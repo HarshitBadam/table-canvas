@@ -1,10 +1,11 @@
 /**
- * Lineage Mini Map Component
+ * Data Flow Section Component
  * 
- * Shows a simplified visual of table relationships.
+ * Shows a simplified visual of table relationships with clear legend.
+ * Collapsible to reduce visual clutter.
  */
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { LineageNode, LineageEdge } from '../useDashboardData'
 
 interface LineageMiniMapProps {
@@ -14,53 +15,65 @@ interface LineageMiniMapProps {
 }
 
 export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProps) {
-  // Don't render if no nodes or only 1 node with no edges
-  if (nodes.length === 0 || (nodes.length === 1 && edges.length === 0)) {
-    return null
-  }
+  const [isCollapsed, setIsCollapsed] = useState(false)
 
   // Separate source and derived tables
   const sourceNodes = useMemo(() => nodes.filter(n => n.kind === 'source_table'), [nodes])
   const derivedNodes = useMemo(() => nodes.filter(n => n.kind === 'derived_table'), [nodes])
 
-  // Only show lineage map if there are actual relationships
-  if (derivedNodes.length === 0 && edges.length === 0) {
+  // Don't render if no meaningful lineage to show
+  if (nodes.length === 0 || (derivedNodes.length === 0 && edges.length === 0)) {
     return null
   }
 
   return (
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-semibold text-text-primary">Data Lineage</h3>
-        <span className="text-xs text-text-tertiary">
-          {sourceNodes.length} source{sourceNodes.length !== 1 ? 's' : ''} 
-          {derivedNodes.length > 0 && ` → ${derivedNodes.length} derived`}
-        </span>
-      </div>
-      
-      <div className="bg-surface rounded-xl border border-border p-4 overflow-hidden">
-        <LineageVisualization 
-          nodes={nodes}
-          edges={edges}
-          onNodeClick={onNodeClick}
-        />
-        
-        {/* Legend */}
-        <div className="flex items-center gap-4 mt-4 pt-3 border-t border-border">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-node-source-border" />
-            <span className="text-xs text-text-tertiary">Source Table</span>
+    <div className="bg-surface rounded-xl border border-border">
+      {/* Section Header - Clickable to collapse */}
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-surface-secondary/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-text-primary">Data Flow</h3>
+          <span className="text-xs text-text-tertiary">
+            {sourceNodes.length} source{sourceNodes.length !== 1 ? 's' : ''} → {derivedNodes.length} derived
+          </span>
+        </div>
+        <svg 
+          className={`w-4 h-4 text-text-tertiary transition-transform ${isCollapsed ? '' : 'rotate-180'}`} 
+          fill="none" 
+          viewBox="0 0 24 24" 
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Collapsible Content */}
+      {!isCollapsed && (
+        <div className="border-t border-border">
+          {/* Inline Legend */}
+          <div className="px-4 py-2 bg-surface-secondary/30 flex items-center gap-4 text-xs text-text-tertiary">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-node-source-border" />
+              <span>Source (imported data)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-node-derived-border" />
+              <span>Derived (from transforms)</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-node-derived-border" />
-            <span className="text-xs text-text-tertiary">Derived Table</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-0.5 bg-border" />
-            <span className="text-xs text-text-tertiary">Transform</span>
+
+          {/* Visualization */}
+          <div className="p-4">
+            <LineageVisualization 
+              nodes={nodes}
+              edges={edges}
+              onNodeClick={onNodeClick}
+            />
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -127,7 +140,7 @@ function LineageVisualization({
   const nodePositions = useMemo(() => {
     const positions: Map<string, { x: number; y: number }> = new Map()
     const containerWidth = 100 // percentage
-    const layerHeight = 80 // pixels
+    const layerHeight = 70 // pixels
     
     layout.layerGroups.forEach((layerNodes, layerIdx) => {
       const nodeWidth = containerWidth / (layerNodes.length + 1)
@@ -135,7 +148,7 @@ function LineageVisualization({
       layerNodes.forEach((node, nodeIdx) => {
         positions.set(node.id, {
           x: nodeWidth * (nodeIdx + 1),
-          y: layerIdx * layerHeight + 20,
+          y: layerIdx * layerHeight + 16,
         })
       })
     })
@@ -143,12 +156,12 @@ function LineageVisualization({
     return positions
   }, [layout])
 
-  const containerHeight = (layout.maxLayer + 1) * 80 + 40
+  const containerHeight = (layout.maxLayer + 1) * 70 + 32
 
   return (
     <div 
       className="relative" 
-      style={{ height: `${Math.min(containerHeight, 300)}px` }}
+      style={{ height: `${Math.min(containerHeight, 250)}px` }}
     >
       {/* Edges (SVG) */}
       <svg 
@@ -161,15 +174,13 @@ function LineageVisualization({
           
           if (!fromPos || !toPos) return null
           
-          // Convert percentages to actual positions
-          // We'll use a viewBox trick to make this work
           return (
             <line
               key={edge.id}
               x1={`${fromPos.x}%`}
-              y1={fromPos.y + 16}
+              y1={fromPos.y + 14}
               x2={`${toPos.x}%`}
-              y2={toPos.y}
+              y2={toPos.y - 2}
               stroke="currentColor"
               strokeWidth={1.5}
               className="text-border"
@@ -206,9 +217,9 @@ function LineageVisualization({
             onClick={() => onNodeClick(node.id)}
             className={`
               absolute transform -translate-x-1/2
-              px-3 py-1.5 rounded-lg border text-xs font-medium
+              px-3 py-1 rounded-lg border text-xs font-medium
               transition-all hover:scale-105 hover:shadow-md
-              max-w-[120px] truncate
+              max-w-[110px] truncate
               ${node.kind === 'source_table'
                 ? 'bg-node-source border-node-source-border text-node-source-border hover:bg-node-source/80'
                 : 'bg-node-derived border-node-derived-border text-node-derived-border hover:bg-node-derived/80'
