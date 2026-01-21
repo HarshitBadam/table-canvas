@@ -86,7 +86,7 @@ export function QuickActionsSection({
     return (
       <div className="bg-surface rounded-xl border border-border">
         <div className="px-4 py-3 border-b border-border">
-          <h3 className="text-sm font-semibold text-text-primary">What To Do Next</h3>
+          <h3 className="text-sm font-semibold text-text-primary">Suggested Actions</h3>
         </div>
         <div className="p-4 space-y-3">
           {[1, 2, 3].map((i) => (
@@ -109,7 +109,7 @@ export function QuickActionsSection({
     return (
       <div className="bg-surface rounded-xl border border-border">
         <div className="px-4 py-3 border-b border-border">
-          <h3 className="text-sm font-semibold text-text-primary">What To Do Next</h3>
+          <h3 className="text-sm font-semibold text-text-primary">Suggested Actions</h3>
         </div>
         <div className="p-4">
           <p className="text-sm text-text-tertiary">
@@ -124,7 +124,7 @@ export function QuickActionsSection({
     <div className="bg-surface rounded-xl border border-border">
       {/* Section Header */}
       <div className="px-4 py-3 border-b border-border">
-        <h3 className="text-sm font-semibold text-text-primary">What To Do Next</h3>
+        <h3 className="text-sm font-semibold text-text-primary">Suggested Actions</h3>
       </div>
 
       {/* Suggestions List */}

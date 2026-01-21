@@ -2,13 +2,14 @@
  * Dashboard Components Index
  */
 
-// Keep old components for backward compatibility (can be removed later)
+// V3 Components
+export { LineageMiniMap } from './LineageMiniMap'
+export { TableStatsSection } from './TableStatsSection'
+export { QuickActionsSection } from './QuickActionsSection'
+
+// Legacy components (kept for potential future use)
 export { HealthScoreHero } from './HealthScoreHero'
 export { DataQualitySection } from './DataQualitySection'
-
-// New UX-improved components
 export { TablesListSection } from './TablesListSection'
 export { DataHealthPanel } from './DataHealthPanel'
 export { KeyInsightsSection } from './KeyInsightsSection'
-export { QuickActionsSection } from './QuickActionsSection'
-export { LineageMiniMap } from './LineageMiniMap'
