@@ -148,7 +148,7 @@ export function useNodeIds(): string[] {
 /**
  * Select schema for a table node.
  */
-export function useTableSchema(tableId: string): { columns: ColumnSchema[]; rowCount: number } | undefined {
+export function useTableSchema(tableId: string): { columns: ColumnSchema[]; rowCount?: number } | undefined {
   return useProjectStore(state => {
     const node = state.nodes[tableId]
     if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {

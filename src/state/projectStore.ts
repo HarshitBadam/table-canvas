@@ -23,7 +23,7 @@ import {
 
 export const useProjectStore = create<ProjectStoreState>()(
   immer((...args) => {
-    const [set, get] = args
+    // Note: set and get are available via args and passed to slices
     
     return {
       // Project metadata

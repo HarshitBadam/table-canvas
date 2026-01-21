@@ -102,7 +102,7 @@ export function isGroupableCategory(col: ColumnSchema, profile?: ColumnProfile):
  * Classify a numeric column as continuous or discrete.
  */
 export function classifyNumericColumn(
-  col: ColumnSchema,
+  _col: ColumnSchema,
   profile: ColumnProfile | undefined,
   rowCount: number
 ): ColumnClassification {

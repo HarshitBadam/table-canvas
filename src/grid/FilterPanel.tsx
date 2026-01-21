@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import { CellValue, ColumnSchema, FilterCondition, FilterOperator, ColumnType } from '@/lib/types'
+import { CellValue, ColumnSchema, FilterCondition, FilterOperator } from '@/lib/types'
 import {
   GridFilterConfig,
   FilterColumnType,
@@ -512,7 +512,7 @@ function StringInput({
 interface FilterCardProps {
   condition: FilterConditionWithId
   index: number
-  column: ColumnSchema | undefined
+  column?: ColumnSchema
   filterType: FilterColumnType
   uniqueValues: CellValue[]
   operators: FilterOperator[]
@@ -526,7 +526,6 @@ interface FilterCardProps {
 function DateFilterCard({
   condition,
   index,
-  column,
   operators,
   onUpdate,
   onRemove,
@@ -693,14 +692,14 @@ function NumberFilterCard({
           <div className="w-full">
             {isBetween ? (
               <NumberRangeInput
-                startValue={condition.value ?? ''}
-                endValue={condition.value2 ?? ''}
+                startValue={typeof condition.value === 'boolean' ? '' : (condition.value ?? '')}
+                endValue={typeof condition.value2 === 'boolean' ? '' : (condition.value2 ?? '')}
                 onStartChange={(val) => onUpdate({ value: val ? Number(val) : '' })}
                 onEndChange={(val) => onUpdate({ value2: val ? Number(val) : undefined })}
               />
             ) : (
               <NumberInput
-                value={condition.value ?? ''}
+                value={typeof condition.value === 'boolean' ? '' : (condition.value ?? '')}
                 onChange={(val) => onUpdate({ value: val ? Number(val) : '' })}
               />
             )}

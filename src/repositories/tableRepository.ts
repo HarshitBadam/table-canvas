@@ -343,9 +343,11 @@ export async function createTableRepository(): Promise<ITableRepository> {
       const result = await engine.getProfile(id)
       // Convert ProfileResult to TableProfile format
       return {
+        tableId: id,
         rowCount: result.rowCount,
         columns: result.columns,
         computedAt: result.computedAt,
+        phase: 1 as const,
       }
     },
     async aggregate(id, groupBy, aggregations) {

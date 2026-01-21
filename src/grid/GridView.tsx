@@ -311,12 +311,14 @@ export function GridView({ tableId }: GridViewProps) {
   const getColumnInsertionIndex = useCallback((): number => {
     if (!selection) return columns.length // No selection = end
     switch (selection.type) {
-      case 'cell':
+      case 'cell': {
         const cellColIdx = columns.findIndex(c => c.id === selection.columnId)
         return cellColIdx >= 0 ? cellColIdx + 1 : columns.length // Right of selected cell
-      case 'column':
+      }
+      case 'column': {
         const colIdx = columns.findIndex(c => c.id === selection.columnId)
         return colIdx >= 0 ? colIdx + 1 : columns.length // Right of selected column
+      }
       case 'index-column':
       case 'corner':
       case 'row':
@@ -961,12 +963,14 @@ export function GridView({ tableId }: GridViewProps) {
     const truncateName = (name: string, maxLen = 12) => 
       name.length > maxLen ? name.slice(0, maxLen) + '…' : name
     switch (selection.type) {
-      case 'cell':
+      case 'cell': {
         const cellCol = columns.find(c => c.id === selection.columnId)
         return cellCol ? `after ${truncateName(cellCol.name)}` : 'at end'
-      case 'column':
+      }
+      case 'column': {
         const col = columns.find(c => c.id === selection.columnId)
         return col ? `after ${truncateName(col.name)}` : 'at end'
+      }
       case 'index-column':
       case 'corner':
       case 'row':

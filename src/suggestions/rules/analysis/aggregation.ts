@@ -83,13 +83,13 @@ export const groupByAggregationRule: SuggestionRule = {
       action: {
         kind: 'createDerivedTable',
         transform: {
-          type: 'aggregate',
+          type: 'group_summarize',
           sourceTableId: ctx.tableId,
-          groupBy: [groupCol.id],
+          groupByColumns: [groupCol.id],
           aggregations: [
-            { columnId: valueCol.id, function: 'SUM', alias: `total_${valueCol.name}` },
-            { columnId: valueCol.id, function: 'AVG', alias: `avg_${valueCol.name}` },
-            { columnId: '*', function: 'COUNT', alias: 'count' },
+            { columnId: valueCol.id, operation: 'sum', alias: `total_${valueCol.name}` },
+            { columnId: valueCol.id, operation: 'avg', alias: `avg_${valueCol.name}` },
+            { columnId: valueCol.id, operation: 'count', alias: 'count' },
           ],
         },
         tableName: `${ctx.tableName} by ${groupCol.name}`,
@@ -151,11 +151,11 @@ export const countByCategoryRule: SuggestionRule = {
     action: {
       kind: 'createDerivedTable',
       transform: {
-        type: 'aggregate',
+        type: 'group_summarize',
         sourceTableId: ctx.tableId,
-        groupBy: [meta.column!.id],
+        groupByColumns: [meta.column!.id],
         aggregations: [
-          { columnId: '*', function: 'COUNT', alias: 'count' },
+          { columnId: meta.column!.id, operation: 'count', alias: 'count' },
         ],
       },
       tableName: `Count by ${meta.column!.name}`,

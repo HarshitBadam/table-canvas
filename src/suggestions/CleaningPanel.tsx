@@ -52,7 +52,7 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
     if (!tableData?.rows) return []
 
     // Merge tableData.rows with patches to get current actual values
-    let rows = tableData.rows
+    const rows = tableData.rows
       .filter(row => !patches?.deletedRows?.has(row.__rowId))
       .map(row => {
         const patchedRow = { ...row }
@@ -160,7 +160,7 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       const allHighlights: string[] = []
       
       // Build merged rows for scanning
-      let mergedRows = tableData.rows
+      const mergedRows = tableData.rows
         .filter(row => !patches?.deletedRows?.has(row.__rowId))
         .map(row => {
           const patchedRow = { ...row }

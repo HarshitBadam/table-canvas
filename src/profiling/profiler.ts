@@ -17,9 +17,9 @@ const PATTERNS = {
   percentage: /^\d+\.?\d*%$/,
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
   url: /^https?:\/\/[^\s]+$/,
-  phone: /^[\d\-\+\(\)\s]+$/,
+  phone: /^[\d\-+()s]+$/,
   zipcode: /^\d{5}(-\d{4})?$/,
-  date: /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/,
+  date: /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/,
 }
 
 /**
@@ -211,7 +211,7 @@ export const useProfilingStore = create<ProfilingState>((set, get) => ({
  * This is needed when tables are restored from persistence but not yet in DuckDB
  * @param force - If true, always reload data into DuckDB even if it exists
  */
-async function ensureTableInEngine(tableId: string, force: boolean = false): Promise<boolean> {
+async function ensureTableInEngine(tableId: string, _force: boolean = false): Promise<boolean> {
   try {
     const tableData = useDataStore.getState().tableData[tableId]
     const node = useProjectStore.getState().getTableNode(tableId)
