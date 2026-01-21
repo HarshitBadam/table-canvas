@@ -440,32 +440,49 @@ async function computeDerivedTable(tableId: string): Promise<MaterializationResu
     // Execute the transform
     const result = await engine.executeTransform(node.plan.transformDef, tableId)
     
-    // Update schema if changed, with proper column name mapping
+    // Update schema if changed, with proper column ID mapping
     if (result.schema) {
-      // Build a column ID to name mapping from upstream source tables
-      const columnNameMap = new Map<string, string>()
+      // Build mappings from upstream tables:
+      // - nameToId: human-readable name -> original column ID (e.g., "Date" -> "col_5_date")
+      // - idToName: original column ID -> human-readable name (e.g., "col_5_date" -> "Date")
+      const nameToId = new Map<string, string>()
+      const idToName = new Map<string, string>()
       
       for (const upstreamId of node.plan.upstreamNodeIds) {
         const upstreamNode = projectStore.getTableNode(upstreamId)
         if (upstreamNode?.schema?.columns) {
           for (const col of upstreamNode.schema.columns) {
-            // Map column ID to its human-readable name
-            columnNameMap.set(col.id, col.name)
+            // Map both directions for lookups
+            nameToId.set(col.name, col.id)
+            idToName.set(col.id, col.name)
+            // Also map by lowercase for case-insensitive matching
+            nameToId.set(col.name.toLowerCase(), col.id)
           }
         }
       }
       
-      // Update schema columns with proper names
-      const schemaWithNames = {
+      // Update schema columns with proper IDs preserved from upstream
+      // DuckDB returns human-readable names, we need to map back to original IDs
+      const schemaWithIds = {
         ...result.schema,
-        columns: result.schema.columns.map(col => ({
-          ...col,
-          // Use the mapped name if available, otherwise use the existing name
-          name: columnNameMap.get(col.id) || col.name,
-        })),
+        columns: result.schema.columns.map(col => {
+          // col.id and col.name from DuckDB are the same (human-readable name like "Date")
+          const duckDbColName = col.id
+          
+          // Find the original column ID from upstream tables
+          const originalId = nameToId.get(duckDbColName) || nameToId.get(duckDbColName.toLowerCase())
+          
+          return {
+            ...col,
+            // Preserve original column ID if found, otherwise keep DuckDB name
+            id: originalId || duckDbColName,
+            // Name stays as the human-readable name
+            name: duckDbColName,
+          }
+        }),
       }
       
-      projectStore.updateTableSchema(tableId, schemaWithNames)
+      projectStore.updateTableSchema(tableId, schemaWithIds)
     }
     
     // Fetch ALL data from DuckDB (not just preview) and store in dataStore

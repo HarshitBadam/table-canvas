@@ -209,15 +209,28 @@ export const useProfilingStore = create<ProfilingState>((set, get) => ({
 /**
  * Ensure table data is loaded into the engine before profiling
  * This is needed when tables are restored from persistence but not yet in DuckDB
+ * For derived tables, this will trigger materialization first.
  * @param force - If true, always reload data into DuckDB even if it exists
  */
 async function ensureTableInEngine(tableId: string, _force: boolean = false): Promise<boolean> {
   try {
-    const tableData = useDataStore.getState().tableData[tableId]
     const node = useProjectStore.getState().getTableNode(tableId)
+    if (!node) return false
     
+    // For derived tables, use materialization service to compute the table
+    if (node.kind === 'derived_table') {
+      const { ensureTableMaterialized } = await import('@/engine/materializationService')
+      const result = await ensureTableMaterialized(tableId)
+      return result.status !== 'error'
+    }
+    
+    // For source tables, load from dataStore
+    const tableData = useDataStore.getState().tableData[tableId]
     if (!tableData?.rows || !node?.schema) {
-      return false
+      // Try materialization for source tables too if data not in store
+      const { ensureTableMaterialized } = await import('@/engine/materializationService')
+      const result = await ensureTableMaterialized(tableId)
+      return result.status !== 'error'
     }
     
     // Load the table into DuckDB engine (always reload if force=true)
@@ -226,7 +239,8 @@ async function ensureTableInEngine(tableId: string, _force: boolean = false): Pr
     const engine = getEngine()
     await engine.loadTable(tableId, node.schema, tableData.rows, patches)
     return true
-  } catch {
+  } catch (err) {
+    console.error('[Profiler] ensureTableInEngine failed:', tableId, err)
     return false
   }
 }
