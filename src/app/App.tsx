@@ -10,6 +10,7 @@ import { useApp, useAppAuth } from '@/state/AppContext'
 import { LoginPage } from '@/auth/LoginPage'
 import { EarlyAccessPage } from '@/auth/EarlyAccessPage'
 import { LoadingScreen } from '@/components/LoadingScreen'
+import { ErrorBoundary } from '@/design/components'
 import type { ChartNode } from '@/lib/types'
 
 export type ViewMode = 'canvas' | 'grid' | 'chart' | 'dashboard'
@@ -54,26 +55,28 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route
-        path="/login"
-        element={
-          isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
-        }
-      />
-      <Route
-        path="/early-access"
-        element={
-          isAuthenticated ? <Navigate to="/" replace /> : <EarlyAccessPage />
-        }
-      />
-      <Route
-        path="/*"
-        element={
-          isAuthenticated ? <MainApp /> : <Navigate to="/login" replace />
-        }
-      />
-    </Routes>
+    <ErrorBoundary name="App">
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
+          }
+        />
+        <Route
+          path="/early-access"
+          element={
+            isAuthenticated ? <Navigate to="/" replace /> : <EarlyAccessPage />
+          }
+        />
+        <Route
+          path="/*"
+          element={
+            isAuthenticated ? <MainApp /> : <Navigate to="/login" replace />
+          }
+        />
+      </Routes>
+    </ErrorBoundary>
   )
 }
 
@@ -254,19 +257,27 @@ function MainApp() {
           </div>
         </header>
 
-        {/* Main Content */}
+        {/* Main Content - Wrapped with Error Boundaries */}
         <div className="flex-1 overflow-hidden">
           {viewMode === 'canvas' && (
-            <CanvasView onNodeDoubleClick={handleNodeDoubleClick} />
+            <ErrorBoundary name="CanvasView">
+              <CanvasView onNodeDoubleClick={handleNodeDoubleClick} />
+            </ErrorBoundary>
           )}
           {viewMode === 'grid' && selectedNodeId && (
-            <GridView tableId={selectedNodeId} />
+            <ErrorBoundary name="GridView">
+              <GridView tableId={selectedNodeId} />
+            </ErrorBoundary>
           )}
           {viewMode === 'chart' && selectedNodeId && (
-            <ChartView chartId={selectedNodeId} onNavigateToTable={handleNavigateToTable} />
+            <ErrorBoundary name="ChartView">
+              <ChartView chartId={selectedNodeId} onNavigateToTable={handleNavigateToTable} />
+            </ErrorBoundary>
           )}
           {viewMode === 'dashboard' && (
-            <Dashboard />
+            <ErrorBoundary name="Dashboard">
+              <Dashboard />
+            </ErrorBoundary>
           )}
         </div>
       </main>

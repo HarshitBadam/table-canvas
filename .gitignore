@@ -1,35 +1,67 @@
 # Dependencies
 node_modules/
 
-# Environment files (contain secrets)
-.env
-.env.local
-.env.*.local
-!.env.example
-
-# Seed script (contains credentials)
-server/scripts/seed.ts
-
 # Build outputs
 dist/
+build/
 *.tsbuildinfo
 
-# IDE and editor files
-.vscode/
-.idea/
-.cursor/
-*.swp
-*.swo
-
-# OS files
-.DS_Store
-Thumbs.db
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+*.local
+!.env.example
 
 # Test artifacts
 coverage/
 playwright-report/
 test-results/
+.nyc_output/
 
 # Logs
+logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE and Editor configurations
+.vscode/
+.idea/
+.cursor/
+.cursorrules
+.cursorignore
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# Runtime and cache
+.cache/
+.turbo/
+.parcel-cache/
+*.pid
+*.seed
+*.pid.lock
+
+# TypeScript
+*.tsbuildinfo
+
+# MongoDB local data
+data/db/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp

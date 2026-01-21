@@ -6,6 +6,9 @@ import { IProject, ProjectNode, Edge, SerializedPatches } from '../types/index.j
 // ============================================================================
 
 export interface IProjectDocument extends Omit<IProject, '_id'>, Document {
+  deletedAt: Date | null;
+  
+  // Instance methods
   toPublic(): {
     id: string;
     name: string;
@@ -15,11 +18,16 @@ export interface IProjectDocument extends Omit<IProject, '_id'>, Document {
     createdAt: Date;
     updatedAt: Date;
   };
+  softDelete(): Promise<IProjectDocument>;
+  restore(): Promise<IProjectDocument>;
+  isDeleted(): boolean;
 }
 
 interface IProjectModel extends Model<IProjectDocument> {
   findByUser(userId: string | Types.ObjectId): Promise<IProjectDocument[]>;
   findByIdAndUser(projectId: string, userId: string): Promise<IProjectDocument | null>;
+  findWithDeleted(filter?: mongoose.FilterQuery<IProjectDocument>): Promise<IProjectDocument[]>;
+  findByUserWithDeleted(userId: string | Types.ObjectId): Promise<IProjectDocument[]>;
 }
 
 const ProjectSchema = new Schema<IProjectDocument, IProjectModel>(
@@ -68,6 +76,11 @@ const ProjectSchema = new Schema<IProjectDocument, IProjectModel>(
         message: 'Patches must be an object',
       },
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -81,8 +94,14 @@ const ProjectSchema = new Schema<IProjectDocument, IProjectModel>(
 // Indexes
 // ============================================================================
 
-ProjectSchema.index({ userId: 1, updatedAt: -1 });
+// Primary query pattern: user's active projects sorted by last update
+ProjectSchema.index({ userId: 1, deletedAt: 1, updatedAt: -1 });
+
+// Search by name within user's projects
 ProjectSchema.index({ userId: 1, name: 1 });
+
+// Cleanup jobs: find old deleted projects
+ProjectSchema.index({ deletedAt: 1 }, { sparse: true });
 
 // ============================================================================
 // Instance Methods
@@ -100,16 +119,48 @@ ProjectSchema.methods.toPublic = function () {
   };
 };
 
+/**
+ * Soft delete the project by setting deletedAt timestamp
+ */
+ProjectSchema.methods.softDelete = async function (): Promise<IProjectDocument> {
+  this.deletedAt = new Date();
+  return this.save();
+};
+
+/**
+ * Restore a soft-deleted project by clearing deletedAt
+ */
+ProjectSchema.methods.restore = async function (): Promise<IProjectDocument> {
+  this.deletedAt = null;
+  return this.save();
+};
+
+/**
+ * Check if project is soft-deleted
+ */
+ProjectSchema.methods.isDeleted = function (): boolean {
+  return this.deletedAt !== null;
+};
+
 // ============================================================================
 // Static Methods
 // ============================================================================
 
+/**
+ * Find all active (non-deleted) projects for a user
+ */
 ProjectSchema.statics.findByUser = function (userId: string | Types.ObjectId) {
-  return this.find({ userId })
+  return this.find({ 
+    userId,
+    deletedAt: null,  // Exclude soft-deleted
+  })
     .select('_id name updatedAt createdAt')
     .sort({ updatedAt: -1 });
 };
 
+/**
+ * Find a specific active (non-deleted) project by ID and user
+ */
 ProjectSchema.statics.findByIdAndUser = function (
   projectId: string,
   userId: string
@@ -117,7 +168,28 @@ ProjectSchema.statics.findByIdAndUser = function (
   return this.findOne({
     _id: new Types.ObjectId(projectId),
     userId: new Types.ObjectId(userId),
+    deletedAt: null,  // Exclude soft-deleted
   });
+};
+
+/**
+ * Find all projects including soft-deleted (for admin/recovery)
+ */
+ProjectSchema.statics.findWithDeleted = function (
+  filter: mongoose.FilterQuery<IProjectDocument> = {}
+) {
+  return this.find(filter).sort({ updatedAt: -1 });
+};
+
+/**
+ * Find all projects for a user including soft-deleted
+ */
+ProjectSchema.statics.findByUserWithDeleted = function (
+  userId: string | Types.ObjectId
+) {
+  return this.find({ userId })
+    .select('_id name updatedAt createdAt deletedAt')
+    .sort({ updatedAt: -1 });
 };
 
 // ============================================================================

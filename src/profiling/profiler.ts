@@ -217,31 +217,16 @@ async function ensureTableInEngine(tableId: string, force: boolean = false): Pro
     const node = useProjectStore.getState().getTableNode(tableId)
     
     if (!tableData?.rows || !node?.schema) {
-      console.warn('[Profiler] No data available for table:', tableId, {
-        hasTableData: !!tableData,
-        hasRows: !!tableData?.rows,
-        rowCount: tableData?.rows?.length,
-        hasNode: !!node,
-        hasSchema: !!node?.schema,
-      })
       return false
     }
     
-    console.log('[Profiler] Loading table into engine:', tableId, {
-      rowCount: tableData.rows.length,
-      columnCount: node.schema.columns.length,
-      force,
-    })
-    
     // Load the table into DuckDB engine (always reload if force=true)
-    // IMPORTANT: Get patches so profiler sees the same data as the UI
+    // Get patches so profiler sees the same data as the UI
     const patches = useProjectStore.getState().patches[tableId]
     const engine = getEngine()
     await engine.loadTable(tableId, node.schema, tableData.rows, patches)
-    console.log('[Profiler] Successfully loaded table into engine:', tableId)
     return true
-  } catch (error) {
-    console.error('[Profiler] Failed to load table into engine:', error)
+  } catch {
     return false
   }
 }
@@ -265,40 +250,29 @@ export function useProfile(tableId: string | null) {
     const currentProfile = store.profiles[tableId]
     
     if (currentLoading || currentProfile) {
-      console.log('[Profiler] Skipping - already loading or has profile:', { tableId, currentLoading, hasProfile: !!currentProfile })
       return
     }
     
-    console.log('[Profiler] Starting profile load for:', tableId)
     setLoading(tableId, true)
     
     try {
-      // Ensure table is in DuckDB first
       const loaded = await ensureTableInEngine(tableId)
       if (!loaded) {
-        console.warn('[Profiler] Could not load table into engine, skipping profiling')
         setLoading(tableId, false)
         return
       }
       
-      // Phase 1 first
-      console.log('[Profiler] Running Phase 1 profiling...')
+      // Phase 1 profiling
       const phase1 = await runPhase1Profiling(tableId)
       const enrichedPhase1 = enrichProfileWithSemanticHints(phase1, tableId)
-      console.log('[Profiler] Phase 1 complete:', {
-        rowCount: phase1.rowCount,
-        columnCount: phase1.columns.length,
-      })
       setProfile(tableId, enrichedPhase1)
       
-      // Then Phase 2 in background
+      // Phase 2 in background
       runPhase2Profiling(tableId).then(phase2 => {
-        console.log('[Profiler] Phase 2 complete')
         const enrichedPhase2 = enrichProfileWithSemanticHints(phase2, tableId)
         setProfile(tableId, enrichedPhase2)
-      }).catch(console.error)
-    } catch (error) {
-      console.error('[Profiler] Profiling error:', error)
+      }).catch(() => {})
+    } catch {
       setLoading(tableId, false)
     }
   }, [tableId, setLoading, setProfile])
@@ -377,9 +351,8 @@ export async function loadProfileForTable(tableId: string, force: boolean = fals
     runPhase2Profiling(tableId).then(phase2 => {
       const enrichedPhase2 = enrichProfileWithSemanticHints(phase2, tableId)
       store.setProfile(tableId, enrichedPhase2)
-    }).catch(console.error)
-  } catch (error) {
-    console.error('[Profiler] Error loading profile:', error)
+    }).catch(() => {})
+  } catch {
     store.setLoading(tableId, false)
   }
 }

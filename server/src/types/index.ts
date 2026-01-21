@@ -2,6 +2,25 @@ import { Request } from 'express';
 import { Types } from 'mongoose';
 
 // ============================================================================
+// Base Types
+// ============================================================================
+
+/**
+ * Base interface for soft-deletable entities
+ */
+export interface SoftDeletable {
+  deletedAt: Date | null;
+}
+
+/**
+ * Base interface for timestamped entities
+ */
+export interface Timestamped {
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================================================
 // User Types
 // ============================================================================
 
@@ -72,15 +91,13 @@ export interface SerializedPatches {
   insertedRows: Array<{ rowId: string; values: Record<string, unknown>; insertedAt: number }>;
 }
 
-export interface IProject {
+export interface IProject extends SoftDeletable, Timestamped {
   _id: Types.ObjectId;
   userId: Types.ObjectId;
   name: string;
   nodes: Record<string, ProjectNode>;
   edges: Record<string, Edge>;
   patches: Record<string, SerializedPatches>;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface IProjectPublic {
@@ -91,6 +108,45 @@ export interface IProjectPublic {
   patches: Record<string, SerializedPatches>;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// ============================================================================
+// File Types
+// ============================================================================
+
+export interface IFile extends SoftDeletable, Timestamped {
+  _id: Types.ObjectId;
+  gridFsId: Types.ObjectId;
+  userId: Types.ObjectId;
+  projectId?: Types.ObjectId;
+  filename: string;
+  originalName: string;
+  contentType: string;
+  size: number;
+}
+
+export interface IFilePublic {
+  id: string;
+  filename: string;
+  originalName: string;
+  contentType: string;
+  size: number;
+  projectId?: string;
+  createdAt: Date;
+}
+
+export interface FileMetadata {
+  originalName: string;
+  projectId?: string;
+  userId: string;
+}
+
+export interface UploadedFile {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  uploadDate: Date;
 }
 
 // ============================================================================
@@ -132,19 +188,22 @@ export interface RegisterResponse {
 }
 
 // ============================================================================
-// File Types
+// Pagination Types
 // ============================================================================
 
-export interface FileMetadata {
-  originalName: string;
-  projectId?: string;
-  userId: string;
+export interface PaginationOptions {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
-export interface UploadedFile {
-  id: string;
-  filename: string;
-  contentType: string;
-  size: number;
-  uploadDate: Date;
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
 }

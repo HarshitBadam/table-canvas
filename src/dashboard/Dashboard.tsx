@@ -7,7 +7,7 @@ import { useState, useRef, useMemo } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
 import { ChartRenderer } from '@/charts/ChartRenderer'
-import type { ChartNode, DashboardCard, CellValue, TableNode } from '@/lib/types'
+import type { ChartNode, DashboardCard, CellValue, TableNode, ProjectNode } from '@/lib/types'
 
 interface DashboardProps {
   dashboardId?: string // Reserved for future use
@@ -26,12 +26,13 @@ export function Dashboard({ dashboardId: _dashboardId }: DashboardProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Get all chart nodes
-  const chartNodes = Object.values(nodes).filter(
+  const allNodes = Object.values(nodes) as ProjectNode[]
+  const chartNodes = allNodes.filter(
     (n): n is ChartNode => n.kind === 'chart'
   )
   
   // Get all table nodes
-  const tableNodes = Object.values(nodes).filter(
+  const tableNodes = allNodes.filter(
     (n): n is TableNode => n.kind === 'source_table' || n.kind === 'derived_table'
   )
   

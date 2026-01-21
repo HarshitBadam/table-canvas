@@ -1,6 +1,6 @@
 # Table Canvas User Guide
 
-Welcome to Table Canvas! This guide will help you get started with importing data, creating analyses, and building dashboards.
+This guide covers importing data, creating analyses, and building dashboards in Table Canvas.
 
 ---
 
@@ -21,101 +21,90 @@ Welcome to Table Canvas! This guide will help you get started with importing dat
 
 ## Getting Started
 
-### Starting the Application
+### Running the Application
 
-1. Open your terminal
-2. Navigate to the project folder
-3. Run `npm run dev`
-4. Open http://localhost:5173 in your browser
+```bash
+npm run dev
+# Open http://localhost:5173
+```
 
 ### Interface Overview
 
-The interface has three main areas:
-
-- **Sidebar (left)**: Import data, create new tables, view table list
-- **Canvas (center)**: Visual view of your data tables and their relationships
-- **Grid View**: Opens when you double-click a table to view/edit data
+- **Sidebar (left)** — Import data, create new tables, view table list
+- **Canvas (center)** — Visual view of your data tables and their relationships
+- **Grid View** — Opens when you double-click a table to view/edit data
 
 ---
 
 ## Importing Data
 
-### Importing CSV Files
+### CSV Files
 
-1. Click **"Import Data"** in the left sidebar
-2. Select a `.csv` file from your computer
-3. The file will be parsed and appear as a new table on the canvas
+1. Click **Import Data** in the sidebar
+2. Select a `.csv` file
+3. The table appears on the canvas
 
-### Importing Excel Files
+### Excel Files
 
-1. Click **"Import Data"** in the left sidebar
+1. Click **Import Data** in the sidebar
 2. Select an `.xlsx` or `.xls` file
-3. If the file has multiple sheets:
-   - A dialog will appear showing all sheets
-   - Check the sheets you want to import
-   - Click **"Import X Sheet(s)"**
-4. Each selected sheet becomes a separate table on the canvas
+3. If the file has multiple sheets, select which ones to import
+4. Each selected sheet becomes a separate table
 
-### Creating a Blank Table
+### Blank Tables
 
-1. Click **"New Table"** in the left sidebar
-2. A new empty table will appear on the canvas
-3. Double-click to open in Grid View and add data
+1. Click **New Table** in the sidebar
+2. Double-click to open in Grid View and add data
 
 ---
 
 ## Working with the Canvas
 
-### Navigating the Canvas
+### Navigation
 
-- **Pan**: Click and drag on empty space
-- **Zoom**: Use scroll wheel or pinch gesture
-- **Select**: Click on a table node
-- **Move**: Drag a table node to reposition it
+| Action | How |
+|--------|-----|
+| Pan | Click and drag on empty space |
+| Zoom | Scroll wheel or pinch gesture |
+| Select | Click on a table node |
+| Move | Drag a table node |
 
-### Understanding Table Nodes
+### Table Nodes
 
-Each table node shows:
-- **Name**: The table name at the top
-- **Stats**: Row and column counts
-- **Columns**: First 4 column names with their types
-- **Badge**: "Source" (imported/created) or "Derived" (from transform)
+Each node displays:
+- **Name** — Table name at the top
+- **Stats** — Row and column counts
+- **Columns** — First 4 column names with types
+- **Badge** — "Source" (imported) or "Derived" (from transform)
 
-### Opening a Table
-
-**Double-click** any table node to open it in Grid View.
+**Double-click** any table to open it in Grid View.
 
 ---
 
 ## Editing Data in Grid View
 
-### Opening Grid View
-
-Double-click a table on the canvas to open it in Grid View.
-
-### Navigating the Grid
+### Navigation
 
 | Action | How |
 |--------|-----|
 | Move between cells | Arrow keys |
-| Select a cell | Click on it |
-| Select a column | Click the column header |
+| Select a cell | Click |
+| Select a column | Click the header |
 | Scroll | Mouse wheel or trackpad |
 
-### Editing Cells (Source Tables Only)
+### Editing Cells
 
-Source tables (imported or created) can be edited. Derived tables are read-only.
+Source tables can be edited. Derived tables are read-only.
 
-1. **Select** a cell by clicking on it
-2. **Press Enter** or **double-click** to start editing
-3. **Type** your new value
-4. **Press Enter** to save, or **Escape** to cancel
-5. **Press Tab** to save and move to the next cell
+1. Select a cell
+2. Press **Enter** or double-click to edit
+3. Type the new value
+4. Press **Enter** to save, **Escape** to cancel, **Tab** to save and move right
 
 ### Undo/Redo
 
-- **Undo**: `Cmd+Z` (Mac) or `Ctrl+Z` (Windows)
-- **Redo**: `Cmd+Shift+Z` or `Cmd+Y`
+- **Undo**: `Cmd+Z` (Mac) / `Ctrl+Z` (Windows)
+- **Redo**: `Cmd+Shift+Z` / `Cmd+Y`
 
 ---
 
@@ -123,19 +112,15 @@ Source tables (imported or created) can be edited. Derived tables are read-only.
 
 ### Creating a Join
 
-1. On the canvas, find the **connection handle** (small blue dot) on the right side of a table
-2. **Drag** from this handle to another table
-3. A **Transform Modal** will appear
-4. Select **"Join"** as the transform type
-5. Choose:
-   - **Join Type**: Left, Inner, Right, or Full
-   - **Left Key**: Column from the first table
-   - **Right Key**: Column from the second table
-6. Review the **suggested keys** (ranked by match confidence)
-7. Check the **preview** for estimated rows and warnings
-8. Click **"Create Table"**
+1. Find the **connection handle** (blue dot) on the right side of a table
+2. Drag from this handle to another table
+3. In the Transform Modal, select **Join**
+4. Choose join type, left key, and right key
+5. Review suggested keys (ranked by match confidence)
+6. Check the preview for estimated rows and warnings
+7. Click **Create Table**
 
-### Join Types Explained
+### Join Types
 
 | Type | Result |
 |------|--------|
@@ -151,23 +136,23 @@ Source tables (imported or created) can be edited. Derived tables are read-only.
 ### Accessing Suggestions
 
 1. Open a table in Grid View
-2. Click the **"Suggestions"** button in the toolbar
+2. Click **Suggestions** in the toolbar
 
-### Types of Suggestions
+### Suggestion Categories
 
-**Cleaning Suggestions**
+**Cleaning**
 - Fill missing values
 - Convert data types
 - Trim whitespace
 - Remove duplicates
 
-**Analysis Suggestions**
+**Analysis**
 - Sum by category
 - Trend over time
 - Top contributors
 - Distribution analysis
 
-**Recipe Suggestions**
+**Recipes**
 - Variance analysis (actual vs budget)
 - Trend analysis
 - Category contribution (Pareto)
@@ -175,168 +160,116 @@ Source tables (imported or created) can be edited. Derived tables are read-only.
 
 ### Applying a Suggestion
 
-1. Click on a suggestion card to expand it
+1. Click a suggestion card to expand it
 2. Review the preview and explanation
-3. Click **"Apply"** to execute the suggestion
+3. Click **Apply**
 
 ---
 
 ## Creating Charts
 
-### From the Canvas
+### Chart Types
 
-1. Right-click on a table node (coming soon)
-2. Or use the Suggestions panel to create charts
+| Type | Use Case |
+|------|----------|
+| Bar | Compare categories |
+| Line | Show trends over time |
+| Pie | Show composition/proportions |
+| Scatter | Show correlations |
 
-### Chart Types Available
+### Configuration
 
-- **Bar Chart**: Compare categories
-- **Line Chart**: Show trends over time
-- **Pie Chart**: Show composition/proportions
-- **Scatter Chart**: Show correlations
-
-### Configuring a Chart
-
-1. Select **Data Source**: Which table to visualize
-2. Choose **Chart Type**: Bar, Line, Pie, or Scatter
-3. Set **X Axis**: Category or time dimension
-4. Set **Y Axis**: Numeric value to display
-5. Choose **Aggregation**: Sum, Average, Count, Min, Max
-6. Optionally set **Group By** for multiple series
+1. Select the data source table
+2. Choose chart type
+3. Set X axis (category or time dimension)
+4. Set Y axis (numeric value)
+5. Choose aggregation (Sum, Average, Count, Min, Max)
+6. Optionally set Group By for multiple series
 
 ---
 
 ## Building Dashboards
 
-### Accessing the Dashboard
+### Adding Charts
 
-The Dashboard view is accessible via the Dashboard component. Currently, charts created on the canvas can be added to a dashboard layout.
-
-### Adding Charts to Dashboard
-
-1. First, create charts on your canvas
+1. Create charts on the canvas
 2. Open the Dashboard view
-3. Click **"Add Chart"**
+3. Click **Add Chart**
 4. Select from available charts
-5. Charts appear in a grid layout
 
-### Arranging Charts
-
-- Charts can be positioned in a responsive grid
-- Each chart shows as a card with title and visualization
+Charts appear in a responsive grid layout.
 
 ---
 
 ## Exporting to PDF
 
-### Quick Export
-
 1. Open the Dashboard view
-2. Click **"Export PDF"** button
-3. Use your browser's print dialog
-4. Select "Save as PDF" as the destination
-5. Click Save
+2. Click **Export PDF**
+3. In the browser print dialog, select "Save as PDF"
+4. Click Save
 
-### Print Settings
+### Recommended Print Settings
 
-For best results:
-- Set margins to "Default" or "Minimum"
-- Enable "Background graphics"
-- Choose "Portrait" or "Landscape" based on your dashboard
-
-### What's Included
-
-- All charts in your dashboard
-- Chart titles and legends
-- Clean, professional formatting
-- Consistent typography
+- Margins: Default or Minimum
+- Background graphics: Enabled
+- Orientation: Match your dashboard layout
 
 ---
 
 ## Keyboard Shortcuts
 
-### Global Shortcuts
+### Global
 
 | Shortcut | Action |
 |----------|--------|
 | `Cmd/Ctrl + Z` | Undo |
 | `Cmd/Ctrl + Shift + Z` | Redo |
-| `Cmd/Ctrl + Y` | Redo (alternative) |
 
-### Grid View Shortcuts
+### Grid View
 
 | Shortcut | Action |
 |----------|--------|
-| `↑` `↓` `←` `→` | Navigate cells |
+| Arrow keys | Navigate cells |
 | `Enter` | Edit selected cell |
 | `Escape` | Cancel editing |
 | `Tab` | Save and move to next cell |
-| `Double-click` | Edit cell |
 
-### Canvas Shortcuts
+### Canvas
 
 | Shortcut | Action |
 |----------|--------|
-| `Delete/Backspace` | Delete selected node |
-| `Click + Drag` | Move node |
-| `Scroll` | Zoom in/out |
+| `Delete` / `Backspace` | Delete selected node |
+| Scroll | Zoom in/out |
 
 ---
 
-## Tips & Best Practices
+## Tips
 
 ### Data Import
-- Clean your data before importing for best results
 - Use consistent date formats
-- Remove completely empty rows/columns
+- Remove empty rows/columns before import
 
 ### Joins
-- Start with a Left Join if unsure
+- Start with Left Join if unsure
 - Pay attention to many-to-many warnings
 - Use the suggested keys when available
 
 ### Performance
 - The app handles thousands of rows smoothly
-- Very large files (100k+ rows) may take a moment to profile
-- Use filters to work with subsets of large data
+- Large files (100k+ rows) may take longer to profile
+- Use filters to work with subsets
 
-### Saving Your Work
-- Projects are auto-saved to your browser's storage
-- Export important projects as `.tablecanvas.json` files
-- Re-import project files when needed
+### Saving
+- Projects auto-save to browser storage
+- Export important projects as `.tablecanvas.json`
 
 ---
 
 ## Troubleshooting
 
-### Table won't open in Grid View
-- Make sure you **double-click** (not single click)
-- Single click selects, double-click opens
-
-### Can't edit a cell
-- Check if it's a **Source** table (editable) vs **Derived** table (read-only)
-- Press **Enter** or **double-click** to start editing
-
-### Join not working
-- Ensure both tables have compatible key columns
-- Check for data type mismatches
-
-### Buttons not responding
-- Try refreshing the page
-- Check browser console for errors
-- Ensure you're clicking the button (not the icon)
-
----
-
-## Getting Help
-
-If you encounter issues:
-1. Refresh the page
-2. Check the browser console for errors (`F12` → Console tab)
-3. Try with a smaller dataset to isolate the issue
-4. Review this guide for the correct workflow
-
----
-
-*Table Canvas v1.0.0*
-
+| Issue | Solution |
+|-------|----------|
+| Table won't open | Double-click (not single click) |
+| Can't edit a cell | Check if it's a Source table (Derived tables are read-only) |
+| Join not working | Check for compatible key columns and matching data types |
+| Buttons not responding | Refresh the page |
