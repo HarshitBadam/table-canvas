@@ -7,7 +7,6 @@ import { useState, useMemo } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import type { Suggestion, ColumnSchema, TransformDef } from '@/lib/types'
-import { generateId } from '@/lib/utils'
 
 interface RecipeWizardProps {
   isOpen: boolean
@@ -68,7 +67,7 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
         ],
       }
     },
-    getTableName: (tableName, bindings, columns) => {
+    getTableName: (_tableName, bindings, columns) => {
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const valueName = valueCol?.name || 'Values'
       return `${valueName} Trend`
@@ -96,7 +95,7 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
         ],
       }
     },
-    getTableName: (tableName, bindings, columns) => {
+    getTableName: (_tableName, bindings, columns) => {
       const categoryCol = columns?.find(c => c.id === bindings.categoryColumnId)
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const categoryName = categoryCol?.name || 'Category'
@@ -126,7 +125,7 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
         expression: `("${bindings.actualColumnId}" - "${bindings.budgetColumnId}")`,
       }
     },
-    getTableName: (tableName, bindings, columns) => {
+    getTableName: (_tableName, bindings, columns) => {
       const actualCol = columns?.find(c => c.id === bindings.actualColumnId)
       const budgetCol = columns?.find(c => c.id === bindings.budgetColumnId)
       const actualName = actualCol?.name || 'Actual'
@@ -149,12 +148,9 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
       type: 'join',
       leftTableId: bindings.leftTableId,
       rightTableId: bindings.rightTableId,
-      joinType: 'outer',
-      conditions: [{
-        leftColumn: bindings.leftKeyColumn,
-        rightColumn: bindings.rightKeyColumn,
-        operator: 'equals',
-      }],
+      joinType: 'full',
+      leftKey: bindings.leftKeyColumn,
+      rightKey: bindings.rightKeyColumn,
     }),
     getTableName: () => 'Reconciliation Results',
   },
@@ -188,7 +184,7 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
         ],
       }
     },
-    getTableName: (tableName, bindings, columns) => {
+    getTableName: (_tableName, bindings, columns) => {
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const valueName = valueCol?.name || 'Value'
       const period = bindings.period || 'period'
@@ -209,7 +205,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
   
   // Initialize bindings from suggestion
   const initialBindings = suggestion?.action.kind === 'launchRecipe' 
-    ? suggestion.action.initialBindings ?? {}
+    ? (suggestion.action.initialBindings as Record<string, string> | undefined) ?? {}
     : {}
   
   const [bindings, setBindings] = useState<Record<string, string>>(initialBindings)
@@ -218,7 +214,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
   // Reset bindings when suggestion changes
   useMemo(() => {
     if (suggestion?.action.kind === 'launchRecipe') {
-      setBindings(suggestion.action.initialBindings ?? {})
+      setBindings((suggestion.action.initialBindings as Record<string, string> | undefined) ?? {})
     }
   }, [suggestion])
   

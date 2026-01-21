@@ -93,15 +93,22 @@ export const normalizeCasingRule: SuggestionRule = {
   },
   
   build: (ctx, meta) => {
-    const mappings = getMixedCaseVariants(meta.columnProfile!.topValues!)
-    const variants = Object.keys(mappings)
+    const variantMappings = getMixedCaseVariants(meta.columnProfile!.topValues!)
+    // Convert from { canonical: variants[] } to { variant: canonical } for CleaningOperation
+    const mappings: Record<string, string> = {}
+    for (const [canonical, variants] of Object.entries(variantMappings)) {
+      for (const variant of variants) {
+        mappings[variant] = canonical
+      }
+    }
+    const variantCount = Object.keys(mappings).length
     
     return {
       id: createSuggestionId('normalize_case', ctx.tableId, meta.column?.id),
       category: 'cleaning',
       scope: 'column',
       title: `Normalize casing in "${meta.column!.name}"`,
-      description: `Found ${variants.length} case variant(s): ${variants.slice(0, 3).map(v => `"${v}"`).join(', ')}${variants.length > 3 ? '...' : ''}`,
+      description: `Found ${variantCount} case variant(s): ${Object.keys(mappings).slice(0, 3).map(v => `"${v}"`).join(', ')}${variantCount > 3 ? '...' : ''}`,
       confidence: 'medium',
       context: {
         tableId: ctx.tableId,
@@ -116,7 +123,7 @@ export const normalizeCasingRule: SuggestionRule = {
       ],
       impact: {
         kind: 'derivedTable',
-        summary: `Normalizes ${variants.length} case variant(s) to canonical form`,
+        summary: `Normalizes ${variantCount} case variant(s) to canonical form`,
       },
       action: {
         kind: 'applyPatch',

@@ -115,7 +115,7 @@ function getCleanColumnName(colId: string): string {
 async function buildJoinColumnSelection(
   leftTable: string,
   rightTable: string,
-  leftKey: string,
+  _leftKey: string,
   rightKey: string,
   leftColumns?: string[],
   rightColumns?: string[],
@@ -151,7 +151,6 @@ async function buildJoinColumnSelection(
   // Track clean names to detect conflicts
   const leftNameSet = new Set([...leftCleanNames.values()])
   const rightNameSet = new Set([...rightCleanNames.values()])
-  const hasConflicts = [...rightNameSet].some(name => leftNameSet.has(name))
   
   // Get friendly table prefixes
   const leftPrefix = leftTableName 

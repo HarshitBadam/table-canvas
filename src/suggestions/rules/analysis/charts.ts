@@ -6,7 +6,7 @@
 
 import type { SuggestionRule, AggregationOpportunity } from '../../engine/types'
 import type { ColumnSchema, ColumnProfile } from '@/lib/types'
-import { createSuggestionId, getVersionHash, isAnalyzableNumeric, isGroupableCategory, classifyColumn } from '../helpers'
+import { createSuggestionId, getVersionHash, isAnalyzableNumeric, isGroupableCategory } from '../helpers'
 
 /**
  * Detect aggregation opportunities (numeric + category columns).
@@ -52,7 +52,7 @@ export const barChartRule: SuggestionRule = {
   category: 'analysis',
   scope: 'table',
   
-  when: (ctx, meta) => {
+  when: (_ctx, meta) => {
     const opportunities = detectAggregationOpportunities(meta.schema, meta.profile?.columns)
     return opportunities.length > 0
   },
@@ -89,11 +89,14 @@ export const barChartRule: SuggestionRule = {
       },
       action: {
         kind: 'createChart',
-        chartType: 'bar',
-        config: {
-          xAxis: groupCol.column.id,
-          yAxis: opp.valueColumn.id,
-          aggregation: 'sum',
+        chart: {
+          chartType: 'bar',
+          sourceTableId: ctx.tableId,
+          config: {
+            xAxis: groupCol.column.id,
+            yAxis: opp.valueColumn.id,
+            aggregation: 'sum',
+          },
         },
       },
     }
@@ -117,7 +120,7 @@ export const pieChartRule: SuggestionRule = {
   category: 'analysis',
   scope: 'table',
   
-  when: (ctx, meta) => {
+  when: (_ctx, meta) => {
     const opportunities = detectAggregationOpportunities(meta.schema, meta.profile?.columns)
     if (opportunities.length === 0) return false
     
@@ -158,10 +161,13 @@ export const pieChartRule: SuggestionRule = {
       },
       action: {
         kind: 'createChart',
-        chartType: 'pie',
-        config: {
-          category: groupCol.column.id,
-          value: opp.valueColumn.id,
+        chart: {
+          chartType: 'pie',
+          sourceTableId: ctx.tableId,
+          config: {
+            xAxis: groupCol.column.id,
+            yAxis: opp.valueColumn.id,
+          },
         },
       },
     }

@@ -6,7 +6,7 @@
 
 import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, PatchesSliceState } from './types'
-import type { Patches, CellValue } from '@/types'
+import type { Patches } from '@/types'
 
 /**
  * Create initial empty patches object

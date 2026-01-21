@@ -44,7 +44,7 @@ export function isPlaceholder(value: unknown): boolean {
   if (PLACEHOLDER_VALUES.has(str)) return true
   
   // Check for common patterns
-  if (/^[\-\s\.]+$/.test(str)) return true // Only dashes, spaces, dots
+  if (/^[-\s.]+$/.test(str)) return true // Only dashes, spaces, dots
   if (/^\?+$/.test(str)) return true // Only question marks
   if (/^x+$/i.test(str)) return true // Only x's
   if (/^\d{1,2}\/\d{1,2}\/1900$/.test(str)) return true // Excel epoch dates
@@ -81,7 +81,7 @@ export function findPlaceholders(
       else if (['n/a', 'na', 'n.a.', 'not available', 'not applicable'].includes(strLower)) type = 'not-applicable'
       else if (['missing', 'blank', 'unknown', 'unk'].includes(strLower)) type = 'missing-indicator'
       else if (['tbd', 'tba', 'pending'].includes(strLower)) type = 'pending'
-      else if (/^[\-\.\?x]+$/i.test(strLower)) type = 'symbol'
+      else if (/^[-.?x]+$/i.test(strLower)) type = 'symbol'
       
       placeholders.push({ value: str, count, type })
     }

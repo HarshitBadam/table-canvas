@@ -64,7 +64,7 @@ export const varianceAnalysisRule: SuggestionRule = {
   category: 'recipe',
   scope: 'table',
   
-  when: (ctx, meta) => {
+  when: (_ctx, meta) => {
     const opportunities = detectVarianceOpportunities(meta.schema, meta.profile?.columns)
     return opportunities.length > 0
   },
@@ -102,14 +102,14 @@ export const varianceAnalysisRule: SuggestionRule = {
       action: {
         kind: 'createDerivedTable',
         transform: {
-          type: 'aggregate',
+          type: 'group_summarize',
           sourceTableId: ctx.tableId,
-          groupBy: [opp.groupColumn.id],
+          groupByColumns: [opp.groupColumn.id],
           aggregations: [
-            { columnId: opp.valueColumn.id, function: 'AVG', alias: 'mean' },
-            { columnId: opp.valueColumn.id, function: 'MIN', alias: 'min' },
-            { columnId: opp.valueColumn.id, function: 'MAX', alias: 'max' },
-            { columnId: '*', function: 'COUNT', alias: 'count' },
+            { columnId: opp.valueColumn.id, operation: 'avg', alias: 'mean' },
+            { columnId: opp.valueColumn.id, operation: 'min', alias: 'min' },
+            { columnId: opp.valueColumn.id, operation: 'max', alias: 'max' },
+            { columnId: opp.valueColumn.id, operation: 'count', alias: 'count' },
           ],
         },
         tableName: `${opp.valueColumn.name} Variance by ${opp.groupColumn.name}`,

@@ -38,11 +38,12 @@ function getNodeHeight(node: Node): number {
   const columnCount = node.data?.schema?.columns?.length || 4
   
   switch (viewMode) {
-    case 'stats': 
+    case 'stats': {
       // Stats view height depends on number of columns
       // Header (~100px) + each column card (~85px) + padding
       const statsHeight = BASE_HEIGHTS.stats + (Math.min(columnCount, 6) * STATS_PER_COLUMN_HEIGHT)
       return Math.min(statsHeight, 600) // Cap at 600px
+    }
     case 'data': 
       return BASE_HEIGHTS.data
     default: 

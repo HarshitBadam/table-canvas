@@ -7,8 +7,7 @@
 import type { Suggestion, TransformDef } from '@/lib/types';
 import { 
   SuggestionEngineContext, 
-  MetadataBundle, 
-  getRules,
+  MetadataBundle,
   getTableRules,
   getColumnRules,
 } from './registry';

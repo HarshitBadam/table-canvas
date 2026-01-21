@@ -2,26 +2,20 @@
  * Main Stylesheet
  * 
  * Imports all CSS modules in the correct order:
- * 1. Tailwind base/components/utilities
- * 2. Base styles (reset, variables, typography)
- * 3. Component styles (buttons, inputs, cards)
- * 4. Utility styles (animations, helpers)
- * 5. Vendor overrides (React Flow)
- * 6. Print styles
+ * 1. CSS imports (must come first)
+ * 2. Tailwind base/components/utilities
+ * 
+ * Note: @import must precede all other statements except @charset
  */
+
+/* CSS imports must come first */
+@import './base.css';
+@import './components.css';
+@import './utilities.css';
+@import './vendor/react-flow.css';
+@import '../dashboard/PrintStyles.css';
 
 /* Tailwind */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* App styles */
-@import './base.css';
-@import './components.css';
-@import './utilities.css';
-
-/* Vendor overrides */
-@import './vendor/react-flow.css';
-
-/* Print styles */
-@import '../dashboard/PrintStyles.css';

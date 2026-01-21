@@ -112,6 +112,7 @@ export function createLazyComponent<T extends ComponentType<object>>(
   
   const WrappedComponent = (props: React.ComponentProps<T>) => (
     <LazyLoad message={fallbackMessage} compact={compact} fallback={fallback}>
+      {/* @ts-expect-error - Generic component props are difficult to type correctly */}
       <LazyComponent {...props} />
     </LazyLoad>
   );

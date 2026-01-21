@@ -4,7 +4,7 @@
  * Suggestion rules for data cleaning operations.
  */
 
-import { registerRule, createSuggestionId, getVersionHash, SuggestionEngineContext, MetadataBundle } from '../registry';
+import { registerRule, createSuggestionId, getVersionHash } from '../registry';
 import { 
   hasLeadingTrailingWhitespace,
   looksLikeNumber,

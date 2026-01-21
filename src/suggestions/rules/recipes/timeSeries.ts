@@ -60,7 +60,7 @@ export const timeSeriesTrendRule: SuggestionRule = {
   category: 'recipe',
   scope: 'table',
   
-  when: (ctx, meta) => {
+  when: (_ctx, meta) => {
     const opportunities = detectTimeSeriesOpportunities(
       meta.schema,
       meta.profile?.columns,
@@ -105,11 +105,13 @@ export const timeSeriesTrendRule: SuggestionRule = {
       },
       action: {
         kind: 'createChart',
-        chartType: 'line',
-        config: {
-          xAxis: opp.dateColumn.id,
-          yAxis: opp.valueColumn.id,
-          period: opp.suggestedPeriod,
+        chart: {
+          chartType: 'line',
+          sourceTableId: ctx.tableId,
+          config: {
+            xAxis: opp.dateColumn.id,
+            yAxis: opp.valueColumn.id,
+          },
         },
       },
     }
@@ -135,7 +137,7 @@ export const periodComparisonRule: SuggestionRule = {
   category: 'recipe',
   scope: 'table',
   
-  when: (ctx, meta) => {
+  when: (_ctx, meta) => {
     const opportunities = detectTimeSeriesOpportunities(
       meta.schema,
       meta.profile?.columns,
@@ -184,15 +186,14 @@ export const periodComparisonRule: SuggestionRule = {
       action: {
         kind: 'createDerivedTable',
         transform: {
-          type: 'aggregate',
+          type: 'group_summarize',
           sourceTableId: ctx.tableId,
-          groupBy: [opp.dateColumn.id],
+          groupByColumns: [opp.dateColumn.id],
           aggregations: [
-            { columnId: opp.valueColumn.id, function: 'SUM', alias: 'total' },
-            { columnId: opp.valueColumn.id, function: 'AVG', alias: 'average' },
-            { columnId: '*', function: 'COUNT', alias: 'count' },
+            { columnId: opp.valueColumn.id, operation: 'sum', alias: 'total' },
+            { columnId: opp.valueColumn.id, operation: 'avg', alias: 'average' },
+            { columnId: opp.valueColumn.id, operation: 'count', alias: 'count' },
           ],
-          periodTruncate: opp.suggestedPeriod,
         },
         tableName: `${opp.valueColumn.name} by ${opp.suggestedPeriod}`,
         openAfterApply: true,

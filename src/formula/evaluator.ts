@@ -150,7 +150,7 @@ export class FormulaEvaluator {
         return -(argument as number)
       
       case 'NOT':
-        return !Boolean(argument)
+        return !argument
 
       default:
         throw new Error(`Unknown unary operator: ${operator}`)
@@ -181,7 +181,7 @@ export class FormulaEvaluator {
   private evaluateConditional(condition: ASTNode, consequent: ASTNode, alternate: ASTNode): FormulaValue {
     const conditionValue = this.evaluate(condition)
     
-    if (Boolean(conditionValue)) {
+    if (conditionValue) {
       return this.evaluate(consequent)
     } else {
       return this.evaluate(alternate)
