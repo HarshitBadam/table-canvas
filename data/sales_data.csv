@@ -1,0 +1,32 @@
+order_id,date,customer_id,product,category,quantity,unit_price,total_amount,region
+ORD001,2024-01-05,CUST101,Laptop Pro,Electronics,2,1299.99,2599.98,North
+ORD002,2024-01-06,CUST102,Wireless Mouse,Electronics,5,29.99,149.95,South
+ORD003,2024-01-07,CUST103,Office Chair,Furniture,3,249.99,749.97,East
+ORD004,2024-01-08,CUST101,USB Hub,Electronics,10,19.99,199.90,North
+ORD005,2024-01-10,CUST104,Standing Desk,Furniture,1,599.99,599.99,West
+ORD006,2024-01-12,CUST105,Monitor 27",Electronics,2,349.99,699.98,South
+ORD007,2024-01-15,CUST102,Keyboard,Electronics,3,79.99,239.97,South
+ORD008,2024-01-17,CUST106,Desk Lamp,Furniture,6,45.99,275.94,East
+ORD009,2024-01-20,CUST107,Webcam HD,Electronics,4,89.99,359.96,North
+ORD010,2024-01-22,CUST103,Filing Cabinet,Furniture,2,189.99,379.98,East
+ORD011,2024-01-25,CUST108,Laptop Pro,Electronics,1,1299.99,1299.99,West
+ORD012,2024-01-28,CUST101,Monitor 27",Electronics,1,349.99,349.99,North
+ORD013,2024-02-01,CUST109,Wireless Mouse,Electronics,8,29.99,239.92,South
+ORD014,2024-02-03,CUST110,Office Chair,Furniture,4,249.99,999.96,West
+ORD015,2024-02-05,CUST102,Desk Lamp,Furniture,2,45.99,91.98,South
+ORD016,2024-02-08,CUST111,Laptop Pro,Electronics,3,1299.99,3899.97,East
+ORD017,2024-02-10,CUST104,USB Hub,Electronics,15,19.99,299.85,West
+ORD018,2024-02-12,CUST112,Standing Desk,Furniture,2,599.99,1199.98,North
+ORD019,2024-02-15,CUST103,Keyboard,Electronics,5,79.99,399.95,East
+ORD020,2024-02-18,CUST113,Filing Cabinet,Furniture,1,189.99,189.99,South
+ORD021,2024-02-20,CUST106,Webcam HD,Electronics,3,89.99,269.97,South
+ORD022,2024-02-22,CUST114,Monitor 27",Electronics,4,349.99,1399.96,West
+ORD023,2024-02-25,CUST107,Office Chair,Furniture,2,249.99,499.98,North
+ORD024,2024-02-28,CUST115,Wireless Mouse,Electronics,10,29.99,299.90,East
+ORD025,2024-03-02,CUST101,Desk Lamp,Furniture,3,45.99,137.97,North
+ORD026,2024-03-05,CUST116,Laptop Pro,Electronics,2,1299.99,2599.98,South
+ORD027,2024-03-08,CUST108,USB Hub,Electronics,6,19.99,119.94,West
+ORD028,2024-03-10,CUST117,Standing Desk,Furniture,1,599.99,599.99,East
+ORD029,2024-03-12,CUST102,Keyboard,Electronics,4,79.99,319.96,South
+ORD030,2024-03-15,CUST118,Filing Cabinet,Furniture,3,189.99,569.97,North
+
