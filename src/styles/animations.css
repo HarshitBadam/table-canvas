@@ -1,0 +1,105 @@
+/**
+ * Animation Utilities
+ * 
+ * Reusable animation classes.
+ */
+
+@layer utilities {
+  /* Fade animations */
+  .animate-in {
+    animation: fadeIn var(--transition-normal) var(--ease-out);
+  }
+
+  .animate-out {
+    animation: fadeOut var(--transition-normal) var(--ease-out);
+  }
+
+  /* Slide animations */
+  .slide-in-from-top {
+    animation: slideFromTop var(--transition-slow) var(--ease-out);
+  }
+
+  .slide-in-from-bottom {
+    animation: slideFromBottom var(--transition-slow) var(--ease-out);
+  }
+
+  .slide-in-from-left {
+    animation: slideFromLeft var(--transition-slow) var(--ease-out);
+  }
+
+  .slide-in-from-right {
+    animation: slideFromRight var(--transition-slow) var(--ease-out);
+  }
+
+  /* Scale animations */
+  .zoom-in {
+    animation: zoomIn var(--transition-normal) var(--ease-out);
+  }
+
+  .zoom-out {
+    animation: zoomOut var(--transition-normal) var(--ease-out);
+  }
+
+  /* Pulse */
+  .pulse {
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    @apply bg-surface-tertiary rounded animate-pulse;
+  }
+
+  .skeleton-text {
+    @apply skeleton h-4 w-full;
+  }
+
+  .skeleton-circle {
+    @apply skeleton rounded-full;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideFromTop {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideFromBottom {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideFromLeft {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideFromRight {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes zoomOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.95); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}

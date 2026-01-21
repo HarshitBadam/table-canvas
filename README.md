@@ -1,32 +1,29 @@
-# Table Canvas v1.0.0
+# Table Canvas
 
-A web application for Excel power users where tables are objects on a canvas, connections create derived tables (joins/transforms), clicking a table opens an Excel-like grid editor, and the app provides fast profiling + "analysis auto-complete" suggestions.
+A visual data analysis tool for Excel power users. Import tables, create joins and transforms on a canvas, edit data in an Excel-like grid, and build polished dashboards.
 
 ## Features
 
-### Core Functionality
-- **Canvas View**: Visual data lineage with drag-and-drop table nodes
-- **Grid View**: Excel-like editing with virtualized scrolling (60fps)
-- **Data Import**: CSV and XLSX file support with sheet selection
-- **Transforms**: Join, Filter, Select, Calculated Column, Group/Summarize
-- **Undo/Redo**: Full history for canvas and grid operations
+- **Canvas View** — Visual data lineage with drag-and-drop table nodes
+- **Grid View** — Excel-like editing with virtualized scrolling (60fps)
+- **Smart Joins** — Suggested keys, match rate preview, row explosion warnings
+- **Transforms** — Filter, Select, Calculated Columns, Group/Summarize
+- **Profiling** — Schema inference, missing values, distinct counts, semantic hints
+- **Suggestions** — Context-aware cleaning and analysis recommendations
+- **Charts** — Bar, Line, Pie, Scatter with configurable aggregations
+- **Dashboards** — Drag-and-drop layout with PDF export
 
-### Data Intelligence
-- **Automatic Profiling**: Schema inference, missing values, distinct counts
-- **Type Detection**: Semantic hints (currency, email, date patterns)
-- **Join Suggestions**: Smart key matching with confidence scores
-- **Analysis Suggestions**: Context-aware cleaning and analysis recommendations
+## Quick Start
 
-### Visualization
-- **Chart Builder**: Bar, Line, Pie, Scatter with axis mapping
-- **Dashboard**: Drag-and-drop chart layout
-- **PDF Export**: Print-optimized layout with consistent styling
+```bash
+# Install dependencies
+npm install
 
-### Commerce Recipes
-- Trend Analysis
-- Category Contribution (Pareto)
-- Variance Analysis (Actual vs Budget)
-- Ratio KPIs
+# Start development server
+npm run dev
+
+# Open http://localhost:5173
+```
 
 ## Tech Stack
 
@@ -40,38 +37,8 @@ A web application for Excel power users where tables are objects on a canvas, co
 | Data Engine | DuckDB-WASM (Web Worker) |
 | State | Zustand + Immer |
 | Charts | Recharts |
-| Storage | IndexedDB (idb) |
+| Storage | IndexedDB |
 | File Parsing | Papa Parse, SheetJS |
-
-## Getting Started
-
-### Prerequisites
-- Node.js 18+ 
-- npm or yarn
-
-### Installation
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd table-canvas
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-```
-
-### Development
-
-The app runs entirely in the browser with no backend required. All data processing happens in a Web Worker using DuckDB-WASM.
 
 ## Project Structure
 
@@ -92,13 +59,22 @@ src/
 └── suggestions/   # Analysis recommendations
 ```
 
-## Key Architecture Decisions
+## Documentation
 
-1. **Never block main thread**: All parsing, joins, and profiling run in a Web Worker
-2. **Patch overlay model**: Edits are stored as sparse patches, not rewrites
-3. **Engine abstraction**: DuckDB-WASM behind an adapter for future swappability
-4. **Progressive display**: Show partial results immediately, refine in background
-5. **Normalized state**: Nodes and edges stored separately with IDs
+| Document | Description |
+|----------|-------------|
+| [Architecture](docs/architecture.md) | Product and engineering specification |
+| [User Guide](docs/user-guide.md) | End-user documentation |
+| [Suggestions Spec](docs/suggestions-spec.md) | Suggestion system implementation details |
+| [Internal Map](docs/internal-map.md) | Codebase architecture overview |
+
+## Architecture Highlights
+
+1. **Main thread stays fast** — All parsing, joins, and profiling run in a Web Worker
+2. **Patch overlay model** — Edits are stored as sparse patches, not full rewrites
+3. **Engine abstraction** — DuckDB-WASM behind an adapter for future swappability
+4. **Progressive display** — Show partial results immediately, refine in background
+5. **Normalized state** — Nodes and edges stored separately with IDs
 
 ## Keyboard Shortcuts
 
@@ -111,21 +87,21 @@ src/
 | `Tab` | Move to next cell |
 | `Arrow keys` | Navigate grid |
 
-## Browser Support
+## Environment Setup
 
-- Chrome 90+
-- Firefox 90+
-- Safari 15+
-- Edge 90+
+For backend features (optional):
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MONGODB_URI` | MongoDB connection string | `mongodb://localhost:27017/table-canvas` |
+| `JWT_ACCESS_SECRET` | Access token secret | Required in production |
+| `JWT_REFRESH_SECRET` | Refresh token secret | Required in production |
+| `PORT` | Server port | `3001` |
 
 ## License
 
 MIT
-
-## Acknowledgments
-
-- [DuckDB](https://duckdb.org/) - In-process SQL database
-- [React Flow](https://reactflow.dev/) - Canvas library
-- [Radix UI](https://www.radix-ui.com/) - Accessible primitives
-- [Recharts](https://recharts.org/) - Chart library
-

@@ -199,7 +199,7 @@ router.patch(
 );
 
 // ============================================================================
-// DELETE /api/projects/:id - Delete project
+// DELETE /api/projects/:id - Soft delete project
 // ============================================================================
 
 router.delete(
@@ -220,14 +220,53 @@ router.delete(
       throw new NotFoundError('Project');
     }
 
-    // Delete the project
-    await Project.deleteOne({ _id: project._id });
-
-    // TODO: Also delete associated files from GridFS
+    // Soft delete the project
+    await project.softDelete();
 
     const response: ApiResponse = {
       success: true,
       message: 'Project deleted successfully',
+    };
+
+    res.json(response);
+  })
+);
+
+// ============================================================================
+// POST /api/projects/:id/restore - Restore soft-deleted project
+// ============================================================================
+
+router.post(
+  '/:id/restore',
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const projectId = req.params.id;
+
+    // Validate ObjectId format
+    if (!Types.ObjectId.isValid(projectId)) {
+      throw new ValidationError(['Invalid project ID format']);
+    }
+
+    // Find project including deleted ones
+    const project = await Project.findOne({
+      _id: new Types.ObjectId(projectId),
+      userId: new Types.ObjectId(userId),
+      deletedAt: { $ne: null },
+    });
+
+    if (!project) {
+      throw new NotFoundError('Deleted project');
+    }
+
+    // Restore the project
+    await project.restore();
+
+    const response: ApiResponse<{ project: IProjectPublic }> = {
+      success: true,
+      data: {
+        project: project.toPublic(),
+      },
+      message: 'Project restored successfully',
     };
 
     res.json(response);

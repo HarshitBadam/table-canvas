@@ -90,8 +90,8 @@ export async function fetchProjects(): Promise<ProjectSummary[]> {
     try {
       const projects = await listProjects();
       return projects;
-    } catch (error) {
-      console.warn('[Sync] Failed to fetch projects from backend, using local:', error);
+    } catch {
+      // Fallback to local storage
     }
   }
   
@@ -131,8 +131,8 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
         isLocalOnly: false,
         needsSync: false,
       };
-    } catch (error) {
-      console.warn('[Sync] Failed to load project from backend:', error);
+    } catch {
+      // Fallback to local storage
     }
   }
   
@@ -179,8 +179,8 @@ export async function createProjectWithSync(name?: string): Promise<ProjectWithS
         isLocalOnly: false,
         needsSync: false,
       };
-    } catch (error) {
-      console.warn('[Sync] Failed to create project on backend:', error);
+    } catch {
+      // Fallback to local-only project
     }
   }
   
@@ -288,8 +288,8 @@ export async function deleteProjectWithSync(projectId: string): Promise<void> {
   if (isOnline && !projectId.startsWith('local_')) {
     try {
       await apiDeleteProject(projectId);
-    } catch (error) {
-      console.warn('[Sync] Failed to delete project from backend:', error);
+    } catch {
+      // Backend deletion failed, but local is already removed
     }
   }
 }
@@ -318,8 +318,8 @@ export async function uploadFileWithSync(
         name: uploaded.filename,
         type: uploaded.contentType,
       };
-    } catch (error) {
-      console.warn('[Sync] Failed to upload file to backend:', error);
+    } catch {
+      // Fallback to local-only storage
     }
   }
   
@@ -355,8 +355,8 @@ export async function loadFileWithSync(fileId: string): Promise<ArrayBuffer | nu
       await saveFileLocal(fileId, fileId, 'application/octet-stream', buffer);
       
       return buffer;
-    } catch (error) {
-      console.warn('[Sync] Failed to load file from backend:', error);
+    } catch {
+      // File not available from backend
     }
   }
   
@@ -374,8 +374,8 @@ export async function deleteFileWithSync(fileId: string): Promise<void> {
   if (isOnline && !fileId.startsWith('local_file_')) {
     try {
       await apiDeleteFile(fileId);
-    } catch (error) {
-      console.warn('[Sync] Failed to delete file from backend:', error);
+    } catch {
+      // Backend deletion failed, but local is already removed
     }
   }
 }
@@ -418,9 +418,8 @@ export async function syncLocalProjectsToBackend(): Promise<void> {
           deserializePatches(created.patches)
         );
         
-        console.log(`[Sync] Synced local project ${summary.id} -> ${created.id}`);
-      } catch (error) {
-        console.error(`[Sync] Failed to sync project ${summary.id}:`, error);
+      } catch {
+        // Failed to sync this project, will retry on next online event
       }
     }
   }

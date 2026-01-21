@@ -1,0 +1,207 @@
+/**
+ * Utility Styles
+ * 
+ * Custom utilities, animations, and helper classes.
+ */
+
+/* ============================================================================
+   Custom Utility Classes
+   ============================================================================ */
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ============================================================================
+   Animations - Keyframes
+   ============================================================================ */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from { 
+    opacity: 0; 
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  to { 
+    opacity: 1; 
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes slide-in-right {
+  from { 
+    opacity: 0; 
+    transform: translateX(20px);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from { 
+    opacity: 0; 
+    transform: translateX(-20px);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-up {
+  from { 
+    opacity: 0; 
+    transform: translateY(10px);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-up {
+  from { 
+    opacity: 0; 
+    transform: translateY(8px);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0);
+  }
+}
+
+@keyframes expand-down {
+  from { 
+    opacity: 0; 
+    max-height: 0;
+    transform: scaleY(0.95);
+    transform-origin: top;
+  }
+  to { 
+    opacity: 1; 
+    max-height: 500px;
+    transform: scaleY(1);
+    transform-origin: top;
+  }
+}
+
+/* ============================================================================
+   Animation Classes
+   ============================================================================ */
+
+.animate-fade-in {
+  animation: fade-in 150ms ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 200ms ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 200ms ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 200ms ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 200ms ease-out;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 200ms ease-out both;
+}
+
+.animate-expand-down {
+  animation: expand-down 200ms ease-out;
+}
+
+/* ============================================================================
+   Connection Line Animations
+   ============================================================================ */
+
+@keyframes connection-dash {
+  0% {
+    stroke-dashoffset: 32;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.connection-line-animated {
+  animation: connection-dash 0.6s linear infinite;
+}
+
+/* Pulsing ring animation for connection target */
+@keyframes target-ring-pulse {
+  0%, 100% {
+    r: 12;
+    opacity: 0.4;
+    stroke-width: 2;
+  }
+  50% {
+    r: 18;
+    opacity: 0.15;
+    stroke-width: 1;
+  }
+}
+
+.connection-target-ring {
+  animation: target-ring-pulse 1s ease-in-out infinite;
+}
+
+/* ============================================================================
+   Canvas Grid Background
+   ============================================================================ */
+
+.canvas-grid {
+  background-color: #f8faf9;
+  background-image: 
+    linear-gradient(rgba(33, 115, 70, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(33, 115, 70, 0.12) 1px, transparent 1px),
+    linear-gradient(rgba(33, 115, 70, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(33, 115, 70, 0.06) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+}
+
+[data-theme="dark"] .canvas-grid {
+  background-color: #0a0c0b;
+  background-image: 
+    linear-gradient(rgba(34, 164, 93, 0.2) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 164, 93, 0.2) 1px, transparent 1px),
+    linear-gradient(rgba(34, 164, 93, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 164, 93, 0.08) 1px, transparent 1px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .canvas-grid {
+    background-color: #0a0c0b;
+    background-image: 
+      linear-gradient(rgba(34, 164, 93, 0.2) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34, 164, 93, 0.2) 1px, transparent 1px),
+      linear-gradient(rgba(34, 164, 93, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34, 164, 93, 0.08) 1px, transparent 1px);
+  }
+}
