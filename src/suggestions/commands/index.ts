@@ -58,8 +58,6 @@ export function setToastHandler(handler: (toast: ToastNotification) => void): vo
 export function showToast(toast: ToastNotification): void {
   if (toastHandler) {
     toastHandler(toast)
-  } else {
-    console.log(`[Toast] ${toast.type}: ${toast.message}`)
   }
 }
 
@@ -684,7 +682,6 @@ export function createCommand(suggestion: Suggestion): SuggestionCommand | null 
       return new HighlightCellsCommand(suggestion, action)
     
     default:
-      console.warn('Unknown suggestion action kind:', action)
       return null
   }
 }

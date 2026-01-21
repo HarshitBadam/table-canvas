@@ -173,7 +173,6 @@ export function AppProvider({ children }: AppProviderProps) {
         const engine = getEngine();
         await engine.init();
         setState((prev) => ({ ...prev, engineReady: true }));
-        console.log('[AppContext] Engine initialized');
 
         // Phase 2: Check Authentication
         setPhase('checking_auth');
@@ -188,7 +187,6 @@ export function AppProvider({ children }: AppProviderProps) {
             user: null,
             isAuthenticated: false,
           }));
-          console.log('[AppContext] Not authenticated, showing login');
           return;
         }
 
@@ -197,7 +195,6 @@ export function AppProvider({ children }: AppProviderProps) {
           user,
           isAuthenticated: true,
         }));
-        console.log('[AppContext] Authenticated as', user.email);
 
         // Phase 3: Load Project
         setPhase('loading_project');
@@ -230,7 +227,6 @@ export function AppProvider({ children }: AppProviderProps) {
             { id: project.id, name: project.name, updatedAt: new Date(), createdAt: new Date() },
           ],
         }));
-        console.log('[AppContext] Project loaded:', project.name);
 
         // Phase 4: Materialize Tables (source tables first, then derived)
         const sourceTableIds = Object.entries(project.nodes)
@@ -245,14 +241,13 @@ export function AppProvider({ children }: AppProviderProps) {
 
         if (totalTables > 0) {
           setPhase('materializing');
-          console.log(`[AppContext] Materializing ${sourceTableIds.length} source + ${derivedTableIds.length} derived tables...`);
           
           // First materialize source tables
           for (const tableId of sourceTableIds) {
             try {
               await ensureTableMaterialized(tableId);
-            } catch (err) {
-              console.warn(`[AppContext] Failed to materialize source table ${tableId}:`, err);
+            } catch {
+              // Table materialization failed, will show error state
             }
           }
           
@@ -260,18 +255,15 @@ export function AppProvider({ children }: AppProviderProps) {
           for (const tableId of derivedTableIds) {
             try {
               await ensureTableMaterialized(tableId);
-            } catch (err) {
-              console.warn(`[AppContext] Failed to materialize derived table ${tableId}:`, err);
+            } catch {
+              // Table materialization failed, will show error state
             }
           }
         }
 
-        // Done!
         setPhase('ready');
-        console.log('[AppContext] Ready');
 
       } catch (error) {
-        console.error('[AppContext] Initialization failed:', error);
         setPhase('error', error instanceof Error ? error.message : 'Initialization failed');
       }
     };
@@ -308,9 +300,8 @@ export function AppProvider({ children }: AppProviderProps) {
           edges,
           patches
         );
-        console.log('[AppContext] Auto-saved project');
-      } catch (error) {
-        console.error('[AppContext] Auto-save failed:', error);
+      } catch {
+        // Auto-save failed, will retry on next change
       } finally {
         isSavingRef.current = false;
         setState((prev) => ({ ...prev, isSaving: false }));
@@ -382,15 +373,15 @@ export function AppProvider({ children }: AppProviderProps) {
         for (const tableId of sourceTableIds) {
           try {
             await ensureTableMaterialized(tableId);
-          } catch (err) {
-            console.warn(`[AppContext] Failed to materialize source ${tableId}:`, err);
+          } catch {
+            // Materialization failed
           }
         }
         for (const tableId of derivedTableIds) {
           try {
             await ensureTableMaterialized(tableId);
-          } catch (err) {
-            console.warn(`[AppContext] Failed to materialize derived ${tableId}:`, err);
+          } catch {
+            // Materialization failed
           }
         }
       }
@@ -459,7 +450,6 @@ export function AppProvider({ children }: AppProviderProps) {
         ],
       }));
     } catch (error) {
-      console.error('[AppContext] Create project failed:', error);
       throw error;
     }
   }, []);
@@ -501,22 +491,21 @@ export function AppProvider({ children }: AppProviderProps) {
         for (const tableId of sourceTableIds) {
           try {
             await ensureTableMaterialized(tableId);
-          } catch (err) {
-            console.warn(`[AppContext] Failed to materialize source ${tableId}:`, err);
+          } catch {
+            // Materialization failed
           }
         }
         for (const tableId of derivedTableIds) {
           try {
             await ensureTableMaterialized(tableId);
-          } catch (err) {
-            console.warn(`[AppContext] Failed to materialize derived ${tableId}:`, err);
+          } catch {
+            // Materialization failed
           }
         }
       }
 
       setPhase('ready');
     } catch (error) {
-      console.error('[AppContext] Load project failed:', error);
       setPhase('error', error instanceof Error ? error.message : 'Failed to load project');
     }
   }, [setPhase]);
@@ -525,8 +514,8 @@ export function AppProvider({ children }: AppProviderProps) {
     try {
       const projectList = await fetchProjects();
       setState((prev) => ({ ...prev, projects: projectList }));
-    } catch (error) {
-      console.error('[AppContext] Refresh projects failed:', error);
+    } catch {
+      // Refresh failed
     }
   }, []);
 
@@ -539,11 +528,8 @@ export function AppProvider({ children }: AppProviderProps) {
     const node = currentNodes[nodeId];
     
     if (!node) {
-      console.warn('[AppContext] Node not found for deletion:', nodeId);
       return;
     }
-
-    console.log('[AppContext] Deleting node:', node.name);
 
     // Get file reference before deleting (for source tables)
     let fileRef: string | null = null;
@@ -561,9 +547,8 @@ export function AppProvider({ children }: AppProviderProps) {
     if (fileRef) {
       try {
         await deleteFile(fileRef);
-        console.log('[AppContext] Deleted file from IndexedDB:', fileRef);
-      } catch (err) {
-        console.warn('[AppContext] Failed to delete file:', err);
+      } catch {
+        // File deletion failed
       }
     }
 
@@ -571,13 +556,9 @@ export function AppProvider({ children }: AppProviderProps) {
     try {
       const engine = getEngine();
       await engine.dropTable(nodeId);
-      console.log('[AppContext] Dropped table from engine:', nodeId);
-    } catch (err) {
-      console.warn('[AppContext] Failed to drop table from engine:', err);
+    } catch {
+      // Engine cleanup failed
     }
-
-    // 5. Auto-save will handle backend sync (triggered by store change)
-    console.log('[AppContext] Node deleted, auto-save will sync to backend');
   }, []);
 
   // ========================================================================

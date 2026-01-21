@@ -47,7 +47,6 @@ export class EngineAdapter {
     await this.rpc.waitForReady()
     await this.rpc.call('init', {})
     this.initialized = true
-    console.log('[EngineAdapter] Initialized')
   }
 
   /**

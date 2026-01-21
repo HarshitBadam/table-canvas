@@ -1,4 +1,25 @@
 /**
+ * Conditionally join class names (lightweight clsx alternative)
+ */
+export function clsx(...inputs: (string | boolean | undefined | null | Record<string, boolean>)[]): string {
+  const classes: string[] = []
+  
+  for (const input of inputs) {
+    if (!input) continue
+    
+    if (typeof input === 'string') {
+      classes.push(input)
+    } else if (typeof input === 'object') {
+      for (const [key, value] of Object.entries(input)) {
+        if (value) classes.push(key)
+      }
+    }
+  }
+  
+  return classes.join(' ')
+}
+
+/**
  * Generate a unique ID
  */
 export function generateId(): string {

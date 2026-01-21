@@ -1,9 +1,8 @@
-import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
 import { CellValue, ColumnSchema } from '@/lib/types'
 import { formatNumber, generateId } from '@/lib/utils'
-import { SuggestionsPanel } from '@/suggestions/SuggestionsPanel'
 import { detectPattern, generateNextValues } from './autofill'
 import { useTheme } from '@/components/ThemeToggle'
 import { FilterPanel } from './FilterPanel'
@@ -11,7 +10,10 @@ import { GridFilterConfig, applyFilters, createEmptyFilterConfig, hasActiveFilte
 import { FormulaColumnModal } from './FormulaColumnModal'
 import { evaluateFormula, FormulaValue } from '@/formula'
 import { ensureTableMaterialized } from '@/engine/materializationService'
-import { ChartBuilder } from '@/charts/ChartBuilder'
+
+// Lazy loaded components for code splitting
+const SuggestionsPanel = lazy(() => import('@/suggestions/SuggestionsPanel').then(m => ({ default: m.SuggestionsPanel })))
+const ChartBuilder = lazy(() => import('@/charts/ChartBuilder').then(m => ({ default: m.ChartBuilder })))
 
 interface GridViewProps {
   tableId: string
@@ -1667,13 +1669,17 @@ export function GridView({ tableId }: GridViewProps) {
         </div>
       )}
 
-      {/* Suggestions Panel */}
-      <SuggestionsPanel
-        isOpen={showSuggestions}
-        onClose={() => setShowSuggestions(false)}
-        tableId={tableId}
-        selectedColumnId={selectedColumn ?? undefined}
-      />
+      {/* Suggestions Panel - Lazy Loaded */}
+      {showSuggestions && (
+        <Suspense fallback={<div className="fixed right-0 top-0 w-96 h-full bg-surface border-l border-border animate-pulse" />}>
+          <SuggestionsPanel
+            isOpen={showSuggestions}
+            onClose={() => setShowSuggestions(false)}
+            tableId={tableId}
+            selectedColumnId={selectedColumn ?? undefined}
+          />
+        </Suspense>
+      )}
 
       {/* Filter Panel */}
       <FilterPanel
@@ -1704,16 +1710,20 @@ export function GridView({ tableId }: GridViewProps) {
         onCancel={handleNewColumnCancel}
       />
 
-      {/* Chart Builder Modal */}
-      <ChartBuilder
-        isOpen={chartBuilderOpen}
-        onClose={() => {
-          setChartBuilderOpen(false)
-          setChartPreselectedColumn(undefined)
-        }}
-        sourceTableId={tableId}
-        preselectedColumn={chartPreselectedColumn}
-      />
+      {/* Chart Builder Modal - Lazy Loaded */}
+      {chartBuilderOpen && (
+        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center"><div className="bg-surface rounded-lg p-8 animate-pulse">Loading chart builder...</div></div>}>
+          <ChartBuilder
+            isOpen={chartBuilderOpen}
+            onClose={() => {
+              setChartBuilderOpen(false)
+              setChartPreselectedColumn(undefined)
+            }}
+            sourceTableId={tableId}
+            preselectedColumn={chartPreselectedColumn}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }
