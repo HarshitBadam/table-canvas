@@ -2,12 +2,11 @@
  * useViewMode Hook
  * 
  * Manages view mode cycling for table nodes on the canvas.
- * Supports three modes: collapsed -> stats -> data
+ * Supports two modes: collapsed (schema) and data preview.
  */
 
 import { useCallback } from 'react'
 import type { NodeViewMode } from '@/types'
-import { loadProfileForTable } from '@/profiling/profiler'
 
 interface NodeUIState {
   expanded?: boolean
@@ -44,15 +43,15 @@ export function useViewMode({
   // Get current view mode from UI state
   const getViewMode = useCallback((ui: NodeUIState): NodeViewMode => {
     if (ui?.viewMode) return ui.viewMode
-    if (ui?.expanded) return 'stats'
+    // Legacy: expanded maps to data now (stats removed)
+    if (ui?.expanded) return 'data'
     return 'collapsed'
   }, [])
 
-  // Get next view mode in cycle
+  // Get next view mode in cycle (only 2 modes now)
   const getNextViewMode = useCallback((current: NodeViewMode): NodeViewMode => {
     switch (current) {
-      case 'collapsed': return 'stats'
-      case 'stats': return 'data'
+      case 'collapsed': return 'data'
       case 'data': return 'collapsed'
       default: return 'collapsed'
     }
@@ -62,12 +61,7 @@ export function useViewMode({
   const handleSetViewMode = useCallback((nodeId: string, mode: NodeViewMode) => {
     const node = nodes[nodeId]
     if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-      updateNodeUI(nodeId, { viewMode: mode, expanded: mode === 'stats' })
-
-      // Trigger profile loading when switching to stats mode
-      if (mode === 'stats') {
-        loadProfileForTable(nodeId)
-      }
+      updateNodeUI(nodeId, { viewMode: mode, expanded: mode === 'data' })
     }
   }, [nodes, updateNodeUI])
 
@@ -86,12 +80,7 @@ export function useViewMode({
     const node = nodes[nodeId]
     if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
       const willExpand = !node.ui.expanded
-      updateNodeUI(nodeId, { expanded: willExpand })
-
-      // Trigger profile loading when expanding
-      if (willExpand) {
-        loadProfileForTable(nodeId)
-      }
+      updateNodeUI(nodeId, { expanded: willExpand, viewMode: willExpand ? 'data' : 'collapsed' })
     }
   }, [nodes, updateNodeUI])
 
