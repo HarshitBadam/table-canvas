@@ -2,7 +2,7 @@
  * Dashboard Component
  * 
  * Project Overview - comprehensive view of workspace state.
- * Clear visual hierarchy with explicit sections.
+ * Data Flow hero at top, followed by Your Data and Suggested Actions.
  */
 
 import { useState, useCallback, useEffect } from 'react'
@@ -12,21 +12,17 @@ import type { Suggestion } from '@/lib/types'
 
 // Import dashboard components
 import { 
-  TablesListSection,
-  DataHealthPanel,
-  KeyInsightsSection,
-  QuickActionsSection,
   LineageMiniMap,
+  TableStatsSection,
+  QuickActionsSection,
 } from './components'
 
 // Import dashboard hooks
 import {
   useProjectHealthMetrics,
   useDataQualityMetrics,
-  useAggregatedInsights,
   useTopSuggestions,
   useLineageData,
-  useChartNodes,
 } from './useDashboardData'
 
 interface DashboardProps {
@@ -39,11 +35,9 @@ export function Dashboard({ onOpenTable, onOpenSuggestions }: DashboardProps) {
   
   // Dashboard data hooks
   const healthMetrics = useProjectHealthMetrics()
-  const { tableMetrics, isLoading: qualityLoading } = useDataQualityMetrics()
-  const { insights, isLoading: insightsLoading } = useAggregatedInsights()
-  const { suggestions, isLoading: suggestionsLoading } = useTopSuggestions(3) // Limit to 3
+  const { tableMetrics } = useDataQualityMetrics()
+  const { suggestions, isLoading: suggestionsLoading } = useTopSuggestions(3)
   const lineageData = useLineageData()
-  const chartNodes = useChartNodes()
   
   // Toast notification state
   const [toast, setToast] = useState<ToastNotification | null>(null)
@@ -65,14 +59,6 @@ export function Dashboard({ onOpenTable, onOpenSuggestions }: DashboardProps) {
     }
   }, [onOpenTable, selectNode])
 
-  const handleOpenSuggestions = useCallback((tableId: string) => {
-    if (onOpenSuggestions) {
-      onOpenSuggestions(tableId)
-    } else {
-      handleOpenTable(tableId)
-    }
-  }, [onOpenSuggestions, handleOpenTable])
-
   // Apply suggestion handler
   const handleApplySuggestion = useCallback(async (suggestion: Suggestion) => {
     await applySuggestion(suggestion)
@@ -80,7 +66,7 @@ export function Dashboard({ onOpenTable, onOpenSuggestions }: DashboardProps) {
 
   // Check if we have any data at all
   const hasData = tableMetrics.length > 0
-  const { totalTables, totalRows, totalColumns, chartCount } = healthMetrics
+  const { totalTables, totalRows, totalColumns } = healthMetrics
 
   return (
     <div className="h-full flex flex-col bg-canvas">
@@ -95,12 +81,6 @@ export function Dashboard({ onOpenTable, onOpenSuggestions }: DashboardProps) {
               <Stat icon={<RowsIcon />} value={formatNumber(totalRows)} label="Rows" />
               <span className="text-text-tertiary">·</span>
               <Stat icon={<ColumnsIcon />} value={totalColumns} label="Columns" />
-              {chartCount > 0 && (
-                <>
-                  <span className="text-text-tertiary">·</span>
-                  <Stat icon={<ChartIcon />} value={chartCount} label="Charts" />
-                </>
-              )}
             </div>
           )}
         </div>
@@ -123,47 +103,33 @@ export function Dashboard({ onOpenTable, onOpenSuggestions }: DashboardProps) {
           <EmptyState />
         ) : (
           <div className="max-w-7xl mx-auto space-y-6">
-            {/* Top Row: Your Data + Data Health */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left: Tables List (takes 2 columns) */}
-              <div className="lg:col-span-2">
-                <TablesListSection
-                  tableMetrics={tableMetrics}
-                  onOpenTable={handleOpenTable}
-                />
-              </div>
-
-              {/* Right: Data Health Panel */}
-              <div>
-                <DataHealthPanel
-                  metrics={healthMetrics}
-                  tableMetrics={tableMetrics}
-                />
-              </div>
-            </div>
-
-            {/* Middle Row: What We Found + What To Do Next */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <KeyInsightsSection
-                insights={insights}
-                onOpenTable={handleOpenTable}
-                isLoading={insightsLoading}
-              />
-              
-              <QuickActionsSection
-                suggestions={suggestions}
-                onApply={handleApplySuggestion}
-                onOpenTable={handleOpenTable}
-                isLoading={suggestionsLoading}
-              />
-            </div>
-
-            {/* Bottom: Data Flow (Lineage) */}
+            {/* Hero: Data Flow (full width) */}
             <LineageMiniMap
               nodes={lineageData.nodes}
               edges={lineageData.edges}
               onNodeClick={handleOpenTable}
             />
+
+            {/* Two Column Layout: Your Data + Suggested Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              {/* Left: Table Stats (larger - 3 columns) */}
+              <div className="lg:col-span-3">
+                <TableStatsSection
+                  tableMetrics={tableMetrics}
+                  onOpenTable={handleOpenTable}
+                />
+              </div>
+
+              {/* Right: Suggested Actions (2 columns) */}
+              <div className="lg:col-span-2">
+                <QuickActionsSection
+                  suggestions={suggestions}
+                  onApply={handleApplySuggestion}
+                  onOpenTable={handleOpenTable}
+                  isLoading={suggestionsLoading}
+                />
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -210,14 +176,6 @@ function ColumnsIcon() {
   return (
     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-    </svg>
-  )
-}
-
-function ChartIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
     </svg>
   )
 }
