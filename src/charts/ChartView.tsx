@@ -38,7 +38,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
   }, [columns])
   
   const config = chartNode?.plan.config || {}
-  const { data: chartData, loading, error } = useChartData(sourceTableId, config, sourceVersionHash)
+  const { data: chartData, loading, error } = useChartData(sourceTableId, config, sourceVersionHash, columns)
   
   const [isEditingName, setIsEditingName] = useState(false)
   const [editName, setEditName] = useState('')

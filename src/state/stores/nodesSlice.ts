@@ -12,7 +12,6 @@ import type {
   ChartNode,
   TableNode,
   Position,
-  TransformDef,
 } from '@/types'
 import { generateId } from '@/lib/utils'
 import { getAllDescendants } from '@/engine/dependencyGraph'

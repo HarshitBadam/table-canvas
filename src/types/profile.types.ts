@@ -30,6 +30,8 @@ export type ColumnClassification =
   | 'temporal'
   /** Free-form text - not suitable for charts */
   | 'text'
+  /** Boolean values - good for pie/bar charts */
+  | 'boolean'
 
 // ============================================================================
 // Column Profile

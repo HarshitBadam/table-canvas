@@ -4,8 +4,21 @@
  * Functions for detecting patterns in string data.
  */
 
-import type { TypoMatch, PlaceholderDetection } from '../types'
 import { isPlaceholder } from '../../cleaningConstants'
+
+/** Result of typo detection (near-duplicate values) */
+export interface TypoMatch {
+  from: string
+  to: string
+  fromCount: number
+  toCount: number
+}
+
+/** Result of placeholder detection */
+export interface PlaceholderResult {
+  placeholders: string[]
+  totalCount: number
+}
 
 // ============================================================================
 // Whitespace Detection
@@ -156,7 +169,7 @@ export function findTypos(topValues: Array<{ value: unknown; count: number }>): 
  */
 export function findPlaceholders(
   topValues: Array<{ value: unknown; count: number }>
-): PlaceholderDetection {
+): PlaceholderResult {
   const found: string[] = []
   let totalCount = 0
 

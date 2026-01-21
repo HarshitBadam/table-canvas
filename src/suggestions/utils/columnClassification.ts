@@ -71,8 +71,8 @@ export function isGroupableCategory(col: ColumnSchema, profile?: ColumnProfile):
 export function isMeasureColumn(col: ColumnSchema, profile?: ColumnProfile): boolean {
   if (col.type !== 'number') return false
   
-  // Check semantic hints
-  if (col.semanticHints?.includes('measure') || col.semanticHints?.includes('amount')) {
+  // Check semantic hints - currency and percentage are common measure types
+  if (col.semanticHints?.includes('currency') || col.semanticHints?.includes('percentage')) {
     return true
   }
   
@@ -120,7 +120,7 @@ export function isDimensionColumn(col: ColumnSchema, profile?: ColumnProfile): b
  * Classify a numeric column as continuous or discrete.
  */
 export function classifyNumericColumn(
-  col: ColumnSchema,
+  _col: ColumnSchema,
   profile: ColumnProfile | undefined,
   rowCount: number
 ): 'continuous_numeric' | 'discrete_numeric' {

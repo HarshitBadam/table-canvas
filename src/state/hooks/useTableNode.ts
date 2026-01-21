@@ -4,7 +4,6 @@
  * Selector hook for accessing table node data with memoization.
  */
 
-import { useMemo } from 'react'
 import { useProjectStore } from '../projectStore'
 import type { TableNode, SourceTableNode, DerivedTableNode } from '@/types'
 

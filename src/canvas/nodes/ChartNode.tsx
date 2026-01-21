@@ -30,7 +30,8 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
   const xAxisName = config.xAxis ? (columnNames[config.xAxis] || config.xAxis) : ''
   const yAxisName = config.yAxis ? (columnNames[config.yAxis] || config.yAxis) : ''
 
-  const { data: chartData, loading, error } = useChartData(sourceTableId, config, sourceVersionHash)
+  const columns = sourceTable?.schema?.columns
+  const { data: chartData, loading, error } = useChartData(sourceTableId, config, sourceVersionHash, columns)
 
   // Chart type colors for subtle accents
   const typeColors: Record<string, string> = {

@@ -16,8 +16,8 @@ export function looksLikeDate(value: unknown): boolean {
   const str = String(value)
 
   const datePatterns = [
-    /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/,  // MM/DD/YYYY or DD-MM-YYYY
-    /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/,     // YYYY-MM-DD
+    /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/,  // MM/DD/YYYY or DD-MM-YYYY
+    /^\d{4}[/-]\d{1,2}[/-]\d{1,2}$/,     // YYYY-MM-DD
     /^[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4}$/,   // Month DD, YYYY
     /^\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}$/,     // DD Month YYYY
   ]

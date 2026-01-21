@@ -320,76 +320,72 @@ export function AppProvider({ children }: AppProviderProps) {
   // ========================================================================
 
   const login = useCallback(async (credentials: LoginCredentials) => {
-    try {
-      const { user } = await apiLogin(credentials);
-      
-      setState((prev) => ({
-        ...prev,
-        user,
-        isAuthenticated: true,
-      }));
+    const { user } = await apiLogin(credentials);
+    
+    setState((prev) => ({
+      ...prev,
+      user,
+      isAuthenticated: true,
+    }));
 
-      // Load project after login
-      setPhase('loading_project');
-      const projectList = await fetchProjects();
-      
-      let project;
-      if (projectList.length > 0) {
-        project = await loadProjectWithSync(projectList[0].id);
-      }
-      
-      if (!project) {
-        project = await createProjectWithSync('Untitled Project');
-      }
-
-      useProjectStore.setState({
-        projectId: project.id,
-        projectName: project.name,
-        nodes: project.nodes,
-        edges: project.edges,
-        patches: project.patches,
-      });
-
-      setState((prev) => ({
-        ...prev,
-        projectId: project.id,
-        projectName: project.name,
-        projects: projectList.length > 0 ? projectList : [
-          { id: project.id, name: project.name, updatedAt: new Date(), createdAt: new Date() },
-        ],
-      }));
-
-      // Materialize tables (source first, then derived)
-      const sourceTableIds = Object.entries(project.nodes)
-        .filter(([, node]) => node.kind === 'source_table')
-        .map(([id]) => id);
-
-      const derivedTableIds = Object.entries(project.nodes)
-        .filter(([, node]) => node.kind === 'derived_table')
-        .map(([id]) => id);
-
-      if (sourceTableIds.length > 0 || derivedTableIds.length > 0) {
-        setPhase('materializing');
-        for (const tableId of sourceTableIds) {
-          try {
-            await ensureTableMaterialized(tableId);
-          } catch {
-            // Materialization failed
-          }
-        }
-        for (const tableId of derivedTableIds) {
-          try {
-            await ensureTableMaterialized(tableId);
-          } catch {
-            // Materialization failed
-          }
-        }
-      }
-
-      setPhase('ready');
-    } catch (error) {
-      throw error;
+    // Load project after login
+    setPhase('loading_project');
+    const projectList = await fetchProjects();
+    
+    let project;
+    if (projectList.length > 0) {
+      project = await loadProjectWithSync(projectList[0].id);
     }
+    
+    if (!project) {
+      project = await createProjectWithSync('Untitled Project');
+    }
+
+    useProjectStore.setState({
+      projectId: project.id,
+      projectName: project.name,
+      nodes: project.nodes,
+      edges: project.edges,
+      patches: project.patches,
+    });
+
+    setState((prev) => ({
+      ...prev,
+      projectId: project.id,
+      projectName: project.name,
+      projects: projectList.length > 0 ? projectList : [
+        { id: project.id, name: project.name, updatedAt: new Date(), createdAt: new Date() },
+      ],
+    }));
+
+    // Materialize tables (source first, then derived)
+    const sourceTableIds = Object.entries(project.nodes)
+      .filter(([, node]) => node.kind === 'source_table')
+      .map(([id]) => id);
+
+    const derivedTableIds = Object.entries(project.nodes)
+      .filter(([, node]) => node.kind === 'derived_table')
+      .map(([id]) => id);
+
+    if (sourceTableIds.length > 0 || derivedTableIds.length > 0) {
+      setPhase('materializing');
+      for (const tableId of sourceTableIds) {
+        try {
+          await ensureTableMaterialized(tableId);
+        } catch {
+          // Materialization failed
+        }
+      }
+      for (const tableId of derivedTableIds) {
+        try {
+          await ensureTableMaterialized(tableId);
+        } catch {
+          // Materialization failed
+        }
+      }
+    }
+
+    setPhase('ready');
   }, [setPhase]);
 
   const logout = useCallback(async () => {
@@ -429,29 +425,25 @@ export function AppProvider({ children }: AppProviderProps) {
   // ========================================================================
 
   const createNewProject = useCallback(async (name?: string) => {
-    try {
-      const project = await createProjectWithSync(name || 'Untitled Project');
-      
-      useProjectStore.setState({
-        projectId: project.id,
-        projectName: project.name,
-        nodes: project.nodes,
-        edges: project.edges,
-        patches: project.patches,
-      });
+    const project = await createProjectWithSync(name || 'Untitled Project');
+    
+    useProjectStore.setState({
+      projectId: project.id,
+      projectName: project.name,
+      nodes: project.nodes,
+      edges: project.edges,
+      patches: project.patches,
+    });
 
-      setState((prev) => ({
-        ...prev,
-        projectId: project.id,
-        projectName: project.name,
-        projects: [
-          { id: project.id, name: project.name, updatedAt: new Date(), createdAt: new Date() },
-          ...prev.projects,
-        ],
-      }));
-    } catch (error) {
-      throw error;
-    }
+    setState((prev) => ({
+      ...prev,
+      projectId: project.id,
+      projectName: project.name,
+      projects: [
+        { id: project.id, name: project.name, updatedAt: new Date(), createdAt: new Date() },
+        ...prev.projects,
+      ],
+    }));
   }, []);
 
   const loadProject = useCallback(async (projectId: string) => {
