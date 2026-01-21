@@ -1,0 +1,18 @@
+# Data files - sample datasets don't need indexing
+data/
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# Lock files (large, not useful for context)
+package-lock.json
+server/package-lock.json
