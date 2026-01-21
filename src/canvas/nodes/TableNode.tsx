@@ -1,8 +1,7 @@
 import { memo, useCallback, useState, useRef, useEffect } from 'react'
 import { Handle, Position, NodeProps } from 'reactflow'
-import { TableSchema, CacheInfo, ColumnProfile, NodeUI, NodeViewMode, CellValue, ViewFilterConfig } from '@/lib/types'
+import { TableSchema, CacheInfo, NodeUI, NodeViewMode, CellValue, ViewFilterConfig } from '@/lib/types'
 import { formatNumber } from '@/lib/utils'
-import type { ProfileResult } from '@/engine/types'
 import { MiniTableView } from './MiniTableView'
 
 interface TableNodeData {
@@ -13,8 +12,6 @@ interface TableNodeData {
   cacheInfo?: CacheInfo
   ui: NodeUI
   selected: boolean
-  profile?: ProfileResult
-  profileLoading?: boolean
   patches?: {
     cellPatches?: Record<string, Record<string, CellValue>>
     deletedRows?: Set<string>
@@ -28,26 +25,6 @@ interface TableNodeData {
 // ============================================================================
 // iOS-Inspired Table Card Design System
 // ============================================================================
-
-function formatStat(value: number | undefined): string {
-  if (value === undefined || value === null) return '—'
-  if (Number.isNaN(value)) return '—'
-  if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(1)}M`
-  if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(1)}K`
-  if (Number.isInteger(value)) return value.toLocaleString()
-  return value.toFixed(2)
-}
-
-function formatDateSpan(minDate: number, maxDate: number): string {
-  const diffMs = maxDate - minDate
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  if (diffDays < 1) return '< 1 day'
-  if (diffDays < 30) return `${diffDays}d`
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo`
-  const years = Math.floor(diffDays / 365)
-  const months = Math.floor((diffDays % 365) / 30)
-  return months > 0 ? `${years}y ${months}mo` : `${years}y`
-}
 
 // Type badge colors - refined, muted tones (no green)
 function getTypeBadgeStyle(type: string): { bg: string; text: string } {
@@ -67,196 +44,22 @@ function getTypeBadgeStyle(type: string): { bg: string; text: string } {
   return { bg: 'bg-gray-100 dark:bg-gray-500/15', text: 'text-gray-500 dark:text-gray-400' }
 }
 
-// Stat row - refined spacing and typography
-function StatRow({ label, value, secondary }: { label: string; value: string; secondary?: string }) {
-  return (
-    <div className="flex justify-between items-baseline py-1">
-      <span className="text-[11px] text-text-tertiary font-medium">{label}</span>
-      <span className="text-[11px] font-mono text-text-primary tabular-nums">
-        {value}
-        {secondary && <span className="text-text-tertiary ml-1.5 font-normal">{secondary}</span>}
-      </span>
-    </div>
-  )
-}
-
-// Numeric stats
-function NumericStats({ profile }: { profile: ColumnProfile }) {
-  if (profile.min === undefined && profile.mean === undefined) return null
-  return (
-    <div className="space-y-0.5">
-      <StatRow label="Range" value={`${formatStat(profile.min)} – ${formatStat(profile.max)}`} />
-      {profile.mean !== undefined && <StatRow label="Mean" value={formatStat(profile.mean)} />}
-      {profile.median !== undefined && <StatRow label="Median" value={formatStat(profile.median)} />}
-      {profile.stdDev !== undefined && <StatRow label="Std Dev" value={formatStat(profile.stdDev)} />}
-      {profile.iqr !== undefined && <StatRow label="IQR" value={formatStat(profile.iqr)} />}
-    </div>
-  )
-}
-
-// String stats - handles unique vs categorical differently
-function StringStats({ profile, rowCount }: { profile: ColumnProfile; rowCount: number }) {
-  const isUnique = profile.cardinalityClass === 'unique'
-  const isHighCardinality = profile.cardinalityClass === 'high'
-  const topValues = profile.topValues?.slice(0, 4) || []
-  
-  // For unique fields - show distinct count + sample values
-  if (isUnique || isHighCardinality) {
-    const samples = topValues.slice(0, 3).map(tv => String(tv.value))
-    const sampleText = samples.join(', ') + (topValues.length > 3 ? ' …' : '')
-    return (
-      <div className="space-y-1.5">
-        <StatRow 
-          label="Distinct" 
-          value={formatNumber(profile.distinctCount)} 
-          secondary={isUnique ? "(unique)" : `of ${formatNumber(rowCount)}`} 
-        />
-        {samples.length > 0 && (
-          <div className="text-[11px] text-text-secondary leading-relaxed truncate">
-            {sampleText}
-          </div>
-        )}
-      </div>
-    )
-  }
-  
-  // For low cardinality (categorical) - show distribution
-  if (topValues.length === 0) return null
-  return (
-    <div className="space-y-1.5">
-      <StatRow label="Distinct" value={formatNumber(profile.distinctCount)} />
-      <div className="pt-1.5 border-t border-gray-100 dark:border-gray-700/50 space-y-1">
-        {topValues.map((tv, i) => {
-          const pct = rowCount > 0 ? ((tv.count / rowCount) * 100).toFixed(0) : '0'
-          return (
-            <div key={i} className="flex justify-between items-center">
-              <span className="text-[11px] text-text-secondary truncate max-w-[150px]">{String(tv.value)}</span>
-              <span className="text-[10px] font-mono text-text-tertiary tabular-nums">{pct}%</span>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// Boolean stats - visual bar representation
-function BooleanStats({ profile }: { profile: ColumnProfile }) {
-  const topValues = profile.topValues || []
-  if (topValues.length === 0) return null
-  const trueVal = topValues.find(v => v.value === true || v.value === 'true')
-  const falseVal = topValues.find(v => v.value === false || v.value === 'false')
-  const total = (trueVal?.count || 0) + (falseVal?.count || 0)
-  const truePct = total > 0 ? (trueVal?.count || 0) / total * 100 : 0
-  
-  return (
-    <div className="space-y-2">
-      <div className="h-1.5 bg-gray-100 dark:bg-gray-700/50 rounded-full overflow-hidden">
-        <div 
-          className="h-full bg-blue-500 dark:bg-blue-400 rounded-full transition-all"
-          style={{ width: `${truePct}%` }}
-        />
-      </div>
-      <div className="flex justify-between text-[11px]">
-        <span>
-          <span className="font-medium text-text-primary">{truePct.toFixed(0)}%</span>
-          <span className="text-text-tertiary ml-1">true</span>
-        </span>
-        <span>
-          <span className="font-medium text-text-primary">{(100 - truePct).toFixed(0)}%</span>
-          <span className="text-text-tertiary ml-1">false</span>
-        </span>
-      </div>
-    </div>
-  )
-}
-
-// Date stats
-function DateStats({ profile }: { profile: ColumnProfile }) {
-  if (profile.min === undefined || profile.max === undefined) return null
-  const min = new Date(profile.min)
-  const max = new Date(profile.max)
-  return (
-    <div className="space-y-0.5">
-      <StatRow label="From" value={min.toLocaleDateString()} />
-      <StatRow label="To" value={max.toLocaleDateString()} />
-      <StatRow label="Span" value={formatDateSpan(profile.min, profile.max)} />
-    </div>
-  )
-}
-
-// Column profile card - iOS grouped list style
-function ColumnProfileCard({ 
-  column, columnProfile, columnType, rowCount
-}: { 
-  column: { id: string; name: string; type: string }
-  columnProfile?: ColumnProfile
-  columnType: string
-  rowCount: number
-}) {
-  const nullCount = columnProfile?.missingCount ?? 0
-  const nullPct = columnProfile?.missingPercent ?? 0
-  const typeStyle = getTypeBadgeStyle(columnType)
-  
-  return (
-    <div className="px-4 py-3">
-      {/* Header row */}
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[13px] font-medium text-text-primary truncate flex-1" title={column.name}>
-          {column.name}
-        </span>
-        <span className={`text-[10px] font-medium uppercase px-1.5 py-0.5 rounded ${typeStyle.bg} ${typeStyle.text}`}>
-          {columnType}
-        </span>
-      </div>
-      
-      {/* Meta line */}
-      <div className="text-[11px] text-text-tertiary mt-1">
-        {formatNumber(rowCount - nullCount)} values
-        {nullCount > 0 && (
-          <span className={nullPct > 5 ? 'text-amber-600 dark:text-amber-400' : ''}>
-            {' · '}{nullPct.toFixed(1)}% null
-          </span>
-        )}
-      </div>
-      
-      {/* Stats */}
-      {columnProfile && (
-        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/50">
-          {columnType === 'number' && <NumericStats profile={columnProfile} />}
-          {columnType === 'string' && <StringStats profile={columnProfile} rowCount={rowCount} />}
-          {columnType === 'boolean' && <BooleanStats profile={columnProfile} />}
-          {(columnType === 'date' || columnType === 'datetime') && <DateStats profile={columnProfile} />}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // Helper to get current view mode from UI state
 function getViewMode(ui: NodeUI | undefined): NodeViewMode {
   // If viewMode is explicitly set, use it
   if (ui?.viewMode) return ui.viewMode
-  // Legacy support: convert expanded boolean to view mode
-  if (ui?.expanded) return 'stats'
+  // Legacy support: expanded boolean maps to data
+  if (ui?.expanded) return 'data'
   return 'collapsed'
 }
 
-// View mode labels and icons
+// View mode labels and icons (only schema and data now)
 const VIEW_MODE_CONFIG: Record<NodeViewMode, { label: string; icon: JSX.Element }> = {
   collapsed: {
     label: 'Schema',
     icon: (
       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-      </svg>
-    ),
-  },
-  stats: {
-    label: 'Stats',
-    icon: (
-      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     ),
   },
@@ -367,8 +170,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
   const rowCount = schema?.rowCount ?? 0
   const colCount = schema?.columns.length ?? 0
   const viewMode = getViewMode(data.ui)
-  const profile = data.profile
-  const profileLoading = data.profileLoading
   const hasFilters = data.viewFilters && data.viewFilters.conditions.length > 0
 
   const handleSetViewMode = useCallback((mode: NodeViewMode) => {
@@ -426,9 +227,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
                   Filtered
                 </span>
               )}
-              {profileLoading && (
-                <span className={`inline-block w-1.5 h-1.5 rounded-full ${isSource ? 'bg-[#217346]' : 'bg-violet-500'} animate-pulse`} />
-              )}
             </p>
           </div>
           
@@ -464,32 +262,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
                 +{schema.columns.length - 4} more
               </div>
             )}
-          </div>
-        )}
-
-        {/* Stats: Column profiles */}
-        {viewMode === 'stats' && schema && schema.columns.length > 0 && (
-          <div 
-            className="max-h-[400px] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800/50 nowheel scrollbar-hide"
-            onWheelCapture={(e) => e.stopPropagation()}
-          >
-            {!profile && !profileLoading && (
-              <div className="px-4 py-6 text-[12px] text-text-tertiary text-center">
-                No profile data available
-              </div>
-            )}
-            {schema.columns.map((col) => {
-              const columnProfile = profile?.columns.find(p => p.columnId === col.id)
-              return (
-                <ColumnProfileCard
-                  key={col.id}
-                  column={col}
-                  columnProfile={columnProfile}
-                  columnType={col.type}
-                  rowCount={rowCount}
-                />
-              )
-            })}
           </div>
         )}
 
