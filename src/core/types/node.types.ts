@@ -18,7 +18,7 @@ export interface Position {
   y: number;
 }
 
-export type NodeViewMode = 'collapsed' | 'stats' | 'data';
+export type NodeViewMode = 'collapsed' | 'data';
 
 export interface NodeUI {
   position: Position;

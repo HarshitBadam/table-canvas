@@ -76,15 +76,15 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   // Helper to get current view mode from UI state
   const getViewMode = useCallback((ui: { expanded?: boolean; viewMode?: NodeViewMode }): NodeViewMode => {
     if (ui?.viewMode) return ui.viewMode
-    if (ui?.expanded) return 'stats'
+    // Legacy: expanded maps to data now (stats removed)
+    if (ui?.expanded) return 'data'
     return 'collapsed'
   }, [])
 
-  // Helper to get next view mode in cycle
+  // Helper to get next view mode in cycle (only 2 modes now)
   const getNextViewMode = useCallback((current: NodeViewMode): NodeViewMode => {
     switch (current) {
-      case 'collapsed': return 'stats'
-      case 'stats': return 'data'
+      case 'collapsed': return 'data'
       case 'data': return 'collapsed'
       default: return 'collapsed'
     }
@@ -94,12 +94,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const handleSetViewMode = useCallback((nodeId: string, mode: NodeViewMode) => {
     const node = projectNodes[nodeId]
     if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-      updateNodeUI(nodeId, { viewMode: mode, expanded: mode === 'stats' })
-      
-      // Trigger profile loading when switching to stats mode
-      if (mode === 'stats') {
-        loadProfileForTable(nodeId)
-      }
+      updateNodeUI(nodeId, { viewMode: mode, expanded: mode === 'data' })
     }
   }, [projectNodes, updateNodeUI])
 
