@@ -1,0 +1,17 @@
+product_id,product_name,category,supplier,cost_price,retail_price,stock_quantity,reorder_level,last_restocked
+PROD001,Laptop Pro,Electronics,TechSupply Inc,950.00,1299.99,45,20,2024-02-15
+PROD002,Wireless Mouse,Electronics,TechSupply Inc,15.00,29.99,250,100,2024-03-01
+PROD003,Office Chair,Furniture,OfficePlus,150.00,249.99,80,30,2024-02-20
+PROD004,USB Hub,Electronics,TechSupply Inc,8.00,19.99,400,150,2024-03-05
+PROD005,Standing Desk,Furniture,OfficePlus,350.00,599.99,25,10,2024-01-28
+PROD006,Monitor 27",Electronics,DisplayCorp,200.00,349.99,60,25,2024-02-10
+PROD007,Keyboard,Electronics,TechSupply Inc,35.00,79.99,180,75,2024-03-08
+PROD008,Desk Lamp,Furniture,LightWorks,22.00,45.99,300,100,2024-02-25
+PROD009,Webcam HD,Electronics,TechSupply Inc,45.00,89.99,120,50,2024-03-12
+PROD010,Filing Cabinet,Furniture,OfficePlus,95.00,189.99,40,15,2024-01-15
+PROD011,Headphones Pro,Electronics,AudioMax,75.00,149.99,90,40,2024-03-01
+PROD012,Desk Organizer,Furniture,OfficePlus,12.00,24.99,200,80,2024-02-28
+PROD013,External SSD 1TB,Electronics,StorageTech,55.00,109.99,150,60,2024-03-10
+PROD014,Ergonomic Mousepad,Electronics,TechSupply Inc,8.00,18.99,350,120,2024-02-22
+PROD015,Bookshelf,Furniture,OfficePlus,180.00,329.99,35,12,2024-01-20
+

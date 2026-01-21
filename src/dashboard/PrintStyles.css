@@ -1,0 +1,173 @@
+/**
+ * Print Styles for PDF Export
+ * Creates a polished, print-safe layout
+ */
+
+@media print {
+  /* Hide non-print elements */
+  .print\\:hidden {
+    display: none !important;
+  }
+
+  /* Show print-only elements */
+  .print\\:block {
+    display: block !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 1.5cm;
+  }
+
+  /* Reset body */
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: white !important;
+    font-size: 10pt;
+  }
+
+  /* Hide sidebar and other UI */
+  aside,
+  header,
+  nav,
+  .react-flow__controls,
+  .react-flow__minimap,
+  button:not(.print-keep) {
+    display: none !important;
+  }
+
+  /* Dashboard container */
+  .dashboard-container {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Chart cards */
+  .dashboard-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 1cm;
+    border: 1px solid #e5e5ea !important;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: none !important;
+  }
+
+  /* Chart titles */
+  .chart-title {
+    font-size: 12pt;
+    font-weight: 600;
+    padding: 0.5cm;
+    border-bottom: 1px solid #e5e5ea;
+    background: #f5f5f7;
+  }
+
+  /* Chart content */
+  .chart-content {
+    padding: 0.5cm;
+    min-height: 200px;
+  }
+
+  /* SVG charts - ensure they print */
+  svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Grid layout for dashboard */
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1cm;
+  }
+
+  /* Full width charts */
+  .dashboard-card.full-width {
+    grid-column: span 2;
+  }
+
+  /* Typography */
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+
+  p, table {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Tables */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th, td {
+    border: 1px solid #e5e5ea;
+    padding: 0.3cm;
+    text-align: left;
+  }
+
+  th {
+    background: #f5f5f7;
+    font-weight: 600;
+  }
+
+  /* Links */
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  /* Footer with page numbers */
+  .print-footer {
+    position: fixed;
+    bottom: 0.5cm;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 9pt;
+    color: #6e6e73;
+  }
+
+  /* Header for each page */
+  .print-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 0.5cm;
+    border-bottom: 1px solid #e5e5ea;
+    background: white;
+    font-size: 10pt;
+    color: #6e6e73;
+  }
+
+  /* Date stamp */
+  .print-date::after {
+    content: " - Printed on " attr(data-date);
+  }
+
+  /* Ensure colors print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Recharts specific fixes */
+  .recharts-wrapper {
+    margin: 0 auto;
+  }
+
+  .recharts-surface {
+    overflow: visible !important;
+  }
+
+  .recharts-legend-wrapper {
+    position: static !important;
+  }
+}
+

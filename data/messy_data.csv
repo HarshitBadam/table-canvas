@@ -1,0 +1,21 @@
+id,product_name,category,status,price,quantity,notes
+1,Laptop Pro ,Electronics,active,950,25,Good product
+2, Wireless Mouse,Electronics,Active,15,150,Best seller
+3,Office Chair,electronics,ACTIVE,150,45,N/A
+4,USB Hub,electronics,active,-5,200,TBD
+5,Standing Desk,ELECTRONICS,Active,350,12,Premium
+6,Monitor 27",ELECTRONICS,active,200,30,Popular
+7, Keyboard ,electronics,inactive,35,85,null
+8,Desk Lamp,ELECTRONICS,Active,22,60,Great
+9,Webcam HD,electronics,active,45,2500,unknown
+10,Filing Cabinet,Electronics,ACTIVE,95,18,Heavy duty
+11,Headphones Pro,ELECTRONICS,Active,75,55,N/A
+12,Desk Organizer,electronics,active,12,100,TBD
+13,External SSD,Electronics,Active,55,70,Fast
+14,Mousepad,ELECTRONICS,active,8,250,Comfort
+15,Bookshelf,electronics,Active,180,8,null
+16,Power Strip,Electronics,active,25,90,6 outlets
+17,Whiteboard,ELECTRONICS,Active,45,25,Large
+18,Cable Kit,electronics,active,10,180,unknown
+19,Monitor Stand,Electronics,Active,25,65,NULL
+20,Laptop Bag,ELECTRONICS,active,30,40,Nice
