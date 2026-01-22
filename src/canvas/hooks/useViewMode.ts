@@ -42,7 +42,11 @@ export function useViewMode({
 }: UseViewModeOptions): UseViewModeReturn {
   // Get current view mode from UI state
   const getViewMode = useCallback((ui: NodeUIState): NodeViewMode => {
-    if (ui?.viewMode) return ui.viewMode
+    if (ui?.viewMode) {
+      // Handle legacy 'stats' mode - map to 'collapsed'
+      if ((ui.viewMode as string) === 'stats') return 'collapsed'
+      return ui.viewMode
+    }
     // Legacy: expanded maps to data now (stats removed)
     if (ui?.expanded) return 'data'
     return 'collapsed'

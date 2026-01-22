@@ -102,34 +102,27 @@ export function Dashboard({ onOpenTable, onOpenSuggestions }: DashboardProps) {
         {!hasData ? (
           <EmptyState />
         ) : (
-          <div className="max-w-7xl mx-auto space-y-6">
-            {/* Hero: Data Flow (full width) */}
+          <div className="max-w-5xl mx-auto space-y-8">
+            {/* Data Flow (full width) */}
             <LineageMiniMap
               nodes={lineageData.nodes}
               edges={lineageData.edges}
               onNodeClick={handleOpenTable}
             />
 
-            {/* Two Column Layout: Your Data + Suggested Actions */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-              {/* Left: Table Stats (larger - 3 columns) */}
-              <div className="lg:col-span-3">
-                <TableStatsSection
-                  tableMetrics={tableMetrics}
-                  onOpenTable={handleOpenTable}
-                />
-              </div>
+            {/* Your Data - Table Cards (full width) */}
+            <TableStatsSection
+              tableMetrics={tableMetrics}
+              onOpenTable={handleOpenTable}
+            />
 
-              {/* Right: Suggested Actions (2 columns) */}
-              <div className="lg:col-span-2">
-                <QuickActionsSection
-                  suggestions={suggestions}
-                  onApply={handleApplySuggestion}
-                  onOpenTable={handleOpenTable}
-                  isLoading={suggestionsLoading}
-                />
-              </div>
-            </div>
+            {/* Suggested Actions (full width) */}
+            <QuickActionsSection
+              suggestions={suggestions}
+              onApply={handleApplySuggestion}
+              onOpenTable={handleOpenTable}
+              isLoading={suggestionsLoading}
+            />
           </div>
         )}
       </div>
