@@ -87,15 +87,13 @@ export const flagOutliersRule: SuggestionRule = {
         'May indicate data entry errors',
       ],
       impact: {
-        kind: 'insight',
+        kind: 'patch',
         summary: `Highlights ${count} value(s) for review`,
       },
       action: {
         kind: 'highlightCells',
-        filter: {
-          columnId: meta.column!.id,
-          condition: 'outlier',
-        },
+        cells: [],  // Will be populated during apply
+        target: 'source',
       },
     }
   },

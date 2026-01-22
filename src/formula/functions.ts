@@ -456,7 +456,7 @@ registerFunction({
   maxArgs: 1,
   examples: ['NOT([active])'],
   evaluate: (args) => {
-    return !Boolean(args[0])
+    return !args[0]
   },
 })
 

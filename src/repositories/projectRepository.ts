@@ -14,7 +14,6 @@ import {
   deleteProjectWithSync,
   getSyncStatus,
   isNetworkOnline,
-  type ProjectWithSync,
   type SyncStatus,
 } from '@/persistence/syncService'
 import {
@@ -26,7 +25,7 @@ import {
   importProjectFile,
   type StoredProject,
 } from '@/persistence/db'
-import type { ProjectSummary } from '@/api/projects.api'
+// Note: ProjectSummary type is used in syncService
 
 // ============================================================================
 // Types

@@ -276,7 +276,9 @@ function MainApp() {
           )}
           {viewMode === 'dashboard' && (
             <ErrorBoundary name="Dashboard">
-              <Dashboard />
+              <Dashboard 
+                onOpenTable={handleOpenTable}
+              />
             </ErrorBoundary>
           )}
         </div>

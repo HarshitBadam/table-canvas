@@ -20,7 +20,8 @@ export type ColumnClassification =
   | 'low_cardinality_cat'    // String with <20 distinct values - good for pie/bar
   | 'high_cardinality_cat'   // String with 20-95% unique - needs Top N treatment  
   | 'temporal'               // Date/datetime - suitable for time series
-  | 'text';                  // Free-form text - not suitable for charts
+  | 'text'                   // Free-form text - not suitable for charts
+  | 'boolean';               // Boolean values - good for pie/bar charts
 
 // ============================================================================
 // Column Profile

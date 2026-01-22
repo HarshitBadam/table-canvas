@@ -66,8 +66,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               'focus:outline-none focus:ring-2',
               'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-surface-secondary',
               sizeStyles[size],
-              leftIcon && 'pl-10',
-              rightIcon && 'pr-10',
+              leftIcon ? 'pl-10' : '',
+              rightIcon ? 'pr-10' : '',
               error
                 ? 'border-error focus:border-error focus:ring-error/20'
                 : 'border-border focus:border-primary-500 focus:ring-primary-500/20',

@@ -44,7 +44,7 @@ export const GridContextMenu = memo(function GridContextMenu({
   onInsertColumnRight,
   onToggleHighlight,
   onCreateChart,
-  onClose,
+  onClose: _onClose,
 }: GridContextMenuProps) {
   if (!isEditable) return null;
 

@@ -4,7 +4,12 @@
  * Functions for detecting patterns in numeric data.
  */
 
-import type { OutlierDetection } from '../types'
+/** Result of outlier detection using IQR method */
+export interface OutlierResult {
+  hasOutliers: boolean
+  lowerBound: number
+  upperBound: number
+}
 
 // ============================================================================
 // Number Detection
@@ -63,7 +68,7 @@ export function detectOutliers(profile: {
   q1?: number
   q3?: number
   iqr?: number
-}): OutlierDetection | null {
+}): OutlierResult | null {
   const { min, max, q1, q3, iqr } = profile
   if (q1 === undefined || q3 === undefined || iqr === undefined || iqr === 0) {
     return null
