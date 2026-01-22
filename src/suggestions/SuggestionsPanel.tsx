@@ -1,6 +1,6 @@
 /**
  * Suggestions Panel Component
- * Displays AI-generated suggestions in a slide-out drawer with enhanced UX
+ * Displays context-aware suggestions in a slide-out drawer
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
@@ -125,7 +125,6 @@ export function SuggestionsPanel({
   // Load profile when panel opens
   useEffect(() => {
     if (isOpen && tableId) {
-      console.log('[Suggestions] Panel opened, triggering profile load for:', tableId)
       loadProfile()
     }
   }, [isOpen, tableId, loadProfile])
@@ -138,18 +137,6 @@ export function SuggestionsPanel({
     )
   }, [profile])
 
-  // Log when profile changes
-  useEffect(() => {
-    console.log('[Suggestions] Profile state changed:', {
-      tableId,
-      hasProfile: !!profile,
-      profileLoading,
-      rowCount: profile?.rowCount,
-      columnCount: profile?.columns?.length,
-      hasPhase2Stats,
-      phase: profile?.phase,
-    })
-  }, [tableId, profile, profileLoading, hasPhase2Stats])
 
   // Detect when Phase 2 stats become available and clear cache to regenerate suggestions
   useEffect(() => {
@@ -167,7 +154,6 @@ export function SuggestionsPanel({
     const hasPhase2Now = hasPhase2Stats
     
     if (cached && cached.length > 0 && !hadPhase2Before && hasPhase2Now) {
-      console.log('[Suggestions] Phase 2 stats now available - clearing cache to regenerate suggestions with outlier detection')
       clearCache(tableId)
       lastPhase2StatsSeenRef.current = true
     } else if (hasPhase2Now) {
@@ -199,7 +185,6 @@ export function SuggestionsPanel({
     
     // Don't generate while profile is still loading
     if (profileLoading) {
-      console.log('[Suggestions] Waiting for profile to load...')
       return
     }
 
@@ -207,7 +192,6 @@ export function SuggestionsPanel({
     // An empty cache might mean we generated before profile loaded
     const cached = getSuggestions(contextKey)
     if (cached && cached.length > 0) {
-      console.log('[Suggestions] Using cached suggestions:', cached.length)
       lastContextKeyRef.current = contextKey
       return
     }
@@ -256,19 +240,9 @@ export function SuggestionsPanel({
         existingDerivedTables,
       }
 
-      console.log('[Suggestions] Generating suggestions with context:', {
-        tableId,
-        tableName: node.name,
-        schemaColumns: node.schema!.columns.map(c => ({ id: c.id, name: c.name, type: c.type })),
-        hasProfile: !!profile,
-        profileColumns: profile?.columns.map(c => ({ id: c.columnId, distinctCount: c.distinctCount })),
-        selectedColumnId,
-      })
-
       const newSuggestions = selectedColumnId 
         ? getColumnSuggestions(context)
         : generateSuggestions(context)
-      console.log('[Suggestions] Generated suggestions:', newSuggestions.length, newSuggestions.map(s => s.title))
 
       // Check again before setting
       if (!shouldCancelRequest(requestId)) {

@@ -5,7 +5,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
-import type { ChartConfig, AggregationType, TableNode } from '@/lib/types'
+import type { AggregationType, TableNode, ProjectNode } from '@/lib/types'
 import { generateId } from '@/lib/utils'
 
 type ChartType = 'bar' | 'line' | 'pie' | 'scatter'
@@ -29,7 +29,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
   const saveSnapshot = useProjectStore((state) => state.saveSnapshot)
 
   const tables = useMemo(() => 
-    Object.values(nodes).filter((n): n is TableNode => n.kind === 'source_table' || n.kind === 'derived_table'),
+    (Object.values(nodes) as ProjectNode[]).filter((n): n is TableNode => n.kind === 'source_table' || n.kind === 'derived_table'),
     [nodes]
   )
 

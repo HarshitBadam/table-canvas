@@ -29,10 +29,8 @@ async function loadTableIntoEngine(
       error: undefined,
     })
     
-    console.log(`[Import] Table ${tableId} loaded into engine and marked as fresh`)
     return true
   } catch (error) {
-    console.error('[Import] Failed to load table into engine:', error)
     // Mark error state
     useProjectStore.getState().updateCacheInfo(tableId, {
       isDirty: true,

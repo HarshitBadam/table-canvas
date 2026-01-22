@@ -4,6 +4,7 @@ import { useApp } from '@/state/AppContext'
 import { ImportButton } from '@/components/ImportButton'
 import { NewTableModal } from '@/canvas/modals/NewTableModal'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import type { ProjectNode, TableNode, ChartNode } from '@/lib/types'
 
 interface SidebarProps {
   onOpenTable: (tableId: string) => void
@@ -19,12 +20,13 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenDashboard }: SidebarPr
   const [newTableModalOpen, setNewTableModalOpen] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
-  const tableNodes = Object.values(nodes).filter(
-    (node) => node.kind === 'source_table' || node.kind === 'derived_table'
+  const allNodes = Object.values(nodes) as ProjectNode[]
+  const tableNodes = allNodes.filter(
+    (node): node is TableNode => node.kind === 'source_table' || node.kind === 'derived_table'
   )
 
-  const chartNodes = Object.values(nodes).filter(
-    (node) => node.kind === 'chart'
+  const chartNodes = allNodes.filter(
+    (node): node is ChartNode => node.kind === 'chart'
   )
 
   // Handle new table creation - opens modal for schema configuration

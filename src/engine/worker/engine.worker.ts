@@ -42,8 +42,6 @@ async function initDuckDB(): Promise<void> {
   URL.revokeObjectURL(worker_url)
   
   conn = await db.connect()
-  
-  console.log('[Engine Worker] DuckDB initialized')
 }
 
 // Load table data into DuckDB
@@ -77,8 +75,6 @@ async function loadTable(request: LoadTableRequest): Promise<void> {
       await conn.query(`INSERT INTO "${tableName}" (${columns}) VALUES ${values}`)
     }
   }
-  
-  console.log(`[Engine Worker] Loaded table ${tableName} with ${data.rows.length} rows`)
 }
 
 // Get table schema for building explicit column lists

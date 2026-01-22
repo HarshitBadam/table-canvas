@@ -1,0 +1,236 @@
+/**
+ * GridToolbar Component
+ * 
+ * Toolbar for grid actions (add row/column, filter, suggestions, etc.)
+ */
+
+import { memo } from 'react';
+import { formatNumber, clsx } from '@/lib/utils';
+
+export interface GridToolbarProps {
+  totalRows: number;
+  unfilteredTotalRows: number;
+  columnCount: number;
+  hasActiveFilters: boolean;
+  activeFilterCount: number;
+  highlightCount: number;
+  isDirty: boolean;
+  isComputing: boolean;
+  isMaterializing: boolean;
+  isEditable: boolean;
+  showSuggestions: boolean;
+  showFilterPanel: boolean;
+  rowInsertionDescription: string;
+  columnInsertionDescription: string;
+  onAddRow: () => void;
+  onAddColumn: () => void;
+  onToggleFilters: () => void;
+  onToggleSuggestions: () => void;
+  onCreateChart: () => void;
+  onClearHighlights: () => void;
+  onToggleTheme: () => void;
+  theme: 'light' | 'dark';
+}
+
+export const GridToolbar = memo(function GridToolbar({
+  totalRows,
+  unfilteredTotalRows,
+  columnCount,
+  hasActiveFilters,
+  activeFilterCount,
+  highlightCount,
+  isDirty,
+  isComputing,
+  isMaterializing,
+  isEditable,
+  showSuggestions,
+  showFilterPanel,
+  rowInsertionDescription,
+  columnInsertionDescription,
+  onAddRow,
+  onAddColumn,
+  onToggleFilters,
+  onToggleSuggestions,
+  onCreateChart,
+  onClearHighlights,
+  onToggleTheme,
+  theme,
+}: GridToolbarProps) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-surface">
+      {/* Row/Column count */}
+      <div className="text-sm text-text-secondary">
+        {hasActiveFilters ? (
+          <>
+            <span className="font-medium text-green-600 dark:text-green-400">
+              {formatNumber(totalRows)}
+            </span>
+            <span className="text-text-tertiary"> of {formatNumber(unfilteredTotalRows)}</span>
+            {' '}rows × {columnCount} columns
+          </>
+        ) : (
+          <>{formatNumber(totalRows)} rows × {columnCount} columns</>
+        )}
+        {/* Status indicators */}
+        {isDirty && !isMaterializing && !isComputing && (
+          <span className="ml-2 text-amber-600 dark:text-amber-400 text-xs">
+            (needs refresh)
+          </span>
+        )}
+        {(isMaterializing || isComputing) && (
+          <span className="ml-2 text-blue-600 dark:text-blue-400 text-xs animate-pulse">
+            (computing...)
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1" />
+
+      {/* Editable actions */}
+      {isEditable && (
+        <>
+          <button
+            onClick={onAddRow}
+            className="btn btn-primary text-xs gap-1.5"
+            title={`Insert row ${rowInsertionDescription}`}
+          >
+            <PlusIcon />
+            Add Row
+            <span className="text-[10px] opacity-60 font-normal ml-1">
+              {rowInsertionDescription}
+            </span>
+          </button>
+          <button
+            onClick={onAddColumn}
+            className="btn btn-primary text-xs gap-1.5"
+            title={`Insert column ${columnInsertionDescription}`}
+          >
+            <PlusIcon />
+            Add Column
+            <span className="text-[10px] opacity-60 font-normal ml-1">
+              {columnInsertionDescription}
+            </span>
+          </button>
+          <span className="badge badge-blue">Editable</span>
+        </>
+      )}
+
+      {!isEditable && (
+        <span className="badge badge-orange">View only (Derived table)</span>
+      )}
+
+      {/* Filter button */}
+      <button
+        onClick={onToggleFilters}
+        className={clsx('btn text-xs', showFilterPanel || hasActiveFilters ? 'btn-primary' : 'btn-ghost')}
+      >
+        <FilterIcon />
+        Filter
+        {hasActiveFilters && (
+          <span className="ml-1 px-1.5 py-0.5 text-[10px] font-medium bg-white/20 rounded-full">
+            {activeFilterCount}
+          </span>
+        )}
+      </button>
+
+      {/* Create Chart button */}
+      <button
+        onClick={onCreateChart}
+        className="btn btn-secondary text-xs gap-1.5"
+        title="Create chart from this table"
+      >
+        <ChartIcon />
+        Create Chart
+      </button>
+
+      {/* Clear Highlights button */}
+      {highlightCount > 0 && (
+        <button
+          onClick={onClearHighlights}
+          className="btn btn-ghost text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+          title="Clear all highlighted cells"
+        >
+          <XIcon />
+          Clear {highlightCount} Highlight{highlightCount !== 1 ? 's' : ''}
+        </button>
+      )}
+
+      {/* Suggestions button */}
+      <button
+        onClick={onToggleSuggestions}
+        className={clsx('btn text-xs', showSuggestions ? 'btn-primary' : 'btn-ghost')}
+      >
+        <LightbulbIcon />
+        Suggestions
+      </button>
+
+      {/* Theme Toggle */}
+      <div className="ml-auto flex items-center gap-2">
+        <button
+          onClick={onToggleTheme}
+          className="btn btn-ghost text-xs p-2"
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+        >
+          {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+        </button>
+      </div>
+    </div>
+  );
+});
+
+// Icons
+function PlusIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  );
+}
+
+function FilterIcon() {
+  return (
+    <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+    </svg>
+  );
+}
+
+function ChartIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  );
+}
+
+function LightbulbIcon() {
+  return (
+    <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+    </svg>
+  );
+}

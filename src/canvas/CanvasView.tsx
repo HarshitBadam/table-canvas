@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import ReactFlow, {
   Controls,
   Node,
@@ -17,16 +17,18 @@ import 'reactflow/dist/style.css'
 import { useProjectStore } from '@/state/projectStore'
 import { useApp } from '@/state/AppContext'
 import { useProfilingStore, loadProfileForTable } from '@/profiling/profiler'
-import type { NodeViewMode } from '@/lib/types'
+import type { NodeViewMode, ProjectNode, Edge as ProjectEdge } from '@/lib/types'
 import { wouldCreateCycle } from '@/engine/dependencyGraph'
 import { TableNodeComponent } from './nodes/TableNode'
 import { ChartNodeComponent } from './nodes/ChartNode'
-import { TransformModal } from './modals/TransformModal'
-import { NewTableModal } from './modals/NewTableModal'
 import { ImportButton } from '@/components/ImportButton'
 import { computeSmartEdges, SmartEdge } from './edgeRouter'
 import { CustomConnectionLine } from './ConnectionLine'
 import { getLayoutedNodes, LayoutDirection } from './autoLayout'
+
+// Lazy loaded modals for code splitting
+const TransformModal = lazy(() => import('./modals/TransformModal').then(m => ({ default: m.TransformModal })))
+const NewTableModal = lazy(() => import('./modals/NewTableModal').then(m => ({ default: m.NewTableModal })))
 
 // Define custom node types
 const nodeTypes: NodeTypes = {
@@ -127,7 +129,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
 
   // Convert project nodes to React Flow nodes
   const initialNodes: Node[] = useMemo(() => {
-    return Object.values(projectNodes).map((node) => ({
+    return (Object.values(projectNodes) as ProjectNode[]).map((node) => ({
       id: node.id,
       type: node.kind === 'chart' ? 'chartNode' : 'tableNode',
       position: node.ui.position,
@@ -155,7 +157,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
 
   // Base edges without handle computation (for reuse during drag)
   const baseEdges: Edge[] = useMemo(() => {
-    return Object.values(projectEdges).map((edge) => ({
+    return (Object.values(projectEdges) as ProjectEdge[]).map((edge) => ({
       id: edge.id,
       source: edge.fromNodeId,
       target: edge.toNodeId,
@@ -191,7 +193,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
 
   // Convert project edges to React Flow edges with smart handle selection
   const initialEdges: SmartEdge[] = useMemo(() => {
-    const rfNodes: Node[] = Object.values(projectNodes).map((node) => ({
+    const rfNodes: Node[] = (Object.values(projectNodes) as ProjectNode[]).map((node) => ({
       id: node.id,
       type: node.kind === 'chart' ? 'chartNode' : 'tableNode',
       position: node.ui.position,
@@ -482,21 +484,27 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         )}
       </ReactFlow>
 
-      {/* Transform Modal */}
+      {/* Transform Modal - Lazy Loaded */}
       {transformModalOpen && pendingConnection && (
-        <TransformModal
-          isOpen={transformModalOpen}
-          onClose={handleTransformModalClose}
-          sourceNodeId={pendingConnection.source}
-          targetNodeId={pendingConnection.target}
-        />
+        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center"><div className="bg-surface rounded-lg p-8 animate-pulse">Loading...</div></div>}>
+          <TransformModal
+            isOpen={transformModalOpen}
+            onClose={handleTransformModalClose}
+            sourceNodeId={pendingConnection.source}
+            targetNodeId={pendingConnection.target}
+          />
+        </Suspense>
       )}
       
-      {/* New Table Modal */}
-      <NewTableModal
-        isOpen={newTableModalOpen}
-        onClose={() => setNewTableModalOpen(false)}
-      />
+      {/* New Table Modal - Lazy Loaded */}
+      {newTableModalOpen && (
+        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center"><div className="bg-surface rounded-lg p-8 animate-pulse">Loading...</div></div>}>
+          <NewTableModal
+            isOpen={newTableModalOpen}
+            onClose={() => setNewTableModalOpen(false)}
+          />
+        </Suspense>
+      )}
       
       {/* Cycle Warning Toast */}
       {cycleWarning && (

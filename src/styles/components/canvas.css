@@ -1,0 +1,108 @@
+/**
+ * Canvas Component Styles
+ * 
+ * ReactFlow canvas and node styles.
+ */
+
+@layer components {
+  /* Canvas container */
+  .canvas-container {
+    @apply h-full w-full bg-canvas;
+  }
+
+  /* Node base styles */
+  .canvas-node {
+    @apply bg-surface rounded-lg shadow-node;
+    @apply border-2 transition-shadow duration-fast;
+    @apply cursor-pointer;
+  }
+
+  .canvas-node:hover {
+    @apply shadow-node-hover;
+  }
+
+  .canvas-node.selected {
+    @apply shadow-node-hover;
+  }
+
+  /* Source table node */
+  .canvas-node-source {
+    @apply bg-node-source border-node-source-border;
+  }
+
+  /* Derived table node */
+  .canvas-node-derived {
+    @apply bg-node-derived border-node-derived-border;
+  }
+
+  /* Chart node */
+  .canvas-node-chart {
+    @apply bg-node-chart border-node-chart-border;
+  }
+
+  /* Node header */
+  .node-header {
+    @apply flex items-center gap-2 px-3 py-2;
+    @apply border-b border-border-subtle;
+  }
+
+  .node-title {
+    @apply text-sm font-medium text-text-primary truncate;
+  }
+
+  .node-badge {
+    @apply px-1.5 py-0.5 text-[10px] font-medium rounded;
+    @apply bg-surface-secondary text-text-secondary;
+  }
+
+  /* Node body */
+  .node-body {
+    @apply p-3;
+  }
+
+  /* Node stats */
+  .node-stats {
+    @apply flex flex-col gap-1;
+  }
+
+  .node-stat {
+    @apply flex items-center justify-between;
+    @apply text-xs text-text-secondary;
+  }
+
+  .node-stat-value {
+    @apply font-mono text-text-primary;
+  }
+
+  /* Node handles */
+  .react-flow__handle {
+    @apply w-3 h-3 bg-accent-green border-2 border-white;
+    @apply transition-transform duration-fast;
+  }
+
+  .react-flow__handle:hover {
+    @apply scale-125;
+  }
+
+  /* Edge styles */
+  .react-flow__edge-path {
+    stroke: var(--edge-color);
+    stroke-width: 2.5;
+  }
+
+  .react-flow__edge.selected .react-flow__edge-path {
+    stroke-width: 3;
+  }
+
+  /* Controls panel */
+  .react-flow__controls {
+    @apply bg-surface border border-border rounded-lg shadow-md;
+    @apply overflow-hidden;
+  }
+
+  .react-flow__controls-button {
+    @apply bg-transparent border-none text-text-secondary;
+    @apply hover:bg-surface-secondary hover:text-text-primary;
+    @apply transition-colors;
+  }
+}

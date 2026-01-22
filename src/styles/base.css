@@ -1,0 +1,212 @@
+/**
+ * Base Styles
+ * 
+ * CSS reset, custom properties (CSS variables), and typography.
+ * This file establishes the design system foundation.
+ */
+
+/* ============================================================================
+   CSS Custom Properties for Runtime Theming
+   ============================================================================ */
+
+:root {
+  /* Light mode colors (default) - Excel Green Theme */
+  --color-canvas: #f8faf9;
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f5f5f7;
+  --color-surface-tertiary: #e8e8ed;
+  --color-border: #d2d2d7;
+  --color-border-subtle: #e5e5ea;
+  --color-border-focus: #217346;
+  --color-text-primary: #1d1d1f;
+  --color-text-secondary: #6e6e73;
+  --color-text-tertiary: #86868b;
+  --color-accent: #217346;
+  --color-accent-hover: #185c37;
+  --color-success: #107c41;
+  --color-warning: #ff9500;
+  --color-error: #ff3b30;
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas, monospace;
+
+  /* Spacing (4px/8px grid) */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --spacing-2xl: 32px;
+
+  /* Border Radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* Edge color */
+  --edge-color: #217346;
+
+  /* Transitions */
+  --transition-fast: 100ms;
+  --transition-normal: 150ms;
+  --transition-slow: 300ms;
+  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dark mode - Excel Green Theme */
+[data-theme="dark"] {
+  --color-canvas: #0a0c0b;
+  --color-surface: #1a1a1a;
+  --color-surface-secondary: #242424;
+  --color-surface-tertiary: #2e2e2e;
+  --color-border: #3a3a3a;
+  --color-border-subtle: #2e2e2e;
+  --color-border-focus: #22a45d;
+  --color-text-primary: #f5f5f5;
+  --color-text-secondary: #a3a3a3;
+  --color-text-tertiary: #737373;
+  --color-accent: #22a45d;
+  --color-accent-hover: #2ecc71;
+  --color-success: #27ae60;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+
+  /* Darker shadows for dark mode */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  
+  /* Edge color for dark mode */
+  --edge-color: #28a55a;
+}
+
+/* System preference dark mode - Excel Green Theme */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-canvas: #0a0c0b;
+    --color-surface: #1a1a1a;
+    --color-surface-secondary: #242424;
+    --color-surface-tertiary: #2e2e2e;
+    --color-border: #3a3a3a;
+    --color-border-subtle: #2e2e2e;
+    --color-border-focus: #28a55a;
+    --color-text-primary: #f5f5f5;
+    --color-text-secondary: #a3a3a3;
+    --color-text-tertiary: #737373;
+    --color-accent: #28a55a;
+    --color-accent-hover: #2ecc71;
+    --color-success: #27ae60;
+    --color-warning: #f59e0b;
+    --color-error: #ef4444;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    
+    /* Edge color for dark mode */
+    --edge-color: #28a55a;
+  }
+}
+
+/* ============================================================================
+   CSS Reset & Base Styles
+   ============================================================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  background-color: var(--color-canvas);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hide number input spinners globally */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ============================================================================
+   Focus Styles
+   ============================================================================ */
+
+:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   Scrollbar Styling
+   ============================================================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(33, 115, 70, 0.6);
+}
+
+/* Dark mode scrollbar */
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 164, 93, 0.7);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
+    background: rgba(34, 164, 93, 0.7);
+  }
+}
+
+/* Hide scrollbar utilities */
+.scrollbar-hide::-webkit-scrollbar,
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide,
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ============================================================================
+   Selection Style - Excel Green
+   ============================================================================ */
+
+::selection {
+  background-color: rgba(33, 115, 70, 0.2);
+}

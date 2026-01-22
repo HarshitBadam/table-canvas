@@ -1,0 +1,104 @@
+/**
+ * Grid Component Styles
+ * 
+ * Data grid specific styles.
+ */
+
+@layer components {
+  /* Grid container */
+  .grid-container {
+    @apply flex flex-col h-full bg-surface;
+    @apply border border-border rounded-lg overflow-hidden;
+  }
+
+  /* Grid header */
+  .grid-header {
+    @apply flex items-center bg-surface-secondary;
+    @apply border-b border-border;
+    @apply sticky top-0 z-sticky;
+  }
+
+  /* Grid header cell */
+  .grid-header-cell {
+    @apply flex items-center gap-1 px-2;
+    @apply text-xs font-medium text-text-secondary;
+    @apply border-r border-border;
+    @apply cursor-pointer select-none;
+    @apply hover:bg-surface-tertiary;
+  }
+
+  .grid-header-cell.selected {
+    @apply bg-accent-green/10 text-accent-green;
+  }
+
+  /* Grid body */
+  .grid-body {
+    @apply flex-1 overflow-auto;
+  }
+
+  /* Grid row */
+  .grid-row {
+    @apply flex border-b border-border-subtle;
+    @apply hover:bg-surface-secondary/50;
+  }
+
+  .grid-row.selected {
+    @apply bg-accent-green/5;
+  }
+
+  /* Grid cell */
+  .grid-cell {
+    @apply flex items-center px-2;
+    @apply text-sm text-text-primary;
+    @apply border-r border-border-subtle;
+    @apply overflow-hidden;
+  }
+
+  .grid-cell.selected {
+    @apply bg-accent-green/10 outline outline-2 outline-accent-green;
+  }
+
+  .grid-cell.highlighted {
+    @apply bg-emerald-100 dark:bg-emerald-900/50;
+    @apply outline outline-2 outline-emerald-500;
+  }
+
+  .grid-cell.editing {
+    @apply p-0;
+  }
+
+  .grid-cell.editing input {
+    @apply w-full h-full px-2 bg-transparent;
+    @apply border-none outline-none;
+  }
+
+  /* Row number column */
+  .grid-row-number {
+    @apply w-12 flex-shrink-0;
+    @apply flex items-center justify-center;
+    @apply text-xs text-text-tertiary;
+    @apply bg-surface-secondary border-r border-border;
+    @apply cursor-pointer;
+  }
+
+  .grid-row-number:hover,
+  .grid-row-number.selected {
+    @apply bg-accent-green/10 text-accent-green;
+  }
+
+  /* Fill handle */
+  .fill-handle {
+    @apply absolute bottom-0 right-0 w-2.5 h-2.5;
+    @apply bg-accent-green cursor-crosshair z-10;
+    @apply hover:bg-accent-green-hover;
+    transform: translate(50%, 50%);
+  }
+
+  /* Resize handle */
+  .resize-handle {
+    @apply absolute right-0 top-0 bottom-0 w-1;
+    @apply cursor-col-resize z-10;
+    @apply hover:bg-accent-green/50;
+    @apply transition-colors;
+  }
+}

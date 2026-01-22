@@ -169,12 +169,6 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
       }
     }
     
-    console.log(`[MaterializationService] Loading source table ${tableId}...`, {
-      existsInEngine,
-      hasExistingData: !!existingData?.rows?.length,
-      isDirty: node.cacheInfo?.isDirty,
-    })
-    
     // Load data from IndexedDB
     let rows: TableRow[] = []
     
@@ -189,14 +183,8 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
           ...row,
           __rowId: row.__rowId || `row_${idx}`,
         }))
-        
-        console.log(`[MaterializationService] Loaded ${rows.length} rows from file`)
       } else {
-        // File not in IndexedDB - this happens for projects created before file saving was implemented
-        // User needs to re-import the data
-        console.warn(`[MaterializationService] File not found in IndexedDB: ${node.plan.fileRef}`)
-        console.warn('[MaterializationService] Please re-import the data file to restore the table')
-        
+        // File not in IndexedDB - user needs to re-import the data
         projectStore.updateCacheInfo(tableId, {
           isComputing: false,
           error: 'Data file not found. Please re-import the file.',
@@ -237,7 +225,6 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
     
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error(`[MaterializationService] Error loading source table ${tableId}:`, error)
     
     projectStore.updateCacheInfo(tableId, {
       isComputing: false,
@@ -261,8 +248,6 @@ async function parseFileData(
   sheetName?: string,
   schema?: TableSchema
 ): Promise<TableRow[]> {
-  console.log(`[MaterializationService] Parsing ${fileType} file...`, fileData.byteLength, 'bytes')
-  
   if (fileType === 'csv') {
     return parseCSVData(fileData, schema)
   } else if (fileType === 'xlsx') {
@@ -284,15 +269,10 @@ function parseCSVData(fileData: ArrayBuffer, schema?: TableSchema): Promise<Tabl
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        if (results.errors.length > 0) {
-          console.warn('[MaterializationService] CSV parsing warnings:', results.errors)
-        }
-        
         const rows = convertToTableRows(results.data, results.meta.fields || [], schema)
         resolve(rows)
       },
-      error: (error: Error) => {
-        console.error('[MaterializationService] CSV parsing error:', error)
+      error: () => {
         resolve([])
       },
     })
@@ -310,7 +290,6 @@ function parseExcelData(fileData: ArrayBuffer, sheetName?: string, schema?: Tabl
       const sheet = wb.Sheets[targetSheet]
       
       if (!sheet) {
-        console.error(`[MaterializationService] Sheet "${targetSheet}" not found`)
         resolve([])
         return
       }
@@ -458,12 +437,6 @@ async function computeDerivedTable(tableId: string): Promise<MaterializationResu
       }
     }
     
-    console.log(`[MaterializationService] Computing derived table ${tableId}...`, {
-      existsInEngine,
-      hasDataInStore,
-      isDirty: node.cacheInfo?.isDirty,
-    })
-    
     // Execute the transform
     const result = await engine.executeTransform(node.plan.transformDef, tableId)
     
@@ -503,10 +476,8 @@ async function computeDerivedTable(tableId: string): Promise<MaterializationResu
         __rowId: `derived_row_${idx}`,
       })) as TableRow[]
       dataStore.setTableData(tableId, rows)
-      console.log(`[MaterializationService] Stored ${rows.length} rows for derived table ${tableId}`)
-    } catch (sliceError) {
+    } catch {
       // Fallback to preview if full fetch fails
-      console.warn('[MaterializationService] Failed to fetch full data, using preview:', sliceError)
       if (result.preview && result.preview.length > 0) {
         const rows: TableRow[] = result.preview.map((row, idx) => ({
           ...row,
