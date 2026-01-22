@@ -47,7 +47,11 @@ function getTypeBadgeStyle(type: string): { bg: string; text: string } {
 // Helper to get current view mode from UI state
 function getViewMode(ui: NodeUI | undefined): NodeViewMode {
   // If viewMode is explicitly set, use it
-  if (ui?.viewMode) return ui.viewMode
+  if (ui?.viewMode) {
+    // Handle legacy 'stats' mode - map to 'collapsed'
+    if ((ui.viewMode as string) === 'stats') return 'collapsed'
+    return ui.viewMode
+  }
   // Legacy support: expanded boolean maps to data
   if (ui?.expanded) return 'data'
   return 'collapsed'
