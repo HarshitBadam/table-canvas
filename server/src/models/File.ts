@@ -88,7 +88,7 @@ const FileSchema = new Schema<IFileDocument, IFileModel>(
     deletedAt: {
       type: Date,
       default: null,
-      index: true,
+      // Index defined below with sparse option
     },
   },
   {

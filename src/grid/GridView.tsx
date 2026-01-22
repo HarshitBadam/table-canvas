@@ -10,6 +10,7 @@ import { GridFilterConfig, applyFilters, createEmptyFilterConfig, hasActiveFilte
 import { FormulaColumnModal } from './FormulaColumnModal'
 import { evaluateFormula, FormulaValue } from '@/formula'
 import { ensureTableMaterialized } from '@/engine/materializationService'
+import type { GridClipboardData } from '@/types/clipboard.types'
 
 // Lazy loaded components for code splitting
 const SuggestionsPanel = lazy(() => import('@/suggestions/SuggestionsPanel').then(m => ({ default: m.SuggestionsPanel })))
@@ -980,9 +981,69 @@ export function GridView({ tableId }: GridViewProps) {
     }
   }, [selection, columns])
 
+  // Get selected cell data for copy operation
+  const getSelectedCellData = useCallback((): GridClipboardData | null => {
+    if (!node) return null;
+    
+    let range: { startRow: number; endRow: number; startColIndex: number; endColIndex: number };
+    
+    if (cellRangeSelection) {
+      range = cellRangeSelection;
+    } else if (selection?.type === 'cell') {
+      const colIndex = columns.findIndex(c => c.id === selection.columnId);
+      if (colIndex < 0) return null;
+      range = {
+        startRow: selection.rowIndex,
+        endRow: selection.rowIndex,
+        startColIndex: colIndex,
+        endColIndex: colIndex,
+      };
+    } else {
+      return null;
+    }
+    
+    const selectedCols = columns.slice(range.startColIndex, range.endColIndex + 1);
+    const headers = selectedCols.map(c => c.name);
+    const columnIds = selectedCols.map(c => c.id);
+    const dataRows = filteredRows.slice(range.startRow, range.endRow + 1)
+      .map(row => selectedCols.map(col => getDisplayValue(row.__rowId, col.id, row[col.id], row)));
+    
+    return {
+      headers,
+      columnIds,
+      rows: dataRows,
+      sourceTableId: tableId,
+      sourceTableName: node.name,
+      timestamp: Date.now(),
+    };
+  }, [cellRangeSelection, selection, columns, filteredRows, getDisplayValue, tableId, node]);
+
+  // Format clipboard data as tab-separated text for external paste
+  const formatClipboardText = useCallback((data: GridClipboardData): string => {
+    const headerRow = data.headers.join('\t');
+    const dataRows = data.rows.map(row => 
+      row.map(cell => cell === null || cell === undefined ? '' : String(cell)).join('\t')
+    );
+    return [headerRow, ...dataRows].join('\n');
+  }, []);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Copy handler (Cmd+C / Ctrl+C)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+        if (cellRangeSelection || selection?.type === 'cell') {
+          const data = getSelectedCellData();
+          if (data) {
+            e.preventDefault();
+            // Store structured data for internal paste (report)
+            window.__gridClipboard = data;
+            // Also copy as text for external paste
+            navigator.clipboard.writeText(formatClipboardText(data)).catch(console.error);
+          }
+        }
+      }
+      
       if (editingCell) {
         if (e.key === 'Enter') {
           e.preventDefault()
@@ -1056,7 +1117,7 @@ export function GridView({ tableId }: GridViewProps) {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [editingCell, selectedCell, selection, columns, rows, isEditable, commitEdit, cancelEdit, startEditing, getDisplayValue, saveSnapshot, setCellValue, tableId])
+  }, [editingCell, selectedCell, selection, columns, rows, isEditable, commitEdit, cancelEdit, startEditing, getDisplayValue, saveSnapshot, setCellValue, tableId, cellRangeSelection, getSelectedCellData, formatClipboardText])
 
   if (!node) {
     return (

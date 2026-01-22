@@ -3,7 +3,7 @@
  * Renders different chart types using Recharts
  */
 
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import {
   BarChart,
   Bar,
@@ -31,10 +31,14 @@ interface ChartRendererProps {
   showLegend?: boolean
   compact?: boolean  // When true, hides axis labels and tooltips for cleaner canvas display
   columnNames?: Record<string, string>  // columnId -> displayName mapping
+  colorScheme?: string[]  // Custom color palette
+  showGrid?: boolean  // Show/hide grid lines (default true)
+  title?: string  // Optional chart title
+  subtitle?: string  // Optional chart subtitle
 }
 
 // Improved color palette - harmonious, accessible, Apple-inspired
-const COLORS = [
+const DEFAULT_COLORS = [
   '#217346', // Excel Green (primary)
   '#2D8B57', // Lighter green
   '#0EA5E9', // Sky blue
@@ -69,7 +73,7 @@ function formatAxisValue(value: CellValue): string {
   return String(value)
 }
 
-export function ChartRenderer({
+export const ChartRenderer = memo(function ChartRenderer({
   type,
   config,
   data,
@@ -77,7 +81,14 @@ export function ChartRenderer({
   showLegend = true,
   compact = false,
   columnNames = {},
+  colorScheme,
+  showGrid = true,
+  title,
+  subtitle,
 }: ChartRendererProps) {
+  // Use custom colors or default
+  const COLORS = colorScheme && colorScheme.length > 0 ? colorScheme : DEFAULT_COLORS
+  
   // Process data for chart
   const chartData = useMemo(() => {
     if (!config.xAxis) return []
@@ -95,6 +106,10 @@ export function ChartRenderer({
   const yAxisKey = config.yAxis || ''
   const xAxisName = columnNames[xAxisKey] || xAxisKey
   const yAxisName = columnNames[yAxisKey] || yAxisKey
+  
+  // Calculate actual height accounting for title/subtitle
+  const headerHeight = (title ? 28 : 0) + (subtitle ? 20 : 0)
+  const chartHeight = height - headerHeight
 
   // Common tooltip style
   const tooltipStyle = {
@@ -120,15 +135,38 @@ export function ChartRenderer({
     typeof chartData[0][xAxisKey] === 'number' && 
     isTimestamp(chartData[0][xAxisKey] as number)
 
+  // Wrapper component for title/subtitle
+  const ChartWrapper = ({ children }: { children: React.ReactNode }) => (
+    <div style={{ height }}>
+      {(title || subtitle) && !compact && (
+        <div className="mb-2">
+          {title && (
+            <h3 className="text-base font-semibold text-text-primary">{title}</h3>
+          )}
+          {subtitle && (
+            <p className="text-sm text-text-secondary">{subtitle}</p>
+          )}
+        </div>
+      )}
+      <div style={{ height: chartHeight }}>
+        {children}
+      </div>
+    </div>
+  )
+
+  // Determine if grid should be shown
+  const shouldShowGrid = showGrid && !compact
+
   switch (type) {
     case 'bar':
       return (
-        <ResponsiveContainer width="100%" height={height}>
-          <BarChart 
-            data={chartData} 
-            margin={compact ? { top: 8, right: 8, left: 2, bottom: 2 } : { top: 20, right: 30, left: 20, bottom: 5 }}
-          >
-            {!compact && <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />}
+        <ChartWrapper>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart 
+              data={chartData} 
+              margin={compact ? { top: 8, right: 8, left: 2, bottom: 2 } : { top: 20, right: 30, left: 20, bottom: 5 }}
+            >
+              {shouldShowGrid && <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />}
             <XAxis 
               dataKey={xAxisKey}
               tick={compact ? false : { fontSize: 12, fill: '#6e6e73' }}
@@ -160,16 +198,18 @@ export function ChartRenderer({
             />
           </BarChart>
         </ResponsiveContainer>
+      </ChartWrapper>
       )
 
     case 'line':
       return (
-        <ResponsiveContainer width="100%" height={height}>
-          <LineChart 
-            data={chartData} 
-            margin={compact ? { top: 8, right: 8, left: 2, bottom: 2 } : { top: 20, right: 30, left: 20, bottom: 5 }}
-          >
-            {!compact && <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />}
+        <ChartWrapper>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart 
+              data={chartData} 
+              margin={compact ? { top: 8, right: 8, left: 2, bottom: 2 } : { top: 20, right: 30, left: 20, bottom: 5 }}
+            >
+              {shouldShowGrid && <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />}
             <XAxis 
               dataKey={xAxisKey}
               tick={compact ? false : { fontSize: 12, fill: '#6e6e73' }}
@@ -204,6 +244,7 @@ export function ChartRenderer({
             />
           </LineChart>
         </ResponsiveContainer>
+      </ChartWrapper>
       )
 
     case 'pie': {
@@ -246,18 +287,19 @@ export function ChartRenderer({
       })
       
       return (
-        <div className="relative w-full flex" style={{ height }}>
-          {/* Grid background covering entire area */}
-          {!compact && (
-            <div 
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                backgroundImage: 'linear-gradient(#e5e5ea 1px, transparent 1px), linear-gradient(90deg, #e5e5ea 1px, transparent 1px)',
-                backgroundSize: '40px 40px',
-                opacity: 0.5,
-              }}
-            />
-          )}
+        <ChartWrapper>
+          <div className="relative w-full h-full flex">
+            {/* Grid background covering entire area */}
+            {shouldShowGrid && (
+              <div 
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  backgroundImage: 'linear-gradient(#e5e5ea 1px, transparent 1px), linear-gradient(90deg, #e5e5ea 1px, transparent 1px)',
+                  backgroundSize: '40px 40px',
+                  opacity: 0.5,
+                }}
+              />
+            )}
           
           {/* Chart area */}
           <div className="flex-1 relative">
@@ -270,7 +312,7 @@ export function ChartRenderer({
                   cx="50%"
                   cy="50%"
                   innerRadius={0}
-                  outerRadius={compact ? height / 2.5 : "85%"}
+                  outerRadius={compact ? chartHeight / 2.5 : "85%"}
                   paddingAngle={1}
                   label={false}
                   labelLine={false}
@@ -311,8 +353,8 @@ export function ChartRenderer({
           
           {/* Custom legend on the right */}
           {!compact && showLegend && (
-            <div className="w-48 flex flex-col justify-center pl-4 pr-2">
-              <div className="space-y-2">
+            <div className="w-48 flex flex-col justify-center pl-4 pr-2 relative z-10">
+              <div className="space-y-2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-lg p-3 shadow-sm border border-gray-100 dark:border-gray-800">
                 {legendData.map((item, index) => (
                   <div key={index} className="flex items-center gap-3">
                     <div 
@@ -323,7 +365,7 @@ export function ChartRenderer({
                       <div className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
                         {item.name}
                       </div>
-                      <div className="text-xs text-gray-400">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
                         {item.value.toLocaleString()} · {item.percent.toFixed(0)}%
                       </div>
                     </div>
@@ -333,14 +375,16 @@ export function ChartRenderer({
             </div>
           )}
         </div>
+      </ChartWrapper>
       )
     }
 
     case 'scatter':
       return (
-        <ResponsiveContainer width="100%" height={height}>
-          <ScatterChart margin={compact ? { top: 8, right: 8, left: 2, bottom: 2 } : { top: 20, right: 30, left: 20, bottom: 5 }}>
-            {!compact && <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />}
+        <ChartWrapper>
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={compact ? { top: 8, right: 8, left: 2, bottom: 2 } : { top: 20, right: 30, left: 20, bottom: 5 }}>
+              {shouldShowGrid && <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />}
             <XAxis 
               dataKey={xAxisKey}
               type="number"
@@ -374,6 +418,7 @@ export function ChartRenderer({
             />
           </ScatterChart>
         </ResponsiveContainer>
+      </ChartWrapper>
       )
 
     default:
@@ -386,7 +431,7 @@ export function ChartRenderer({
         </div>
       )
   }
-}
+});
 
 /**
  * Mini chart for dashboard cards and canvas previews

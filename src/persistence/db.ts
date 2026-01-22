@@ -1,10 +1,11 @@
 /**
  * IndexedDB Persistence Layer
- * Stores project data, file blobs, and cached results
+ * Stores project data, file blobs, cached results, and reports
  */
 
 import { openDB, DBSchema, IDBPDatabase } from 'idb'
 import type { ProjectNode, Edge, Patches } from '@/lib/types'
+import type { Report } from '@/report/types'
 
 // Database schema
 interface TableCanvasDB extends DBSchema {
@@ -41,10 +42,15 @@ interface TableCanvasDB extends DBSchema {
     }
     indexes: { 'by-table': string }
   }
+  reports: {
+    key: string
+    value: Report
+    indexes: { 'by-updated': string }
+  }
 }
 
 const DB_NAME = 'table-canvas'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 let dbInstance: IDBPDatabase<TableCanvasDB> | null = null
 
@@ -55,17 +61,26 @@ async function getDB(): Promise<IDBPDatabase<TableCanvasDB>> {
   if (dbInstance) return dbInstance
 
   dbInstance = await openDB<TableCanvasDB>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      // Projects store
-      const projectStore = db.createObjectStore('projects', { keyPath: 'id' })
-      projectStore.createIndex('by-updated', 'updatedAt')
+    upgrade(db, oldVersion) {
+      // Version 1: Initial schema
+      if (oldVersion < 1) {
+        // Projects store
+        const projectStore = db.createObjectStore('projects', { keyPath: 'id' })
+        projectStore.createIndex('by-updated', 'updatedAt')
 
-      // Files store (for imported data files)
-      db.createObjectStore('files', { keyPath: 'id' })
+        // Files store (for imported data files)
+        db.createObjectStore('files', { keyPath: 'id' })
 
-      // Cache store (for profiling, slices, etc.)
-      const cacheStore = db.createObjectStore('cache', { keyPath: ['tableId', 'type'] })
-      cacheStore.createIndex('by-table', 'tableId')
+        // Cache store (for profiling, slices, etc.)
+        const cacheStore = db.createObjectStore('cache', { keyPath: ['tableId', 'type'] })
+        cacheStore.createIndex('by-table', 'tableId')
+      }
+
+      // Version 2: Add reports store
+      if (oldVersion < 2) {
+        const reportsStore = db.createObjectStore('reports', { keyPath: 'id' })
+        reportsStore.createIndex('by-updated', 'updatedAt')
+      }
     },
   })
 
@@ -325,5 +340,75 @@ export async function importProjectFile(file: File): Promise<string> {
   )
 
   return newId
+}
+
+// ============================================================================
+// Report Operations
+// ============================================================================
+
+/**
+ * Save a report to IndexedDB
+ */
+export async function saveReport(report: Report): Promise<void> {
+  const db = await getDB()
+  await db.put('reports', report)
+}
+
+/**
+ * Load a report from IndexedDB
+ */
+export async function loadReport(id: string): Promise<Report | null> {
+  const db = await getDB()
+  const report = await db.get('reports', id)
+  return report ?? null
+}
+
+/**
+ * Load all reports from IndexedDB
+ */
+export async function loadAllReports(): Promise<Record<string, Report>> {
+  const db = await getDB()
+  const reports = await db.getAll('reports')
+  const result: Record<string, Report> = {}
+  for (const report of reports) {
+    result[report.id] = report
+  }
+  return result
+}
+
+/**
+ * List all reports (summary only)
+ */
+export async function listReports(): Promise<Array<{ id: string; name: string; updatedAt: string }>> {
+  const db = await getDB()
+  const reports = await db.getAllFromIndex('reports', 'by-updated')
+  
+  return reports.map(r => ({
+    id: r.id,
+    name: r.name,
+    updatedAt: r.updatedAt,
+  })).reverse() // Most recent first
+}
+
+/**
+ * Delete a report
+ */
+export async function deleteReport(id: string): Promise<void> {
+  const db = await getDB()
+  await db.delete('reports', id)
+}
+
+/**
+ * Save all reports to IndexedDB (bulk save)
+ */
+export async function saveAllReports(reports: Record<string, Report>): Promise<void> {
+  const db = await getDB()
+  const tx = db.transaction('reports', 'readwrite')
+  
+  for (const report of Object.values(reports)) {
+    await tx.store.put(report)
+  }
+  
+  await tx.done
 }
 
