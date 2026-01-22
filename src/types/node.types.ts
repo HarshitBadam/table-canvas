@@ -14,7 +14,7 @@ import type { Position } from './common.types'
 export type NodeKind = 'source_table' | 'derived_table' | 'chart' | 'dashboard'
 
 /** View modes for table nodes on canvas */
-export type NodeViewMode = 'collapsed' | 'stats' | 'data'
+export type NodeViewMode = 'collapsed' | 'data'
 
 // ============================================================================
 // Node UI State

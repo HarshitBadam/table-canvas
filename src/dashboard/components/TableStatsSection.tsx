@@ -1,15 +1,23 @@
 /**
- * Table Stats Section Component
+ * Your Data Section Component
  * 
- * Expandable table list with column-level statistics.
- * Shows min, max, avg, distributions for each column.
+ * Rich, collapsible table cards with detailed column statistics.
+ * Uses shared stats components for visualizations.
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useProfilingStore } from '@/profiling/profiler'
 import type { TableQualityMetrics } from '../useDashboardData'
 import type { ColumnProfile, TableSchema } from '@/lib/types'
 import { useProjectStore } from '@/state/projectStore'
+import {
+  NumericStats,
+  StringStats,
+  BooleanStats,
+  DateStats,
+  getTypeBadgeStyle,
+  formatNumber,
+} from '@/components/stats'
 
 interface TableStatsSectionProps {
   tableMetrics: TableQualityMetrics[]
@@ -20,7 +28,13 @@ export function TableStatsSection({
   tableMetrics, 
   onOpenTable,
 }: TableStatsSectionProps) {
-  const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
+  // Start with first table expanded by default
+  const [expandedTables, setExpandedTables] = useState<Set<string>>(() => {
+    if (tableMetrics.length > 0) {
+      return new Set([tableMetrics[0].tableId])
+    }
+    return new Set()
+  })
 
   if (tableMetrics.length === 0) {
     return null
@@ -45,16 +59,16 @@ export function TableStatsSection({
   })
 
   return (
-    <div className="bg-surface rounded-xl border border-border">
+    <div className="bg-surface rounded-xl border border-border overflow-hidden">
       {/* Section Header */}
-      <div className="px-4 py-3 border-b border-border">
+      <div className="px-5 py-3 border-b border-border">
         <h3 className="text-sm font-semibold text-text-primary">Your Data</h3>
       </div>
 
       {/* Tables List */}
       <div className="divide-y divide-border">
         {sortedTables.map((table) => (
-          <TableRow
+          <TableCard
             key={table.tableId}
             table={table}
             isExpanded={expandedTables.has(table.tableId)}
@@ -67,8 +81,11 @@ export function TableStatsSection({
   )
 }
 
-// Individual table row with expandable stats
-function TableRow({
+// ============================================================================
+// Table Card Component
+// ============================================================================
+
+function TableCard({
   table,
   isExpanded,
   onToggle,
@@ -86,17 +103,25 @@ function TableRow({
   const node = nodes[table.tableId]
   const schema = node && 'schema' in node ? (node as { schema?: TableSchema }).schema : undefined
 
+  const isSource = table.tableKind === 'source_table'
+
   return (
-    <div>
-      {/* Main Row */}
-      <div className="flex items-center">
-        {/* Expand Toggle */}
+    <div className="transition-colors">
+      {/* Card Header - Always visible */}
+      <div 
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-secondary/30 transition-colors"
+        onClick={onToggle}
+      >
+        {/* Expand/Collapse Toggle */}
         <button
-          onClick={onToggle}
-          className="px-3 py-3 hover:bg-surface-secondary/50 transition-colors"
+          className="flex-shrink-0 p-0.5 rounded hover:bg-surface-secondary transition-colors"
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggle()
+          }}
         >
           <svg 
-            className={`w-4 h-4 text-text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            className={`w-4 h-4 text-text-tertiary transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
             fill="none" 
             viewBox="0 0 24 24" 
             stroke="currentColor"
@@ -105,80 +130,91 @@ function TableRow({
           </svg>
         </button>
 
-        {/* Table Info - Clickable to navigate */}
-        <button
-          onClick={onOpen}
-          className="flex-1 py-3 pr-4 flex items-center gap-3 hover:bg-surface-secondary/50 transition-colors text-left group"
-        >
-          {/* Table Icon */}
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-            table.tableKind === 'source_table' 
-              ? 'bg-node-source/10 text-node-source-border' 
-              : 'bg-node-derived/10 text-node-derived-border'
-          }`}>
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2zm2 0h14v4H5V5zm0 6h4v8H5v-8zm6 0h8v8h-8v-8z" />
-            </svg>
-          </div>
+        {/* Table Icon */}
+        <div className={`
+          w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
+          ${isSource 
+            ? 'bg-[#217346] shadow-sm shadow-[#217346]/20' 
+            : 'bg-violet-500 shadow-sm shadow-violet-500/20'
+          }
+        `}>
+          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2zm2 0h14v4H5V5zm0 6h4v8H5v-8zm6 0h8v8h-8v-8z" />
+          </svg>
+        </div>
 
-          {/* Name and Meta */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-green transition-colors">
-                {table.tableName}
+        {/* Table Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`
+              text-sm font-medium truncate
+              ${isSource ? 'text-text-primary' : 'text-text-primary'}
+            `}>
+              {table.tableName}
+            </span>
+            {!isSource && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 font-medium">
+                Derived
               </span>
-              {table.tableKind === 'derived_table' && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-node-derived/10 text-node-derived-border font-medium">
-                  Derived
-                </span>
-              )}
-            </div>
-            <div className="text-xs text-text-tertiary">
-              {table.rowCount.toLocaleString()} rows, {table.columnCount} columns
-            </div>
-          </div>
-
-          {/* Status */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {table.isLoading ? (
-              <div className="w-4 h-4 border-2 border-text-tertiary/30 border-t-text-tertiary rounded-full animate-spin" />
-            ) : table.issueCount > 0 ? (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 font-medium">
-                {table.issueCount} issue{table.issueCount !== 1 ? 's' : ''}
-              </span>
-            ) : (
-              <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
             )}
-            
-            <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
           </div>
-        </button>
+          <div className="text-xs text-text-tertiary mt-0.5">
+            {isSource ? 'Source' : 'Derived'} · {formatNumber(table.rowCount)} rows · {table.columnCount} columns
+          </div>
+        </div>
+
+        {/* Status & Actions */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {table.isLoading ? (
+            <div className="w-4 h-4 border-2 border-text-tertiary/30 border-t-text-tertiary rounded-full animate-spin" />
+          ) : table.issueCount > 0 ? (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 font-medium">
+              {table.issueCount} issue{table.issueCount !== 1 ? 's' : ''}
+            </span>
+          ) : (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+              Clean
+            </span>
+          )}
+          
+          {/* Open in Canvas button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpen()
+            }}
+            className="p-1.5 rounded-lg hover:bg-surface-secondary text-text-tertiary hover:text-text-primary transition-colors"
+            title="Open in Canvas"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      {/* Expanded Column Stats */}
+      {/* Expanded Content - Column Stats */}
       {isExpanded && (
-        <div className="bg-surface-secondary/30 border-t border-border">
+        <div className="border-t border-border bg-surface-secondary/20">
           {profile && schema ? (
-            <div className="divide-y divide-border/50">
-              {schema.columns.map((col) => {
-                const colProfile = profile.columns.find(cp => cp.columnId === col.id)
-                return (
-                  <ColumnStatsRow 
-                    key={col.id} 
-                    column={col} 
-                    profile={colProfile}
-                    rowCount={table.rowCount}
-                  />
-                )
-              })}
-            </div>
+            <ColumnStatsList 
+              schema={schema} 
+              profile={profile} 
+              rowCount={table.rowCount} 
+            />
           ) : (
-            <div className="px-4 py-6 text-center text-sm text-text-tertiary">
-              {table.isLoading ? 'Loading column stats...' : 'No profile data available'}
+            <div className="px-5 py-8 text-center">
+              {table.isLoading ? (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-5 h-5 border-2 border-text-tertiary/30 border-t-text-tertiary rounded-full animate-spin" />
+                  <span className="text-sm text-text-tertiary">Loading statistics...</span>
+                </div>
+              ) : (
+                <span className="text-sm text-text-tertiary">No profile data available</span>
+              )}
             </div>
           )}
         </div>
@@ -187,8 +223,46 @@ function TableRow({
   )
 }
 
-// Individual column stats row
-function ColumnStatsRow({
+// ============================================================================
+// Column Stats List
+// ============================================================================
+
+function ColumnStatsList({
+  schema,
+  profile,
+  rowCount,
+}: {
+  schema: TableSchema
+  profile: { columns: ColumnProfile[] }
+  rowCount: number
+}) {
+  return (
+    <div className="px-4 py-3">
+      <div className="text-[11px] font-medium text-text-tertiary uppercase tracking-wider mb-3">
+        Columns ({schema.columns.length})
+      </div>
+      <div className="space-y-2">
+        {schema.columns.map((col) => {
+          const colProfile = profile.columns.find(cp => cp.columnId === col.id)
+          return (
+            <ColumnStatsCard 
+              key={col.id} 
+              column={col} 
+              profile={colProfile}
+              rowCount={rowCount}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Column Stats Card
+// ============================================================================
+
+function ColumnStatsCard({
   column,
   profile,
   rowCount,
@@ -200,150 +274,46 @@ function ColumnStatsRow({
   const typeStyle = getTypeBadgeStyle(column.type)
   const nullCount = profile?.missingCount ?? 0
   const nullPct = profile?.missingPercent ?? 0
+  const t = column.type.toLowerCase()
+
+  // Determine column type category
+  const isNumeric = t === 'number' || t === 'integer' || t === 'float' || t === 'double'
+  const isString = t === 'string' || t === 'varchar' || t === 'text'
+  const isBoolean = t === 'boolean' || t === 'bool'
+  const isDate = t === 'date' || t === 'datetime' || t === 'timestamp'
 
   return (
-    <div className="px-4 py-2.5 flex items-start gap-4">
-      {/* Column Name & Type */}
-      <div className="w-32 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-text-primary truncate" title={column.name}>
+    <div className="bg-white dark:bg-gray-800/50 rounded-lg border border-border/50 p-3">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[13px] font-medium text-text-primary truncate" title={column.name}>
             {column.name}
           </span>
+          <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${typeStyle.bg} ${typeStyle.text}`}>
+            {column.type}
+          </span>
         </div>
-        <span className={`text-[10px] font-medium uppercase px-1 py-0.5 rounded ${typeStyle.bg} ${typeStyle.text}`}>
-          {column.type}
-        </span>
-      </div>
-
-      {/* Stats */}
-      <div className="flex-1 text-xs text-text-secondary">
-        {profile ? (
-          <ColumnStatsSummary 
-            profile={profile} 
-            columnType={column.type} 
-            rowCount={rowCount}
-          />
-        ) : (
-          <span className="text-text-tertiary">—</span>
+        {nullCount > 0 && (
+          <span className={`text-[11px] font-medium ${nullPct > 10 ? 'text-orange-600 dark:text-orange-400' : 'text-text-tertiary'}`}>
+            {nullPct.toFixed(0)}% null
+          </span>
         )}
       </div>
 
-      {/* Null indicator */}
-      {nullCount > 0 && (
-        <div className={`text-xs flex-shrink-0 ${nullPct > 5 ? 'text-orange-600' : 'text-text-tertiary'}`}>
-          {nullPct.toFixed(0)}% null
+      {/* Stats Content */}
+      {profile ? (
+        <div className="mt-2">
+          {isNumeric && <NumericStats profile={profile} />}
+          {isString && <StringStats profile={profile} rowCount={rowCount} />}
+          {isBoolean && <BooleanStats profile={profile} />}
+          {isDate && <DateStats profile={profile} />}
+        </div>
+      ) : (
+        <div className="text-[11px] text-text-tertiary">
+          {formatNumber(rowCount)} values
         </div>
       )}
     </div>
   )
-}
-
-// Summary stats based on column type
-function ColumnStatsSummary({
-  profile,
-  columnType,
-  rowCount,
-}: {
-  profile: ColumnProfile
-  columnType: string
-  rowCount: number
-}) {
-  // Numeric columns
-  if (columnType === 'number') {
-    if (profile.min !== undefined && profile.max !== undefined) {
-      const parts: string[] = []
-      parts.push(`Range: ${formatNum(profile.min)} – ${formatNum(profile.max)}`)
-      if (profile.mean !== undefined) {
-        parts.push(`Avg: ${formatNum(profile.mean)}`)
-      }
-      return <span>{parts.join(' · ')}</span>
-    }
-    return <span>{profile.distinctCount} distinct values</span>
-  }
-
-  // Date columns
-  if (columnType === 'date' || columnType === 'datetime') {
-    if (profile.min !== undefined && profile.max !== undefined) {
-      const minDate = formatDate(profile.min)
-      const maxDate = formatDate(profile.max)
-      return <span>{minDate} → {maxDate}</span>
-    }
-    return <span>{profile.distinctCount} distinct dates</span>
-  }
-
-  // Boolean columns
-  if (columnType === 'boolean') {
-    const topValues = profile.topValues || []
-    const trueVal = topValues.find(v => v.value === true || v.value === 'true')
-    const falseVal = topValues.find(v => v.value === false || v.value === 'false')
-    const total = (trueVal?.count || 0) + (falseVal?.count || 0)
-    if (total > 0) {
-      const truePct = Math.round((trueVal?.count || 0) / total * 100)
-      return <span>{truePct}% true, {100 - truePct}% false</span>
-    }
-    return <span>Boolean values</span>
-  }
-
-  // String columns
-  const isUnique = profile.cardinalityClass === 'unique'
-  const isHighCardinality = profile.cardinalityClass === 'high'
-  
-  if (isUnique) {
-    return <span>{profile.distinctCount} unique values (potential ID)</span>
-  }
-  
-  if (!isHighCardinality && profile.topValues && profile.topValues.length > 0) {
-    const topThree = profile.topValues.slice(0, 3)
-    const preview = topThree.map(tv => `"${tv.value}"`).join(', ')
-    return <span>{profile.distinctCount} values: {preview}{profile.topValues.length > 3 ? '...' : ''}</span>
-  }
-
-  return <span>{profile.distinctCount} distinct values</span>
-}
-
-// Helper: Format number for display
-function formatNum(val: unknown): string {
-  if (typeof val !== 'number') return String(val)
-  if (Math.abs(val) >= 1000000) return `${(val / 1000000).toFixed(1)}M`
-  if (Math.abs(val) >= 1000) return `${(val / 1000).toFixed(1)}K`
-  if (Number.isInteger(val)) return val.toLocaleString()
-  return val.toFixed(2)
-}
-
-// Helper: Format date for display
-function formatDate(val: unknown): string {
-  if (typeof val === 'number') {
-    const date = new Date(val)
-    if (!isNaN(date.getTime())) {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    }
-  }
-  if (typeof val === 'string') {
-    const date = new Date(val)
-    if (!isNaN(date.getTime())) {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    }
-    return val
-  }
-  return String(val)
-}
-
-// Helper: Get type badge style
-function getTypeBadgeStyle(type: string): { bg: string; text: string } {
-  switch (type?.toLowerCase()) {
-    case 'number':
-    case 'integer':
-    case 'float':
-      return { bg: 'bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400' }
-    case 'string':
-    case 'text':
-      return { bg: 'bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-400' }
-    case 'date':
-    case 'datetime':
-      return { bg: 'bg-purple-500/10', text: 'text-purple-600 dark:text-purple-400' }
-    case 'boolean':
-      return { bg: 'bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400' }
-    default:
-      return { bg: 'bg-gray-500/10', text: 'text-gray-600 dark:text-gray-400' }
-  }
 }
