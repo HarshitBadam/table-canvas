@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { CanvasView } from '@/canvas/CanvasView'
@@ -6,14 +6,19 @@ import { GridView } from '@/grid/GridView'
 import { ChartView } from '@/charts/ChartView'
 import { Dashboard } from '@/dashboard/Dashboard'
 import { useProjectStore } from '@/state/projectStore'
+import { useReportStore } from '@/report/reportStore'
 import { useApp, useAppAuth } from '@/state/AppContext'
 import { LoginPage } from '@/auth/LoginPage'
 import { EarlyAccessPage } from '@/auth/EarlyAccessPage'
 import { LoadingScreen } from '@/components/LoadingScreen'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { ErrorBoundary } from '@/design/components'
 import type { ChartNode } from '@/lib/types'
 
-export type ViewMode = 'canvas' | 'grid' | 'chart' | 'dashboard'
+// Lazy load ReportView for code splitting
+const ReportView = lazy(() => import('@/report/ReportView').then(m => ({ default: m.ReportView })))
+
+export type ViewMode = 'canvas' | 'grid' | 'chart' | 'dashboard' | 'report'
 
 // ============================================================================
 // Main App Component with routing
@@ -93,6 +98,14 @@ function MainApp() {
   )
   const selectNode = useProjectStore((state) => state.selectNode)
   
+  // Report store - single report mode
+  const reports = useReportStore((state) => state.reports)
+  const addReport = useReportStore((state) => state.addReport)
+  const selectReport = useReportStore((state) => state.selectReport)
+  
+  // Get the single report (first one, or create if none exists)
+  const reportId = Object.keys(reports)[0] || null
+  
   const { user, logout } = useAppAuth()
   const { isSaving } = useApp()
 
@@ -115,6 +128,17 @@ function MainApp() {
   const handleOpenDashboard = useCallback(() => {
     setViewMode('dashboard')
   }, [])
+
+  // Handle opening the report (auto-create if none exists)
+  const handleOpenReport = useCallback(() => {
+    let activeReportId = reportId
+    if (!activeReportId) {
+      // Create a new report if none exists
+      activeReportId = addReport('My Report')
+    }
+    selectReport(activeReportId)
+    setViewMode('report')
+  }, [reportId, addReport, selectReport])
 
   // Handle opening a table from sidebar
   const handleOpenTable = useCallback((tableId: string) => {
@@ -139,7 +163,9 @@ function MainApp() {
       <Sidebar 
         onOpenTable={handleOpenTable}
         onOpenChart={handleOpenChart}
+        onOpenCanvas={handleBackToCanvas}
         onOpenDashboard={handleOpenDashboard}
+        onOpenReport={handleOpenReport}
       />
       
       <main className="flex-1 flex flex-col overflow-hidden">
@@ -208,6 +234,34 @@ function MainApp() {
               <div className="h-6 w-px bg-border" />
               <span className="text-sm font-medium">Dashboard</span>
               <div className="flex-1" />
+            </>
+          )}
+          {viewMode === 'report' && (
+            <>
+              <button
+                onClick={handleBackToCanvas}
+                className="btn btn-ghost gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Canvas
+              </button>
+              <div className="h-6 w-px bg-border" />
+              <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="text-sm font-medium">Report</span>
+              <div className="flex-1" />
+              <button
+                onClick={() => window.print()}
+                className="btn btn-secondary gap-2 text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export
+              </button>
             </>
           )}
           {viewMode === 'canvas' && (
@@ -279,6 +333,20 @@ function MainApp() {
               <Dashboard 
                 onOpenTable={handleOpenTable}
               />
+            </ErrorBoundary>
+          )}
+          {viewMode === 'report' && reportId && (
+            <ErrorBoundary name="ReportView">
+              <Suspense fallback={
+                <div className="flex items-center justify-center h-full">
+                  <LoadingSpinner />
+                </div>
+              }>
+                <ReportView 
+                  reportId={reportId}
+                  onOpenTable={handleOpenTable}
+                />
+              </Suspense>
             </ErrorBoundary>
           )}
         </div>

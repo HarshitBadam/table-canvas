@@ -1,0 +1,204 @@
+/**
+ * Report Print Styles
+ * 
+ * Styles for PDF export and printing of reports.
+ * These styles ensure a clean, professional output.
+ */
+
+@media print {
+  /* Hide non-print elements */
+  .print\\:hidden,
+  header,
+  nav,
+  aside,
+  button,
+  .btn,
+  [role="navigation"],
+  .no-print {
+    display: none !important;
+  }
+
+  /* Show print-only elements */
+  .print\\:block,
+  .hidden.print\\:block {
+    display: block !important;
+  }
+
+  /* Reset page margins */
+  @page {
+    margin: 1in;
+    size: letter;
+  }
+
+  /* Body styles */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt !important;
+    line-height: 1.5 !important;
+  }
+
+  /* Report container */
+  .report-view {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    background: white !important;
+  }
+
+  /* Report title */
+  .report-title {
+    font-size: 24pt !important;
+    font-weight: bold !important;
+    margin-bottom: 12pt !important;
+    color: black !important;
+    page-break-after: avoid;
+  }
+
+  /* Headings */
+  h1 {
+    font-size: 20pt !important;
+    margin-top: 18pt !important;
+    margin-bottom: 8pt !important;
+    page-break-after: avoid;
+  }
+
+  h2 {
+    font-size: 16pt !important;
+    margin-top: 14pt !important;
+    margin-bottom: 6pt !important;
+    page-break-after: avoid;
+  }
+
+  h3 {
+    font-size: 14pt !important;
+    margin-top: 12pt !important;
+    margin-bottom: 4pt !important;
+    page-break-after: avoid;
+  }
+
+  /* Text blocks */
+  p {
+    orphans: 3;
+    widows: 3;
+    margin-bottom: 8pt !important;
+  }
+
+  /* Charts */
+  .chart-block {
+    page-break-inside: avoid;
+    margin: 12pt 0 !important;
+  }
+
+  .chart-block svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Table snippets */
+  .table-snippet-block {
+    page-break-inside: avoid;
+    margin: 12pt 0 !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 10pt !important;
+  }
+
+  th, td {
+    border: 1px solid #ccc !important;
+    padding: 4pt 8pt !important;
+    text-align: left !important;
+  }
+
+  th {
+    background: #f0f0f0 !important;
+    font-weight: 600 !important;
+  }
+
+  /* Dividers */
+  hr {
+    border: none !important;
+    border-top: 1px solid #ccc !important;
+    margin: 12pt 0 !important;
+  }
+
+  /* Links */
+  a {
+    color: inherit !important;
+    text-decoration: underline !important;
+  }
+
+  /* Code */
+  code {
+    background: #f5f5f5 !important;
+    padding: 2pt 4pt !important;
+    border-radius: 2pt !important;
+    font-size: 9pt !important;
+  }
+
+  /* Hide interactive elements */
+  .config-panel,
+  .add-block-button,
+  .drag-handle,
+  .block-actions {
+    display: none !important;
+  }
+
+  /* Block spacing */
+  .block-wrapper {
+    margin-bottom: 8pt !important;
+  }
+
+  /* Ensure proper colors for dark mode users */
+  * {
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Remove box shadows */
+  * {
+    box-shadow: none !important;
+  }
+
+  /* Keep backgrounds for charts and highlights */
+  .chart-container,
+  .highlight {
+    background-color: inherit !important;
+  }
+}
+
+/* Print preview styles (visible in UI before print) */
+.print-preview {
+  background: white;
+  color: black;
+  padding: 1in;
+  max-width: 8.5in;
+  margin: 0 auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.print-preview h1 {
+  font-size: 24pt;
+  margin-bottom: 12pt;
+}
+
+.print-preview h2 {
+  font-size: 18pt;
+  margin-top: 14pt;
+  margin-bottom: 8pt;
+}
+
+.print-preview h3 {
+  font-size: 14pt;
+  margin-top: 12pt;
+  margin-bottom: 6pt;
+}
+
+.print-preview p {
+  margin-bottom: 8pt;
+  line-height: 1.6;
+}
