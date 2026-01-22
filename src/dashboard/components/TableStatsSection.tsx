@@ -2,10 +2,10 @@
  * Your Data Section Component
  * 
  * Rich, collapsible table cards with detailed column statistics.
- * Uses shared stats components for visualizations.
+ * Each table is a separate card with spacing between them.
  */
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useProfilingStore } from '@/profiling/profiler'
 import type { TableQualityMetrics } from '../useDashboardData'
 import type { ColumnProfile, TableSchema } from '@/lib/types'
@@ -59,14 +59,12 @@ export function TableStatsSection({
   })
 
   return (
-    <div className="bg-surface rounded-xl border border-border overflow-hidden">
+    <div>
       {/* Section Header */}
-      <div className="px-5 py-3 border-b border-border">
-        <h3 className="text-sm font-semibold text-text-primary">Your Data</h3>
-      </div>
+      <h3 className="text-sm font-semibold text-text-primary mb-4">Your Data</h3>
 
-      {/* Tables List */}
-      <div className="divide-y divide-border">
+      {/* Separate Table Cards */}
+      <div className="space-y-4">
         {sortedTables.map((table) => (
           <TableCard
             key={table.tableId}
@@ -82,7 +80,7 @@ export function TableStatsSection({
 }
 
 // ============================================================================
-// Table Card Component
+// Table Card Component - Self-contained with border/shadow
 // ============================================================================
 
 function TableCard({
@@ -106,10 +104,12 @@ function TableCard({
   const isSource = table.tableKind === 'source_table'
 
   return (
-    <div className="transition-colors">
+    <div 
+      className="bg-surface rounded-xl border border-border overflow-hidden transition-shadow hover:shadow-md"
+    >
       {/* Card Header - Always visible */}
       <div 
-        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-secondary/30 transition-colors"
+        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-surface-secondary/30 transition-colors"
         onClick={onToggle}
       >
         {/* Expand/Collapse Toggle */}
@@ -132,13 +132,13 @@ function TableCard({
 
         {/* Table Icon */}
         <div className={`
-          w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
+          w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
           ${isSource 
             ? 'bg-[#217346] shadow-sm shadow-[#217346]/20' 
             : 'bg-violet-500 shadow-sm shadow-violet-500/20'
           }
         `}>
-          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
             <path d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2zm2 0h14v4H5V5zm0 6h4v8H5v-8zm6 0h8v8h-8v-8z" />
           </svg>
         </div>
@@ -146,10 +146,7 @@ function TableCard({
         {/* Table Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className={`
-              text-sm font-medium truncate
-              ${isSource ? 'text-text-primary' : 'text-text-primary'}
-            `}>
+            <span className="text-sm font-semibold text-text-primary truncate">
               {table.tableName}
             </span>
             {!isSource && (
@@ -168,11 +165,11 @@ function TableCard({
           {table.isLoading ? (
             <div className="w-4 h-4 border-2 border-text-tertiary/30 border-t-text-tertiary rounded-full animate-spin" />
           ) : table.issueCount > 0 ? (
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 font-medium">
+            <span className="text-[11px] px-2.5 py-1 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 font-medium">
               {table.issueCount} issue{table.issueCount !== 1 ? 's' : ''}
             </span>
           ) : (
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
+            <span className="text-[11px] px-2.5 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
@@ -186,7 +183,7 @@ function TableCard({
               e.stopPropagation()
               onOpen()
             }}
-            className="p-1.5 rounded-lg hover:bg-surface-secondary text-text-tertiary hover:text-text-primary transition-colors"
+            className="p-2 rounded-lg hover:bg-surface-secondary text-text-tertiary hover:text-text-primary transition-colors"
             title="Open in Canvas"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -237,11 +234,11 @@ function ColumnStatsList({
   rowCount: number
 }) {
   return (
-    <div className="px-4 py-3">
+    <div className="px-4 py-4">
       <div className="text-[11px] font-medium text-text-tertiary uppercase tracking-wider mb-3">
         Columns ({schema.columns.length})
       </div>
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {schema.columns.map((col) => {
           const colProfile = profile.columns.find(cp => cp.columnId === col.id)
           return (
