@@ -33,7 +33,6 @@ export function BlockEditor({ reportId, blocks, onOpenTable }: BlockEditorProps)
   const transformBlock = useReportStore((state) => state.transformBlock);
 
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -243,7 +242,7 @@ export function BlockEditor({ reportId, blocks, onOpenTable }: BlockEditorProps)
   }, [reportId, draggedIndex, dragOverIndex, reorderBlocks]);
 
   // Keyboard shortcuts for blocks
-  const handleKeyDown = useCallback((e: React.KeyboardEvent, blockId: string, index: number) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, blockId: string, _index: number) => {
     if (e.key === 'Backspace' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleBlockDelete(blockId);
@@ -328,6 +327,11 @@ export function BlockEditor({ reportId, blocks, onOpenTable }: BlockEditorProps)
         level: transform.level as HeadingLevel, 
         content: transform.content || '' 
       });
+    } else if (transform.type === 'text') {
+      // Convert heading back to text
+      handleBlockTransform(blockId, 'text', { 
+        content: transform.content || '' 
+      });
     } else if (transform.type === 'divider') {
       const blockIndex = blocks.findIndex(b => b.id === blockId);
       handleBlockTransform(blockId, 'divider', {});
@@ -336,74 +340,88 @@ export function BlockEditor({ reportId, blocks, onOpenTable }: BlockEditorProps)
     }
   }, [blocks, handleBlockTransform, handleAddBlock]);
 
+  // Navigate to previous block
+  const handleNavigatePrev = useCallback((currentBlockId: string) => {
+    const index = blocks.findIndex(b => b.id === currentBlockId);
+    if (index > 0) {
+      const prevBlock = blocks[index - 1];
+      setSelectedBlockId(prevBlock.id);
+      setActiveBlockId(prevBlock.id);
+    }
+  }, [blocks]);
+
+  // Navigate to next block
+  const handleNavigateNext = useCallback((currentBlockId: string) => {
+    const index = blocks.findIndex(b => b.id === currentBlockId);
+    if (index < blocks.length - 1) {
+      const nextBlock = blocks[index + 1];
+      setSelectedBlockId(nextBlock.id);
+      setActiveBlockId(nextBlock.id);
+    }
+  }, [blocks]);
+
+  // Merge current block with previous block (for backspace at start)
+  const handleMergeWithPrevious = useCallback((currentBlockId: string) => {
+    const index = blocks.findIndex(b => b.id === currentBlockId);
+    if (index <= 0) return;
+    
+    const currentBlock = blocks[index];
+    const prevBlock = blocks[index - 1];
+    
+    // Only merge text/heading blocks
+    if ((currentBlock.type === 'text' || currentBlock.type === 'heading') &&
+        (prevBlock.type === 'text' || prevBlock.type === 'heading')) {
+      const currentContent = currentBlock.content || '';
+      const prevContent = prevBlock.content || '';
+      const mergedContent = prevContent + currentContent;
+      
+      // Update previous block with merged content
+      updateBlock(reportId, prevBlock.id, { content: mergedContent });
+      
+      // Delete current block
+      deleteBlock(reportId, currentBlockId);
+      
+      // Focus previous block at the merge point
+      setSelectedBlockId(prevBlock.id);
+      setActiveBlockId(prevBlock.id);
+    } else {
+      // Can't merge - just navigate to previous
+      setSelectedBlockId(prevBlock.id);
+      setActiveBlockId(prevBlock.id);
+    }
+  }, [blocks, reportId, updateBlock, deleteBlock]);
+
   return (
     <div ref={containerRef} className="relative min-h-[200px]">
       {blocks.length === 0 ? (
         <EmptyState onAddBlock={handlePlaceholderClick} />
       ) : (
-        <div className="space-y-0.5">
+        <div className="space-y-1">
           {blocks.map((block, index) => (
             <div
               key={block.id}
-              className={`group relative ${dragOverIndex === index ? 'pt-1' : ''}`}
-              onMouseEnter={() => setHoveredBlockId(block.id)}
-              onMouseLeave={() => setHoveredBlockId(null)}
+              className={`relative ${dragOverIndex === index ? 'pt-1' : ''}`}
               draggable
               onDragStart={() => handleDragStart(index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
             >
-              {/* Drop indicator line */}
               {dragOverIndex === index && (
-                <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent-green rounded-full" />
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent-green" />
               )}
 
-              {/* Block controls - left side */}
-              <div 
-                className={`absolute -left-12 top-1 flex items-center gap-0.5 transition-opacity duration-150 ${
-                  hoveredBlockId === block.id || selectedBlockId === block.id ? 'opacity-100' : 'opacity-0'
-                }`}
-              >
-                {/* Add block button */}
-                <button
-                  onClick={() => {
-                    const newBlockId = handleAddBlock({ type: 'text', content: '' }, index);
-                    if (newBlockId) {
-                      setTimeout(() => setActiveBlockId(newBlockId), 0);
-                    }
-                  }}
-                  className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-                  title="Add block"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </button>
-                
-                {/* Drag handle */}
-                <button
-                  className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-grab active:cursor-grabbing transition-colors"
-                  title="Drag to reorder"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM8 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM8 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM14 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM14 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Block content */}
-              <div className={`${draggedIndex === index ? 'opacity-50' : ''}`}>
+              <div className={draggedIndex === index ? 'opacity-50' : ''}>
                 <EditableBlockWrapper
                   block={block}
                   reportId={reportId}
                   isSelected={selectedBlockId === block.id}
-                  isHovered={hoveredBlockId === block.id}
                   isActive={activeBlockId === block.id}
+                  blockIndex={index}
+                  totalBlocks={blocks.length}
                   onSelect={() => handleBlockSelect(block.id)}
                   onActivate={() => handleBlockActivate(block.id)}
                   onDeactivate={handleBlockDeactivate}
                   onDelete={() => handleBlockDelete(block.id)}
-                  onDuplicate={() => handleBlockDuplicate(block.id)}
                   onKeyDown={(e) => handleKeyDown(e, block.id, index)}
                   onOpenTable={onOpenTable}
                   onContentChange={(content) => handleContentChange(block.id, content)}
@@ -413,28 +431,22 @@ export function BlockEditor({ reportId, blocks, onOpenTable }: BlockEditorProps)
                   onEnterKey={() => handleEnterKey(block.id)}
                   onMoveUp={() => handleMoveUp(block.id)}
                   onMoveDown={() => handleMoveDown(block.id)}
+                  onNavigatePrev={() => handleNavigatePrev(block.id)}
+                  onNavigateNext={() => handleNavigateNext(block.id)}
+                  onMergeWithPrevious={() => handleMergeWithPrevious(block.id)}
                 />
               </div>
             </div>
           ))}
 
-          {/* Placeholder for adding new block at end */}
-          <div 
-            className="group py-2"
-            onMouseEnter={() => setHoveredBlockId('__end__')}
-            onMouseLeave={() => setHoveredBlockId(null)}
-          >
-            <button
+          {/* Placeholder for adding new block at end - invisible until focused */}
+          <div className="py-1">
+            <div 
               onClick={handlePlaceholderClick}
-              className={`flex items-center gap-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-opacity duration-150 ${
-                hoveredBlockId === '__end__' ? 'opacity-100' : 'opacity-50'
-              }`}
+              className="text-gray-400 hover:text-gray-500 cursor-text text-base py-1"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span className="text-sm">Type '/' for commands, or click to add a block</span>
-            </button>
+              <span className="opacity-50 hover:opacity-70">Press Enter to continue, or / for commands</span>
+            </div>
           </div>
         </div>
       )}
@@ -457,13 +469,13 @@ interface EditableBlockWrapperProps {
   block: ReportBlock;
   reportId: string;
   isSelected: boolean;
-  isHovered: boolean;
   isActive: boolean;
+  blockIndex: number;
+  totalBlocks: number;
   onSelect: () => void;
   onActivate: () => void;
   onDeactivate: () => void;
   onDelete: () => void;
-  onDuplicate: () => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   onOpenTable?: (tableId: string) => void;
   onContentChange: (content: string) => void;
@@ -473,19 +485,22 @@ interface EditableBlockWrapperProps {
   onEnterKey: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onNavigatePrev: () => void;
+  onNavigateNext: () => void;
+  onMergeWithPrevious: () => void;
 }
 
 function EditableBlockWrapper({
   block,
   reportId,
   isSelected,
-  isHovered,
   isActive,
+  blockIndex,
+  totalBlocks,
   onSelect,
   onActivate,
   onDeactivate,
   onDelete,
-  onDuplicate,
   onKeyDown,
   onOpenTable,
   onContentChange,
@@ -495,12 +510,14 @@ function EditableBlockWrapper({
   onEnterKey,
   onMoveUp,
   onMoveDown,
+  onNavigatePrev,
+  onNavigateNext,
+  onMergeWithPrevious,
 }: EditableBlockWrapperProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [localContent, setLocalContent] = useState(
     (block.type === 'text' || block.type === 'heading') ? block.content : ''
   );
-  const [slashFilterText, setSlashFilterText] = useState('');
   const lastSlashPos = useRef<number | null>(null);
 
   // Sync local content when block changes
@@ -549,11 +566,9 @@ function EditableBlockWrapper({
             onSlashCommand({ x: rect.left + 20, y: rect.bottom + 4 }, textAfterSlash);
           }
         }
-        setSlashFilterText(textAfterSlash);
       }
     } else if (lastSlashPos.current !== null) {
       lastSlashPos.current = null;
-      setSlashFilterText('');
       onSlashClose();
     }
     
@@ -581,6 +596,11 @@ function EditableBlockWrapper({
 
   // Handle key events
   const handleTextKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const cursorPos = textareaRef.current?.selectionStart ?? 0;
+    const cursorEnd = textareaRef.current?.selectionEnd ?? 0;
+    const isAtStart = cursorPos === 0 && cursorEnd === 0;
+    const isAtEnd = cursorPos === localContent.length;
+    
     // Check for transformations on Enter
     if (e.key === 'Enter' && !e.shiftKey) {
       const trimmed = localContent.trim();
@@ -605,17 +625,73 @@ function EditableBlockWrapper({
       }
       
       // Normal enter - create new block
-      if (localContent === '' || textareaRef.current?.selectionStart === localContent.length) {
+      if (localContent === '' || isAtEnd) {
         e.preventDefault();
         onEnterKey();
         return;
       }
     }
     
-    // Delete empty block with Backspace
-    if (e.key === 'Backspace' && localContent === '') {
+    // Backspace behavior - contextual
+    if (e.key === 'Backspace') {
+      if (localContent === '') {
+        e.preventDefault();
+        // If it's a heading, convert to text first (don't delete)
+        if (block.type === 'heading') {
+          onTransform({ type: 'text', content: '' });
+        } else {
+          // It's an empty text block - delete it
+          onDelete();
+        }
+        return;
+      }
+      
+      // At start of non-empty text block - merge with previous
+      if (isAtStart && blockIndex > 0) {
+        e.preventDefault();
+        onMergeWithPrevious();
+        return;
+      }
+    }
+    
+    // Arrow key navigation between blocks
+    if (e.key === 'ArrowUp' && !e.shiftKey && !(e.metaKey || e.ctrlKey)) {
+      // At first line - navigate to previous block
+      if (textareaRef.current) {
+        const textBeforeCursor = localContent.substring(0, cursorPos);
+        const isFirstLine = !textBeforeCursor.includes('\n');
+        if (isFirstLine && blockIndex > 0) {
+          e.preventDefault();
+          onNavigatePrev();
+          return;
+        }
+      }
+    }
+    
+    if (e.key === 'ArrowDown' && !e.shiftKey && !(e.metaKey || e.ctrlKey)) {
+      // At last line - navigate to next block
+      if (textareaRef.current) {
+        const textAfterCursor = localContent.substring(cursorPos);
+        const isLastLine = !textAfterCursor.includes('\n');
+        if (isLastLine && blockIndex < totalBlocks - 1) {
+          e.preventDefault();
+          onNavigateNext();
+          return;
+        }
+      }
+    }
+    
+    // Left arrow at start - navigate to previous block
+    if (e.key === 'ArrowLeft' && isAtStart && blockIndex > 0 && !e.shiftKey) {
       e.preventDefault();
-      onDelete();
+      onNavigatePrev();
+      return;
+    }
+    
+    // Right arrow at end - navigate to next block
+    if (e.key === 'ArrowRight' && isAtEnd && blockIndex < totalBlocks - 1 && !e.shiftKey) {
+      e.preventDefault();
+      onNavigateNext();
       return;
     }
     
@@ -623,7 +699,6 @@ function EditableBlockWrapper({
     if (e.key === 'Escape' && lastSlashPos.current !== null) {
       e.preventDefault();
       lastSlashPos.current = null;
-      setSlashFilterText('');
       onSlashClose();
       return;
     }
@@ -644,7 +719,7 @@ function EditableBlockWrapper({
     
     // Pass other key events to parent
     onKeyDown(e);
-  }, [localContent, onTransform, onEnterKey, onDelete, onSlashClose, onMoveUp, onMoveDown, onKeyDown]);
+  }, [localContent, block.type, blockIndex, totalBlocks, onTransform, onEnterKey, onDelete, onSlashClose, onMoveUp, onMoveDown, onKeyDown, onNavigatePrev, onNavigateNext, onMergeWithPrevious]);
 
   // Determine styles based on block type
   const getTextStyles = () => {
@@ -667,57 +742,26 @@ function EditableBlockWrapper({
   };
 
   // For text and heading blocks, render inline editable textarea
+  // No boxes, no outlines - just text on a page
   if (block.type === 'text' || block.type === 'heading') {
     return (
       <div
-        className={`relative rounded-md transition-colors duration-100 ${
-          isSelected 
-            ? 'bg-accent-green/5 dark:bg-accent-green/10' 
-            : isHovered 
-              ? 'bg-gray-50 dark:bg-gray-800/30' 
-              : ''
-        }`}
+        className="relative"
         onClick={onSelect}
         onKeyDown={onKeyDown}
         tabIndex={0}
       >
-        {/* Block actions menu */}
-        {(isHovered || isSelected) && (
-          <div className="absolute -top-2 right-2 flex items-center gap-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-md px-1 py-0.5 z-10">
-            <button
-              onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
-              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              title="Duplicate"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-              title="Delete"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
-          </div>
-        )}
-
-        <div className="py-1">
-          <textarea
-            ref={textareaRef}
-            value={localContent}
-            onChange={handleTextChange}
-            onKeyDown={handleTextKeyDown}
-            onFocus={onActivate}
-            onBlur={onDeactivate}
-            placeholder={getPlaceholder()}
-            className={`w-full min-h-[1.5em] resize-none bg-transparent border-none outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 ${getTextStyles()}`}
-            rows={1}
-          />
-        </div>
+        <textarea
+          ref={textareaRef}
+          value={localContent}
+          onChange={handleTextChange}
+          onKeyDown={handleTextKeyDown}
+          onFocus={onActivate}
+          onBlur={onDeactivate}
+          placeholder={getPlaceholder()}
+          className={`w-full min-h-[1.5em] resize-none bg-transparent border-none outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 ${getTextStyles()}`}
+          rows={1}
+        />
       </div>
     );
   }
@@ -728,32 +772,38 @@ function EditableBlockWrapper({
       block={block}
       reportId={reportId}
       isSelected={isSelected}
-      isHovered={isHovered}
       onSelect={onSelect}
       onDelete={onDelete}
-      onDuplicate={onDuplicate}
       onKeyDown={onKeyDown}
       onOpenTable={onOpenTable}
     />
   );
 }
 
-// Empty state - Notion style
+// Empty state - simple, page-like
 function EmptyState({ onAddBlock }: { onAddBlock: () => void }) {
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [value, setValue] = useState('');
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      onAddBlock();
+    }
+  };
+
   return (
-    <div className="py-4">
-      <button
-        onClick={onAddBlock}
-        className="w-full text-left py-3 px-4 text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg transition-colors group"
-      >
-        <span className="group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors">
-          Click here to start writing, or press{' '}
-          <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono text-gray-500">
-            /
-          </kbd>{' '}
-          for commands
-        </span>
-      </button>
+    <div className="py-2">
+      <textarea
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onFocus={onAddBlock}
+        placeholder="Start typing, or press / for commands..."
+        className="w-full resize-none bg-transparent border-none outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 text-base"
+        rows={1}
+      />
     </div>
   );
 }

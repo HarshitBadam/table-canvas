@@ -1,13 +1,17 @@
 /**
  * DividerBlock Component
  * 
- * Simple horizontal divider - Notion style.
+ * Simple horizontal divider.
  */
 
-export function DividerBlock() {
+interface DividerBlockProps {
+  isSelected?: boolean;
+}
+
+export function DividerBlock({ isSelected }: DividerBlockProps) {
   return (
     <div className="py-3">
-      <hr className="border-gray-200 dark:border-gray-700" />
+      <hr className={`${isSelected ? 'border-accent-green' : 'border-gray-200 dark:border-gray-700'}`} />
     </div>
   );
 }

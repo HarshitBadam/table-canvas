@@ -70,7 +70,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
       {/* Logo / Title */}
       <div className="h-14 border-b border-border flex items-center px-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#217346] flex items-center justify-center shadow-sm">
+          <div className="w-9 h-9 rounded bg-accent-green flex items-center justify-center">
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
@@ -106,7 +106,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
         </div>
         {tableNodes.length === 0 ? (
           <div className="text-center py-8 px-4">
-            <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-surface-secondary flex items-center justify-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded bg-surface-secondary flex items-center justify-center">
               <svg className="w-6 h-6 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
@@ -123,7 +123,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
                   onClick={() => handleTableClick(node.id)}
                   className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all ${
                     selectedNodeId === node.id
-                      ? 'bg-accent-green/10 text-accent-green shadow-sm'
+                      ? 'bg-accent-green/10 text-accent-green'
                       : 'hover:bg-surface-secondary text-text-primary'
                   }`}
                 >
@@ -171,7 +171,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
                     onClick={() => handleChartClick(node.id)}
                     className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
                       selectedNodeId === node.id
-                        ? 'bg-accent-green/10 text-accent-green shadow-sm'
+                        ? 'bg-accent-green/10 text-accent-green'
                         : 'hover:bg-surface-secondary text-text-primary'
                     }`}
                   >
@@ -192,7 +192,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
 
       </div>
 
-      {/* Quick Actions */}
+      {/* Canvas Section */}
       <div className="px-4 py-3 border-t border-border">
         <button
           type="button"
@@ -206,9 +206,8 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
         </button>
       </div>
       
-      <div className="mx-4 border-t border-gray-200 dark:border-gray-700" />
-      
-      <div className="px-4 py-3 space-y-1">
+      {/* Dashboard Section */}
+      <div className="px-4 py-3 border-t border-border">
         <button
           type="button"
           onClick={onOpenDashboard}
@@ -219,6 +218,10 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
           </svg>
           Dashboard
         </button>
+      </div>
+      
+      {/* Report Section */}
+      <div className="px-4 py-3 border-t border-border">
         <button
           type="button"
           onClick={onOpenReport}
@@ -245,30 +248,33 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
       {/* Delete Table Confirmation Modal */}
       {deleteConfirmId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-surface rounded-xl shadow-xl p-6 max-w-sm mx-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="bg-surface border border-border rounded-lg shadow-lg p-5 max-w-sm mx-4">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-8 h-8 rounded bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-text-primary">Delete Table</h3>
-                <p className="text-sm text-text-secondary">
+                <h3 className="text-sm font-semibold text-text-primary">Delete Table</h3>
+                <p className="text-xs text-text-secondary mt-0.5">
                   "{nodes[deleteConfirmId]?.name}"
                 </p>
               </div>
             </div>
-            <p className="text-sm text-text-secondary mb-6">
-              Are you sure you want to delete this table? This action cannot be undone.
+            <p className="text-xs text-text-secondary mb-4">
+              Are you sure? This action cannot be undone.
             </p>
             <div className="flex justify-end gap-2">
-              <button onClick={cancelDelete} className="btn btn-secondary">
+              <button 
+                onClick={cancelDelete} 
+                className="px-3 py-1.5 text-xs font-medium text-text-primary border border-border rounded hover:bg-surface-secondary transition-colors"
+              >
                 Cancel
               </button>
               <button 
                 onClick={confirmDelete} 
-                className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded transition-colors"
               >
                 Delete
               </button>

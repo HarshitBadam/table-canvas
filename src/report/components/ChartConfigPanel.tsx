@@ -77,19 +77,19 @@ export function ChartConfigPanel({
   }, [onConfigChange]);
 
   return (
-    <div className="border-t border-border bg-white dark:bg-gray-900 shadow-lg rounded-b-xl overflow-hidden">
+    <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 bg-gray-50 dark:bg-gray-800 border-b border-border">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
           <svg className="w-4 h-4 text-accent-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Chart Configuration</h3>
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Chart Configuration</h3>
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
           title="Close"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -98,13 +98,13 @@ export function ChartConfigPanel({
         </button>
       </div>
 
-      <div className="p-5 space-y-5">
+      <div className="p-4 space-y-4">
         {/* Chart Type Section */}
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+        <div className="pb-4 border-b border-gray-100 dark:border-gray-800">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
             Chart Type
           </label>
-          <div className="flex gap-2">
+          <div className="flex gap-1">
             {[
               { type: 'bar' as const, label: 'Bar', icon: <BarIcon /> },
               { type: 'line' as const, label: 'Line', icon: <LineIcon /> },
@@ -114,27 +114,27 @@ export function ChartConfigPanel({
               <button
                 key={ct.type}
                 onClick={() => onChartTypeChange(ct.type)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all duration-200 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 border transition-colors ${
                   chartType === ct.type
-                    ? 'border-accent-green bg-accent-green/10 text-accent-green shadow-sm'
-                    : 'border-transparent bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:border-gray-200 dark:hover:border-gray-600 hover:shadow-sm'
+                    ? 'border-accent-green bg-accent-green/5 text-accent-green'
+                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:border-gray-300'
                 }`}
               >
                 {ct.icon}
-                <span className="text-sm font-medium">{ct.label}</span>
+                <span className="text-sm">{ct.label}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Labels Section */}
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+        <div className="pb-4 border-b border-gray-100 dark:border-gray-800">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
             Labels
           </label>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                 Title
               </label>
               <input
@@ -142,11 +142,11 @@ export function ChartConfigPanel({
                 value={config.title || ''}
                 onChange={handleTitleChange}
                 placeholder="Chart title"
-                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-green/30 focus:border-accent-green transition-all"
+                className="w-full px-2 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:border-accent-green"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                 Subtitle
               </label>
               <input
@@ -154,26 +154,26 @@ export function ChartConfigPanel({
                 value={config.subtitle || ''}
                 onChange={handleSubtitleChange}
                 placeholder="Optional subtitle"
-                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-green/30 focus:border-accent-green transition-all"
+                className="w-full px-2 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:border-accent-green"
               />
             </div>
           </div>
         </div>
 
         {/* Data Mapping Section */}
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+        <div className="pb-4 border-b border-gray-100 dark:border-gray-800">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
             Data Mapping
           </label>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                 Category (X-Axis)
               </label>
               <select
                 value={config.xAxis || ''}
                 onChange={handleXAxisChange}
-                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-green/30 focus:border-accent-green transition-all cursor-pointer"
+                className="w-full px-2 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-accent-green cursor-pointer"
               >
                 <option value="">Select column</option>
                 {(chartType === 'scatter' ? numericColumns : categoricalColumns.length > 0 ? categoricalColumns : columns).map((col) => (
@@ -182,13 +182,13 @@ export function ChartConfigPanel({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                 Value (Y-Axis)
               </label>
               <select
                 value={config.yAxis || ''}
                 onChange={handleYAxisChange}
-                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-green/30 focus:border-accent-green transition-all cursor-pointer"
+                className="w-full px-2 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-accent-green cursor-pointer"
               >
                 <option value="">Select column</option>
                 {numericColumns.map((col) => (
@@ -197,13 +197,13 @@ export function ChartConfigPanel({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                 Aggregation
               </label>
               <select
                 value={config.aggregation || 'sum'}
                 onChange={handleAggregationChange}
-                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-green/30 focus:border-accent-green transition-all cursor-pointer"
+                className="w-full px-2 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:border-accent-green cursor-pointer"
               >
                 <option value="sum">Sum</option>
                 <option value="avg">Average</option>
@@ -215,9 +215,9 @@ export function ChartConfigPanel({
           </div>
           
           {/* Axis Labels */}
-          <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                 X-Axis Label
               </label>
               <input
@@ -225,11 +225,11 @@ export function ChartConfigPanel({
                 value={config.xAxisLabel || ''}
                 onChange={handleXAxisLabelChange}
                 placeholder="X-axis label"
-                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-green/30 focus:border-accent-green transition-all"
+                className="w-full px-2 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:border-accent-green"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                 Y-Axis Label
               </label>
               <input
@@ -237,68 +237,54 @@ export function ChartConfigPanel({
                 value={config.yAxisLabel || ''}
                 onChange={handleYAxisLabelChange}
                 placeholder="Y-axis label"
-                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-green/30 focus:border-accent-green transition-all"
+                className="w-full px-2 py-1.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:border-accent-green"
               />
             </div>
           </div>
         </div>
 
         {/* Display Options Section */}
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+        <div className="pb-4 border-b border-gray-100 dark:border-gray-800">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
             Display Options
           </label>
           
-          <div className="flex items-center gap-6 mb-4">
-            <label className="flex items-center gap-2.5 cursor-pointer group">
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={config.showLegend !== false}
-                  onChange={handleLegendToggle}
-                  className="sr-only peer"
-                />
-                <div className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 peer-checked:border-accent-green peer-checked:bg-accent-green transition-all flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              </div>
-              <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">Show Legend</span>
+          <div className="flex items-center gap-4 mb-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={config.showLegend !== false}
+                onChange={handleLegendToggle}
+                className="w-4 h-4 border-gray-300 text-accent-green focus:ring-accent-green/50"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Show Legend</span>
             </label>
-            <label className="flex items-center gap-2.5 cursor-pointer group">
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={config.showGrid !== false}
-                  onChange={handleGridToggle}
-                  className="sr-only peer"
-                />
-                <div className="w-5 h-5 rounded-md border-2 border-gray-300 dark:border-gray-600 peer-checked:border-accent-green peer-checked:bg-accent-green transition-all flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              </div>
-              <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">Show Grid</span>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={config.showGrid !== false}
+                onChange={handleGridToggle}
+                className="w-4 h-4 border-gray-300 text-accent-green focus:ring-accent-green/50"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Show Grid</span>
             </label>
           </div>
 
           {/* Legend Position */}
           {config.showLegend !== false && (
-            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+            <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">
                 Legend Position
               </label>
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 {(['top', 'bottom', 'left', 'right'] as const).map((pos) => (
                   <button
                     key={pos}
                     onClick={() => handleLegendPositionChange(pos)}
-                    className={`px-4 py-2 text-xs font-medium rounded-lg border-2 transition-all duration-200 ${
+                    className={`px-3 py-1 text-xs border transition-colors ${
                       (config.legendPosition || 'bottom') === pos
-                        ? 'border-accent-green bg-accent-green/10 text-accent-green'
-                        : 'border-transparent bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:border-gray-200 dark:hover:border-gray-600'
+                        ? 'border-accent-green bg-accent-green/5 text-accent-green'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:border-gray-300'
                     }`}
                   >
                     {pos.charAt(0).toUpperCase() + pos.slice(1)}
@@ -310,42 +296,42 @@ export function ChartConfigPanel({
         </div>
 
         {/* Color Scheme Section */}
-        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+        <div className="pb-3">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
             Color Scheme
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {(Object.keys(CHART_COLOR_SCHEMES) as ColorSchemeName[]).map((scheme) => (
               <button
                 key={scheme}
                 onClick={() => handleColorSchemeChange(scheme)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all duration-200 ${
+                className={`flex items-center gap-1.5 px-2 py-1.5 border transition-colors ${
                   JSON.stringify(config.colorScheme) === JSON.stringify(CHART_COLOR_SCHEMES[scheme])
-                    ? 'border-accent-green bg-accent-green/10 shadow-sm'
-                    : 'border-transparent bg-white dark:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600'
+                    ? 'border-accent-green bg-accent-green/5'
+                    : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300'
                 }`}
                 title={scheme}
               >
-                <div className="flex -space-x-1">
+                <div className="flex -space-x-0.5">
                   {CHART_COLOR_SCHEMES[scheme].slice(0, 4).map((color, i) => (
                     <div
                       key={i}
-                      className="w-4 h-4 rounded-full border-2 border-white dark:border-gray-800 shadow-sm"
+                      className="w-3 h-3 rounded-full border border-white dark:border-gray-800"
                       style={{ backgroundColor: color }}
                     />
                   ))}
                 </div>
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-300 capitalize">{scheme}</span>
+                <span className="text-xs text-gray-600 dark:text-gray-300 capitalize">{scheme}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Done Button */}
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end pt-3 border-t border-gray-100 dark:border-gray-800">
           <button
             onClick={onClose}
-            className="px-5 py-2.5 bg-accent-green hover:bg-accent-green/90 text-white text-sm font-medium rounded-lg shadow-sm transition-all duration-200 hover:shadow-md"
+            className="px-4 py-1.5 bg-accent-green hover:bg-accent-green/90 text-white text-sm font-medium transition-colors"
           >
             Done
           </button>
