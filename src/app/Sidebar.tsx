@@ -9,10 +9,12 @@ import type { ProjectNode, TableNode, ChartNode } from '@/lib/types'
 interface SidebarProps {
   onOpenTable: (tableId: string) => void
   onOpenChart: (chartId: string) => void
+  onOpenCanvas: () => void
   onOpenDashboard: () => void
+  onOpenReport: () => void
 }
 
-export function Sidebar({ onOpenTable, onOpenChart, onOpenDashboard }: SidebarProps) {
+export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboard, onOpenReport }: SidebarProps) {
   const nodes = useProjectStore((state) => state.nodes)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
   const { deleteNodeWithSync } = useApp()
@@ -187,10 +189,26 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenDashboard }: SidebarPr
             </ul>
           </>
         )}
+
       </div>
 
       {/* Quick Actions */}
-      <div className="p-4 border-t border-border">
+      <div className="px-4 py-3 border-t border-border">
+        <button
+          type="button"
+          onClick={onOpenCanvas}
+          className="btn btn-ghost w-full gap-2.5 justify-start text-sm"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+          </svg>
+          Canvas
+        </button>
+      </div>
+      
+      <div className="mx-4 border-t border-gray-200 dark:border-gray-700" />
+      
+      <div className="px-4 py-3 space-y-1">
         <button
           type="button"
           onClick={onOpenDashboard}
@@ -200,6 +218,16 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenDashboard }: SidebarPr
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
           Dashboard
+        </button>
+        <button
+          type="button"
+          onClick={onOpenReport}
+          className="btn btn-ghost w-full gap-2.5 justify-start text-sm"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Report
         </button>
       </div>
 
@@ -214,7 +242,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenDashboard }: SidebarPr
         onClose={() => setNewTableModalOpen(false)}
       />
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Table Confirmation Modal */}
       {deleteConfirmId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-surface rounded-xl shadow-xl p-6 max-w-sm mx-4">
@@ -248,6 +276,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenDashboard }: SidebarPr
           </div>
         </div>
       )}
+
     </aside>
   )
 }

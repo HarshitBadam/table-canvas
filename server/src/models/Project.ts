@@ -79,7 +79,7 @@ const ProjectSchema = new Schema<IProjectDocument, IProjectModel>(
     deletedAt: {
       type: Date,
       default: null,
-      index: true,
+      // Index defined below with sparse option
     },
   },
   {

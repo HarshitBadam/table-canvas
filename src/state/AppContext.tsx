@@ -40,6 +40,7 @@ import {
 import { deleteFile } from '@/persistence/db';
 import { ProjectSummary } from '@/api/projects.api';
 import type { SourceTableNode } from '@/lib/types';
+import { initializeReportStore } from '@/report/reportStore';
 
 // ============================================================================
 // Types
@@ -227,6 +228,13 @@ export function AppProvider({ children }: AppProviderProps) {
             { id: project.id, name: project.name, updatedAt: new Date(), createdAt: new Date() },
           ],
         }));
+
+        // Initialize reports from IndexedDB
+        try {
+          await initializeReportStore();
+        } catch (err) {
+          console.error('[AppContext] Failed to initialize reports:', err);
+        }
 
         // Phase 4: Materialize Tables (source tables first, then derived)
         const sourceTableIds = Object.entries(project.nodes)
