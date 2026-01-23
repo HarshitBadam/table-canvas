@@ -11,15 +11,13 @@
      ============================================================================ */
 
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150;
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+    @apply inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium transition-colors;
+    @apply focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-green;
     @apply disabled:pointer-events-none disabled:opacity-50;
-    @apply active:scale-[0.98];
-    --tw-ring-color: var(--color-accent);
   }
 
   .btn-primary {
-    @apply text-white shadow-sm hover:shadow-md;
+    @apply text-white;
     background-color: var(--color-accent);
   }
   
@@ -29,13 +27,11 @@
 
   .btn-secondary {
     @apply text-text-primary border border-border;
-    background-color: var(--color-surface-secondary);
+    background-color: transparent;
   }
   
   .btn-secondary:hover {
-    background-color: rgba(33, 115, 70, 0.12);
-    border-color: rgba(33, 115, 70, 0.4);
-    color: var(--color-accent);
+    background-color: var(--color-surface-secondary);
   }
 
   .btn-ghost {
@@ -43,12 +39,12 @@
   }
   
   .btn-ghost:hover {
-    background-color: rgba(33, 115, 70, 0.12);
-    color: var(--color-accent);
+    background-color: var(--color-surface-secondary);
+    color: var(--color-text-primary);
   }
 
   .btn-danger {
-    @apply bg-red-500 text-white hover:bg-red-600 shadow-sm;
+    @apply bg-red-500 text-white hover:bg-red-600;
   }
 
   /* ============================================================================
@@ -56,16 +52,11 @@
      ============================================================================ */
 
   .input {
-    @apply w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm;
+    @apply w-full border border-border bg-surface px-2 py-1.5 text-sm;
     @apply placeholder:text-text-tertiary;
-    @apply focus:border-accent-green focus:outline-none focus:ring-2;
+    @apply focus:border-accent-green focus:outline-none;
     @apply disabled:cursor-not-allowed disabled:opacity-50;
-    @apply transition-shadow duration-150;
-    --tw-ring-color: rgba(33, 115, 70, 0.2);
-  }
-  
-  .input:focus {
-    --tw-ring-color: rgba(33, 115, 70, 0.3);
+    @apply transition-colors;
   }
 
   /* ============================================================================
@@ -73,7 +64,7 @@
      ============================================================================ */
 
   .card {
-    @apply rounded-xl bg-surface shadow-md border border-border;
+    @apply bg-surface border border-border;
   }
 
   /* ============================================================================
@@ -81,7 +72,7 @@
      ============================================================================ */
 
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center px-1.5 py-0.5 text-xs font-medium;
   }
 
   .badge-blue {
