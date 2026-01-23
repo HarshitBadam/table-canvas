@@ -226,7 +226,7 @@ export function ImportButton() {
       <button
         onClick={handleClick}
         disabled={isImporting}
-        className="btn btn-primary w-full gap-2"
+        className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-accent-green hover:bg-accent-green-hover rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
         {isImporting ? (
           <>
@@ -250,32 +250,32 @@ export function ImportButton() {
       <Dialog.Root open={sheetModalOpen} onOpenChange={setSheetModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/40 animate-fade-in z-50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-xl shadow-xl w-full max-w-md animate-scale-in z-50">
-            <div className="p-6">
-              <Dialog.Title className="text-lg font-semibold text-text-primary mb-1">
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface border border-border rounded-lg shadow-lg w-full max-w-sm animate-scale-in z-50">
+            <div className="p-4">
+              <Dialog.Title className="text-sm font-semibold text-text-primary mb-0.5">
                 Select Sheets to Import
               </Dialog.Title>
-              <Dialog.Description className="text-sm text-text-secondary mb-4">
-                This Excel file contains multiple sheets. Select which ones to import.
+              <Dialog.Description className="text-xs text-text-secondary mb-3">
+                This file contains multiple sheets.
               </Dialog.Description>
 
-              <div className="space-y-2 max-h-64 overflow-y-auto">
+              <div className="space-y-1 max-h-48 overflow-y-auto">
                 {sheets.map((sheet, index) => (
                   <label
                     key={sheet.name}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-surface-secondary hover:bg-surface-tertiary cursor-pointer transition-colors"
+                    className="flex items-center gap-2 px-2 py-1.5 rounded bg-surface-secondary hover:bg-surface-tertiary cursor-pointer transition-colors"
                   >
                     <input
                       type="checkbox"
                       checked={sheet.selected}
                       onChange={() => toggleSheet(index)}
-                      className="w-4 h-4 rounded border-border text-accent-green focus:ring-accent-green"
+                      className="w-3.5 h-3.5 rounded-sm border-border text-accent-green focus:ring-accent-green"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-text-primary truncate">
+                      <div className="text-xs font-medium text-text-primary truncate">
                         {sheet.name}
                       </div>
-                      <div className="text-xs text-text-tertiary">
+                      <div className="text-[10px] text-text-tertiary tabular-nums">
                         ~{sheet.rowCount} rows
                       </div>
                     </div>
@@ -284,14 +284,16 @@ export function ImportButton() {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
+            <div className="px-4 py-3 border-t border-border flex justify-end gap-2">
               <Dialog.Close asChild>
-                <button className="btn btn-secondary">Cancel</button>
+                <button className="px-3 py-1.5 text-xs font-medium text-text-primary border border-border rounded hover:bg-surface-secondary transition-colors">
+                  Cancel
+                </button>
               </Dialog.Close>
               <button
                 onClick={handleImportSelectedSheets}
                 disabled={!sheets.some((s) => s.selected)}
-                className="btn btn-primary"
+                className="px-3 py-1.5 text-xs font-medium text-white bg-accent-green hover:bg-accent-green-hover rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Import {sheets.filter((s) => s.selected).length} Sheet(s)
               </button>
