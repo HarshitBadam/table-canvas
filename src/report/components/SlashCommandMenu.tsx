@@ -262,42 +262,28 @@ export function SlashCommandMenu({
     return (
       <div
         ref={menuRef}
-        className="fixed z-50 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-72 overflow-hidden"
+        className="fixed z-50 bg-white dark:bg-gray-800 shadow border border-gray-300 dark:border-gray-600 w-52"
         style={{ left: position.x, top: position.y }}
       >
-        <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            Select a table
-          </h3>
+        <div className="px-2 py-1.5 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500">
+          Select a table
         </div>
-        <div className="max-h-64 overflow-y-auto">
+        <div className="max-h-48 overflow-y-auto">
           {tableNodes.map((table) => (
             <button
               key={table.id}
               onClick={() => handleTableSelect(table.id)}
-              className="w-full px-3 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+              className="w-full px-2 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
             >
-              <div className="w-8 h-8 rounded-lg bg-accent-green/10 flex items-center justify-center text-accent-green">
-                <TableIcon />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  {table.name}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {table.schema?.rowCount || 0} rows
-                </div>
-              </div>
+              <div className="text-gray-900 dark:text-gray-100">{table.name}</div>
+              <div className="text-xs text-gray-500">{table.schema?.rowCount || 0} rows</div>
             </button>
           ))}
         </div>
-        <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+        <div className="px-2 py-1 border-t border-gray-200 dark:border-gray-700">
           <button
-            onClick={() => {
-              setShowTablePicker(false);
-              setPendingCommand(null);
-            }}
-            className="w-full px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+            onClick={() => { setShowTablePicker(false); setPendingCommand(null); }}
+            className="text-xs text-gray-500 hover:text-gray-700"
           >
             Cancel
           </button>
@@ -310,7 +296,7 @@ export function SlashCommandMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-72 overflow-hidden"
+      className="fixed z-50 bg-white dark:bg-gray-800 shadow border border-gray-300 dark:border-gray-600 w-52"
       style={{ left: position.x, top: position.y }}
     >
       {filteredCommands.length === 0 ? (
@@ -326,7 +312,7 @@ export function SlashCommandMenu({
               <div className="px-3 py-2 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                 Basic
               </div>
-              {basicCommands.map((cmd, idx) => {
+              {basicCommands.map((cmd) => {
                 const absoluteIndex = filteredCommands.indexOf(cmd);
                 return (
                   <CommandItem
@@ -364,15 +350,8 @@ export function SlashCommandMenu({
       )}
       
       {/* Hint */}
-      <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-        <p className="text-[10px] text-gray-400 dark:text-gray-500">
-          <span className="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-500 dark:text-gray-400 mr-1">↑↓</span>
-          Navigate
-          <span className="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-500 dark:text-gray-400 mx-1">↵</span>
-          Select
-          <span className="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-500 dark:text-gray-400 mx-1">esc</span>
-          Close
-        </p>
+      <div className="px-2 py-1 border-t border-gray-200 dark:border-gray-700 text-[10px] text-gray-400">
+        ↑↓ navigate · Enter select · Esc close
       </div>
     </div>
   );
@@ -394,7 +373,7 @@ function CommandItem({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`w-full px-3 py-2 text-left flex items-center gap-3 transition-colors ${
+      className={`w-full px-2 py-1 text-left flex items-center gap-2 text-sm ${
         disabled
           ? 'opacity-40 cursor-not-allowed'
           : isSelected
@@ -402,26 +381,14 @@ function CommandItem({
             : 'hover:bg-gray-100 dark:hover:bg-gray-700'
       }`}
     >
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-        isSelected 
-          ? 'bg-accent-green/20 text-accent-green' 
-          : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+      <span className={`w-5 h-5 flex items-center justify-center text-xs ${
+        isSelected ? 'text-accent-green' : 'text-gray-400'
       }`}>
         {command.icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className={`text-sm font-medium ${
-          isSelected ? 'text-accent-green' : 'text-gray-900 dark:text-gray-100'
-        }`}>
-          {command.label}
-        </div>
-        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-          {command.description}
-        </div>
-      </div>
-      <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">
-        {command.shortcut}
-      </div>
+      </span>
+      <span className={isSelected ? 'text-accent-green' : 'text-gray-900 dark:text-gray-100'}>
+        {command.label}
+      </span>
     </button>
   );
 }

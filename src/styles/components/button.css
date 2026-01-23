@@ -7,10 +7,10 @@
 @layer components {
   /* Base button */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2;
-    @apply text-sm font-medium rounded-md;
-    @apply transition-colors duration-fast;
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+    @apply inline-flex items-center justify-center gap-2 px-3 py-1.5;
+    @apply text-sm font-medium;
+    @apply transition-colors;
+    @apply focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-green;
     @apply disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
@@ -18,49 +18,45 @@
   .btn-primary {
     @apply bg-accent-green text-white;
     @apply hover:bg-accent-green-hover;
-    @apply focus-visible:ring-accent-green;
   }
 
   /* Secondary button - outlined */
   .btn-secondary {
     @apply bg-transparent border border-border text-text-primary;
     @apply hover:bg-surface-secondary;
-    @apply focus-visible:ring-border-focus;
   }
 
   /* Ghost button - no background */
   .btn-ghost {
     @apply bg-transparent text-text-secondary;
     @apply hover:bg-surface-secondary hover:text-text-primary;
-    @apply focus-visible:ring-border-focus;
   }
 
   /* Danger button */
   .btn-danger {
     @apply bg-error text-white;
     @apply hover:bg-red-700;
-    @apply focus-visible:ring-error;
   }
 
   /* Button sizes */
   .btn-sm {
-    @apply px-3 py-1.5 text-xs;
+    @apply px-2 py-1 text-xs;
   }
 
   .btn-lg {
-    @apply px-6 py-3 text-base;
+    @apply px-4 py-2 text-base;
   }
 
   /* Icon-only button */
   .btn-icon {
-    @apply p-2;
-  }
-
-  .btn-icon.btn-sm {
     @apply p-1.5;
   }
 
+  .btn-icon.btn-sm {
+    @apply p-1;
+  }
+
   .btn-icon.btn-lg {
-    @apply p-3;
+    @apply p-2;
   }
 }

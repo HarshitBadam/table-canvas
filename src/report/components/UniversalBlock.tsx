@@ -91,7 +91,6 @@ export function UniversalBlock({
 }: UniversalBlockProps) {
   const [content, setContent] = useState(getBlockContent(block));
   const [slashMenuOpen, setSlashMenuOpen] = useState(false);
-  const [slashFilterText, setSlashFilterText] = useState('');
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastSlashPos = useRef<number | null>(null);
@@ -148,11 +147,9 @@ export function UniversalBlock({
             onSlashCommand({ x: rect.left + 20, y: rect.bottom + 4 }, textAfterSlash);
           }
         }
-        setSlashFilterText(textAfterSlash);
       }
     } else if (slashMenuOpen) {
       setSlashMenuOpen(false);
-      setSlashFilterText('');
       onSlashClose();
       lastSlashPos.current = null;
     }
@@ -176,7 +173,6 @@ export function UniversalBlock({
       if (e.key === 'Escape') {
         e.preventDefault();
         setSlashMenuOpen(false);
-        setSlashFilterText('');
         onSlashClose();
         lastSlashPos.current = null;
         return;
