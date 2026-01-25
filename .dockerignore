@@ -1,0 +1,41 @@
+# Dependencies
+node_modules
+server/node_modules
+
+# Build outputs
+dist
+build
+server/dist
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment files (handled by docker-compose)
+.env
+.env.*
+!.env.example
+
+# Test files
+coverage
+test-results
+playwright-report
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (prevent recursive copy)
+Dockerfile
+docker-compose.yml
+.dockerignore

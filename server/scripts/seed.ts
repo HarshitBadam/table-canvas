@@ -34,7 +34,7 @@ const User = mongoose.model('User', UserSchema);
 const seedUsers = [
   {
     email: 'demo@tablecanvas.app',
-    password: '#YJP9log',
+    password: '1234',
     name: 'Demo User',
   },
 ];
@@ -72,7 +72,7 @@ async function seed() {
     console.log('\n🎉 Seed completed successfully!');
     console.log('\n📋 Test Credentials:');
     console.log('   Email: demo@tablecanvas.app');
-    console.log('   Password: #YJP9log');
+    console.log('   Password: 1234');
 
   } catch (error) {
     console.error('\n❌ Seed failed:', error);

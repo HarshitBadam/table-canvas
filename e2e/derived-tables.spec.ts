@@ -148,7 +148,7 @@ test.describe('Canvas View and Table Nodes', () => {
     // Try to wait for either the canvas or login page
     const canvasOrLogin = await Promise.race([
       page.waitForSelector('.react-flow', { timeout: 10000 }).then(() => 'canvas'),
-      page.waitForSelector('text=Sign in, text=Login, input[type="email"]', { timeout: 10000 }).then(() => 'login'),
+      page.waitForSelector('input[type="email"]', { timeout: 10000 }).then(() => 'login'),
     ]).catch(() => 'unknown')
     
     // If we hit login, we need authentication setup
