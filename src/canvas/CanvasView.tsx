@@ -172,7 +172,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
       zIndex: 0,
       style: {
         strokeWidth: 2.5,
-        stroke: '#059669', // emerald-600
+        stroke: '#3d6b52',
       },
       labelStyle: { 
         fontSize: 10, 
@@ -384,7 +384,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
           type: 'smoothstep',
           style: {
             strokeWidth: 2.5,
-            stroke: '#059669',
+            stroke: '#3d6b52',
           },
         }}
         connectionLineType={ConnectionLineType.SmoothStep}

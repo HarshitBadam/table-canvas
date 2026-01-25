@@ -30,6 +30,7 @@ export default {
           DEFAULT: 'var(--color-border)',
           subtle: 'var(--color-border-subtle)',
           focus: 'var(--color-border-focus)',
+          elevation: 'var(--color-border-elevation)',
         },
         text: {
           primary: 'var(--color-text-primary)',
@@ -84,14 +85,14 @@ export default {
           dark: '#1e40af',
         },
         
-        // Node colors for canvas
+        // Node colors for canvas (CSS variable-based for theme support)
         node: {
-          source: '#e6f4ea',
-          'source-border': '#217346',
-          derived: '#f3e8ff',
-          'derived-border': '#a855f7',
-          chart: '#dcfce7',
-          'chart-border': '#107c41',
+          source: 'var(--color-node-source)',
+          'source-border': 'var(--color-node-source-border)',
+          derived: 'var(--color-node-derived)',
+          'derived-border': 'var(--color-node-derived-border)',
+          chart: 'var(--color-node-chart)',
+          'chart-border': 'var(--color-node-chart-border)',
         },
         
         // Chart colors - Accessible palette

@@ -36,6 +36,13 @@ export interface ColumnSchema {
   // Formula column support
   formula?: string;           // e.g., "[unit_price] * [quantity]"
   isComputed?: boolean;       // Flag for virtual/computed columns
+  /** 
+   * The actual column name used in DuckDB queries.
+   * - For source tables: same as `id` (e.g., "col_1_date")
+   * - For derived tables: same as `name` (e.g., "Date")
+   * This field ensures queries always use what DuckDB expects.
+   */
+  duckDbName?: string;
 }
 
 export interface TableSchema {

@@ -38,7 +38,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
   }, [columns])
   
   const config = chartNode?.plan.config || {}
-  const { data: chartData, loading, error } = useChartData(sourceTableId, config, sourceVersionHash, columns)
+  const { data: chartData, loading, error, refetch } = useChartData(sourceTableId, config, sourceVersionHash, columns)
   
   const [isEditingName, setIsEditingName] = useState(false)
   const [editName, setEditName] = useState('')
@@ -81,7 +81,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
           {/* Chart Header */}
           <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#217346] rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-accent-green rounded-lg flex items-center justify-center">
                 <ChartTypeIcon type={chartType} className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -92,12 +92,12 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
                     onChange={(e) => setEditName(e.target.value)}
                     onBlur={handleNameSave}
                     onKeyDown={(e) => e.key === 'Enter' && handleNameSave()}
-                    className="text-lg font-semibold bg-transparent border-b-2 border-[#217346] outline-none text-gray-900 dark:text-white"
+                    className="text-lg font-semibold bg-transparent border-b-2 border-accent-green outline-none text-gray-900 dark:text-white"
                     autoFocus
                   />
                 ) : (
                   <h1 
-                    className="text-lg font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-[#217346] transition-colors"
+                    className="text-lg font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-accent-green transition-colors"
                     onClick={() => { setEditName(chartNode.name); setIsEditingName(true); }}
                     title="Click to rename"
                   >
@@ -109,7 +109,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => onNavigateToTable(sourceTableId)}
-                className="px-3 py-1.5 text-sm font-medium text-[#217346] bg-[#217346]/10 hover:bg-[#217346]/20 rounded-md transition-colors"
+                className="px-3 py-1.5 text-sm font-medium text-accent-green bg-accent-green/10 hover:bg-accent-green/20 rounded-md transition-colors"
               >
                 {sourceTable?.name}
               </button>
@@ -121,13 +121,48 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
           <div className="p-6">
             {loading ? (
               <div className="h-[420px] flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-gray-200 border-t-[#217346] rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-gray-200 border-t-accent-green rounded-full animate-spin" />
               </div>
             ) : error ? (
-              <div className="h-[420px] flex items-center justify-center text-base text-red-500">{error}</div>
+              <div className="h-[420px] flex flex-col items-center justify-center text-center px-8">
+                <div className="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center mb-4">
+                  <svg className="w-7 h-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
+                  Configuration Error
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-md">
+                  {error.includes('Column reference') 
+                    ? 'The chart references columns that no longer exist in the source table.'
+                    : error
+                  }
+                </p>
+                <div className="flex gap-3 mb-4">
+                  <button
+                    onClick={refetch}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Retry
+                  </button>
+                </div>
+                <p className="text-xs text-accent-green font-medium">
+                  Select new columns below to fix this chart
+                </p>
+              </div>
             ) : chartData.length === 0 ? (
-              <div className="h-[420px] flex items-center justify-center text-base text-gray-400">
-                Configure data fields below
+              <div className="h-[420px] flex flex-col items-center justify-center text-center">
+                <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
+                  <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">No Data to Display</p>
+                <p className="text-xs text-gray-400">Configure data fields below</p>
               </div>
             ) : (
               <ChartRenderer
@@ -154,7 +189,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
                   onClick={() => handleChartTypeChange(type)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     chartType === type
-                      ? 'bg-[#217346] text-white'
+                      ? 'bg-accent-green text-white'
                       : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                   }`}
                 >
@@ -173,7 +208,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   {chartType === 'pie' ? 'Category' : 'X-Axis'}
                 </span>
-                <span className="px-2.5 py-1 text-xs font-medium text-[#217346] bg-[#217346]/10 rounded-md">
+                <span className="px-2.5 py-1 text-xs font-medium text-accent-green bg-accent-green/10 rounded-md">
                   {xAxisName}
                 </span>
               </div>
@@ -186,7 +221,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
                       onClick={() => handleConfigChange({ xAxis: col.id })}
                       className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
                         config.xAxis === col.id
-                          ? 'bg-[#217346] text-white'
+                          ? 'bg-accent-green text-white'
                           : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
                       }`}
                     >
@@ -204,7 +239,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   {chartType === 'pie' ? 'Value' : 'Y-Axis'}
                 </span>
-                <span className="px-2.5 py-1 text-xs font-medium text-[#217346] bg-[#217346]/10 rounded-md">
+                <span className="px-2.5 py-1 text-xs font-medium text-accent-green bg-accent-green/10 rounded-md">
                   {yAxisName}
                 </span>
               </div>
@@ -215,7 +250,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
                     onClick={() => handleConfigChange({ yAxis: col.id })}
                     className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
                       config.yAxis === col.id
-                        ? 'bg-[#217346] text-white'
+                        ? 'bg-accent-green text-white'
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
                     }`}
                   >
@@ -232,7 +267,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-3">
                   <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Aggregation</span>
-                  <span className="px-2.5 py-1 text-xs font-medium text-[#217346] bg-[#217346]/10 rounded-md">
+                  <span className="px-2.5 py-1 text-xs font-medium text-accent-green bg-accent-green/10 rounded-md">
                     {(config.aggregation || 'sum').charAt(0).toUpperCase() + (config.aggregation || 'sum').slice(1)}
                   </span>
                 </div>
@@ -243,7 +278,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
                       onClick={() => handleConfigChange({ aggregation: agg as AggregationType })}
                       className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
                         config.aggregation === agg
-                          ? 'bg-[#217346] text-white'
+                          ? 'bg-accent-green text-white'
                           : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
                       }`}
                     >

@@ -161,13 +161,38 @@ export type ReportBlock =
   | DividerBlock;
 
 // ============================================================================
+// TipTap Content Type
+// ============================================================================
+
+export interface TipTapContent {
+  type: 'doc';
+  content: TipTapNode[];
+}
+
+export interface TipTapNode {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: TipTapNode[];
+  text?: string;
+  marks?: TipTapMark[];
+}
+
+export interface TipTapMark {
+  type: string;
+  attrs?: Record<string, unknown>;
+}
+
+// ============================================================================
 // Report Interface
 // ============================================================================
 
 export interface Report {
   id: string;
   name: string;
+  /** @deprecated Use tiptapContent instead. Kept for backward compatibility. */
   blocks: ReportBlock[];
+  /** TipTap JSON content - new format */
+  tiptapContent?: TipTapContent;
   createdAt: string;
   updatedAt: string;
 }

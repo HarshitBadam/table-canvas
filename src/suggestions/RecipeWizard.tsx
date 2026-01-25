@@ -54,16 +54,20 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
     ],
     outputs: ['Summary table with period totals', 'Line chart showing trend'],
     buildTransform: (bindings, tableId, columns) => {
+      const dateCol = columns?.find(c => c.id === bindings.dateColumnId)
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const valueName = valueCol?.name || 'Value'
+      // Use column name (what DuckDB expects) for derived tables, fall back to ID
+      const dateColRef = dateCol?.name || bindings.dateColumnId
+      const valueColRef = valueCol?.name || bindings.valueColumnId
       return {
         type: 'group_summarize',
         sourceTableId: tableId,
-        groupByColumns: [bindings.dateColumnId],
+        groupByColumns: [dateColRef],
         aggregations: [
-          { columnId: bindings.valueColumnId, operation: 'sum', alias: `Total ${valueName}` },
-          { columnId: bindings.valueColumnId, operation: 'avg', alias: `Avg ${valueName}` },
-          { columnId: bindings.valueColumnId, operation: 'count', alias: 'Record Count' },
+          { columnId: valueColRef, operation: 'sum', alias: `Total ${valueName}` },
+          { columnId: valueColRef, operation: 'avg', alias: `Avg ${valueName}` },
+          { columnId: valueColRef, operation: 'count', alias: 'Record Count' },
         ],
       }
     },
@@ -83,15 +87,19 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
     ],
     outputs: ['Summary table ranked by contribution', 'Bar chart showing breakdown', 'Cumulative percentage'],
     buildTransform: (bindings, tableId, columns) => {
+      const categoryCol = columns?.find(c => c.id === bindings.categoryColumnId)
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const valueName = valueCol?.name || 'Value'
+      // Use column name (what DuckDB expects) for derived tables, fall back to ID
+      const categoryColRef = categoryCol?.name || bindings.categoryColumnId
+      const valueColRef = valueCol?.name || bindings.valueColumnId
       return {
         type: 'group_summarize',
         sourceTableId: tableId,
-        groupByColumns: [bindings.categoryColumnId],
+        groupByColumns: [categoryColRef],
         aggregations: [
-          { columnId: bindings.valueColumnId, operation: 'sum', alias: `Total ${valueName}` },
-          { columnId: bindings.valueColumnId, operation: 'count', alias: 'Record Count' },
+          { columnId: valueColRef, operation: 'sum', alias: `Total ${valueName}` },
+          { columnId: valueColRef, operation: 'count', alias: 'Record Count' },
         ],
       }
     },
@@ -118,11 +126,14 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
       const budgetCol = columns?.find(c => c.id === bindings.budgetColumnId)
       const actualName = actualCol?.name || 'Actual'
       const budgetName = budgetCol?.name || 'Budget'
+      // Use column name (what DuckDB expects) for derived tables, fall back to ID
+      const actualColRef = actualCol?.name || bindings.actualColumnId
+      const budgetColRef = budgetCol?.name || bindings.budgetColumnId
       return {
         type: 'calculated_column',
         sourceTableId: tableId,
         newColumnName: `${actualName} vs ${budgetName} Variance`,
-        expression: `("${bindings.actualColumnId}" - "${bindings.budgetColumnId}")`,
+        expression: `("${actualColRef}" - "${budgetColRef}")`,
       }
     },
     getTableName: (_tableName, bindings, columns) => {
@@ -171,16 +182,20 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
     ],
     outputs: ['Table with period comparisons', 'Growth rate calculations'],
     buildTransform: (bindings, tableId, columns) => {
+      const dateCol = columns?.find(c => c.id === bindings.dateColumnId)
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const valueName = valueCol?.name || 'Value'
+      // Use column name (what DuckDB expects) for derived tables, fall back to ID
+      const dateColRef = dateCol?.name || bindings.dateColumnId
+      const valueColRef = valueCol?.name || bindings.valueColumnId
       return {
         type: 'group_summarize',
         sourceTableId: tableId,
-        groupByColumns: [bindings.dateColumnId],
+        groupByColumns: [dateColRef],
         aggregations: [
-          { columnId: bindings.valueColumnId, operation: 'sum', alias: `Total ${valueName}` },
-          { columnId: bindings.valueColumnId, operation: 'avg', alias: `Avg ${valueName}` },
-          { columnId: bindings.valueColumnId, operation: 'count', alias: 'Record Count' },
+          { columnId: valueColRef, operation: 'sum', alias: `Total ${valueName}` },
+          { columnId: valueColRef, operation: 'avg', alias: `Avg ${valueName}` },
+          { columnId: valueColRef, operation: 'count', alias: 'Record Count' },
         ],
       }
     },

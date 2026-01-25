@@ -70,7 +70,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
       {/* Logo / Title */}
       <div className="h-14 border-b border-border flex items-center px-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded bg-accent-green flex items-center justify-center">
+          <div className="w-9 h-9 rounded bg-[#217346] dark:bg-[#4a7d60] flex items-center justify-center">
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
@@ -95,7 +95,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
       </div>
 
       {/* Tables List */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto scrollbar-hide p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">
             Tables

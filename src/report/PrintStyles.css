@@ -2,41 +2,64 @@
  * Report Print Styles
  * 
  * Styles for PDF export and printing of reports.
- * These styles ensure a clean, professional output.
+ * Clean, professional output with proper page break handling.
  */
 
 @media print {
+  /* ============================================================================
+     Reset & Base
+     ============================================================================ */
+  
   /* Hide non-print elements */
-  .print\\:hidden,
+  .print\:hidden,
   header,
   nav,
   aside,
   button,
   .btn,
   [role="navigation"],
-  .no-print {
+  .no-print,
+  .report-toolbar,
+  .report-toolbar-v2,
+  .block-toolbar,
+  .block-config-panel,
+  .slash-command-menu,
+  .tiptap-block-wrapper.is-selected::before {
     display: none !important;
   }
 
   /* Show print-only elements */
-  .print\\:block,
-  .hidden.print\\:block {
+  .print\:block,
+  .hidden.print\:block {
     display: block !important;
   }
 
-  /* Reset page margins */
+  /* Page setup - clean margins, no browser headers/footers */
   @page {
-    margin: 1in;
+    margin: 0.6in;
     size: letter;
   }
+
+  @page :first {
+    margin-top: 0.5in;
+  }
+
+  /* Try to minimize browser chrome - note: actual header/footer 
+     can only be disabled in browser print settings */
 
   /* Body styles */
   body {
     background: white !important;
-    color: black !important;
-    font-size: 12pt !important;
-    line-height: 1.5 !important;
+    color: #1a1a1a !important;
+    font-size: 11pt !important;
+    line-height: 1.6 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
+
+  /* ============================================================================
+     Layout
+     ============================================================================ */
 
   /* Report container */
   .report-view {
@@ -46,159 +69,393 @@
     background: white !important;
   }
 
-  /* Report title */
-  .report-title {
-    font-size: 24pt !important;
-    font-weight: bold !important;
-    margin-bottom: 12pt !important;
-    color: black !important;
-    page-break-after: avoid;
+  /* Content wrapper */
+  .report-view > div {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
-  /* Headings */
+  /* ============================================================================
+     Typography
+     ============================================================================ */
+
+  /* Report title (H1) */
+  .tiptap-editor h1:first-child,
+  .report-title {
+    font-size: 22pt !important;
+    font-weight: 700 !important;
+    margin-top: 0 !important;
+    margin-bottom: 16pt !important;
+    color: #1a1a1a !important;
+    page-break-after: avoid;
+    border-bottom: 2px solid #217346;
+    padding-bottom: 8pt;
+  }
+
   h1 {
-    font-size: 20pt !important;
-    margin-top: 18pt !important;
-    margin-bottom: 8pt !important;
+    font-size: 18pt !important;
+    font-weight: 700 !important;
+    margin-top: 20pt !important;
+    margin-bottom: 10pt !important;
+    color: #1a1a1a !important;
     page-break-after: avoid;
   }
 
   h2 {
-    font-size: 16pt !important;
-    margin-top: 14pt !important;
-    margin-bottom: 6pt !important;
+    font-size: 14pt !important;
+    font-weight: 600 !important;
+    margin-top: 16pt !important;
+    margin-bottom: 8pt !important;
+    color: #1a1a1a !important;
     page-break-after: avoid;
   }
 
   h3 {
-    font-size: 14pt !important;
-    margin-top: 12pt !important;
-    margin-bottom: 4pt !important;
+    font-size: 12pt !important;
+    font-weight: 600 !important;
+    margin-top: 14pt !important;
+    margin-bottom: 6pt !important;
+    color: #333 !important;
     page-break-after: avoid;
   }
 
-  /* Text blocks */
+  /* Text blocks - prevent splitting */
   p {
-    orphans: 3;
-    widows: 3;
-    margin-bottom: 8pt !important;
+    orphans: 4;
+    widows: 4;
+    margin-bottom: 10pt !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
-
-  /* Charts */
-  .chart-block {
-    page-break-inside: avoid;
-    margin: 12pt 0 !important;
-  }
-
-  .chart-block svg {
-    max-width: 100% !important;
-    height: auto !important;
-  }
-
-  /* Table snippets */
-  .table-snippet-block {
-    page-break-inside: avoid;
-    margin: 12pt 0 !important;
-  }
-
-  table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    font-size: 10pt !important;
-  }
-
-  th, td {
-    border: 1px solid #ccc !important;
-    padding: 4pt 8pt !important;
-    text-align: left !important;
-  }
-
-  th {
-    background: #f0f0f0 !important;
-    font-weight: 600 !important;
-  }
-
-  /* Dividers */
-  hr {
-    border: none !important;
-    border-top: 1px solid #ccc !important;
-    margin: 12pt 0 !important;
+  
+  /* Keep short paragraphs together */
+  p:has(~ p) {
+    page-break-after: auto;
   }
 
   /* Links */
   a {
-    color: inherit !important;
-    text-decoration: underline !important;
+    color: #217346 !important;
+    text-decoration: none !important;
   }
 
   /* Code */
   code {
     background: #f5f5f5 !important;
     padding: 2pt 4pt !important;
-    border-radius: 2pt !important;
+    border-radius: 3pt !important;
     font-size: 9pt !important;
+    font-family: 'SF Mono', Monaco, Consolas, monospace !important;
   }
 
-  /* Hide interactive elements */
-  .config-panel,
-  .add-block-button,
-  .drag-handle,
-  .block-actions {
+  /* ============================================================================
+     Charts - sized to fit page
+     ============================================================================ */
+
+  .chart-block,
+  .chart-block-container {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin: 12pt 0 !important;
+    border: 1px solid #e0e0e0 !important;
+    border-radius: 4pt !important;
+    padding: 10pt !important;
+    background: white !important;
+    max-height: 5in !important; /* Prevent charts from being too tall */
+  }
+
+  .chart-block svg,
+  .chart-block-body {
+    max-width: 100% !important;
+    max-height: 4in !important;
+    height: auto !important;
+  }
+
+  .chart-block-header {
+    border-bottom: 1px solid #e5e5e5 !important;
+    padding-bottom: 6pt !important;
+    margin-bottom: 6pt !important;
+    font-size: 11pt !important;
+  }
+
+  .chart-block-footer {
+    font-size: 8pt !important;
+    color: #888 !important;
+    border-top: 1px solid #e5e5e5 !important;
+    padding-top: 6pt !important;
+    margin-top: 6pt !important;
+  }
+
+  /* Hide chart grid background and config button in print */
+  .chart-block-container > div:first-child[style*="background"],
+  .chart-block-footer button {
     display: none !important;
   }
 
-  /* Block spacing */
-  .block-wrapper {
-    margin-bottom: 8pt !important;
+  /* ============================================================================
+     Tables - can span pages with repeating headers
+     ============================================================================ */
+
+  .table-snippet-block,
+  .table-block-container {
+    margin: 12pt 0 !important;
+    /* Keep tables together - avoid splitting */
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
-  /* Ensure proper colors for dark mode users */
-  * {
-    color-adjust: exact !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+  /* Only allow large tables to break if absolutely necessary */
+  .table-block-container.table-large {
+    page-break-inside: auto !important;
   }
 
-  /* Remove box shadows */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 8.5pt !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* For large tables that must break, repeat header on each page */
+  .table-large table {
+    page-break-inside: auto !important;
+  }
+  
+  .table-large thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: auto;
+  }
+
+  th, td {
+    border: 1px solid #d5d5d5 !important;
+    padding: 5pt 8pt !important;
+    text-align: left !important;
+  }
+
+  th {
+    background: #f5f7f5 !important;
+    font-weight: 600 !important;
+    color: #333 !important;
+    border-bottom: 2px solid #217346 !important;
+  }
+
+  tr:nth-child(even) td {
+    background: #fbfcfb !important;
+  }
+
+  /* Table caption/footer */
+  .table-block-footer {
+    font-size: 8pt !important;
+    color: #888 !important;
+    padding-top: 4pt !important;
+  }
+  
+  /* Keep table with its header */
+  .table-block-header {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* ============================================================================
+     Block Elements
+     ============================================================================ */
+
+  /* Dividers */
+  hr {
+    border: none !important;
+    border-top: 1px solid #e0e0e0 !important;
+    margin: 16pt 0 !important;
+    page-break-after: avoid;
+  }
+
+  /* Blockquotes */
+  blockquote {
+    border-left: 3px solid #217346 !important;
+    padding-left: 12pt !important;
+    margin: 12pt 0 !important;
+    color: #444 !important;
+    font-style: italic;
+    page-break-inside: avoid;
+  }
+
+  /* Lists - keep together when possible */
+  ul, ol {
+    margin: 10pt 0 !important;
+    padding-left: 20pt !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  li {
+    margin-bottom: 4pt !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  /* Allow long lists to break but keep items together */
+  ul:has(li:nth-child(8)), ol:has(li:nth-child(8)) {
+    page-break-inside: auto !important;
+  }
+
+  /* Callouts */
+  .callout-block {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    border: 1px solid #e5e5e5 !important;
+    border-radius: 6pt !important;
+    padding: 12pt !important;
+    margin: 12pt 0 !important;
+    background: #fafafa !important;
+  }
+
+  /* ============================================================================
+     TipTap Specific
+     ============================================================================ */
+
+  .tiptap-block-wrapper {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    background: none !important;
+  }
+
+  .tiptap-block-wrapper.is-selected {
+    box-shadow: none !important;
+    background: none !important;
+  }
+
+  .tiptap-editor-content {
+    padding: 0 !important;
+  }
+
+  /* Toggle blocks - show content expanded */
+  .toggle-block {
+    page-break-inside: avoid;
+    border: 1px solid #e5e5e5 !important;
+    border-radius: 4pt !important;
+    padding: 8pt !important;
+    margin: 8pt 0 !important;
+  }
+
+  .toggle-block-content {
+    display: block !important;
+    padding-top: 8pt !important;
+  }
+
+  .toggle-block-trigger {
+    font-weight: 600 !important;
+  }
+
+  /* Hide the toggle arrow icon in print */
+  .toggle-block-trigger svg {
+    display: none !important;
+  }
+
+  /* ============================================================================
+     Page Breaks
+     ============================================================================ */
+
+  /* Prevent awkward breaks */
+  h1, h2, h3, h4 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  /* Keep headings with following content */
+  h1 + *, h2 + *, h3 + *, h4 + * {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  img, svg, figure {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Force page break before major sections if needed */
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+  
+  /* Prevent page break after these elements */
+  .page-break-avoid-after {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+  
+  /* TipTap content blocks - keep together */
+  .tiptap-block-wrapper {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  /* Keep content sections together */
+  section, article, .content-block {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* ============================================================================
+     Clean Up
+     ============================================================================ */
+
+  /* Remove all shadows */
   * {
     box-shadow: none !important;
+    text-shadow: none !important;
   }
 
-  /* Keep backgrounds for charts and highlights */
-  .chart-container,
-  .highlight {
-    background-color: inherit !important;
+  /* Remove animations/transitions */
+  * {
+    animation: none !important;
+    transition: none !important;
   }
 }
 
-/* Print preview styles (visible in UI before print) */
+/* ============================================================================
+   Print Preview (visible in UI before print)
+   ============================================================================ */
+
 .print-preview {
   background: white;
-  color: black;
-  padding: 1in;
+  color: #1a1a1a;
+  padding: 0.75in;
   max-width: 8.5in;
   margin: 0 auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
 }
 
-.print-preview h1 {
-  font-size: 24pt;
-  margin-bottom: 12pt;
+.print-preview h1:first-child {
+  font-size: 22pt;
+  font-weight: 700;
+  margin-bottom: 16pt;
+  border-bottom: 2px solid #217346;
+  padding-bottom: 8pt;
 }
 
 .print-preview h2 {
-  font-size: 18pt;
-  margin-top: 14pt;
-  margin-bottom: 8pt;
-}
-
-.print-preview h3 {
   font-size: 14pt;
-  margin-top: 12pt;
-  margin-bottom: 6pt;
+  font-weight: 600;
+  margin-top: 16pt;
+  margin-bottom: 8pt;
 }
 
 .print-preview p {
-  margin-bottom: 8pt;
+  margin-bottom: 10pt;
   line-height: 1.6;
 }

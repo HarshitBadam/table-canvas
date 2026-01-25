@@ -47,15 +47,15 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
     <div
       className={`
         w-[220px] rounded-lg transition-all duration-200 ease-out overflow-hidden
-        bg-white dark:bg-gray-900
+        bg-surface
         ${selected 
           ? 'ring-2 ring-accent-green shadow-xl scale-[1.02]' 
-          : 'ring-1 ring-gray-200 dark:ring-gray-700 shadow-md hover:shadow-lg'
+          : 'ring-1 ring-border shadow-md hover:shadow-lg'
         }
       `}
     >
       {/* Header - Clean, no top stripe */}
-      <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
+      <div className="px-3 py-2 border-b border-border-subtle bg-surface-secondary/50">
         <div className="flex items-center gap-2">
           <div 
             className="w-5 h-5 rounded flex items-center justify-center"
@@ -75,19 +75,19 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
               {chartType === 'scatter' && <><circle cx="7" cy="14" r="2" /><circle cx="11" cy="10" r="2" /><circle cx="15" cy="16" r="2" /><circle cx="17" cy="8" r="2" /></>}
             </svg>
           </div>
-          <span className="text-xs font-medium text-gray-700 dark:text-gray-200 truncate flex-1">
+          <span className="text-xs font-medium text-text-primary truncate flex-1">
             {data.name}
           </span>
         </div>
       </div>
 
       {/* Chart Area with grid background */}
-      <div className="relative px-2 py-2 bg-white dark:bg-gray-900">
+      <div className="relative px-2 py-2 bg-surface">
         {/* Subtle grid pattern */}
         <div 
           className="absolute inset-0 pointer-events-none"
           style={{
-            backgroundImage: 'linear-gradient(#e5e5ea 1px, transparent 1px), linear-gradient(90deg, #e5e5ea 1px, transparent 1px)',
+            backgroundImage: 'linear-gradient(var(--color-border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--color-border-subtle) 1px, transparent 1px)',
             backgroundSize: '20px 20px',
             opacity: 0.4,
           }}
@@ -96,13 +96,23 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
         {loading ? (
           <div className="relative h-[110px] flex items-center justify-center">
             <div 
-              className="w-4 h-4 border-2 border-gray-200 rounded-full animate-spin"
+              className="w-4 h-4 border-2 border-border rounded-full animate-spin"
               style={{ borderTopColor: accentColor }}
             />
           </div>
         ) : error ? (
-          <div className="relative h-[110px] flex items-center justify-center text-[10px] text-red-500 px-2 text-center">
-            {error}
+          <div className="relative h-[110px] flex flex-col items-center justify-center px-3 text-center">
+            <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-2">
+              <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <p className="text-[9px] font-medium text-red-600 dark:text-red-400 leading-tight">
+              {error.includes('column') ? 'Column not found' : 'Error'}
+            </p>
+            <p className="text-[8px] text-text-tertiary mt-0.5">
+              Reconfigure chart axes
+            </p>
           </div>
         ) : !chartData || chartData.length === 0 ? (
           <div className="relative h-[110px] flex items-center justify-center text-[10px] text-text-tertiary">
@@ -123,8 +133,8 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
       </div>
 
       {/* Footer */}
-      <div className="px-3 py-1.5 bg-gray-50/80 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800">
-        <div className="flex items-center justify-between text-[9px] text-gray-500 dark:text-gray-400">
+      <div className="px-3 py-1.5 bg-surface-secondary/80 border-t border-border-subtle">
+        <div className="flex items-center justify-between text-[9px] text-text-secondary">
           {chartType === 'pie' ? (
             <>
               <span className="truncate max-w-[120px]">{xAxisName} → {yAxisName}</span>
@@ -132,8 +142,8 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
             </>
           ) : (
             <>
-              <span>X: <span className="text-gray-700 dark:text-gray-300">{xAxisName}</span></span>
-              <span>Y: <span className="text-gray-700 dark:text-gray-300">{yAxisName}</span></span>
+              <span>X: <span className="text-text-primary">{xAxisName}</span></span>
+              <span>Y: <span className="text-text-primary">{yAxisName}</span></span>
               <span className="font-medium" style={{ color: accentColor }}>{chartData?.length || 0}</span>
             </>
           )}
@@ -144,12 +154,12 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-2 !h-2 !border-2 !border-white dark:!border-gray-900 !rounded-full !bg-accent-green"
+        className="!w-2 !h-2 !border-2 !border-surface !rounded-full !bg-accent-green"
       />
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-2 !h-2 !border-2 !border-white dark:!border-gray-900 !rounded-full !bg-accent-green"
+        className="!w-2 !h-2 !border-2 !border-surface !rounded-full !bg-accent-green"
       />
     </div>
   )
