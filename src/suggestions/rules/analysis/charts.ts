@@ -61,6 +61,9 @@ export const barChartRule: SuggestionRule = {
     const opportunities = detectAggregationOpportunities(meta.schema, meta.profile?.columns)
     const opp = opportunities[0]
     const groupCol = opp.groupColumns[0]
+    // Use column name (what DuckDB expects) for derived tables
+    const groupColRef = groupCol.column.name || groupCol.column.id
+    const valueColRef = opp.valueColumn.name || opp.valueColumn.id
     
     return {
       id: createSuggestionId('bar_chart', ctx.tableId, groupCol.column.id, opp.valueColumn.id),
@@ -74,8 +77,8 @@ export const barChartRule: SuggestionRule = {
         tableVersionHash: getVersionHash(ctx),
         chartSuggestion: {
           type: 'bar',
-          xAxis: groupCol.column.id,
-          yAxis: opp.valueColumn.id,
+          xAxis: groupColRef,
+          yAxis: valueColRef,
         },
       },
       why: [
@@ -93,8 +96,8 @@ export const barChartRule: SuggestionRule = {
           chartType: 'bar',
           sourceTableId: ctx.tableId,
           config: {
-            xAxis: groupCol.column.id,
-            yAxis: opp.valueColumn.id,
+            xAxis: groupColRef,
+            yAxis: valueColRef,
             aggregation: 'sum',
           },
         },
@@ -133,6 +136,9 @@ export const pieChartRule: SuggestionRule = {
     const opportunities = detectAggregationOpportunities(meta.schema, meta.profile?.columns)
     const opp = opportunities[0]
     const groupCol = opp.groupColumns[0]
+    // Use column name (what DuckDB expects) for derived tables
+    const groupColRef = groupCol.column.name || groupCol.column.id
+    const valueColRef = opp.valueColumn.name || opp.valueColumn.id
     
     return {
       id: createSuggestionId('pie_chart', ctx.tableId, groupCol.column.id, opp.valueColumn.id),
@@ -146,8 +152,8 @@ export const pieChartRule: SuggestionRule = {
         tableVersionHash: getVersionHash(ctx),
         chartSuggestion: {
           type: 'pie',
-          category: groupCol.column.id,
-          value: opp.valueColumn.id,
+          category: groupColRef,
+          value: valueColRef,
         },
       },
       why: [
@@ -165,8 +171,8 @@ export const pieChartRule: SuggestionRule = {
           chartType: 'pie',
           sourceTableId: ctx.tableId,
           config: {
-            xAxis: groupCol.column.id,
-            yAxis: opp.valueColumn.id,
+            xAxis: groupColRef,
+            yAxis: valueColRef,
           },
         },
       },

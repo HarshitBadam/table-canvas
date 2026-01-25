@@ -2,6 +2,7 @@
  * BlockEditor Component
  * 
  * Notion-like block editor with clean, minimal design.
+ * Seamless single-page experience connected to the title.
  * Features:
  * - Real-time markdown detection and block transformation
  * - Slash commands for inserting blocks (/)
@@ -9,22 +10,33 @@
  * - Drag and drop reordering
  * - Keyboard shortcuts
  * - Paste from grid (Cmd+V)
+ * - Seamless navigation between title and content
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useReportStore } from '../reportStore';
 import { BlockRenderer } from './BlockRenderer';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import type { ReportBlock, NewBlock, BlockType, HeadingLevel } from '../types';
 import type { GridClipboardData } from '@/types/clipboard.types';
 
+// Exposed methods for parent components
+export interface BlockEditorHandle {
+  focusFirstBlock: () => void;
+  focusLastBlock: () => void;
+}
+
 interface BlockEditorProps {
   reportId: string;
   blocks: ReportBlock[];
   onOpenTable?: (tableId: string) => void;
+  onFocusTitle?: () => void; // Called when user backspaces from first empty block
 }
 
-export function BlockEditor({ reportId, blocks, onOpenTable }: BlockEditorProps) {
+export const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function BlockEditor(
+  { reportId, blocks, onOpenTable, onFocusTitle },
+  ref
+) {
   const addBlock = useReportStore((state) => state.addBlock);
   const updateBlock = useReportStore((state) => state.updateBlock);
   const deleteBlock = useReportStore((state) => state.deleteBlock);
@@ -45,6 +57,55 @@ export function BlockEditor({ reportId, blocks, onOpenTable }: BlockEditorProps)
   } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const blockRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
+
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    focusFirstBlock: () => {
+      if (blocks.length > 0) {
+        const firstBlock = blocks[0];
+        setSelectedBlockId(firstBlock.id);
+        setActiveBlockId(firstBlock.id);
+        // Focus the textarea
+        setTimeout(() => {
+          const textarea = blockRefs.current.get(firstBlock.id);
+          if (textarea) {
+            textarea.focus();
+            textarea.setSelectionRange(0, 0);
+          }
+        }, 0);
+      } else {
+        // Create a block if none exist
+        const newBlockId = addBlock(reportId, { type: 'text', content: '' } as NewBlock, 0);
+        if (newBlockId) {
+          setSelectedBlockId(newBlockId);
+          setActiveBlockId(newBlockId);
+        }
+      }
+    },
+    focusLastBlock: () => {
+      if (blocks.length > 0) {
+        const lastBlock = blocks[blocks.length - 1];
+        setSelectedBlockId(lastBlock.id);
+        setActiveBlockId(lastBlock.id);
+        setTimeout(() => {
+          const textarea = blockRefs.current.get(lastBlock.id);
+          if (textarea) {
+            textarea.focus();
+            const len = textarea.value.length;
+            textarea.setSelectionRange(len, len);
+          }
+        }, 0);
+      }
+    },
+  }), [blocks, addBlock, reportId]);
+
+  // Auto-create first block if none exist (seamless experience)
+  useEffect(() => {
+    if (blocks.length === 0) {
+      addBlock(reportId, { type: 'text', content: '' } as NewBlock, 0);
+    }
+  }, [blocks.length, addBlock, reportId]);
 
   // Handle adding a new block
   const handleAddBlock = useCallback((blockData: NewBlock, index?: number) => {
@@ -72,9 +133,25 @@ export function BlockEditor({ reportId, blocks, onOpenTable }: BlockEditorProps)
     setActiveBlockId(null);
   }, []);
 
-  // Handle block deletion
-  const handleBlockDelete = useCallback((blockId: string) => {
+  // Handle block deletion with seamless navigation
+  const handleBlockDelete = useCallback((blockId: string, fromBackspace?: boolean) => {
     const blockIndex = blocks.findIndex(b => b.id === blockId);
+    
+    // If this is the first block and backspace was pressed, focus title instead of deleting
+    if (blockIndex === 0 && fromBackspace && onFocusTitle) {
+      // If it's the only block and empty, just focus title (keep the block)
+      const block = blocks[0];
+      if (blocks.length === 1 && (block.type === 'text' || block.type === 'heading') && !block.content) {
+        onFocusTitle();
+        return;
+      }
+      // If there are other blocks, delete this one and focus title
+      if (blocks.length === 1) {
+        onFocusTitle();
+        return;
+      }
+    }
+    
     deleteBlock(reportId, blockId);
     
     // Focus previous block if exists
@@ -83,17 +160,22 @@ export function BlockEditor({ reportId, blocks, onOpenTable }: BlockEditorProps)
       setSelectedBlockId(prevBlock.id);
       setActiveBlockId(prevBlock.id);
     } else if (blocks.length > 1) {
-      // Focus next block
+      // Focus next block (which becomes the first)
       const nextBlock = blocks[blockIndex + 1];
       if (nextBlock) {
         setSelectedBlockId(nextBlock.id);
         setActiveBlockId(nextBlock.id);
       }
     } else {
-      setSelectedBlockId(null);
-      setActiveBlockId(null);
+      // Last block deleted - focus title
+      if (onFocusTitle) {
+        onFocusTitle();
+      } else {
+        setSelectedBlockId(null);
+        setActiveBlockId(null);
+      }
     }
-  }, [reportId, deleteBlock, blocks]);
+  }, [reportId, deleteBlock, blocks, onFocusTitle]);
 
   // Handle block duplication
   const handleBlockDuplicate = useCallback((blockId: string) => {
@@ -422,6 +504,7 @@ export function BlockEditor({ reportId, blocks, onOpenTable }: BlockEditorProps)
                   onActivate={() => handleBlockActivate(block.id)}
                   onDeactivate={handleBlockDeactivate}
                   onDelete={() => handleBlockDelete(block.id)}
+                  onBackspaceDelete={() => handleBlockDelete(block.id, true)}
                   onKeyDown={(e) => handleKeyDown(e, block.id, index)}
                   onOpenTable={onOpenTable}
                   onContentChange={(content) => handleContentChange(block.id, content)}
@@ -434,19 +517,21 @@ export function BlockEditor({ reportId, blocks, onOpenTable }: BlockEditorProps)
                   onNavigatePrev={() => handleNavigatePrev(block.id)}
                   onNavigateNext={() => handleNavigateNext(block.id)}
                   onMergeWithPrevious={() => handleMergeWithPrevious(block.id)}
+                  registerRef={(el) => {
+                    if (el) blockRefs.current.set(block.id, el);
+                    else blockRefs.current.delete(block.id);
+                  }}
                 />
               </div>
             </div>
           ))}
 
-          {/* Placeholder for adding new block at end - invisible until focused */}
-          <div className="py-1">
-            <div 
-              onClick={handlePlaceholderClick}
-              className="text-gray-400 hover:text-gray-500 cursor-text text-base py-1"
-            >
-              <span className="opacity-50 hover:opacity-70">Press Enter to continue, or / for commands</span>
-            </div>
+          {/* Clickable area at end to add new block */}
+          <div 
+            onClick={handlePlaceholderClick}
+            className="py-4 min-h-[4em] cursor-text"
+          >
+            <span className="text-transparent select-none">&nbsp;</span>
           </div>
         </div>
       )}
@@ -462,7 +547,7 @@ export function BlockEditor({ reportId, blocks, onOpenTable }: BlockEditorProps)
       )}
     </div>
   );
-}
+});
 
 // Wrapper component that handles both editable and non-editable blocks
 interface EditableBlockWrapperProps {
@@ -476,6 +561,7 @@ interface EditableBlockWrapperProps {
   onActivate: () => void;
   onDeactivate: () => void;
   onDelete: () => void;
+  onBackspaceDelete: () => void; // Called when backspace deletes empty block
   onKeyDown: (e: React.KeyboardEvent) => void;
   onOpenTable?: (tableId: string) => void;
   onContentChange: (content: string) => void;
@@ -488,6 +574,7 @@ interface EditableBlockWrapperProps {
   onNavigatePrev: () => void;
   onNavigateNext: () => void;
   onMergeWithPrevious: () => void;
+  registerRef: (el: HTMLTextAreaElement | null) => void; // Register textarea ref
 }
 
 function EditableBlockWrapper({
@@ -501,6 +588,7 @@ function EditableBlockWrapper({
   onActivate,
   onDeactivate,
   onDelete,
+  onBackspaceDelete: _onBackspaceDelete,
   onKeyDown,
   onOpenTable,
   onContentChange,
@@ -513,12 +601,19 @@ function EditableBlockWrapper({
   onNavigatePrev,
   onNavigateNext,
   onMergeWithPrevious,
+  registerRef,
 }: EditableBlockWrapperProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [localContent, setLocalContent] = useState(
     (block.type === 'text' || block.type === 'heading') ? block.content : ''
   );
   const lastSlashPos = useRef<number | null>(null);
+
+  // Register textarea ref with parent
+  useEffect(() => {
+    registerRef(textareaRef.current);
+    return () => registerRef(null);
+  }, [registerRef]);
 
   // Sync local content when block changes
   useEffect(() => {
@@ -632,17 +727,12 @@ function EditableBlockWrapper({
       }
     }
     
-    // Backspace behavior - contextual
+    // Backspace behavior - contextual (Notion-like: delete empty blocks)
     if (e.key === 'Backspace') {
       if (localContent === '') {
         e.preventDefault();
-        // If it's a heading, convert to text first (don't delete)
-        if (block.type === 'heading') {
-          onTransform({ type: 'text', content: '' });
-        } else {
-          // It's an empty text block - delete it
-          onDelete();
-        }
+        // Delete any empty block (text or heading) - Notion-like behavior
+        onDelete();
         return;
       }
       
@@ -734,7 +824,11 @@ function EditableBlockWrapper({
     return 'text-base leading-relaxed';
   };
 
+  // Only show placeholder when this block is active (focused)
   const getPlaceholder = () => {
+    if (!isActive) {
+      return ''; // No placeholder for inactive blocks - cleaner look
+    }
     if (block.type === 'heading') {
       return `Heading ${block.level}`;
     }
@@ -800,7 +894,7 @@ function EmptyState({ onAddBlock }: { onAddBlock: () => void }) {
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onFocus={onAddBlock}
-        placeholder="Start typing, or press / for commands..."
+        placeholder="Type here to start..."
         className="w-full resize-none bg-transparent border-none outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 text-base"
         rows={1}
       />

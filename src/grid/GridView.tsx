@@ -1439,8 +1439,8 @@ export function GridView({ tableId }: GridViewProps) {
                   <div
                     key={row.__rowId}
                     className={`flex border-b border-border-subtle ${
-                      actualIndex % 2 === 0 ? 'bg-surface' : 'bg-gray-50 dark:bg-gray-800/30'
-                    } ${isRowSelected || isIndexColumnSelected ? 'bg-green-50 dark:bg-green-900/20' : ''}`}
+                      actualIndex % 2 === 0 ? 'bg-surface' : 'bg-surface-secondary/50'
+                    } ${isRowSelected || isIndexColumnSelected ? 'bg-accent-green/10' : ''}`}
                     style={{ height: ROW_HEIGHT }}
                   >
                     {/* Row number - clickable to select entire row */}
@@ -1449,11 +1449,11 @@ export function GridView({ tableId }: GridViewProps) {
                       onContextMenu={(e) => handleContextMenu(e, 'row', actualIndex)}
                       className={`sticky left-0 z-10 flex items-center justify-center px-3 text-xs border-r border-border-subtle cursor-pointer ${
                         isRowSelected
-                          ? 'text-green-600 dark:text-green-400 font-medium !bg-green-100 dark:!bg-green-900/40 ring-2 ring-inset ring-green-500' 
+                          ? 'text-accent-green font-medium !bg-accent-green/15 ring-2 ring-inset ring-accent-green' 
                           : isIndexColumnSelected
-                            ? 'text-green-600 dark:text-green-400 !bg-green-50 dark:!bg-green-900/20'
+                            ? 'text-accent-green !bg-accent-green/10'
                             : 'text-text-tertiary hover:bg-surface-secondary'
-                      } ${actualIndex % 2 !== 0 ? 'bg-gray-100 dark:bg-gray-800' : 'bg-white dark:bg-gray-900'}`}
+                      } ${actualIndex % 2 !== 0 ? 'bg-surface-secondary' : 'bg-surface'}`}
                       style={{ width: 50, minWidth: 50 }}
                       title={`Row ${actualIndex + 1}`}
                     >
@@ -1777,7 +1777,27 @@ export function GridView({ tableId }: GridViewProps) {
 
       {/* Chart Builder Modal - Lazy Loaded */}
       {chartBuilderOpen && (
-        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center"><div className="bg-surface rounded-lg p-8 animate-pulse">Loading chart builder...</div></div>}>
+        <Suspense fallback={
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ 
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              backdropFilter: 'blur(2px)',
+              animation: 'fadeIn 0.15s ease-out',
+            }}
+          >
+            <div 
+              className="bg-white dark:bg-[#1f1f1f] rounded-2xl p-6 shadow-2xl flex items-center gap-3"
+              style={{
+                animation: 'scale-in 0.15s ease-out',
+                boxShadow: '0 24px 48px rgba(0, 0, 0, 0.15)',
+              }}
+            >
+              <div className="w-5 h-5 border-2 border-gray-200 border-t-[#217346] rounded-full animate-spin" />
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Loading...</span>
+            </div>
+          </div>
+        }>
           <ChartBuilder
             isOpen={chartBuilderOpen}
             onClose={() => {
@@ -1865,7 +1885,7 @@ function ColumnHeader({
       onContextMenu={onContextMenu}
       className={`
         relative flex items-center gap-1 px-2 text-xs font-medium cursor-pointer select-none
-        border-r border-border group text-green-700 dark:text-green-400
+        border-r border-border group text-green-700 dark:text-[#8fc4a3]
         ${bgClass}
       `}
       style={{ width, minWidth: width, maxWidth: width, height: HEADER_HEIGHT }}

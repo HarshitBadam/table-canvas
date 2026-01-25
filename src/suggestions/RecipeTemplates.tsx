@@ -241,6 +241,9 @@ export function createRatioRecipe(context: RecipeContext): Suggestion | null {
     )
     
     if (numCol && denomCol && numCol.id !== denomCol.id) {
+      // Use column name (what DuckDB expects) for derived tables
+      const numColRef = numCol.name || numCol.id
+      const denomColRef = denomCol.name || denomCol.id
       return {
         id: generateId(),
         category: 'recipe',
@@ -264,7 +267,7 @@ export function createRatioRecipe(context: RecipeContext): Suggestion | null {
             type: 'calculated_column',
             sourceTableId: tableId,
             newColumnName: pattern.name.replace(' %', '_pct'),
-            expression: `("${numCol.id}" / NULLIF("${denomCol.id}", 0)) * 100`,
+            expression: `("${numColRef}" / NULLIF("${denomColRef}", 0)) * 100`,
           },
           tableName: `${tableName} (with ${pattern.name})`,
           openAfterApply: true,
@@ -275,6 +278,9 @@ export function createRatioRecipe(context: RecipeContext): Suggestion | null {
   
   // Generic ratio if no pattern matched
   const [col1, col2] = numericCols.slice(0, 2)
+  // Use column name (what DuckDB expects) for derived tables
+  const col1Ref = col1.name || col1.id
+  const col2Ref = col2.name || col2.id
   return {
     id: generateId(),
     category: 'recipe',
@@ -297,7 +303,7 @@ export function createRatioRecipe(context: RecipeContext): Suggestion | null {
         type: 'calculated_column',
         sourceTableId: tableId,
         newColumnName: `${col1.name}_${col2.name}_ratio`,
-        expression: `"${col1.id}" / NULLIF("${col2.id}", 0)`,
+        expression: `"${col1Ref}" / NULLIF("${col2Ref}", 0)`,
       },
       tableName: `${tableName} (with ratio)`,
       openAfterApply: true,

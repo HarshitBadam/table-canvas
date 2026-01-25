@@ -1,8 +1,8 @@
 /**
- * Your Data Section Component
+ * Data Overview Section
  * 
- * Rich, collapsible table cards with detailed column statistics.
- * Each table is a separate card with spacing between them.
+ * Shows comprehensive data profiling information for analysts.
+ * Priority: 1) Data makes sense, 2) Logic works, 3) Easy to understand
  */
 
 import { useState } from 'react'
@@ -10,14 +10,6 @@ import { useProfilingStore } from '@/profiling/profiler'
 import type { TableQualityMetrics } from '../useDashboardData'
 import type { ColumnProfile, TableSchema } from '@/lib/types'
 import { useProjectStore } from '@/state/projectStore'
-import {
-  NumericStats,
-  StringStats,
-  BooleanStats,
-  DateStats,
-  getTypeBadgeStyle,
-  formatNumber,
-} from '@/components/stats'
 
 interface TableStatsSectionProps {
   tableMetrics: TableQualityMetrics[]
@@ -28,17 +20,13 @@ export function TableStatsSection({
   tableMetrics, 
   onOpenTable,
 }: TableStatsSectionProps) {
-  // Start with first table expanded by default
   const [expandedTables, setExpandedTables] = useState<Set<string>>(() => {
-    if (tableMetrics.length > 0) {
-      return new Set([tableMetrics[0].tableId])
-    }
-    return new Set()
+    // Start with first table expanded
+    const first = tableMetrics[0]?.tableId
+    return first ? new Set([first]) : new Set()
   })
 
-  if (tableMetrics.length === 0) {
-    return null
-  }
+  if (tableMetrics.length === 0) return null
 
   const toggleExpanded = (tableId: string) => {
     setExpandedTables(prev => {
@@ -52,35 +40,80 @@ export function TableStatsSection({
     })
   }
 
-  // Sort: source tables first, then derived
-  const sortedTables = [...tableMetrics].sort((a, b) => {
-    if (a.tableKind === b.tableKind) return a.tableName.localeCompare(b.tableName)
-    return a.tableKind === 'source_table' ? -1 : 1
-  })
+  // Group tables
+  const sourceTables = tableMetrics.filter(t => t.tableKind === 'source_table')
+  const derivedTables = tableMetrics.filter(t => t.tableKind === 'derived_table')
 
   return (
-    <div>
-      {/* Section Header */}
-      <h3 className="text-sm font-semibold text-text-primary mb-4">Your Data</h3>
+    <div className="space-y-6">
+      {sourceTables.length > 0 && (
+        <TableSection
+          title="Source Tables"
+          subtitle="Imported data"
+          tables={sourceTables}
+          expandedTables={expandedTables}
+          onToggle={toggleExpanded}
+          onOpenTable={onOpenTable}
+        />
+      )}
 
-      {/* Separate Table Cards */}
-      <div className="space-y-4">
-        {sortedTables.map((table) => (
-          <TableCard
-            key={table.tableId}
-            table={table}
-            isExpanded={expandedTables.has(table.tableId)}
-            onToggle={() => toggleExpanded(table.tableId)}
-            onOpen={() => onOpenTable(table.tableId)}
-          />
-        ))}
-      </div>
+      {derivedTables.length > 0 && (
+        <TableSection
+          title="Derived Tables"
+          subtitle="Computed from joins and transforms"
+          tables={derivedTables}
+          expandedTables={expandedTables}
+          onToggle={toggleExpanded}
+          onOpenTable={onOpenTable}
+        />
+      )}
     </div>
   )
 }
 
 // ============================================================================
-// Table Card Component - Self-contained with border/shadow
+// Table Section
+// ============================================================================
+
+function TableSection({
+  title,
+  subtitle,
+  tables,
+  expandedTables,
+  onToggle,
+  onOpenTable,
+}: {
+  title: string
+  subtitle: string
+  tables: TableQualityMetrics[]
+  expandedTables: Set<string>
+  onToggle: (tableId: string) => void
+  onOpenTable: (tableId: string) => void
+}) {
+  return (
+    <section>
+      <header className="mb-3">
+        <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
+        <p className="text-xs text-text-tertiary">{subtitle}</p>
+      </header>
+
+      <div className="space-y-2">
+        {tables.map((table) => (
+          <TableCard
+            key={table.tableId}
+            table={table}
+            isExpanded={expandedTables.has(table.tableId)}
+            onToggle={() => onToggle(table.tableId)}
+            onOpen={() => onOpenTable(table.tableId)}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+// ============================================================================
+// Table Card
 // ============================================================================
 
 function TableCard({
@@ -101,119 +134,63 @@ function TableCard({
   const node = nodes[table.tableId]
   const schema = node && 'schema' in node ? (node as { schema?: TableSchema }).schema : undefined
 
-  const isSource = table.tableKind === 'source_table'
-
   return (
-    <div 
-      className="bg-surface rounded-xl border border-border overflow-hidden transition-shadow hover:shadow-md"
-    >
-      {/* Card Header - Always visible */}
-      <div 
-        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-surface-secondary/30 transition-colors"
+    <div className="table-card bg-surface rounded border border-border shadow-sm overflow-hidden">
+      {/* Header */}
+      <button
         onClick={onToggle}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-secondary/30 transition-colors text-left"
       >
-        {/* Expand/Collapse Toggle */}
-        <button
-          className="flex-shrink-0 p-0.5 rounded hover:bg-surface-secondary transition-colors"
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggle()
-          }}
-        >
+        <div className="flex items-center gap-3">
           <svg 
-            className={`w-4 h-4 text-text-tertiary transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
+            className={`w-4 h-4 text-text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-        </button>
-
-        {/* Table Icon */}
-        <div className={`
-          w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
-          ${isSource 
-            ? 'bg-[#217346] shadow-sm shadow-[#217346]/20' 
-            : 'bg-violet-500 shadow-sm shadow-violet-500/20'
-          }
-        `}>
-          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2zm2 0h14v4H5V5zm0 6h4v8H5v-8zm6 0h8v8h-8v-8z" />
-          </svg>
-        </div>
-
-        {/* Table Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-text-primary truncate">
-              {table.tableName}
-            </span>
-            {!isSource && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 font-medium">
-                Derived
-              </span>
-            )}
-          </div>
-          <div className="text-xs text-text-tertiary mt-0.5">
-            {isSource ? 'Source' : 'Derived'} · {formatNumber(table.rowCount)} rows · {table.columnCount} columns
+          
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">{table.tableName}</h3>
+            <p className="text-xs text-text-secondary mt-0.5">
+              {table.rowCount.toLocaleString()} rows · {table.columnCount} columns · {table.freshnessLabel}
+            </p>
           </div>
         </div>
 
-        {/* Status & Actions */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {table.isLoading ? (
-            <div className="w-4 h-4 border-2 border-text-tertiary/30 border-t-text-tertiary rounded-full animate-spin" />
-          ) : table.issueCount > 0 ? (
-            <span className="text-[11px] px-2.5 py-1 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 font-medium">
+        <div className="flex items-center gap-3">
+          {table.issueCount > 0 ? (
+            <span className="px-2.5 py-1 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-xs font-medium">
               {table.issueCount} issue{table.issueCount !== 1 ? 's' : ''}
             </span>
           ) : (
-            <span className="text-[11px] px-2.5 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
+            <span className="px-2.5 py-1 rounded bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-xs font-medium">
               Clean
             </span>
           )}
           
-          {/* Open in Canvas button */}
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onOpen()
-            }}
-            className="p-2 rounded-lg hover:bg-surface-secondary text-text-tertiary hover:text-text-primary transition-colors"
-            title="Open in Canvas"
+            onClick={(e) => { e.stopPropagation(); onOpen() }}
+            className="p-1.5 rounded hover:bg-surface-secondary text-text-tertiary hover:text-text-primary"
+            title="Open table"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </button>
         </div>
-      </div>
+      </button>
 
-      {/* Expanded Content - Column Stats */}
-      {isExpanded && (
-        <div className="border-t border-border bg-surface-secondary/20">
-          {profile && schema ? (
-            <ColumnStatsList 
-              schema={schema} 
-              profile={profile} 
-              rowCount={table.rowCount} 
-            />
-          ) : (
-            <div className="px-5 py-8 text-center">
-              {table.isLoading ? (
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-text-tertiary/30 border-t-text-tertiary rounded-full animate-spin" />
-                  <span className="text-sm text-text-tertiary">Loading statistics...</span>
-                </div>
-              ) : (
-                <span className="text-sm text-text-tertiary">No profile data available</span>
-              )}
-            </div>
-          )}
+      {/* Column Details - Always rendered for PDF export, hidden via CSS when collapsed */}
+      {schema && (
+        <div 
+          className={`border-t border-border table-card-content ${isExpanded ? '' : 'hidden'}`}
+          data-expanded={isExpanded}
+        >
+          <ColumnList 
+            schema={schema} 
+            profile={profile} 
+            rowCount={table.rowCount}
+          />
         </div>
       )}
     </div>
@@ -221,45 +198,63 @@ function TableCard({
 }
 
 // ============================================================================
-// Column Stats List
+// Column List
 // ============================================================================
 
-function ColumnStatsList({
+function ColumnList({
   schema,
   profile,
   rowCount,
 }: {
   schema: TableSchema
-  profile: { columns: ColumnProfile[] }
+  profile?: { columns: ColumnProfile[] }
   rowCount: number
 }) {
+  // Build a map of column profiles by ID AND by name for fallback matching
+  const profileMap = new Map<string, ColumnProfile>()
+  const profileByName = new Map<string, ColumnProfile>()
+  
+  if (profile?.columns) {
+    for (const cp of profile.columns) {
+      profileMap.set(cp.columnId, cp)
+      // Also try to match by column name if available
+      if (cp.columnId) {
+        profileByName.set(cp.columnId.toLowerCase(), cp)
+      }
+    }
+  }
+
   return (
-    <div className="px-4 py-4">
-      <div className="text-[11px] font-medium text-text-tertiary uppercase tracking-wider mb-3">
-        Columns ({schema.columns.length})
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {schema.columns.map((col) => {
-          const colProfile = profile.columns.find(cp => cp.columnId === col.id)
-          return (
-            <ColumnStatsCard 
-              key={col.id} 
-              column={col} 
-              profile={colProfile}
-              rowCount={rowCount}
-            />
-          )
-        })}
-      </div>
+    <div className="divide-y divide-border">
+      {schema.columns.map((col, index) => {
+        // Try to find profile by ID first, then by name
+        let colProfile = profileMap.get(col.id)
+        if (!colProfile) {
+          colProfile = profileByName.get(col.name.toLowerCase())
+        }
+        // Also try matching by index if profile columns exist
+        if (!colProfile && profile?.columns?.[index]) {
+          colProfile = profile.columns[index]
+        }
+        
+        return (
+          <ColumnRow 
+            key={col.id} 
+            column={col} 
+            profile={colProfile}
+            rowCount={rowCount}
+          />
+        )
+      })}
     </div>
   )
 }
 
 // ============================================================================
-// Column Stats Card
+// Column Row - The heart of the data display
 // ============================================================================
 
-function ColumnStatsCard({
+function ColumnRow({
   column,
   profile,
   rowCount,
@@ -268,49 +263,272 @@ function ColumnStatsCard({
   profile?: ColumnProfile
   rowCount: number
 }) {
-  const typeStyle = getTypeBadgeStyle(column.type)
-  const nullCount = profile?.missingCount ?? 0
-  const nullPct = profile?.missingPercent ?? 0
   const t = column.type.toLowerCase()
+  const isNumeric = ['number', 'integer', 'float', 'double', 'decimal'].includes(t)
+  const isString = ['string', 'varchar', 'text', 'char'].includes(t)
+  const isBoolean = ['boolean', 'bool'].includes(t)
+  const isDate = ['date', 'datetime', 'timestamp', 'time'].includes(t)
 
-  // Determine column type category
-  const isNumeric = t === 'number' || t === 'integer' || t === 'float' || t === 'double'
-  const isString = t === 'string' || t === 'varchar' || t === 'text'
-  const isBoolean = t === 'boolean' || t === 'bool'
-  const isDate = t === 'date' || t === 'datetime' || t === 'timestamp'
+  // Compute completeness
+  const completeness = profile ? Math.round(100 - (profile.missingPercent || 0)) : 100
+  const missingCount = profile?.missingCount || 0
 
   return (
-    <div className="bg-white dark:bg-gray-800/50 rounded-lg border border-border/50 p-3">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[13px] font-medium text-text-primary truncate" title={column.name}>
-            {column.name}
-          </span>
-          <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${typeStyle.bg} ${typeStyle.text}`}>
-            {column.type}
-          </span>
+    <div className="px-4 py-3">
+      {/* Column header row */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-text-primary">{column.name}</span>
+          <TypeBadge type={column.type} />
         </div>
-        {nullCount > 0 && (
-          <span className={`text-[11px] font-medium ${nullPct > 10 ? 'text-orange-600 dark:text-orange-400' : 'text-text-tertiary'}`}>
-            {nullPct.toFixed(0)}% null
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {missingCount > 0 && (
+            <span className="text-xs text-text-tertiary">
+              {missingCount.toLocaleString()} missing
+            </span>
+          )}
+          <CompletenessBar value={completeness} />
+        </div>
       </div>
 
-      {/* Stats Content */}
-      {profile ? (
-        <div className="mt-2">
-          {isNumeric && <NumericStats profile={profile} />}
-          {isString && <StringStats profile={profile} rowCount={rowCount} />}
-          {isBoolean && <BooleanStats profile={profile} />}
-          {isDate && <DateStats profile={profile} />}
-        </div>
-      ) : (
-        <div className="text-[11px] text-text-tertiary">
-          {formatNumber(rowCount)} values
-        </div>
+      {/* Statistics grid - ALWAYS show something */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3">
+        {profile ? (
+          <>
+            {isNumeric && <NumericStats profile={profile} rowCount={rowCount} />}
+            {isString && <StringStats profile={profile} rowCount={rowCount} />}
+            {isBoolean && <BooleanStats profile={profile} />}
+            {isDate && <DateStats profile={profile} />}
+            
+            {/* Always show distinct count for any type */}
+            {profile.distinctCount !== undefined && (
+              <Stat label="Distinct Values" value={profile.distinctCount.toLocaleString()} />
+            )}
+          </>
+        ) : (
+          // No profile data - show basic info
+          <Stat label="Values" value={rowCount.toLocaleString()} subtext="(profiling pending)" />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Stat Component - Clean label/value display
+// ============================================================================
+
+function Stat({ label, value, subtext }: { label: string; value: string; subtext?: string }) {
+  return (
+    <div>
+      <div className="text-[10px] font-medium text-text-tertiary uppercase tracking-wider mb-0.5">
+        {label}
+      </div>
+      <div className="text-sm font-medium text-text-primary">
+        {value}
+      </div>
+      {subtext && (
+        <div className="text-[10px] text-text-tertiary">{subtext}</div>
       )}
     </div>
+  )
+}
+
+// ============================================================================
+// Type Badge
+// ============================================================================
+
+function TypeBadge({ type }: { type: string }) {
+  const t = type.toLowerCase()
+  let color = 'bg-surface-tertiary text-text-secondary'
+  
+  if (['number', 'integer', 'float', 'double', 'decimal'].includes(t)) {
+    color = 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+  } else if (['string', 'varchar', 'text', 'char'].includes(t)) {
+    color = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+  } else if (['boolean', 'bool'].includes(t)) {
+    color = 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+  } else if (['date', 'datetime', 'timestamp', 'time'].includes(t)) {
+    color = 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
+  }
+
+  return (
+    <span className={`text-xs font-medium px-2 py-0.5 rounded ${color}`}>
+      {type}
+    </span>
+  )
+}
+
+// ============================================================================
+// Completeness Bar
+// ============================================================================
+
+function CompletenessBar({ value }: { value: number }) {
+  const color = value >= 95 ? 'bg-green-500' : value >= 80 ? 'bg-amber-500' : 'bg-red-500'
+  const textColor = value >= 95 
+    ? 'text-green-600 dark:text-green-400' 
+    : value >= 80 
+    ? 'text-amber-600 dark:text-amber-400' 
+    : 'text-red-600 dark:text-red-400'
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-20 h-1.5 bg-surface-tertiary rounded-sm overflow-hidden">
+        <div className={`h-full ${color}`} style={{ width: `${value}%` }} />
+      </div>
+      <span className={`text-xs font-medium tabular-nums ${textColor}`}>{value}%</span>
+    </div>
+  )
+}
+
+// ============================================================================
+// Numeric Stats
+// ============================================================================
+
+function NumericStats({ profile, rowCount }: { profile: ColumnProfile; rowCount: number }) {
+  const fmt = (n: number | undefined) => {
+    if (n === undefined || n === null) return '—'
+    if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(2)}B`
+    if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(2)}M`
+    if (Math.abs(n) >= 1e3) return `${(n / 1e3).toFixed(2)}K`
+    if (Number.isInteger(n)) return n.toLocaleString()
+    return n.toFixed(2)
+  }
+
+  // Check if it's likely an ID
+  const isId = profile.isKeyCandidate || 
+    profile.distinctCount === rowCount ||
+    profile.semanticHints?.includes('id')
+  
+  if (isId) {
+    return (
+      <Stat label="Role" value="Identifier" subtext={`${profile.distinctCount?.toLocaleString() || rowCount} unique`} />
+    )
+  }
+
+  return (
+    <>
+      <Stat label="Minimum" value={fmt(profile.min)} />
+      <Stat label="Maximum" value={fmt(profile.max)} />
+      <Stat label="Average" value={fmt(profile.mean)} />
+      {profile.sum !== undefined && Math.abs(profile.sum) > 0 && (
+        <Stat label="Sum" value={fmt(profile.sum)} />
+      )}
+      {profile.stdDev !== undefined && (
+        <Stat label="Std Dev" value={fmt(profile.stdDev)} />
+      )}
+    </>
+  )
+}
+
+// ============================================================================
+// String Stats
+// ============================================================================
+
+function StringStats({ profile, rowCount }: { profile: ColumnProfile; rowCount: number }) {
+  const isUnique = profile.distinctCount === rowCount && rowCount > 0
+  const isId = profile.isKeyCandidate || profile.semanticHints?.includes('id')
+  
+  if (isUnique || isId) {
+    const sample = profile.topValues?.[0]?.value
+    return (
+      <Stat 
+        label="Role" 
+        value="Identifier" 
+        subtext={sample ? `e.g. ${String(sample).slice(0, 20)}` : undefined}
+      />
+    )
+  }
+
+  // Show distinct count
+  const distinctPct = rowCount > 0 ? Math.round((profile.distinctCount / rowCount) * 100) : 0
+  
+  // Get top values
+  const topValues = profile.topValues?.slice(0, 5) || []
+  
+  return (
+    <>
+      <Stat 
+        label="Distinct" 
+        value={profile.distinctCount?.toLocaleString() || '—'} 
+        subtext={`${distinctPct}% of ${rowCount}`}
+      />
+      {topValues.length > 0 && (
+        <div className="col-span-2 lg:col-span-3">
+          <div className="text-xs font-medium text-text-tertiary uppercase tracking-wider mb-2">
+            Top Values
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {topValues.map((tv, i) => {
+              const pct = rowCount > 0 ? Math.round((tv.count / rowCount) * 100) : 0
+              return (
+                <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-secondary text-xs">
+                  <span className="text-text-primary font-medium">{String(tv.value).slice(0, 20)}</span>
+                  <span className="text-text-tertiary">({pct}%)</span>
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ============================================================================
+// Boolean Stats
+// ============================================================================
+
+function BooleanStats({ profile }: { profile: ColumnProfile }) {
+  const topValues = profile.topValues || []
+  const trueVal = topValues.find(v => v.value === true || v.value === 'true' || v.value === 1)
+  const falseVal = topValues.find(v => v.value === false || v.value === 'false' || v.value === 0)
+  const total = (trueVal?.count || 0) + (falseVal?.count || 0)
+  
+  if (total === 0) {
+    return <Stat label="Values" value="No data" />
+  }
+  
+  const truePct = Math.round((trueVal?.count || 0) / total * 100)
+  const falsePct = 100 - truePct
+
+  return (
+    <>
+      <Stat label="True" value={`${truePct}%`} subtext={`${(trueVal?.count || 0).toLocaleString()} values`} />
+      <Stat label="False" value={`${falsePct}%`} subtext={`${(falseVal?.count || 0).toLocaleString()} values`} />
+    </>
+  )
+}
+
+// ============================================================================
+// Date Stats
+// ============================================================================
+
+function DateStats({ profile }: { profile: ColumnProfile }) {
+  const fmtDate = (val: number | string | undefined) => {
+    if (val === undefined || val === null) return '—'
+    const d = new Date(val)
+    if (isNaN(d.getTime())) return String(val).slice(0, 10)
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  // Calculate span
+  let spanText = ''
+  if (profile.min !== undefined && profile.max !== undefined) {
+    const minDate = new Date(profile.min)
+    const maxDate = new Date(profile.max)
+    const diffMs = maxDate.getTime() - minDate.getTime()
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+    if (diffDays < 30) spanText = `${diffDays} days`
+    else if (diffDays < 365) spanText = `${Math.round(diffDays / 30)} months`
+    else spanText = `${(diffDays / 365).toFixed(1)} years`
+  }
+
+  return (
+    <>
+      <Stat label="Earliest" value={fmtDate(profile.min)} />
+      <Stat label="Latest" value={fmtDate(profile.max)} />
+      {spanText && <Stat label="Span" value={spanText} />}
+    </>
   )
 }

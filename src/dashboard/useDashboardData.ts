@@ -35,6 +35,14 @@ export interface DataQualityIssue {
   affectedCount?: number
 }
 
+export interface ColumnTypeBreakdown {
+  numeric: number
+  categorical: number
+  boolean: number
+  date: number
+  other: number
+}
+
 export interface TableQualityMetrics {
   tableId: string
   tableName: string
@@ -46,6 +54,12 @@ export interface TableQualityMetrics {
   issues: DataQualityIssue[]
   isLoading: boolean
   hasProfile: boolean
+  // Freshness fields
+  importedAt: string | null
+  isStale: boolean // >7 days old for source tables
+  freshnessLabel: string // "Imported yesterday", "5 days ago", etc.
+  // Type breakdown
+  typeBreakdown: ColumnTypeBreakdown
 }
 
 export interface Insight {
@@ -75,8 +89,9 @@ export interface ProjectHealthMetrics {
 export interface LineageNode {
   id: string
   name: string
-  kind: 'source_table' | 'derived_table'
+  kind: 'source_table' | 'derived_table' | 'chart'
   rowCount: number
+  chartType?: string // For charts: 'bar', 'line', 'pie', etc.
 }
 
 export interface LineageEdge {
@@ -88,6 +103,93 @@ export interface LineageEdge {
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/** Stale threshold in days */
+const STALE_THRESHOLD_DAYS = 7
+
+/**
+ * Format a date as a relative time string
+ */
+function formatRelativeTime(dateString: string | null | undefined): string {
+  if (!dateString) return 'Unknown'
+  
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
+  
+  if (diffMinutes < 1) return 'Just now'
+  if (diffMinutes < 60) return `${diffMinutes}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`
+  return `${Math.floor(diffDays / 365)} year${Math.floor(diffDays / 365) > 1 ? 's' : ''} ago`
+}
+
+/**
+ * Check if a date is stale (older than threshold)
+ */
+function isDataStale(dateString: string | null | undefined): boolean {
+  if (!dateString) return false
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = diffMs / (1000 * 60 * 60 * 24)
+  return diffDays > STALE_THRESHOLD_DAYS
+}
+
+/**
+ * Compute column type breakdown from schema
+ */
+function computeTypeBreakdown(schema: TableSchema | undefined): ColumnTypeBreakdown {
+  const breakdown: ColumnTypeBreakdown = {
+    numeric: 0,
+    categorical: 0,
+    boolean: 0,
+    date: 0,
+    other: 0,
+  }
+  
+  if (!schema?.columns) return breakdown
+  
+  for (const col of schema.columns) {
+    const t = col.type.toLowerCase()
+    if (t === 'number' || t === 'integer' || t === 'float' || t === 'double') {
+      breakdown.numeric++
+    } else if (t === 'boolean' || t === 'bool') {
+      breakdown.boolean++
+    } else if (t === 'date' || t === 'datetime' || t === 'timestamp') {
+      breakdown.date++
+    } else if (t === 'string' || t === 'varchar' || t === 'text') {
+      breakdown.categorical++
+    } else {
+      breakdown.other++
+    }
+  }
+  
+  return breakdown
+}
+
+/**
+ * Format a numeric stat value for display
+ */
+function formatStatValue(value: number): string {
+  if (Math.abs(value) >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M`
+  }
+  if (Math.abs(value) >= 1000) {
+    return `${(value / 1000).toFixed(1)}K`
+  }
+  if (Number.isInteger(value)) {
+    return value.toString()
+  }
+  return value.toFixed(2)
+}
 
 function computeTableCompleteness(profile: ProfileResult | undefined, rowCount: number): number {
   if (!profile?.columns || profile.columns.length === 0) return 100
@@ -137,27 +239,50 @@ function extractIssuesFromProfile(
       }
     }
 
-    // Outliers detection (for numeric columns with IQR)
-    if (colProfile.iqr !== undefined && colProfile.q1 !== undefined && colProfile.q3 !== undefined) {
+    // Outliers detection - only flag if significant
+    // Skip outlier detection for ID-like columns or columns with very few values
+    const isLikelyId = colProfile.isKeyCandidate || 
+      colProfile.semanticHints?.includes('id') ||
+      (colProfile.distinctCount === profile.rowCount && profile.rowCount > 0)
+    
+    if (!isLikelyId && colProfile.iqr !== undefined && colProfile.q1 !== undefined && colProfile.q3 !== undefined) {
       const lowerBound = colProfile.q1 - 1.5 * colProfile.iqr
       const upperBound = colProfile.q3 + 1.5 * colProfile.iqr
-      if (colProfile.min !== undefined && colProfile.min < lowerBound) {
-        issues.push({
-          type: 'outlier',
-          severity: 'low',
-          description: `Contains values below ${lowerBound.toFixed(2)}`,
-          columnId: colProfile.columnId,
-          columnName,
-        })
+      
+      // Only flag if IQR is meaningful (not zero) and we have actual outliers
+      const hasIQR = colProfile.iqr > 0
+      const hasLowOutlier = colProfile.min !== undefined && colProfile.min < lowerBound
+      const hasHighOutlier = colProfile.max !== undefined && colProfile.max > upperBound
+      
+      // Calculate how extreme the outlier is (ratio of distance beyond bound vs IQR)
+      // Only flag if the outlier is significantly beyond the bound
+      if (hasIQR && hasLowOutlier) {
+        const distance = lowerBound - colProfile.min!
+        const extremeRatio = distance / colProfile.iqr
+        // Only flag if outlier is > 1 IQR beyond the bound (i.e., very extreme)
+        if (extremeRatio > 1) {
+          issues.push({
+            type: 'outlier',
+            severity: 'low',
+            description: `Extreme low value: ${formatStatValue(colProfile.min!)}`,
+            columnId: colProfile.columnId,
+            columnName,
+          })
+        }
       }
-      if (colProfile.max !== undefined && colProfile.max > upperBound) {
-        issues.push({
-          type: 'outlier',
-          severity: 'low',
-          description: `Contains values above ${upperBound.toFixed(2)}`,
-          columnId: colProfile.columnId,
-          columnName,
-        })
+      if (hasIQR && hasHighOutlier) {
+        const distance = colProfile.max! - upperBound
+        const extremeRatio = distance / colProfile.iqr
+        // Only flag if outlier is > 1 IQR beyond the bound (i.e., very extreme)
+        if (extremeRatio > 1) {
+          issues.push({
+            type: 'outlier',
+            severity: 'low',
+            description: `Extreme high value: ${formatStatValue(colProfile.max!)}`,
+            columnId: colProfile.columnId,
+            columnName,
+          })
+        }
       }
     }
   }
@@ -345,6 +470,16 @@ export function useDataQualityMetrics(): {
       
       const completeness = computeTableCompleteness(profile, rowCount)
       const issues = extractIssuesFromProfile(profile, table.schema)
+      
+      // Freshness: use createdAt for source tables, null for derived
+      const importedAt = table.kind === 'source_table' ? table.createdAt : null
+      const isStale = table.kind === 'source_table' ? isDataStale(importedAt) : false
+      const freshnessLabel = table.kind === 'source_table' 
+        ? `Imported ${formatRelativeTime(importedAt)}`
+        : 'Derived'
+      
+      // Type breakdown
+      const typeBreakdown = computeTypeBreakdown(table.schema)
 
       return {
         tableId: table.id,
@@ -357,6 +492,10 @@ export function useDataQualityMetrics(): {
         issues,
         isLoading,
         hasProfile: !!profile,
+        importedAt,
+        isStale,
+        freshnessLabel,
+        typeBreakdown,
       }
     })
   }, [tableNodes, profiles, tableData, profilesLoading])
@@ -511,17 +650,20 @@ export function useTopSuggestions(limit: number = 5): {
 
 /**
  * Hook to get lineage data (nodes and edges for the mini map)
+ * Includes tables AND charts to show full data flow
  */
 export function useLineageData(): { 
   nodes: LineageNode[]
   edges: LineageEdge[]
 } {
   const tableNodes = useTableNodes()
+  const chartNodes = useChartNodes()
   const storeEdges = useProjectStore((state) => state.edges)
   const tableData = useDataStore((state) => state.tableData)
 
   return useMemo(() => {
-    const nodes: LineageNode[] = tableNodes.map(table => {
+    // Table nodes
+    const tableLineageNodes: LineageNode[] = tableNodes.map(table => {
       const data = tableData[table.id]
       return {
         id: table.id,
@@ -531,9 +673,21 @@ export function useLineageData(): {
       }
     })
 
-    const tableIds = new Set(tableNodes.map(t => t.id))
+    // Chart nodes
+    const chartLineageNodes: LineageNode[] = chartNodes.map(chart => ({
+      id: chart.id,
+      name: chart.name || 'Chart',
+      kind: 'chart' as const,
+      rowCount: 0,
+      chartType: chart.chartConfig?.type || 'bar',
+    }))
+
+    const nodes = [...tableLineageNodes, ...chartLineageNodes]
+    const nodeIds = new Set(nodes.map(n => n.id))
+
+    // Get edges that connect any of our nodes (tables or charts)
     const edges: LineageEdge[] = Object.values(storeEdges)
-      .filter(edge => tableIds.has(edge.fromNodeId) && tableIds.has(edge.toNodeId))
+      .filter(edge => nodeIds.has(edge.fromNodeId) && nodeIds.has(edge.toNodeId))
       .map(edge => ({
         id: edge.id,
         from: edge.fromNodeId,
@@ -541,7 +695,7 @@ export function useLineageData(): {
       }))
 
     return { nodes, edges }
-  }, [tableNodes, storeEdges, tableData])
+  }, [tableNodes, chartNodes, storeEdges, tableData])
 }
 
 /**

@@ -84,19 +84,23 @@ export function QuickActionsSection({
   // Loading state
   if (isLoading) {
     return (
-      <div className="bg-surface rounded-xl border border-border">
-        <div className="px-4 py-3 border-b border-border">
-          <h3 className="text-sm font-semibold text-text-primary">Suggested Actions</h3>
+      <div>
+        <div className="mb-4">
+          <h2 className="text-base font-semibold text-text-primary">Suggested Actions</h2>
+          <p className="text-sm text-text-tertiary">Recommendations based on your data</p>
         </div>
-        <div className="p-4 space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse flex items-center gap-3">
-              <div className="w-8 h-8 bg-surface-secondary rounded-lg" />
-              <div className="flex-1">
-                <div className="h-4 w-40 bg-surface-secondary rounded mb-1" />
-                <div className="h-3 w-full bg-surface-secondary rounded" />
+            <div key={i} className="bg-surface rounded-xl border border-border p-5 animate-pulse">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-surface-secondary rounded-lg" />
+                <div className="flex-1">
+                  <div className="h-4 w-32 bg-surface-secondary rounded mb-2" />
+                  <div className="h-3 w-20 bg-surface-secondary rounded" />
+                </div>
               </div>
-              <div className="w-20 h-8 bg-surface-secondary rounded-lg" />
+              <div className="h-3 w-full bg-surface-secondary rounded mb-4" />
+              <div className="h-10 w-full bg-surface-secondary rounded-lg" />
             </div>
           ))}
         </div>
@@ -107,13 +111,14 @@ export function QuickActionsSection({
   // Empty state
   if (topSuggestions.length === 0) {
     return (
-      <div className="bg-surface rounded-xl border border-border">
-        <div className="px-4 py-3 border-b border-border">
-          <h3 className="text-sm font-semibold text-text-primary">Suggested Actions</h3>
+      <div>
+        <div className="mb-4">
+          <h2 className="text-base font-semibold text-text-primary">Suggested Actions</h2>
+          <p className="text-sm text-text-tertiary">Recommendations based on your data</p>
         </div>
-        <div className="p-4">
-          <p className="text-sm text-text-tertiary">
-            No suggestions right now. Explore your data to discover insights.
+        <div className="bg-surface rounded-xl border border-border p-8 text-center">
+          <p className="text-text-tertiary">
+            No suggestions yet. Import more data to discover insights.
           </p>
         </div>
       </div>
@@ -121,63 +126,54 @@ export function QuickActionsSection({
   }
 
   return (
-    <div className="bg-surface rounded-xl border border-border">
+    <div>
       {/* Section Header */}
-      <div className="px-4 py-3 border-b border-border">
-        <h3 className="text-sm font-semibold text-text-primary">Suggested Actions</h3>
+      <div className="mb-4">
+        <h2 className="text-base font-semibold text-text-primary">Suggested Actions</h2>
+        <p className="text-sm text-text-tertiary">Recommendations based on your data</p>
       </div>
 
-      {/* Suggestions List */}
-      <div className="divide-y divide-border">
+      {/* Suggestions Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {topSuggestions.map((suggestion) => (
           <div
             key={suggestion.id}
-            className="p-4 hover:bg-surface-secondary/50 transition-colors"
+            className="bg-surface rounded-xl border border-border p-5 hover:shadow-md transition-shadow"
           >
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 mb-4">
               {/* Icon */}
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${getCategoryColor(suggestion.category)}`}>
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getCategoryColor(suggestion.category)}`}>
                 {getSuggestionIcon(suggestion)}
               </div>
 
-              {/* Content */}
+              {/* Title */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h4 className="text-sm font-medium text-text-primary">
-                    {suggestion.title}
-                  </h4>
-                </div>
-                <p className="text-xs text-text-secondary mb-2">
-                  {suggestion.description}
-                </p>
+                <h4 className="text-sm font-medium text-text-primary leading-tight">
+                  {suggestion.title}
+                </h4>
                 <button
                   onClick={() => onOpenTable(suggestion.tableId)}
                   className="text-xs text-text-tertiary hover:text-accent-green transition-colors"
                 >
-                  From {suggestion.tableName || 'table'} →
+                  {suggestion.tableName || 'table'}
                 </button>
               </div>
-
-              {/* Action Button */}
-              <button
-                onClick={() => onApply(suggestion)}
-                className="flex-shrink-0 px-3 py-1.5 text-xs font-medium bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"
-              >
-                {getActionLabel(suggestion)}
-              </button>
             </div>
+
+            <p className="text-sm text-text-secondary mb-4 line-clamp-2">
+              {suggestion.description}
+            </p>
+
+            {/* Action Button */}
+            <button
+              onClick={() => onApply(suggestion)}
+              className="w-full px-4 py-2.5 text-sm font-medium bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"
+            >
+              {getActionLabel(suggestion)}
+            </button>
           </div>
         ))}
       </div>
-
-      {/* View More Link */}
-      {suggestions.length > 3 && (
-        <div className="px-4 py-3 border-t border-border">
-          <p className="text-xs text-text-tertiary text-center">
-            +{suggestions.length - 3} more suggestion{suggestions.length - 3 !== 1 ? 's' : ''} available
-          </p>
-        </div>
-      )}
     </div>
   )
 }
