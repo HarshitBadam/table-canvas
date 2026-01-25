@@ -76,6 +76,9 @@ export const timeSeriesTrendRule: SuggestionRule = {
       meta.profile?.rowCount
     )
     const opp = opportunities[0]
+    // Use column name (what DuckDB expects) for derived tables
+    const dateColRef = opp.dateColumn.name || opp.dateColumn.id
+    const valueColRef = opp.valueColumn.name || opp.valueColumn.id
     
     return {
       id: createSuggestionId('time_series', ctx.tableId, opp.dateColumn.id, opp.valueColumn.id),
@@ -89,8 +92,8 @@ export const timeSeriesTrendRule: SuggestionRule = {
         tableVersionHash: getVersionHash(ctx),
         recipeType: 'time_series',
         config: {
-          dateColumn: opp.dateColumn.id,
-          valueColumn: opp.valueColumn.id,
+          dateColumn: dateColRef,
+          valueColumn: valueColRef,
           period: opp.suggestedPeriod,
         },
       },
@@ -109,8 +112,8 @@ export const timeSeriesTrendRule: SuggestionRule = {
           chartType: 'line',
           sourceTableId: ctx.tableId,
           config: {
-            xAxis: opp.dateColumn.id,
-            yAxis: opp.valueColumn.id,
+            xAxis: dateColRef,
+            yAxis: valueColRef,
           },
         },
       },
@@ -156,6 +159,9 @@ export const periodComparisonRule: SuggestionRule = {
       meta.profile?.rowCount
     )
     const opp = opportunities[0]
+    // Use column name (what DuckDB expects) for derived tables
+    const dateColRef = opp.dateColumn.name || opp.dateColumn.id
+    const valueColRef = opp.valueColumn.name || opp.valueColumn.id
     
     return {
       id: createSuggestionId('period_comparison', ctx.tableId, opp.dateColumn.id, opp.valueColumn.id),
@@ -169,8 +175,8 @@ export const periodComparisonRule: SuggestionRule = {
         tableVersionHash: getVersionHash(ctx),
         recipeType: 'period_comparison',
         config: {
-          dateColumn: opp.dateColumn.id,
-          valueColumn: opp.valueColumn.id,
+          dateColumn: dateColRef,
+          valueColumn: valueColRef,
           period: opp.suggestedPeriod,
         },
       },
@@ -188,11 +194,11 @@ export const periodComparisonRule: SuggestionRule = {
         transform: {
           type: 'group_summarize',
           sourceTableId: ctx.tableId,
-          groupByColumns: [opp.dateColumn.id],
+          groupByColumns: [dateColRef],
           aggregations: [
-            { columnId: opp.valueColumn.id, operation: 'sum', alias: 'total' },
-            { columnId: opp.valueColumn.id, operation: 'avg', alias: 'average' },
-            { columnId: opp.valueColumn.id, operation: 'count', alias: 'count' },
+            { columnId: valueColRef, operation: 'sum', alias: 'total' },
+            { columnId: valueColRef, operation: 'avg', alias: 'average' },
+            { columnId: valueColRef, operation: 'count', alias: 'count' },
           ],
         },
         tableName: `${opp.valueColumn.name} by ${opp.suggestedPeriod}`,

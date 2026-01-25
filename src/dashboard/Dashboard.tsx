@@ -27,11 +27,13 @@ import {
 
 interface DashboardProps {
   onOpenTable?: (tableId: string) => void
+  onOpenChart?: (chartId: string) => void
   onOpenSuggestions?: (tableId: string) => void
 }
 
-export function Dashboard({ onOpenTable, onOpenSuggestions }: DashboardProps) {
+export function Dashboard({ onOpenTable, onOpenChart, onOpenSuggestions }: DashboardProps) {
   const selectNode = useProjectStore((state) => state.selectNode)
+  const nodes = useProjectStore((state) => state.nodes)
   
   // Dashboard data hooks
   const healthMetrics = useProjectHealthMetrics()
@@ -50,7 +52,27 @@ export function Dashboard({ onOpenTable, onOpenSuggestions }: DashboardProps) {
     })
   }, [])
 
-  // Navigation handlers
+  // Navigation handlers - detect if it's a table or chart
+  const handleNodeClick = useCallback((nodeId: string) => {
+    const node = nodes[nodeId]
+    if (!node) return
+    
+    if (node.kind === 'chart') {
+      if (onOpenChart) {
+        onOpenChart(nodeId)
+      } else {
+        selectNode(nodeId)
+      }
+    } else {
+      if (onOpenTable) {
+        onOpenTable(nodeId)
+      } else {
+        selectNode(nodeId)
+      }
+    }
+  }, [nodes, onOpenTable, onOpenChart, selectNode])
+
+  // Direct table handler (for table-specific actions)
   const handleOpenTable = useCallback((tableId: string) => {
     if (onOpenTable) {
       onOpenTable(tableId)
@@ -66,63 +88,61 @@ export function Dashboard({ onOpenTable, onOpenSuggestions }: DashboardProps) {
 
   // Check if we have any data at all
   const hasData = tableMetrics.length > 0
-  const { totalTables, totalRows, totalColumns } = healthMetrics
+  const { totalTables, totalRows, totalColumns, overallCompleteness } = healthMetrics
 
   return (
     <div className="h-full flex flex-col bg-canvas">
-      {/* Header - Clean with inline stats */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface">
-        <div>
-          <h1 className="text-lg font-semibold text-text-primary">Project Overview</h1>
+      {/* Header - Compact single line */}
+      <header className="flex items-center justify-between px-5 py-2.5 border-b border-border bg-surface print:hidden">
+        <div className="flex items-center gap-4">
+          <h1 className="text-sm font-semibold text-text-primary">Project Overview</h1>
           {hasData && (
-            <div className="flex items-center gap-3 mt-1">
-              <Stat icon={<TableIcon />} value={totalTables} label="Tables" />
+            <div className="flex items-center gap-2.5 text-xs text-text-secondary">
+              <span className="text-text-tertiary">|</span>
+              <Stat value={totalTables} label="Tables" />
               <span className="text-text-tertiary">·</span>
-              <Stat icon={<RowsIcon />} value={formatNumber(totalRows)} label="Rows" />
+              <Stat value={formatNumber(totalRows)} label="Rows" />
               <span className="text-text-tertiary">·</span>
-              <Stat icon={<ColumnsIcon />} value={totalColumns} label="Columns" />
+              <Stat value={totalColumns} label="Cols" />
+              <span className="text-text-tertiary">·</span>
+              <CompletenessIndicator completeness={overallCompleteness} />
             </div>
           )}
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => window.print()}
-            className="btn btn-secondary gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Export PDF
-          </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto p-6 print:p-0 print:overflow-visible">
+      <div className="flex-1 overflow-auto p-6">
         {!hasData ? (
           <EmptyState />
         ) : (
-          <div className="max-w-5xl mx-auto space-y-8">
-            {/* Data Flow (full width) */}
-            <LineageMiniMap
-              nodes={lineageData.nodes}
-              edges={lineageData.edges}
-              onNodeClick={handleOpenTable}
-            />
+          <div className="max-w-5xl mx-auto space-y-8 dashboard-container">
+            {/* Data Flow - Hero Section (full width) */}
+            <section className="lineage-section">
+              <LineageMiniMap
+                nodes={lineageData.nodes}
+                edges={lineageData.edges}
+                onNodeClick={handleNodeClick}
+              />
+            </section>
 
             {/* Your Data - Table Cards (full width) */}
-            <TableStatsSection
-              tableMetrics={tableMetrics}
-              onOpenTable={handleOpenTable}
-            />
+            <section>
+              <TableStatsSection
+                tableMetrics={tableMetrics}
+                onOpenTable={handleOpenTable}
+              />
+            </section>
 
             {/* Suggested Actions (full width) */}
-            <QuickActionsSection
-              suggestions={suggestions}
-              onApply={handleApplySuggestion}
-              onOpenTable={handleOpenTable}
-              isLoading={suggestionsLoading}
-            />
+            <section className="quick-actions-section">
+              <QuickActionsSection
+                suggestions={suggestions}
+                onApply={handleApplySuggestion}
+                onOpenTable={handleOpenTable}
+                isLoading={suggestionsLoading}
+              />
+            </section>
           </div>
         )}
       </div>
@@ -139,37 +159,36 @@ export function Dashboard({ onOpenTable, onOpenSuggestions }: DashboardProps) {
 // Helper Components
 // ============================================================================
 
-function Stat({ icon, value, label }: { icon: React.ReactNode; value: string | number; label: string }) {
+function Stat({ value, label }: { value: string | number; label: string }) {
   return (
-    <div className="flex items-center gap-1.5 text-xs text-text-secondary">
-      <span className="text-text-tertiary">{icon}</span>
-      <span className="font-medium text-text-primary">{value}</span>
-      <span>{label}</span>
+    <span className="text-text-secondary">
+      <span className="font-medium text-text-primary">{value}</span> {label}
+    </span>
+  )
+}
+
+function CompletenessIndicator({ completeness }: { completeness: number }) {
+  const isGood = completeness >= 95
+  const isWarning = completeness >= 80 && completeness < 95
+  
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="w-12 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div 
+          className={`h-full rounded-full ${
+            isGood ? 'bg-green-500' : isWarning ? 'bg-amber-500' : 'bg-red-500'
+          }`}
+          style={{ width: `${completeness}%` }}
+        />
+      </div>
+      <span className={`font-medium ${
+        isGood ? 'text-green-600 dark:text-green-400' : 
+        isWarning ? 'text-amber-600 dark:text-amber-400' : 
+        'text-red-600 dark:text-red-400'
+      }`}>
+        {completeness}%
+      </span>
     </div>
-  )
-}
-
-function TableIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-    </svg>
-  )
-}
-
-function RowsIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-    </svg>
-  )
-}
-
-function ColumnsIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-    </svg>
   )
 }
 

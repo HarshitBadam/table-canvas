@@ -478,6 +478,8 @@ async function computeDerivedTable(tableId: string): Promise<MaterializationResu
             id: originalId || duckDbColName,
             // Name stays as the human-readable name
             name: duckDbColName,
+            // duckDbName is what DuckDB actually uses for queries
+            duckDbName: duckDbColName,
           }
         }),
       }
@@ -486,20 +488,43 @@ async function computeDerivedTable(tableId: string): Promise<MaterializationResu
     }
     
     // Fetch ALL data from DuckDB (not just preview) and store in dataStore
+    // IMPORTANT: DuckDB returns rows with column names as keys (e.g., "Product Id"),
+    // but our schema uses original column IDs (e.g., "col_0_product_id").
+    // We need to transform row keys to match the schema column IDs.
+    const transformRowKeys = (row: Record<string, CellValue>, schema: TableSchema): TableRow => {
+      const transformedRow: TableRow = { __rowId: '' }
+      for (const col of schema.columns) {
+        // DuckDB key is the column name (which we stored in col.name)
+        const duckDbKey = col.name
+        // Our schema ID is what GridView expects
+        const schemaId = col.id
+        transformedRow[schemaId] = row[duckDbKey] ?? row[col.id] ?? null
+      }
+      return transformedRow
+    }
+    
     try {
       const fullData = await engine.getSlice(tableId, 0, Math.max(result.rowCount, 10000))
-      const rows: TableRow[] = fullData.rows.map((row, idx) => ({
-        ...row,
-        __rowId: `derived_row_${idx}`,
-      })) as TableRow[]
+      const updatedSchema = projectStore.getTableNode(tableId)?.schema
+      const rows: TableRow[] = fullData.rows.map((row, idx) => {
+        const transformedRow = updatedSchema 
+          ? transformRowKeys(row, updatedSchema)
+          : { ...row } as TableRow
+        transformedRow.__rowId = `derived_row_${idx}`
+        return transformedRow
+      })
       dataStore.setTableData(tableId, rows)
     } catch {
       // Fallback to preview if full fetch fails
       if (result.preview && result.preview.length > 0) {
-        const rows: TableRow[] = result.preview.map((row, idx) => ({
-          ...row,
-          __rowId: `derived_row_${idx}`,
-        })) as TableRow[]
+        const updatedSchema = projectStore.getTableNode(tableId)?.schema
+        const rows: TableRow[] = result.preview.map((row, idx) => {
+          const transformedRow = updatedSchema
+            ? transformRowKeys(row, updatedSchema)
+            : { ...row } as TableRow
+          transformedRow.__rowId = `derived_row_${idx}`
+          return transformedRow
+        })
         dataStore.setTableData(tableId, rows)
       }
     }

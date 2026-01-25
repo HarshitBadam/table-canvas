@@ -75,12 +75,13 @@ export class FormulaParser {
   private parseLogicalOr(): ASTNode {
     let left = this.parseLogicalAnd()
 
-    while (this.match('LOGICAL') && this.previous().value === 'OR') {
-      const operator = 'OR'
+    // Check type AND value before consuming to avoid eating wrong tokens
+    while (this.check('LOGICAL') && this.peek().value === 'OR') {
+      this.advance() // Now consume the OR token
       const right = this.parseLogicalAnd()
       left = {
         type: 'BinaryExpression',
-        operator,
+        operator: 'OR',
         left,
         right,
         position: left.position,
@@ -94,12 +95,13 @@ export class FormulaParser {
   private parseLogicalAnd(): ASTNode {
     let left = this.parseComparison()
 
-    while (this.match('LOGICAL') && this.previous().value === 'AND') {
-      const operator = 'AND'
+    // Check type AND value before consuming to avoid eating wrong tokens
+    while (this.check('LOGICAL') && this.peek().value === 'AND') {
+      this.advance() // Now consume the AND token
       const right = this.parseComparison()
       left = {
         type: 'BinaryExpression',
-        operator,
+        operator: 'AND',
         left,
         right,
         position: left.position,

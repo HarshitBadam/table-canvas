@@ -52,6 +52,26 @@
 
   /* Edge color */
   --edge-color: #217346;
+  
+  /* Chart colors for light mode */
+  --color-chart-grid: #e5e5ea;
+  --color-chart-axis: #d2d2d7;
+  --color-chart-text: #6e6e73;
+  
+  /* Elevation border (not needed in light mode, but defined for consistency) */
+  --color-border-elevation: rgba(0, 0, 0, 0.04);
+  
+  /* Node colors for canvas - Light mode */
+  --color-node-source: #e6f4ea;
+  --color-node-source-border: #217346;
+  --color-node-derived: #f3e8ff;
+  --color-node-derived-border: #a855f7;
+  --color-node-chart: #dcfce7;
+  --color-node-chart-border: #107c41;
+  
+  /* Grid line colors for canvas - green tint in light mode */
+  --grid-line-color: rgba(33, 115, 70, 0.12);
+  --grid-line-subtle: rgba(33, 115, 70, 0.06);
 
   /* Transitions */
   --transition-fast: 100ms;
@@ -60,57 +80,113 @@
   --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Dark mode - Excel Green Theme */
+/* Dark mode - Excel Green Theme (Professional dark palette) */
 [data-theme="dark"] {
-  --color-canvas: #0a0c0b;
-  --color-surface: #1a1a1a;
-  --color-surface-secondary: #242424;
-  --color-surface-tertiary: #2e2e2e;
-  --color-border: #3a3a3a;
-  --color-border-subtle: #2e2e2e;
-  --color-border-focus: #22a45d;
-  --color-text-primary: #f5f5f5;
-  --color-text-secondary: #a3a3a3;
-  --color-text-tertiary: #737373;
-  --color-accent: #22a45d;
-  --color-accent-hover: #2ecc71;
-  --color-success: #27ae60;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
+  /* Surfaces - Better layering with visible hierarchy */
+  --color-canvas: #111113;
+  --color-surface: #1a1a1d;
+  --color-surface-secondary: #232326;
+  --color-surface-tertiary: #2c2c30;
+  
+  /* Borders - Higher contrast for better definition */
+  --color-border: #3d3d42;
+  --color-border-subtle: #2c2c30;
+  --color-border-focus: #3d6b52;
+  
+  /* Elevation border (subtle light border for cards) */
+  --color-border-elevation: rgba(255, 255, 255, 0.06);
+  
+  /* Text - Slightly softer white for reduced eye strain */
+  --color-text-primary: #ececef;
+  --color-text-secondary: #a1a1a6;
+  --color-text-tertiary: #6e6e73;
+  
+  /* Accent colors - Muted professional green */
+  --color-accent: #3d6b52;
+  --color-accent-hover: #4a7d60;
+  --color-success: #4a7d60;
+  --color-warning: #d4a04a;
+  --color-error: #e06b6b;
 
-  /* Darker shadows for dark mode */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  /* Shadows with subtle glow for elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  
+  /* Chart colors for dark mode */
+  --color-chart-grid: #3d3d42;
+  --color-chart-axis: #4a4a50;
+  --color-chart-text: #a1a1a6;
+  
+  /* Node colors for canvas - Dark mode (richer, darker versions) */
+  --color-node-source: #1a2f22;
+  --color-node-source-border: #7ab892;
+  --color-node-derived: #2a1f3d;
+  --color-node-derived-border: #c9a8f7;
+  --color-node-chart: #1a2f22;
+  --color-node-chart-border: #7ab892;
   
   /* Edge color for dark mode */
-  --edge-color: #28a55a;
+  --edge-color: #3d6b52;
+  
+  /* Grid line colors for canvas - muted green in dark mode */
+  --grid-line-color: rgba(61, 107, 82, 0.2);
+  --grid-line-subtle: rgba(61, 107, 82, 0.1);
 }
 
-/* System preference dark mode - Excel Green Theme */
+/* System preference dark mode - Excel Green Theme (Professional dark palette) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-canvas: #0a0c0b;
-    --color-surface: #1a1a1a;
-    --color-surface-secondary: #242424;
-    --color-surface-tertiary: #2e2e2e;
-    --color-border: #3a3a3a;
-    --color-border-subtle: #2e2e2e;
-    --color-border-focus: #28a55a;
-    --color-text-primary: #f5f5f5;
-    --color-text-secondary: #a3a3a3;
-    --color-text-tertiary: #737373;
-    --color-accent: #28a55a;
-    --color-accent-hover: #2ecc71;
-    --color-success: #27ae60;
-    --color-warning: #f59e0b;
-    --color-error: #ef4444;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    /* Surfaces - Better layering with visible hierarchy */
+    --color-canvas: #111113;
+    --color-surface: #1a1a1d;
+    --color-surface-secondary: #232326;
+    --color-surface-tertiary: #2c2c30;
+    
+    /* Borders - Higher contrast for better definition */
+    --color-border: #3d3d42;
+    --color-border-subtle: #2c2c30;
+    --color-border-focus: #3d6b52;
+    
+    /* Elevation border (subtle light border for cards) */
+    --color-border-elevation: rgba(255, 255, 255, 0.06);
+    
+    /* Text - Slightly softer white for reduced eye strain */
+    --color-text-primary: #ececef;
+    --color-text-secondary: #a1a1a6;
+    --color-text-tertiary: #6e6e73;
+    
+    /* Accent colors - Muted professional green */
+    --color-accent: #3d6b52;
+    --color-accent-hover: #4a7d60;
+    --color-success: #4a7d60;
+    --color-warning: #d4a04a;
+    --color-error: #e06b6b;
+
+    /* Shadows with subtle glow for elevation */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    
+    /* Chart colors for dark mode */
+    --color-chart-grid: #3d3d42;
+    --color-chart-axis: #4a4a50;
+    --color-chart-text: #a1a1a6;
+    
+    /* Node colors for canvas - Dark mode (richer, darker versions) */
+    --color-node-source: #1a2f22;
+    --color-node-source-border: #7ab892;
+    --color-node-derived: #2a1f3d;
+    --color-node-derived-border: #c9a8f7;
+    --color-node-chart: #1a2f22;
+    --color-node-chart-border: #7ab892;
     
     /* Edge color for dark mode */
-    --edge-color: #28a55a;
+    --edge-color: #3d6b52;
+    
+    /* Grid line colors for canvas - muted green in dark mode */
+    --grid-line-color: rgba(61, 107, 82, 0.2);
+    --grid-line-subtle: rgba(61, 107, 82, 0.1);
   }
 }
 
@@ -183,12 +259,68 @@ input[type="number"] {
 
 /* Dark mode scrollbar */
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(34, 164, 93, 0.7);
+  background: rgba(58, 140, 101, 0.6);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
-    background: rgba(34, 164, 93, 0.7);
+    background: rgba(58, 140, 101, 0.6);
+  }
+}
+
+/* ============================================================================
+   Dark Mode Color Overrides - Muted Greens
+   Override Tailwind's neon emerald/green colors for a professional look
+   Uses same green family as header (#1a2e22) and accent (#3a8c65)
+   ============================================================================ */
+
+[data-theme="dark"] {
+  /* Muted emerald text colors - lighter for better visibility */
+  .text-emerald-400 { color: #8fc4a3 !important; }
+  .text-emerald-500 { color: #7ab892 !important; }
+  .text-emerald-600 { color: #6aab85 !important; }
+  .text-emerald-700 { color: #5a9d7a !important; }
+  
+  /* Muted green text colors - lighter for better visibility */
+  .text-green-400 { color: #8fc4a3 !important; }
+  .text-green-500 { color: #7ab892 !important; }
+  .text-green-600 { color: #6aab85 !important; }
+  .text-green-700 { color: #5a9d7a !important; }
+  
+  /* Muted emerald backgrounds */
+  .bg-emerald-500 { background-color: #3a8c65 !important; }
+  .bg-emerald-600 { background-color: #2d7352 !important; }
+  .bg-green-500 { background-color: #3a8c65 !important; }
+  .bg-green-600 { background-color: #2d7352 !important; }
+  
+  /* Hover states */
+  .hover\:bg-emerald-600:hover { background-color: #2d7352 !important; }
+  .hover\:bg-green-600:hover { background-color: #2d7352 !important; }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* Muted emerald text colors */
+    .text-emerald-400 { color: #5a9d7a !important; }
+    .text-emerald-500 { color: #4a9470 !important; }
+    .text-emerald-600 { color: #3a8c65 !important; }
+    .text-emerald-700 { color: #2d7352 !important; }
+    
+    /* Muted green text colors */
+    .text-green-400 { color: #5a9d7a !important; }
+    .text-green-500 { color: #4a9470 !important; }
+    .text-green-600 { color: #3a8c65 !important; }
+    .text-green-700 { color: #2d7352 !important; }
+    
+    /* Muted emerald backgrounds */
+    .bg-emerald-500 { background-color: #3a8c65 !important; }
+    .bg-emerald-600 { background-color: #2d7352 !important; }
+    .bg-green-500 { background-color: #3a8c65 !important; }
+    .bg-green-600 { background-color: #2d7352 !important; }
+    
+    /* Hover states */
+    .hover\:bg-emerald-600:hover { background-color: #2d7352 !important; }
+    .hover\:bg-green-600:hover { background-color: #2d7352 !important; }
   }
 }
 

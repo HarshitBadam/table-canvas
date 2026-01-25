@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
@@ -16,12 +16,73 @@ interface ColumnConfig {
   type: ColumnType
 }
 
-const COLUMN_TYPES: { value: ColumnType; label: string }[] = [
-  { value: 'string', label: 'Text' },
-  { value: 'number', label: 'Number' },
-  { value: 'boolean', label: 'Yes/No' },
-  { value: 'date', label: 'Date' },
+const COLUMN_TYPES: { value: ColumnType; label: string; icon: string }[] = [
+  { value: 'string', label: 'Text', icon: 'T' },
+  { value: 'number', label: 'Number', icon: '#' },
+  { value: 'boolean', label: 'Yes/No', icon: '◉' },
+  { value: 'date', label: 'Date', icon: '◷' },
 ]
+
+// Custom dropdown component
+function TypeDropdown({ 
+  value, 
+  onChange 
+}: { 
+  value: ColumnType
+  onChange: (value: ColumnType) => void 
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  
+  const selected = COLUMN_TYPES.find(t => t.value === value)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-text-secondary bg-surface-secondary hover:bg-surface-tertiary rounded transition-colors"
+      >
+        <span className="text-[10px] opacity-60">{selected?.icon}</span>
+        <span>{selected?.label}</span>
+        <svg className={`w-3 h-3 opacity-50 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-surface rounded-lg shadow-lg border border-border py-1 z-50 min-w-[110px]">
+          {COLUMN_TYPES.map(type => (
+            <button
+              key={type.value}
+              type="button"
+              onClick={() => {
+                onChange(type.value)
+                setOpen(false)
+              }}
+              className={`w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 hover:bg-surface-secondary transition-colors ${
+                value === type.value ? 'text-accent-green font-medium' : 'text-text-primary'
+              }`}
+            >
+              <span className="opacity-50 w-3">{type.icon}</span>
+              {type.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   const addSourceTable = useProjectStore((state) => state.addSourceTable)
@@ -52,7 +113,6 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   }
 
   const handleCreate = () => {
-    // Build schema
     const schemaColumns: ColumnSchema[] = columns.map((col, index) => ({
       id: `col_${index}_${col.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
       name: col.name,
@@ -65,7 +125,6 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
       rowCount: rowCount,
     }
 
-    // Create empty rows
     const rows: TableRow[] = Array.from({ length: rowCount }, (_, rowIndex) => {
       const row: TableRow = { __rowId: `row_${rowIndex}` }
       schemaColumns.forEach(col => {
@@ -74,7 +133,6 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
       return row
     })
 
-    // Add table to project store
     const tableId = addSourceTable({
       name: tableName,
       fileRef: '',
@@ -83,10 +141,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
       schema,
     })
 
-    // Add data to data store
     setTableData(tableId, rows)
-
-    // Reset form and close
     resetForm()
     onClose()
   }
@@ -108,47 +163,38 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-2xl shadow-2xl w-full max-w-md z-50 overflow-hidden">
+        <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-xl shadow-2xl w-full max-w-md z-50 overflow-hidden border border-border-elevation">
           {/* Header */}
-          <div className="px-6 pt-6 pb-4">
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-10 h-10 rounded-xl bg-accent-green/10 flex items-center justify-center">
-                <svg className="w-5 h-5 text-accent-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <div>
-                <Dialog.Title className="text-lg font-semibold text-text-primary">
-                  Create New Table
-                </Dialog.Title>
-                <Dialog.Description className="text-sm text-text-tertiary">
-                  Define your table structure
-                </Dialog.Description>
-              </div>
-            </div>
+          <div className="px-5 pt-5 pb-4 border-b border-border-subtle">
+            <Dialog.Title className="text-base font-semibold text-text-primary">
+              Create New Table
+            </Dialog.Title>
+            <Dialog.Description className="text-sm text-text-secondary mt-0.5">
+              Define columns and structure for your table
+            </Dialog.Description>
           </div>
 
           {/* Content */}
-          <div className="px-6 pb-4 space-y-5">
+          <div className="px-5 py-4 space-y-5">
             {/* Table Name */}
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">
+              <label className="block text-xs font-medium text-text-tertiary uppercase tracking-wide mb-2">
                 Table Name
               </label>
               <input
                 type="text"
                 value={tableName}
                 onChange={(e) => setTableName(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent-green focus:border-transparent transition-shadow"
+                className="w-full px-3 py-2.5 text-sm bg-surface-secondary border border-border rounded-lg text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-green focus:ring-1 focus:ring-accent-green/20"
                 placeholder="Enter table name"
               />
             </div>
 
             {/* Row Count */}
             <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">
-                Number of Rows
+              <label className="block text-xs font-medium text-text-tertiary uppercase tracking-wide mb-2">
+                Rows
               </label>
               <div className="flex items-center gap-3">
                 <input
@@ -157,70 +203,60 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                   max={100}
                   value={rowCount}
                   onChange={(e) => setRowCount(parseInt(e.target.value))}
-                  className="flex-1 h-2 bg-surface-secondary rounded-lg appearance-none cursor-pointer accent-accent-green"
+                  className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent-green [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-accent-green [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer bg-surface-tertiary"
                 />
-                <input
-                  type="number"
-                  value={rowCount}
-                  onChange={(e) => setRowCount(Math.max(1, Math.min(1000, parseInt(e.target.value) || 1)))}
-                  min={1}
-                  max={1000}
-                  className="w-20 px-3 py-2 rounded-lg border border-border bg-surface text-text-primary text-sm text-center focus:outline-none focus:ring-2 focus:ring-accent-green focus:border-transparent"
-                />
+                <div className="w-14 px-2 py-1.5 text-sm bg-surface-secondary border border-border rounded-lg text-text-primary text-center font-medium">
+                  {rowCount}
+                </div>
               </div>
             </div>
 
             {/* Columns */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-text-primary">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-xs font-medium text-text-tertiary uppercase tracking-wide">
                   Columns
                 </label>
                 <button
                   onClick={addColumn}
                   className="text-xs font-medium text-accent-green hover:text-accent-green/80 transition-colors flex items-center gap-1"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                   </svg>
-                  Add Column
+                  Add
                 </button>
               </div>
               
-              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+              {/* Column rows */}
+              <div className="space-y-2 max-h-52 overflow-y-auto">
                 {columns.map((col, index) => (
                   <div 
                     key={col.id} 
-                    className="flex items-center gap-2 p-2.5 bg-surface-secondary/50 rounded-lg border border-border/50 group"
+                    className="flex items-center gap-2 p-2 bg-surface-secondary rounded-lg group"
                   >
-                    <span className="text-xs font-medium text-text-tertiary w-5 text-center">
+                    <span className="text-xs text-text-tertiary w-5 text-center tabular-nums font-medium">
                       {index + 1}
                     </span>
                     <input
                       type="text"
                       value={col.name}
                       onChange={(e) => updateColumn(col.id, { name: e.target.value })}
-                      className="flex-1 px-2.5 py-1.5 text-sm rounded-md border border-border bg-surface text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-green focus:border-transparent min-w-0"
+                      className="flex-1 px-2 py-1.5 text-sm bg-surface border border-border rounded text-text-primary focus:outline-none focus:border-accent-green min-w-0"
                       placeholder="Column name"
                     />
-                    <select
+                    <TypeDropdown
                       value={col.type}
-                      onChange={(e) => updateColumn(col.id, { type: e.target.value as ColumnType })}
-                      className="px-2.5 py-1.5 text-sm rounded-md border border-border bg-surface text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-green focus:border-transparent appearance-none cursor-pointer"
-                      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236e6e73'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center', backgroundSize: '14px', paddingRight: '24px' }}
-                    >
-                      {COLUMN_TYPES.map(t => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
-                      ))}
-                    </select>
+                      onChange={(type) => updateColumn(col.id, { type })}
+                    />
                     <button
                       onClick={() => removeColumn(col.id)}
                       disabled={columns.length <= 1}
-                      className="p-1.5 rounded-md text-text-tertiary hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-text-tertiary transition-colors"
-                      title={columns.length <= 1 ? 'Must have at least one column' : 'Remove column'}
+                      className="p-1.5 text-text-tertiary hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-text-tertiary disabled:hover:bg-transparent transition-colors"
+                      title={columns.length <= 1 ? 'Must have at least one column' : 'Remove'}
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                     </button>
                   </div>
@@ -230,20 +266,20 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 bg-surface-secondary/30 border-t border-border flex items-center justify-between">
-            <div className="text-sm text-text-tertiary">
-              {rowCount} row{rowCount !== 1 ? 's' : ''} × {columns.length} column{columns.length !== 1 ? 's' : ''}
-            </div>
+          <div className="px-5 py-4 border-t border-border-subtle flex items-center justify-between bg-surface-secondary/50">
+            <span className="text-xs text-text-secondary">
+              {rowCount} rows × {columns.length} columns
+            </span>
             <div className="flex gap-2">
               <Dialog.Close asChild>
-                <button className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-secondary rounded-lg transition-colors">
+                <button className="px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-tertiary rounded-lg transition-colors">
                   Cancel
                 </button>
               </Dialog.Close>
               <button 
                 onClick={handleCreate} 
                 disabled={!tableName.trim() || columns.length === 0}
-                className="px-4 py-2 text-sm font-medium text-white bg-accent-green hover:bg-accent-green/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-medium text-white bg-accent-green hover:bg-accent-green/90 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Create Table
               </button>

@@ -378,7 +378,7 @@ export function FormulaColumnModal({
             type="button"
             onClick={handleConfirm}
             disabled={!columnName.trim() || (isFormula && formulaErrors.length > 0)}
-            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-500 hover:bg-green-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-accent-green hover:bg-accent-green-hover rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Add Column
           </button>

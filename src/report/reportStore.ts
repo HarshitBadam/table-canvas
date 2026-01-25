@@ -7,6 +7,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { current } from 'immer';
 import { generateId } from '@/lib/utils';
 import { 
   saveReport as saveReportDB, 
@@ -79,8 +80,8 @@ export const useReportStore = create<ReportStoreState>()(
         if (report) {
           Object.assign(report, updates);
           report.updatedAt = new Date().toISOString();
-          // Persist to IndexedDB
-          debouncedSave({ ...report });
+          // Persist to IndexedDB - use current() to get non-draft copy
+          debouncedSave(current(report));
         }
       });
     },
@@ -128,8 +129,8 @@ export const useReportStore = create<ReportStoreState>()(
             report.blocks.push(block);
           }
           report.updatedAt = now;
-          // Persist to IndexedDB
-          debouncedSave({ ...report, blocks: [...report.blocks] });
+          // Persist to IndexedDB - use current() to get non-draft copy
+          debouncedSave(current(report));
         }
       });
 
@@ -146,8 +147,8 @@ export const useReportStore = create<ReportStoreState>()(
             Object.assign(block, updates);
             block.updatedAt = new Date().toISOString();
             report.updatedAt = block.updatedAt;
-            // Persist to IndexedDB
-            debouncedSave({ ...report, blocks: [...report.blocks] });
+            // Persist to IndexedDB - use current() to get non-draft copy
+            debouncedSave(current(report));
           }
         }
       });
@@ -161,8 +162,8 @@ export const useReportStore = create<ReportStoreState>()(
           if (blockIndex !== -1) {
             report.blocks.splice(blockIndex, 1);
             report.updatedAt = new Date().toISOString();
-            // Persist to IndexedDB
-            debouncedSave({ ...report, blocks: [...report.blocks] });
+            // Persist to IndexedDB - use current() to get non-draft copy
+            debouncedSave(current(report));
           }
         }
       });
@@ -176,8 +177,8 @@ export const useReportStore = create<ReportStoreState>()(
           if (block) {
             report.blocks.splice(toIndex, 0, block);
             report.updatedAt = new Date().toISOString();
-            // Persist to IndexedDB
-            debouncedSave({ ...report, blocks: [...report.blocks] });
+            // Persist to IndexedDB - use current() to get non-draft copy
+            debouncedSave(current(report));
           }
         }
       });
@@ -208,8 +209,8 @@ export const useReportStore = create<ReportStoreState>()(
         if (rep) {
           rep.blocks.splice(blockIndex + 1, 0, newBlock);
           rep.updatedAt = now;
-          // Persist to IndexedDB
-          debouncedSave({ ...rep, blocks: [...rep.blocks] });
+          // Persist to IndexedDB - use current() to get non-draft copy
+          debouncedSave(current(rep));
         }
       });
 
@@ -235,8 +236,8 @@ export const useReportStore = create<ReportStoreState>()(
             } as ReportBlock;
             
             report.updatedAt = now;
-            // Persist to IndexedDB
-            debouncedSave({ ...report, blocks: [...report.blocks] });
+            // Persist to IndexedDB - use current() to get non-draft copy
+            debouncedSave(current(report));
           }
         }
       });

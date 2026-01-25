@@ -1,6 +1,7 @@
 /**
  * Chart Renderer Component
  * Renders different chart types using Recharts
+ * Theme-aware with dark mode support
  */
 
 import { useMemo, memo } from 'react'
@@ -22,6 +23,7 @@ import {
   Cell,
 } from 'recharts'
 import type { ChartConfig, CellValue } from '@/lib/types'
+import { useTheme } from '@/components/ThemeToggle'
 
 interface ChartRendererProps {
   type: 'bar' | 'line' | 'pie' | 'scatter'
@@ -48,6 +50,28 @@ const DEFAULT_COLORS = [
   '#EC4899', // Pink
   '#6B7280', // Gray (for "Other")
 ]
+
+// Theme-aware chart styling colors
+const CHART_THEME = {
+  light: {
+    gridColor: '#e5e5ea',
+    axisColor: '#d2d2d7',
+    textColor: '#6e6e73',
+    pieGridBg: 'linear-gradient(#e5e5ea 1px, transparent 1px), linear-gradient(90deg, #e5e5ea 1px, transparent 1px)',
+    legendBg: 'rgba(255, 255, 255, 0.95)',
+    legendBorder: '#f3f4f6',
+    cellStroke: 'white',
+  },
+  dark: {
+    gridColor: '#3d3d42',
+    axisColor: '#4a4a50',
+    textColor: '#a1a1a6',
+    pieGridBg: 'linear-gradient(#3d3d42 1px, transparent 1px), linear-gradient(90deg, #3d3d42 1px, transparent 1px)',
+    legendBg: 'rgba(26, 26, 29, 0.95)',
+    legendBorder: '#3d3d42',
+    cellStroke: '#1a1a1d',
+  },
+}
 
 // Check if a value looks like a timestamp
 function isTimestamp(value: unknown): boolean {
@@ -86,6 +110,11 @@ export const ChartRenderer = memo(function ChartRenderer({
   title,
   subtitle,
 }: ChartRendererProps) {
+  // Get current theme
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+  const themeColors = isDark ? CHART_THEME.dark : CHART_THEME.light
+  
   // Use custom colors or default
   const COLORS = colorScheme && colorScheme.length > 0 ? colorScheme : DEFAULT_COLORS
   
@@ -111,12 +140,30 @@ export const ChartRenderer = memo(function ChartRenderer({
   const headerHeight = (title ? 28 : 0) + (subtitle ? 20 : 0)
   const chartHeight = height - headerHeight
 
-  // Common tooltip style
-  const tooltipStyle = {
-    backgroundColor: '#ffffff',
-    border: '1px solid #d2d2d7',
-    borderRadius: '8px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+  // Minimal, elegant tooltip - dark style for better visibility
+  const tooltipStyle: React.CSSProperties = {
+    backgroundColor: 'rgba(24, 24, 27, 0.95)',
+    border: 'none',
+    borderRadius: '6px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+    padding: '6px 10px',
+    backdropFilter: 'blur(8px)',
+  }
+  
+  // Custom tooltip content style - compact and readable
+  const tooltipLabelStyle: React.CSSProperties = {
+    fontSize: '10px',
+    fontWeight: 500,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.3px',
+    marginBottom: '2px',
+  }
+  
+  const tooltipValueStyle: React.CSSProperties = {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#fff',
   }
 
   if (chartData.length === 0) {
@@ -166,35 +213,50 @@ export const ChartRenderer = memo(function ChartRenderer({
               data={chartData} 
               margin={compact ? { top: 8, right: 8, left: 2, bottom: 2 } : { top: 20, right: 30, left: 20, bottom: 5 }}
             >
-              {shouldShowGrid && <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />}
+              {shouldShowGrid && <CartesianGrid strokeDasharray="3 3" stroke={themeColors.gridColor} />}
             <XAxis 
               dataKey={xAxisKey}
-              tick={compact ? false : { fontSize: 12, fill: '#6e6e73' }}
-              tickLine={compact ? false : { stroke: '#d2d2d7' }}
-              axisLine={{ stroke: '#d2d2d7', strokeWidth: compact ? 1 : 1 }}
+              tick={compact ? false : { fontSize: 12, fill: themeColors.textColor }}
+              tickLine={compact ? false : { stroke: themeColors.axisColor }}
+              axisLine={{ stroke: themeColors.axisColor, strokeWidth: compact ? 1 : 1 }}
               height={compact ? 1 : undefined}
               tickFormatter={hasTimestamps ? (value) => formatAxisValue(value) : undefined}
             />
             <YAxis 
-              tick={compact ? false : { fontSize: 12, fill: '#6e6e73' }}
-              tickLine={compact ? false : { stroke: '#d2d2d7' }}
-              axisLine={{ stroke: '#d2d2d7', strokeWidth: compact ? 1 : 1 }}
+              tick={compact ? false : { fontSize: 12, fill: themeColors.textColor }}
+              tickLine={compact ? false : { stroke: themeColors.axisColor }}
+              axisLine={{ stroke: themeColors.axisColor, strokeWidth: compact ? 1 : 1 }}
               width={compact ? 1 : undefined}
               tickFormatter={(value) => value.toLocaleString()}
             />
             {!compact && (
               <Tooltip 
                 contentStyle={tooltipStyle}
-                formatter={(value: number) => [value.toLocaleString(), yAxisName]}
-                labelFormatter={hasTimestamps ? (label) => formatAxisValue(label) : undefined}
+                cursor={{ fill: isDark ? 'rgba(34, 164, 93, 0.08)' : 'rgba(33, 115, 70, 0.04)' }}
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.[0]) return null
+                  const value = payload[0].value as number
+                  return (
+                    <div style={tooltipStyle}>
+                      <div style={tooltipLabelStyle}>{hasTimestamps ? formatAxisValue(label) : String(label)}</div>
+                      <div style={tooltipValueStyle}>{value.toLocaleString()}</div>
+                    </div>
+                  )
+                }}
               />
             )}
-            {!compact && showLegend && <Legend formatter={() => yAxisName} />}
+            {!compact && showLegend && (
+              <Legend 
+                formatter={() => yAxisName}
+                wrapperStyle={{ paddingTop: '12px' }}
+              />
+            )}
             <Bar 
               dataKey={yAxisKey}
               name={yAxisName} 
               fill={COLORS[0]}
               radius={[4, 4, 0, 0]}
+              cursor="pointer"
             />
           </BarChart>
         </ResponsiveContainer>
@@ -209,38 +271,52 @@ export const ChartRenderer = memo(function ChartRenderer({
               data={chartData} 
               margin={compact ? { top: 8, right: 8, left: 2, bottom: 2 } : { top: 20, right: 30, left: 20, bottom: 5 }}
             >
-              {shouldShowGrid && <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />}
+              {shouldShowGrid && <CartesianGrid strokeDasharray="3 3" stroke={themeColors.gridColor} />}
             <XAxis 
               dataKey={xAxisKey}
-              tick={compact ? false : { fontSize: 12, fill: '#6e6e73' }}
-              tickLine={compact ? false : { stroke: '#d2d2d7' }}
-              axisLine={{ stroke: '#d2d2d7', strokeWidth: compact ? 1 : 1 }}
+              tick={compact ? false : { fontSize: 12, fill: themeColors.textColor }}
+              tickLine={compact ? false : { stroke: themeColors.axisColor }}
+              axisLine={{ stroke: themeColors.axisColor, strokeWidth: compact ? 1 : 1 }}
               height={compact ? 1 : undefined}
               tickFormatter={hasTimestamps ? (value) => formatAxisValue(value) : undefined}
             />
             <YAxis 
-              tick={compact ? false : { fontSize: 12, fill: '#6e6e73' }}
-              tickLine={compact ? false : { stroke: '#d2d2d7' }}
-              axisLine={{ stroke: '#d2d2d7', strokeWidth: compact ? 1 : 1 }}
+              tick={compact ? false : { fontSize: 12, fill: themeColors.textColor }}
+              tickLine={compact ? false : { stroke: themeColors.axisColor }}
+              axisLine={{ stroke: themeColors.axisColor, strokeWidth: compact ? 1 : 1 }}
               width={compact ? 1 : undefined}
               tickFormatter={(value) => value.toLocaleString()}
             />
             {!compact && (
               <Tooltip 
                 contentStyle={tooltipStyle}
-                formatter={(value: number) => [value.toLocaleString(), yAxisName]}
-                labelFormatter={hasTimestamps ? (label) => formatAxisValue(label) : undefined}
+                cursor={{ stroke: isDark ? 'rgba(34, 164, 93, 0.3)' : 'rgba(33, 115, 70, 0.2)', strokeWidth: 1 }}
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.[0]) return null
+                  const value = payload[0].value as number
+                  return (
+                    <div style={tooltipStyle}>
+                      <div style={tooltipLabelStyle}>{hasTimestamps ? formatAxisValue(label) : String(label)}</div>
+                      <div style={tooltipValueStyle}>{value.toLocaleString()}</div>
+                    </div>
+                  )
+                }}
               />
             )}
-            {!compact && showLegend && <Legend formatter={() => yAxisName} />}
+            {!compact && showLegend && (
+              <Legend 
+                formatter={() => yAxisName}
+                wrapperStyle={{ paddingTop: '12px' }}
+              />
+            )}
             <Line 
               type="monotone" 
               dataKey={yAxisKey}
               name={yAxisName}
               stroke={COLORS[0]}
-              strokeWidth={compact ? 1.5 : 2}
-              dot={compact ? false : { fill: COLORS[0], strokeWidth: 2 }}
-              activeDot={compact ? false : { r: 6 }}
+              strokeWidth={compact ? 1.5 : 2.5}
+              dot={compact ? false : { fill: isDark ? '#1a1a1d' : '#fff', stroke: COLORS[0], strokeWidth: 2, r: 4 }}
+              activeDot={compact ? false : { r: 6, fill: COLORS[0], stroke: isDark ? '#1a1a1d' : '#fff', strokeWidth: 2 }}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -294,7 +370,7 @@ export const ChartRenderer = memo(function ChartRenderer({
               <div 
                 className="absolute inset-0 pointer-events-none"
                 style={{
-                  backgroundImage: 'linear-gradient(#e5e5ea 1px, transparent 1px), linear-gradient(90deg, #e5e5ea 1px, transparent 1px)',
+                  backgroundImage: themeColors.pieGridBg,
                   backgroundSize: '40px 40px',
                   opacity: 0.5,
                 }}
@@ -324,7 +400,7 @@ export const ChartRenderer = memo(function ChartRenderer({
                       <Cell 
                         key={`cell-${index}`} 
                         fill={isOther ? '#6B7280' : COLORS[index % COLORS.length]}
-                        stroke="white"
+                        stroke={themeColors.cellStroke}
                         strokeWidth={2}
                       />
                     )
@@ -337,11 +413,15 @@ export const ChartRenderer = memo(function ChartRenderer({
                       const { name, value } = payload[0]
                       const percent = ((value as number) / pieTotal) * 100
                       return (
-                        <div className="bg-white dark:bg-gray-800 px-3 py-2 rounded-lg shadow-lg border border-border">
-                          <p className="font-medium text-sm text-text-primary">{String(name)}</p>
-                          <p className="text-text-secondary text-sm">
-                            {Number(value).toLocaleString()} ({percent.toFixed(1)}%)
-                          </p>
+                        <div style={{
+                          ...tooltipStyle,
+                          minWidth: '120px',
+                        }}>
+                          <div style={tooltipLabelStyle}>{String(name)}</div>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                            <span style={tooltipValueStyle}>{Number(value).toLocaleString()}</span>
+                            <span style={{ ...tooltipLabelStyle, marginBottom: 0 }}>({percent.toFixed(1)}%)</span>
+                          </div>
                         </div>
                       )
                     }}
@@ -354,7 +434,15 @@ export const ChartRenderer = memo(function ChartRenderer({
           {/* Custom legend on the right */}
           {!compact && showLegend && (
             <div className="w-48 flex flex-col justify-center pl-4 pr-2 relative z-10">
-              <div className="space-y-2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-lg p-3 shadow-sm border border-gray-100 dark:border-gray-800">
+              <div 
+                className="space-y-2 backdrop-blur-sm rounded-lg p-3 shadow-sm"
+                style={{
+                  backgroundColor: themeColors.legendBg,
+                  borderWidth: 1,
+                  borderStyle: 'solid',
+                  borderColor: themeColors.legendBorder,
+                }}
+              >
                 {legendData.map((item, index) => (
                   <div key={index} className="flex items-center gap-3">
                     <div 
@@ -362,10 +450,10 @@ export const ChartRenderer = memo(function ChartRenderer({
                       style={{ backgroundColor: item.color }}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                      <div className="text-sm font-medium text-text-primary truncate">
                         {item.name}
                       </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                      <div className="text-xs text-text-secondary">
                         {item.value.toLocaleString()} · {item.percent.toFixed(0)}%
                       </div>
                     </div>
@@ -384,22 +472,22 @@ export const ChartRenderer = memo(function ChartRenderer({
         <ChartWrapper>
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={compact ? { top: 8, right: 8, left: 2, bottom: 2 } : { top: 20, right: 30, left: 20, bottom: 5 }}>
-              {shouldShowGrid && <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />}
+              {shouldShowGrid && <CartesianGrid strokeDasharray="3 3" stroke={themeColors.gridColor} />}
             <XAxis 
               dataKey={xAxisKey}
               type="number"
-              tick={compact ? false : { fontSize: 12, fill: '#6e6e73' }}
-              tickLine={compact ? false : { stroke: '#d2d2d7' }}
-              axisLine={{ stroke: '#d2d2d7', strokeWidth: compact ? 1 : 1 }}
+              tick={compact ? false : { fontSize: 12, fill: themeColors.textColor }}
+              tickLine={compact ? false : { stroke: themeColors.axisColor }}
+              axisLine={{ stroke: themeColors.axisColor, strokeWidth: compact ? 1 : 1 }}
               height={compact ? 1 : undefined}
               name={xAxisName}
             />
             <YAxis 
               dataKey={yAxisKey}
               type="number"
-              tick={compact ? false : { fontSize: 12, fill: '#6e6e73' }}
-              tickLine={compact ? false : { stroke: '#d2d2d7' }}
-              axisLine={{ stroke: '#d2d2d7', strokeWidth: compact ? 1 : 1 }}
+              tick={compact ? false : { fontSize: 12, fill: themeColors.textColor }}
+              tickLine={compact ? false : { stroke: themeColors.axisColor }}
+              axisLine={{ stroke: themeColors.axisColor, strokeWidth: compact ? 1 : 1 }}
               width={compact ? 1 : undefined}
               name={yAxisName}
               tickFormatter={(value) => value.toLocaleString()}
@@ -407,14 +495,38 @@ export const ChartRenderer = memo(function ChartRenderer({
             {!compact && (
               <Tooltip 
                 contentStyle={tooltipStyle}
-                formatter={(value: number) => [value.toLocaleString(), yAxisName]}
+                cursor={{ strokeDasharray: '3 3', stroke: isDark ? 'rgba(34, 164, 93, 0.35)' : 'rgba(33, 115, 70, 0.25)' }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.[0]?.payload) return null
+                  const data = payload[0].payload as Record<string, unknown>
+                  return (
+                    <div style={tooltipStyle}>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <div>
+                          <div style={tooltipLabelStyle}>{xAxisName}</div>
+                          <div style={tooltipValueStyle}>{Number(data[xAxisKey]).toLocaleString()}</div>
+                        </div>
+                        <div>
+                          <div style={tooltipLabelStyle}>{yAxisName}</div>
+                          <div style={tooltipValueStyle}>{Number(data[yAxisKey]).toLocaleString()}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }}
               />
             )}
-            {!compact && showLegend && <Legend formatter={() => yAxisName} />}
+            {!compact && showLegend && (
+              <Legend 
+                formatter={() => yAxisName}
+                wrapperStyle={{ paddingTop: '12px' }}
+              />
+            )}
             <Scatter 
               name={yAxisName} 
               data={chartData} 
               fill={COLORS[0]}
+              cursor="pointer"
             />
           </ScatterChart>
         </ResponsiveContainer>

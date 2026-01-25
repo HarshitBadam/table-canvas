@@ -166,7 +166,7 @@ export const TextBlock = memo(function TextBlock({ block, reportId, isSelected }
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         className="w-full min-h-[1.5em] resize-none bg-transparent border-none outline-none text-gray-900 dark:text-gray-100 text-base leading-relaxed placeholder:text-gray-400 dark:placeholder:text-gray-500"
-        placeholder="Type '/' for commands, '---' for divider, '# ' for heading..."
+        placeholder="Type '/' for commands..."
         rows={1}
       />
     );
@@ -188,7 +188,7 @@ export const TextBlock = memo(function TextBlock({ block, reportId, isSelected }
           ))}
         </div>
       ) : (
-        <span>Type '/' for commands, '---' for divider, '# ' for heading...</span>
+        <span className="opacity-0">&nbsp;</span>
       )}
     </div>
   );

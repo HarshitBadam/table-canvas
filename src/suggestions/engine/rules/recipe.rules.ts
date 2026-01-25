@@ -41,6 +41,9 @@ registerRule({
     const opportunities = detectAggregationOpportunities(meta.schema, meta.profile?.columns);
     const best = opportunities[0];
     const groupCol = best.groupColumns[0].column;
+    // Use column name (what DuckDB expects) for derived tables
+    const groupColRef = groupCol.name || groupCol.id;
+    const valueColRef = best.valueColumn.name || best.valueColumn.id;
     
     return {
       id: createSuggestionId('smart_aggregation', ctx.tableId, best.valueColumn.id),
@@ -67,11 +70,11 @@ registerRule({
         transform: {
           type: 'group_summarize',
           sourceTableId: ctx.tableId,
-          groupByColumns: [groupCol.id],
+          groupByColumns: [groupColRef],
           aggregations: [
-            { columnId: best.valueColumn.id, operation: 'sum', alias: `Total ${best.valueColumn.name}` },
-            { columnId: best.valueColumn.id, operation: 'avg', alias: `Avg ${best.valueColumn.name}` },
-            { columnId: best.valueColumn.id, operation: 'count', alias: 'Count' },
+            { columnId: valueColRef, operation: 'sum', alias: `Total ${best.valueColumn.name}` },
+            { columnId: valueColRef, operation: 'avg', alias: `Avg ${best.valueColumn.name}` },
+            { columnId: valueColRef, operation: 'count', alias: 'Count' },
           ],
         },
         tableName: `${best.valueColumn.name} by ${groupCol.name}`,
@@ -159,6 +162,9 @@ registerRule({
   build: (ctx, meta) => {
     const opportunities = detectComparisonOpportunities(meta.schema, meta.profile?.columns);
     const best = opportunities[0];
+    // Use column name (what DuckDB expects) for derived tables
+    const col1Ref = best.column1.name || best.column1.id;
+    const col2Ref = best.column2.name || best.column2.id;
     
     const isVarianceLike = best.similarity > 0.6;
     
@@ -189,7 +195,7 @@ registerRule({
             type: 'calculated_column',
             sourceTableId: ctx.tableId,
             newColumnName: `${best.column1.name} vs ${best.column2.name} Diff`,
-            expression: `("${best.column1.id}" - "${best.column2.id}")`,
+            expression: `("${col1Ref}" - "${col2Ref}")`,
           },
           tableName: `${ctx.tableName} (with comparison)`,
           openAfterApply: true,
@@ -222,7 +228,7 @@ registerRule({
             type: 'calculated_column',
             sourceTableId: ctx.tableId,
             newColumnName: `${best.column1.name} per ${best.column2.name}`,
-            expression: `("${best.column1.id}" / NULLIF("${best.column2.id}", 0))`,
+            expression: `("${col1Ref}" / NULLIF("${col2Ref}", 0))`,
           },
           tableName: `${ctx.tableName} (with ratio)`,
           openAfterApply: true,
@@ -389,6 +395,9 @@ registerRule({
   build: (ctx, meta) => {
     const numericCols = meta.schema.columns.filter(c => c.type === 'number');
     const [num1, num2] = numericCols;
+    // Use column name (what DuckDB expects) for derived tables
+    const num1Ref = num1.name || num1.id;
+    const num2Ref = num2.name || num2.id;
     
     return {
       id: createSuggestionId('ratio_kpi', ctx.tableId, num1.id, num2.id),
@@ -416,7 +425,7 @@ registerRule({
           type: 'calculated_column',
           sourceTableId: ctx.tableId,
           newColumnName: `${num1.name}_ratio`,
-          expression: `("${num1.id}" / NULLIF("${num2.id}", 0)) * 100`,
+          expression: `("${num1Ref}" / NULLIF("${num2Ref}", 0)) * 100`,
         },
         tableName: `${ctx.tableName} (with ratios)`,
         openAfterApply: true,
