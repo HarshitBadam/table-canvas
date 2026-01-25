@@ -38,7 +38,7 @@ jobs:
     if: ${{ github.event.inputs.suite == 'all' || github.event.inputs.suite == 'engine' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -61,7 +61,7 @@ jobs:
     if: ${{ github.event.inputs.suite == 'all' || github.event.inputs.suite == 'formula' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -84,7 +84,7 @@ jobs:
     if: ${{ github.event.inputs.suite == 'all' || github.event.inputs.suite == 'persistence' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -107,7 +107,7 @@ jobs:
     if: ${{ github.event.inputs.suite == 'all' || github.event.inputs.suite == 'suggestions' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -131,7 +131,7 @@ jobs:
     if: ${{ github.event.inputs.suite == 'all' || github.event.inputs.suite == 'e2e' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
