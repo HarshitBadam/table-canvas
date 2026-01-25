@@ -32,7 +32,7 @@
     "docker:seed": "docker compose exec backend npm run seed"
   },
   "dependencies": {
-    "@duckdb/duckdb-wasm": "^1.33.1-dev16.0",
+    "@duckdb/duckdb-wasm": "^1.33.1-dev18.0",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-dropdown-menu": "^2.1.4",
     "@radix-ui/react-select": "^2.2.6",
