@@ -1,7 +1,5 @@
 # Table Canvas
 
-**Status:** Preview
-
 ### Abstract
 
 Table Canvas is a local-first **visual data workbench** that experiments with a node-based approach to ETL (Extract, Transform, Load). Built on a modular React architecture and powered by **DuckDB-WASM**, it explores how visual graphs can improve the auditability of data transformation pipelines compared to traditional tabular interfaces.
