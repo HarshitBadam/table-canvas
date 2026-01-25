@@ -1,0 +1,70 @@
+services:
+  # =============================================================================
+  # MongoDB Database
+  # =============================================================================
+  mongodb:
+    image: mongo:7
+    container_name: tablecanvas-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    command: ["mongod", "--quiet"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # =============================================================================
+  # Backend Server (Express + TypeScript)
+  # =============================================================================
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: tablecanvas-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - MONGODB_URI=mongodb://mongodb:27017/table-canvas
+      - JWT_ACCESS_SECRET=docker-dev-access-secret-not-for-production
+      - JWT_REFRESH_SECRET=docker-dev-refresh-secret-not-for-production
+      - JWT_ACCESS_EXPIRES_IN=15m
+      - JWT_REFRESH_EXPIRES_IN=7d
+      - FRONTEND_URL=http://localhost:5173
+    volumes:
+      - ./server/src:/app/src:ro
+      - ./server/scripts:/app/scripts:ro
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  # =============================================================================
+  # Frontend (Vite + React)
+  # =============================================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tablecanvas-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3001/api
+    volumes:
+      - ./src:/app/src:ro
+      - ./data:/app/data:ro
+      - ./public:/app/public:ro
+    depends_on:
+      - backend
+
+volumes:
+  mongodb_data:
+    driver: local

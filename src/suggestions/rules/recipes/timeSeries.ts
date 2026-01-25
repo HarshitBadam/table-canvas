@@ -76,9 +76,9 @@ export const timeSeriesTrendRule: SuggestionRule = {
       meta.profile?.rowCount
     )
     const opp = opportunities[0]
-    // Use column name (what DuckDB expects) for derived tables
-    const dateColRef = opp.dateColumn.name || opp.dateColumn.id
-    const valueColRef = opp.valueColumn.name || opp.valueColumn.id
+    // Use column ID (what DuckDB uses internally) for derived tables
+    const dateColRef = opp.dateColumn.id
+    const valueColRef = opp.valueColumn.id
     
     return {
       id: createSuggestionId('time_series', ctx.tableId, opp.dateColumn.id, opp.valueColumn.id),
@@ -159,9 +159,9 @@ export const periodComparisonRule: SuggestionRule = {
       meta.profile?.rowCount
     )
     const opp = opportunities[0]
-    // Use column name (what DuckDB expects) for derived tables
-    const dateColRef = opp.dateColumn.name || opp.dateColumn.id
-    const valueColRef = opp.valueColumn.name || opp.valueColumn.id
+    // Use column ID (what DuckDB uses internally) for derived tables
+    const dateColRef = opp.dateColumn.id
+    const valueColRef = opp.valueColumn.id
     
     return {
       id: createSuggestionId('period_comparison', ctx.tableId, opp.dateColumn.id, opp.valueColumn.id),
