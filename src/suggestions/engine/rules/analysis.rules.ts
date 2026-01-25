@@ -23,9 +23,9 @@ registerRule({
   build: (ctx, meta) => {
     const dateCol = meta.schema.columns.find(c => c.type === 'date' || c.type === 'datetime')!;
     const numericCol = meta.schema.columns.find(c => c.type === 'number')!;
-    // Use column name (what DuckDB expects) for derived tables
-    const dateColRef = dateCol.name || dateCol.id;
-    const numericColRef = numericCol.name || numericCol.id;
+    // Use column ID (what DuckDB uses internally) for derived tables
+    const dateColRef = dateCol.id;
+    const numericColRef = numericCol.id;
     
     return {
       id: createSuggestionId('trend_chart', ctx.tableId, numericCol.id),
@@ -178,8 +178,8 @@ registerRule({
     return classification === 'continuous_numeric';
   },
   build: (ctx, meta) => {
-    // Use column name (what DuckDB expects) for derived tables
-    const colRef = meta.column!.name || meta.column!.id;
+    // Use column ID (what DuckDB uses internally) for derived tables
+    const colRef = meta.column!.id;
     return {
       id: createSuggestionId('distribution_histogram', ctx.tableId, meta.column!.id),
       category: 'analysis',
@@ -241,9 +241,9 @@ registerRule({
       (meta.profile?.columns.find(p => p.columnId === c.id)?.distinctCount ?? 100) < 50
     )!;
     const numericCol = meta.schema.columns.find(c => c.type === 'number')!;
-    // Use column name (what DuckDB expects) for derived tables
-    const catColRef = catCol.name || catCol.id;
-    const numericColRef = numericCol.name || numericCol.id;
+    // Use column ID (what DuckDB uses internally) for derived tables
+    const catColRef = catCol.id;
+    const numericColRef = numericCol.id;
     
     return {
       id: createSuggestionId('top_n_analysis', ctx.tableId, numericCol.id),
@@ -329,9 +329,9 @@ registerRule({
       return classification === 'continuous_numeric' || classification === 'discrete_numeric';
     })!;
     
-    // Use column name (what DuckDB expects) for derived tables
-    const stringColRef = stringCol.name || stringCol.id;
-    const numericColRef = numericCol.name || numericCol.id;
+    // Use column ID (what DuckDB uses internally) for derived tables
+    const stringColRef = stringCol.id;
+    const numericColRef = numericCol.id;
     
     return {
       id: createSuggestionId('create_summary_fallback', ctx.tableId, stringCol.id, numericCol.id),
@@ -416,9 +416,9 @@ registerRule({
       return classification === 'continuous_numeric' || classification === 'discrete_numeric';
     })!;
     
-    // Use column name (what DuckDB expects) for derived tables
-    const stringColRef = stringCol.name || stringCol.id;
-    const numericColRef = numericCol.name || numericCol.id;
+    // Use column ID (what DuckDB uses internally) for derived tables
+    const stringColRef = stringCol.id;
+    const numericColRef = numericCol.id;
     
     return {
       id: createSuggestionId('bar_chart_fallback', ctx.tableId, stringCol.id, numericCol.id),

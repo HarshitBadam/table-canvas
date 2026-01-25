@@ -1,190 +1,153 @@
 # Table Canvas
 
-**A visual data transformation platform that replaces fragile Excel workflows with explicit data lineage, live previews, and one-click analytics.**
+**Status:** Preview
 
-![Project Status](https://img.shields.io/badge/status-v1.0_Release-brightgreen) ![TypeScript](https://img.shields.io/badge/TypeScript-61k_LOC-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+### Abstract
 
----
+Table Canvas is a local-first **visual data workbench** that experiments with a node-based approach to ETL (Extract, Transform, Load). Built on a modular React architecture and powered by **DuckDB-WASM**, it explores how visual graphs can improve the auditability of data transformation pipelines compared to traditional tabular interfaces.
 
-## The Problem
+### Technical Scope
 
-Analysts spend 80% of their time on data prep—importing, joining, cleaning, and validating—not analysis. Excel's "everything in one sheet" model creates brittle workbooks where one bad formula breaks everything and lineage is invisible.
+This repository houses the source code for the initial public release. The system encompasses:
 
-**Table Canvas** treats tables as first-class objects on an infinite canvas. Drag connections to create joins, click a table to edit it in a familiar grid, and let the system suggest cleaning operations and analyses based on your data's actual shape.
-
----
-
-## Under the Hood
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Main Thread                              │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────────────────┐ │
-│  │ Canvas  │  │  Grid   │  │ Charts  │  │  Suggestions Panel  │ │
-│  │(ReactFlow)│ │(Virtual)│  │(Recharts)│ │  (Rule Engine)      │ │
-│  └────┬────┘  └────┬────┘  └────┬────┘  └──────────┬──────────┘ │
-│       │            │            │                   │            │
-│       └────────────┴────────────┴───────────────────┘            │
-│                              │                                   │
-│                    ┌─────────▼─────────┐                        │
-│                    │   Zustand Store   │                        │
-│                    │ (Immer + Patches) │                        │
-│                    └─────────┬─────────┘                        │
-└──────────────────────────────┼──────────────────────────────────┘
-                               │ RPC
-┌──────────────────────────────▼──────────────────────────────────┐
-│                        Web Worker                                │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                    DuckDB-WASM                               ││
-│  │  • SQL query execution    • Aggregations & window functions ││
-│  │  • Join optimization      • In-memory columnar storage      ││
-│  └─────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Design Patterns
-
-| Pattern | Implementation |
-|---------|----------------|
-| **Patch Overlay Model** | Edits stored as sparse patches over immutable base data—enables instant undo/redo and lazy recomputation |
-| **Dependency Graph** | Topological sort determines materialization order; dirty flags propagate downstream automatically |
-| **Progressive Profiling** | Phase 1 (instant): type inference, missing %, top values. Phase 2 (background): histograms, correlations, key candidates |
-| **Engine Abstraction** | `EngineAdapter` interface isolates DuckDB-WASM; swap to Polars/DataFusion without touching UI code |
-
-### Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| Framework | React 18 + TypeScript (strict mode) |
-| Build | Vite 6 with Web Worker support |
-| State | Zustand + Immer (normalized graph) |
-| Data Engine | DuckDB-WASM (Web Worker) |
-| Canvas | React Flow (custom nodes/edges) |
-| Grid | Custom virtualized grid (60fps scroll) |
-| Rich Text | TipTap (ProseMirror) for report editor |
-| Charts | Recharts with aggregation pushdown |
-| Persistence | IndexedDB + optional REST sync |
+* **Core Engine:** A client-side SQL execution layer (DuckDB-WASM) capable of processing 100k+ row datasets entirely in the browser.
+* **State Management:** A custom Directed Acyclic Graph (DAG) implementation using **Zustand** and **Immer** to ensure reactive data propagation.
+* **Frontend Architecture:** A modular React 18 application featuring virtualized grids for high-performance rendering.
 
 ---
 
-## Key Features
+## The Motivation
 
-### 1. Safe Joins with Explosion Warnings
+Spreadsheets are the industry standard for data entry and ad-hoc analysis. However, as data transformation complexity grows, tabular interfaces present specific architectural challenges:
 
-Most join tools let you shoot yourself in the foot. Table Canvas previews every join:
+* **Auditability:** In traditional spreadsheets, logic is hidden inside cells. Tracing dependencies often requires manual inspection of formulas.
+* **Linearity:** Complex joins and filtering logic can become difficult to visualize in a grid format.
+* **Reproducibility:** Re-running the same analysis on new datasets often requires manual adjustments to cell ranges.
 
-- **Match rate**: "87% of left rows will match"
-- **Row explosion risk**: Detects many-to-many keys before you create a 10M row monster
-- **Suggested keys**: Ranked by uniqueness and value overlap
+## The Approach
 
-### 2. Context-Aware Suggestions Engine
+Table Canvas proposes a **visual graph paradigm** for data operations. By decoupling the data (tables) from the logic (nodes), users can architect transformation pipelines that self-document their lineage.
 
-A rule-based engine analyzes column metadata and proposes high-confidence actions:
+* **Visual Lineage:** Drag connections between nodes to filter, join, and aggregate data. The pipeline *is* the documentation.
+* **Local-First Execution:** Leveraging WebAssembly (DuckDB-WASM) to execute SQL queries client-side, ensuring data privacy and zero-latency feedback.
+* **Reactive Propagation:** When upstream data changes, the DAG automatically determines which downstream nodes require re-calculation.
 
-- **Cleaning**: Trim whitespace, normalize casing, convert "N/A" to NULL
-- **Analysis**: "Sum of Revenue by Region" with auto-generated chart
-- **Recipes**: Variance analysis, period-over-period trends, reconciliation workflows
+## Tech Stack
 
-Each suggestion includes a live preview and one-click apply.
+| Layer | Technology | Purpose |
+| --- | --- | --- |
+| **Core** | React 18 + TypeScript | Component architecture and type safety |
+| **Engine** | DuckDB-WASM | In-browser SQL execution |
+| **State** | Zustand + Immer | DAG state management and immutability |
+| **Canvas** | ReactFlow | Node-based interactive graph |
+| **Persistence** | IndexedDB | Local storage for offline capability |
+| **Visualization** | Recharts | Reactive data charting |
+| **Backend** | Express + MongoDB | Optional server sync and auth |
 
-### 3. Formula Columns with Live Preview
+## Architecture Overview
 
-A safe expression language (not full Excel) for calculated columns:
+The application follows a **Headless UI** pattern where the calculation engine is decoupled from the visualization layer.
 
-```
-IF([status] = "paid", [amount], 0)
-CONCAT([first_name], " ", [last_name])
-DATEDIFF("day", [start_date], [end_date])
-```
-
-Preview shows results on real data before committing.
-
-### 4. Notion-Style Report Editor
-
-Build polished reports with embedded tables, charts, and rich text. TipTap-powered editor with:
-
-- Slash commands (`/chart`, `/table`, `/heading`)
-- Drag-and-drop block reordering
-- PDF export with print-optimized layout
-
-### 5. Real-Time Data Lineage
-
-Every derived table knows its upstream dependencies. Change a source table and downstream tables show a "stale" badge until re-materialized. No mystery about where numbers come from.
+1. **Ingestion:** Files (CSV/Excel) are parsed and loaded into a transient DuckDB instance in memory.
+2. **DAG Processing:** The visual graph is converted into a topological sort order to determine execution dependency.
+3. **Execution:** SQL queries are generated dynamically based on node connections and executed against the WASM instance.
+4. **Rendering:** Results are streamed back to the UI via web workers to prevent main-thread blocking.
 
 ---
 
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
 - npm 9+
+- Docker and Docker Compose (optional, for full-stack setup)
 
-### Install & Run
+### Local Development (Frontend Only)
 
 ```bash
-# Clone the repository
-git clone https://github.com/HarshitBadam/table-canvas.git
-cd table-canvas
-
 # Install dependencies
 npm install
 
 # Start development server
 npm run dev
-
-# Open http://localhost:5173
 ```
 
-### Run Tests
+The application runs at `http://localhost:5173`. This mode uses IndexedDB for local persistence.
+
+### Full Stack with Docker
 
 ```bash
-# Unit tests
-npm run test:unit
+# Start all services (MongoDB, backend, frontend)
+npm run docker:up
 
-# E2E tests (requires Playwright)
-npx playwright install
-npm run test:e2e
+# Seed sample data
+npm run docker:seed
 
-# All tests
-npm run test:all
+# View logs
+npm run docker:logs
+
+# Stop services
+npm run docker:down
 ```
 
----
+Services:
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:3001`
+- MongoDB: `localhost:27017`
+
+See [docs/setup.md](docs/setup.md) for detailed configuration options.
 
 ## Project Structure
 
 ```
-src/
-├── app/            # App shell, routing, sidebar
-├── canvas/         # React Flow nodes, edges, transform modals
-├── charts/         # Chart builder, Recharts wrappers
-├── dashboard/      # Dashboard layout, PDF export
-├── engine/         # DuckDB adapter, Web Worker, materialization
-├── formula/        # Tokenizer, parser, evaluator for expressions
-├── grid/           # Virtualized grid, cell editors, autofill
-├── persistence/    # IndexedDB storage, project export/import
-├── profiling/      # Schema inference, statistics, semantic hints
-├── report/         # TipTap editor, block components, PDF generation
-├── state/          # Zustand stores, normalized slices
-├── suggestions/    # Rule engine, detectors, cleaning commands
-└── styles/         # Design tokens, Tailwind config
+├── src/                    # Frontend application
+│   ├── canvas/             # ReactFlow-based visual canvas
+│   ├── engine/             # DuckDB-WASM integration + DAG
+│   ├── formula/            # Custom formula parser/evaluator
+│   ├── grid/               # Spreadsheet grid component
+│   ├── suggestions/        # Rule-based analysis suggestions
+│   ├── persistence/        # IndexedDB + export services
+│   ├── state/              # Zustand stores
+│   └── ...
+├── server/                 # Express backend
+│   └── src/
+│       ├── routes/         # API endpoints
+│       ├── models/         # MongoDB schemas
+│       └── services/       # Business logic
+├── e2e/                    # Playwright E2E tests
+└── data/                   # Sample datasets
 ```
-
----
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [Architecture](docs/architecture.md) | Full product and engineering specification |
-| [User Guide](docs/user-guide.md) | End-user documentation |
-| [Suggestions Spec](docs/suggestions-spec.md) | How the suggestion engine works |
+| [Setup Guide](docs/setup.md) | Installation, configuration, environment variables |
+| [Architecture](docs/architecture.md) | System design, DAG implementation, state management |
+| [API Reference](docs/api.md) | REST endpoint documentation |
+| [Features](docs/features.md) | Canvas, suggestions, formulas, export formats |
+| [Testing](docs/testing.md) | Test strategy, coverage, running tests |
 
----
+## Scripts
 
-## License
+```bash
+# Development
+npm run dev              # Start Vite dev server
+npm run build            # Production build
+npm run preview          # Preview production build
 
-MIT
+# Testing
+npm run test             # Run unit tests (watch mode)
+npm run test:run         # Run unit tests once
+npm run test:coverage    # Generate coverage report
+npm run test:e2e         # Run Playwright E2E tests
+
+# Docker
+npm run docker:up        # Start all services
+npm run docker:down      # Stop services
+npm run docker:seed      # Seed database
+
+# Linting
+npm run lint             # ESLint check
+```

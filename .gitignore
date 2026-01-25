@@ -66,5 +66,5 @@ temp/
 *.tmp
 *.temp
 
-# Documentation
-docs/
+# Documentation build artifacts (keep docs/ tracked)
+# docs/

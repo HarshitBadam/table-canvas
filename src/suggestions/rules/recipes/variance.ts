@@ -72,9 +72,9 @@ export const varianceAnalysisRule: SuggestionRule = {
   build: (ctx, meta) => {
     const opportunities = detectVarianceOpportunities(meta.schema, meta.profile?.columns)
     const opp = opportunities[0]
-    // Use column name (what DuckDB expects) for derived tables
-    const groupColRef = opp.groupColumn.name || opp.groupColumn.id
-    const valueColRef = opp.valueColumn.name || opp.valueColumn.id
+    // Use column ID (what DuckDB uses internally) for derived tables
+    const groupColRef = opp.groupColumn.id
+    const valueColRef = opp.valueColumn.id
     
     return {
       id: createSuggestionId('variance_analysis', ctx.tableId, opp.groupColumn.id, opp.valueColumn.id),
