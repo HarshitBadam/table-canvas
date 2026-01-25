@@ -369,8 +369,8 @@ function MainApp() {
                 onClick={() => {
                   // Select the actual editor content, not the scroll container
                   const reportContent = document.querySelector('.report-view .tiptap-editor-content');
-                  const activeReportId = useReportStore.getState().activeReportId;
-                  const report = activeReportId ? useReportStore.getState().reports[activeReportId] : null;
+                  const currentReportId = useReportStore.getState().selectedReportId;
+                  const report = currentReportId ? useReportStore.getState().reports[currentReportId] : null;
                   if (reportContent) {
                     exportReportToPDF(reportContent as HTMLElement, {
                       reportName: report?.name || 'Report',

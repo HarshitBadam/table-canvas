@@ -24,10 +24,22 @@ export interface ZipExportOptions {
   onProgress?: (message: string, percent: number) => void
 }
 
+interface TipTapNode {
+  type: string
+  content?: TipTapNode[]
+  text?: string
+  marks?: Array<{ type: string }>
+  attrs?: Record<string, unknown>
+}
+
+interface TipTapContent {
+  content?: TipTapNode[]
+}
+
 /**
  * Convert TipTap content to HTML string
  */
-function tiptapToHtml(content: any): string {
+function tiptapToHtml(content: TipTapContent): string {
   if (!content || !content.content) return ''
   
   let html = ''
@@ -42,20 +54,22 @@ function tiptapToHtml(content: any): string {
 /**
  * Convert a single TipTap node to HTML
  */
-function nodeToHtml(node: any): string {
+function nodeToHtml(node: TipTapNode): string {
   if (!node) return ''
   
   switch (node.type) {
-    case 'paragraph':
-      const pContent = node.content?.map((n: any) => nodeToHtml(n)).join('') || ''
+    case 'paragraph': {
+      const pContent = node.content?.map((n) => nodeToHtml(n)).join('') || ''
       return `<p>${pContent}</p>\n`
+    }
     
-    case 'heading':
+    case 'heading': {
       const level = node.attrs?.level || 1
-      const hContent = node.content?.map((n: any) => nodeToHtml(n)).join('') || ''
+      const hContent = node.content?.map((n) => nodeToHtml(n)).join('') || ''
       return `<h${level}>${hContent}</h${level}>\n`
+    }
     
-    case 'text':
+    case 'text': {
       let text = node.text || ''
       // Apply marks
       if (node.marks) {
@@ -77,26 +91,32 @@ function nodeToHtml(node: any): string {
         }
       }
       return text
+    }
     
-    case 'bulletList':
-      const ulItems = node.content?.map((n: any) => nodeToHtml(n)).join('') || ''
+    case 'bulletList': {
+      const ulItems = node.content?.map((n) => nodeToHtml(n)).join('') || ''
       return `<ul>${ulItems}</ul>\n`
+    }
     
-    case 'orderedList':
-      const olItems = node.content?.map((n: any) => nodeToHtml(n)).join('') || ''
+    case 'orderedList': {
+      const olItems = node.content?.map((n) => nodeToHtml(n)).join('') || ''
       return `<ol>${olItems}</ol>\n`
+    }
     
-    case 'listItem':
-      const liContent = node.content?.map((n: any) => nodeToHtml(n)).join('') || ''
+    case 'listItem': {
+      const liContent = node.content?.map((n) => nodeToHtml(n)).join('') || ''
       return `<li>${liContent}</li>\n`
+    }
     
-    case 'blockquote':
-      const bqContent = node.content?.map((n: any) => nodeToHtml(n)).join('') || ''
+    case 'blockquote': {
+      const bqContent = node.content?.map((n) => nodeToHtml(n)).join('') || ''
       return `<blockquote>${bqContent}</blockquote>\n`
+    }
     
-    case 'codeBlock':
-      const codeContent = node.content?.map((n: any) => n.text || '').join('') || ''
+    case 'codeBlock': {
+      const codeContent = node.content?.map((n) => n.text || '').join('') || ''
       return `<pre><code>${codeContent}</code></pre>\n`
+    }
     
     case 'horizontalRule':
       return '<hr>\n'
@@ -112,16 +132,27 @@ function nodeToHtml(node: any): string {
     default:
       // Unknown node type - try to render content
       if (node.content) {
-        return node.content.map((n: any) => nodeToHtml(n)).join('')
+        return node.content.map((n) => nodeToHtml(n)).join('')
       }
       return ''
+  }
+}
+
+interface LegacyBlock {
+  type: string
+  content?: string
+  level?: number
+  chartType?: string
+  data?: {
+    headers?: string[]
+    rows?: unknown[][]
   }
 }
 
 /**
  * Convert legacy blocks to HTML
  */
-function blocksToHtml(blocks: any[]): string {
+function blocksToHtml(blocks: LegacyBlock[]): string {
   if (!blocks || blocks.length === 0) return ''
   
   let html = ''
@@ -131,10 +162,11 @@ function blocksToHtml(blocks: any[]): string {
       case 'text':
         html += `<p>${block.content || ''}</p>\n`
         break
-      case 'heading':
+      case 'heading': {
         const level = block.level || 1
         html += `<h${level}>${block.content || ''}</h${level}>\n`
         break
+      }
       case 'divider':
         html += '<hr>\n'
         break
@@ -319,7 +351,7 @@ function generateReportHtml(report: Report): string {
 function sanitizeSheetName(name: string): string {
   // Excel sheet names: max 31 chars, no []:*?/\
   let sanitized = name
-    .replace(/[\[\]:*?\/\\]/g, '_')
+    .replace(/[[\]:*?/\\]/g, '_')
     .substring(0, 31)
   
   // Ensure unique name if empty

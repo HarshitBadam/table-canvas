@@ -160,9 +160,6 @@ export function NumericStats({ profile, rowCount }: { profile: ColumnProfile; ro
   if (profile.mean !== undefined) {
     stats.push(`Avg: ${formatStat(profile.mean)}`)
   }
-  if (profile.sum !== undefined && profile.sum !== 0) {
-    stats.push(`Sum: ${formatStat(profile.sum)}`)
-  }
   
   return (
     <div>
@@ -364,11 +361,10 @@ export function ColumnProfileCard({
 export function ColumnStatsCompact({
   profile,
   columnType,
-  rowCount,
 }: {
   profile: ColumnProfile
   columnType: string
-  rowCount: number
+  rowCount?: number
 }) {
   const t = columnType.toLowerCase()
   

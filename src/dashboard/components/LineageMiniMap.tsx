@@ -257,7 +257,6 @@ function LineageVisualization({
 
         const isSource = node.kind === 'source_table'
         const isChart = node.kind === 'chart'
-        const isDerived = node.kind === 'derived_table'
 
         // Get node colors based on type
         const borderClass = isSource 

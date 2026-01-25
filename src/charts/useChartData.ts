@@ -142,7 +142,7 @@ export function useChartData(
               const obj: Record<string, CellValue> = {}
               aggResult.columns.forEach((col, i) => {
                 // Map the groupBy column back to xAxis config key for chart rendering
-                const key = col === xAxisDuckDb ? config.xAxis : col
+                const key = col === xAxisDuckDb ? config.xAxis! : col
                 obj[key] = row[i]
               })
               return obj
