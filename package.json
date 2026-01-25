@@ -65,9 +65,9 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "@playwright/test": "^1.57.0",
+    "@playwright/test": "^1.58.0",
     "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.1",
+    "@testing-library/react": "^16.3.2",
     "@types/file-saver": "^2.0.7",
     "@types/node": "^22.10.5",
     "@types/papaparse": "^5.3.15",
@@ -85,6 +85,6 @@
     "typescript": "~5.6.2",
     "typescript-eslint": "^8.53.1",
     "vite": "^6.0.5",
-    "vitest": "^4.0.17"
+    "vitest": "^4.0.18"
   }
 }
