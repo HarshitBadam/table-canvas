@@ -1,0 +1,143 @@
+# =============================================================================
+# Table Canvas - Release Workflow
+# =============================================================================
+# Triggered on version tags (v*) to create releases and deploy artifacts.
+#
+# Prerequisites:
+#   - All CI checks must pass
+#   - Tag must follow semantic versioning (e.g., v1.0.0, v1.2.3-beta.1)
+# =============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ===========================================================================
+  # Validate Release
+  # ===========================================================================
+  validate:
+    name: 🔍 Validate
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Releasing version: $VERSION"
+
+      - name: Validate version format
+        run: |
+          if [[ ! "${{ steps.version.outputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "❌ Invalid version format. Expected semver (e.g., 1.0.0, 1.2.3-beta.1)"
+            exit 1
+          fi
+
+  # ===========================================================================
+  # Run Full Test Suite
+  # ===========================================================================
+  test:
+    name: 🧪 Test
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run all tests
+        run: npm run test:all
+        env:
+          CI: true
+
+  # ===========================================================================
+  # Build Production Assets
+  # ===========================================================================
+  build:
+    name: 🏗️ Build
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Create release archive
+        run: |
+          cd dist
+          zip -r ../table-canvas-${{ needs.validate.outputs.version }}.zip .
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build
+          path: table-canvas-${{ needs.validate.outputs.version }}.zip
+          retention-days: 30
+
+  # ===========================================================================
+  # Create GitHub Release
+  # ===========================================================================
+  release:
+    name: 📦 Release
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ needs.validate.outputs.version }}
+          body: |
+            ## Table Canvas v${{ needs.validate.outputs.version }}
+            
+            ### Installation
+            Download the release archive and deploy to your hosting provider.
+            
+            ### What's Changed
+            See the [commit history](https://github.com/${{ github.repository }}/commits/v${{ needs.validate.outputs.version }}) for details.
+          files: |
+            table-canvas-${{ needs.validate.outputs.version }}.zip
+          draft: false
+          prerelease: ${{ contains(needs.validate.outputs.version, '-') }}
