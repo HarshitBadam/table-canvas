@@ -36,7 +36,7 @@ export function CustomConnectionLine({
       <path
         d={path}
         fill="none"
-        stroke="rgba(33, 115, 70, 0.15)"
+        stroke="rgba(61, 107, 82, 0.3)"
         strokeWidth={20}
         strokeLinecap="round"
         filter="url(#connectionGlow)"
@@ -46,7 +46,7 @@ export function CustomConnectionLine({
       <path
         d={path}
         fill="none"
-        stroke="rgba(33, 115, 70, 0.25)"
+        stroke="rgba(61, 107, 82, 0.4)"
         strokeWidth={10}
         strokeLinecap="round"
         className="animate-pulse"
@@ -56,7 +56,7 @@ export function CustomConnectionLine({
       <path
         d={path}
         fill="none"
-        stroke="#217346"
+        stroke="#3d6b52"
         strokeWidth={3}
         strokeLinecap="round"
         strokeDasharray="10 6"
@@ -68,7 +68,7 @@ export function CustomConnectionLine({
         cx={fromX}
         cy={fromY}
         r={5}
-        fill="#217346"
+        fill="#3d6b52"
         stroke="white"
         strokeWidth={2}
       />
@@ -79,7 +79,7 @@ export function CustomConnectionLine({
         cy={toY}
         r={12}
         fill="none"
-        stroke="rgba(33, 115, 70, 0.4)"
+        stroke="rgba(61, 107, 82, 0.5)"
         strokeWidth={2}
         className="connection-target-ring"
       />
@@ -89,7 +89,7 @@ export function CustomConnectionLine({
         cx={toX}
         cy={toY}
         r={7}
-        fill="#217346"
+        fill="#3d6b52"
         stroke="white"
         strokeWidth={2.5}
         className="animate-pulse"

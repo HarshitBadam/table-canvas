@@ -213,6 +213,8 @@ export function ImportButton() {
     )
   }
 
+  const selectedCount = sheets.filter(s => s.selected).length
+
   return (
     <>
       <input
@@ -246,37 +248,53 @@ export function ImportButton() {
         )}
       </button>
 
-      {/* Sheet Selection Modal */}
+      {/* Sheet Selection Modal - iOS/Excel Style */}
       <Dialog.Root open={sheetModalOpen} onOpenChange={setSheetModalOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/40 animate-fade-in z-50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface border border-border rounded-lg shadow-lg w-full max-w-sm animate-scale-in z-50">
-            <div className="p-4">
-              <Dialog.Title className="text-sm font-semibold text-text-primary mb-0.5">
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-xl shadow-2xl w-full max-w-sm z-50 overflow-hidden border border-border-elevation">
+            {/* Header */}
+            <div className="px-5 pt-5 pb-3">
+              <Dialog.Title className="text-base font-semibold text-text-primary">
                 Select Sheets to Import
               </Dialog.Title>
-              <Dialog.Description className="text-xs text-text-secondary mb-3">
-                This file contains multiple sheets.
+              <Dialog.Description className="text-sm text-text-secondary mt-0.5">
+                This file contains {sheets.length} sheets
               </Dialog.Description>
+            </div>
 
-              <div className="space-y-1 max-h-48 overflow-y-auto">
+            {/* Sheet List */}
+            <div className="px-3 pb-3">
+              <div className="bg-surface-secondary rounded-lg overflow-hidden divide-y divide-border-subtle">
                 {sheets.map((sheet, index) => (
                   <label
                     key={sheet.name}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded bg-surface-secondary hover:bg-surface-tertiary cursor-pointer transition-colors"
+                    className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-surface-tertiary transition-colors"
                   >
+                    {/* iOS-style checkbox */}
+                    <div className={`w-[22px] h-[22px] rounded-full flex items-center justify-center transition-colors ${
+                      sheet.selected 
+                        ? 'bg-accent-green' 
+                        : 'border-2 border-border'
+                    }`}>
+                      {sheet.selected && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
                     <input
                       type="checkbox"
                       checked={sheet.selected}
                       onChange={() => toggleSheet(index)}
-                      className="w-3.5 h-3.5 rounded-sm border-border text-accent-green focus:ring-accent-green"
+                      className="sr-only"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-text-primary truncate">
+                      <div className="text-sm font-medium text-text-primary truncate">
                         {sheet.name}
                       </div>
-                      <div className="text-[10px] text-text-tertiary tabular-nums">
-                        ~{sheet.rowCount} rows
+                      <div className="text-xs text-text-secondary">
+                        {sheet.rowCount} rows
                       </div>
                     </div>
                   </label>
@@ -284,19 +302,25 @@ export function ImportButton() {
               </div>
             </div>
 
-            <div className="px-4 py-3 border-t border-border flex justify-end gap-2">
-              <Dialog.Close asChild>
-                <button className="px-3 py-1.5 text-xs font-medium text-text-primary border border-border rounded hover:bg-surface-secondary transition-colors">
-                  Cancel
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-border-subtle flex items-center justify-between bg-surface-secondary/50">
+              <span className="text-sm text-text-secondary">
+                {selectedCount} selected
+              </span>
+              <div className="flex gap-2">
+                <Dialog.Close asChild>
+                  <button className="px-4 py-1.5 text-sm font-medium text-text-secondary hover:bg-surface-tertiary rounded-lg transition-colors">
+                    Cancel
+                  </button>
+                </Dialog.Close>
+                <button
+                  onClick={handleImportSelectedSheets}
+                  disabled={selectedCount === 0}
+                  className="px-4 py-1.5 text-sm font-medium text-white bg-accent-green hover:bg-accent-green/90 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Import
                 </button>
-              </Dialog.Close>
-              <button
-                onClick={handleImportSelectedSheets}
-                disabled={!sheets.some((s) => s.selected)}
-                className="px-3 py-1.5 text-xs font-medium text-white bg-accent-green hover:bg-accent-green-hover rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Import {sheets.filter((s) => s.selected).length} Sheet(s)
-              </button>
+              </div>
             </div>
           </Dialog.Content>
         </Dialog.Portal>
@@ -321,6 +345,7 @@ function processData(
       name: field,
       type: inferredType,
       nullable: hasNulls,
+      duckDbName: columnId, // Source tables use column IDs in DuckDB
     }
   })
 

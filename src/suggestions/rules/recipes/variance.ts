@@ -72,6 +72,9 @@ export const varianceAnalysisRule: SuggestionRule = {
   build: (ctx, meta) => {
     const opportunities = detectVarianceOpportunities(meta.schema, meta.profile?.columns)
     const opp = opportunities[0]
+    // Use column name (what DuckDB expects) for derived tables
+    const groupColRef = opp.groupColumn.name || opp.groupColumn.id
+    const valueColRef = opp.valueColumn.name || opp.valueColumn.id
     
     return {
       id: createSuggestionId('variance_analysis', ctx.tableId, opp.groupColumn.id, opp.valueColumn.id),
@@ -85,8 +88,8 @@ export const varianceAnalysisRule: SuggestionRule = {
         tableVersionHash: getVersionHash(ctx),
         recipeType: 'variance_analysis',
         config: {
-          valueColumn: opp.valueColumn.id,
-          groupColumn: opp.groupColumn.id,
+          valueColumn: valueColRef,
+          groupColumn: groupColRef,
           expectedVariance: opp.expectedVariance,
         },
       },
@@ -104,12 +107,12 @@ export const varianceAnalysisRule: SuggestionRule = {
         transform: {
           type: 'group_summarize',
           sourceTableId: ctx.tableId,
-          groupByColumns: [opp.groupColumn.id],
+          groupByColumns: [groupColRef],
           aggregations: [
-            { columnId: opp.valueColumn.id, operation: 'avg', alias: 'mean' },
-            { columnId: opp.valueColumn.id, operation: 'min', alias: 'min' },
-            { columnId: opp.valueColumn.id, operation: 'max', alias: 'max' },
-            { columnId: opp.valueColumn.id, operation: 'count', alias: 'count' },
+            { columnId: valueColRef, operation: 'avg', alias: 'mean' },
+            { columnId: valueColRef, operation: 'min', alias: 'min' },
+            { columnId: valueColRef, operation: 'max', alias: 'max' },
+            { columnId: valueColRef, operation: 'count', alias: 'count' },
           ],
         },
         tableName: `${opp.valueColumn.name} Variance by ${opp.groupColumn.name}`,

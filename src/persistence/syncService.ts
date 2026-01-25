@@ -294,6 +294,72 @@ export async function deleteProjectWithSync(projectId: string): Promise<void> {
   }
 }
 
+/**
+ * Import a project from exported data
+ * Creates a new project on the server (to get a valid ID) and populates it with imported data
+ */
+export async function importProjectWithSync(
+  importedData: {
+    name: string;
+    nodes: Record<string, ProjectNode>;
+    edges: Record<string, Edge>;
+    patches: Record<string, Patches>;
+  }
+): Promise<ProjectWithSync> {
+  const { name, nodes, edges, patches } = importedData;
+  
+  if (isOnline) {
+    try {
+      // Create a new project on the server to get a valid ID
+      const serverProject = await createProject({ name });
+      const projectId = serverProject.id;
+      
+      // Now update the project with the imported data
+      await updateProject(projectId, {
+        name,
+        nodes,
+        edges,
+        patches: serializePatches(patches),
+      });
+      
+      // Save locally with the server-assigned ID
+      await saveProjectLocal(projectId, name, nodes, edges, patches);
+      
+      console.log(`[Sync] Imported project with server ID: ${projectId}`);
+      
+      return {
+        id: projectId,
+        name,
+        nodes,
+        edges,
+        patches,
+        isLocalOnly: false,
+        needsSync: false,
+      };
+    } catch (error) {
+      console.error('[Sync] Failed to import project to server:', error);
+      // Fall through to local-only import
+    }
+  }
+  
+  // Offline or server failed - create local-only project
+  const localId = `local_${Date.now()}`;
+  
+  await saveProjectLocal(localId, name, nodes, edges, patches);
+  
+  console.log(`[Sync] Imported project locally with ID: ${localId}`);
+  
+  return {
+    id: localId,
+    name,
+    nodes,
+    edges,
+    patches,
+    isLocalOnly: true,
+    needsSync: true,
+  };
+}
+
 // ============================================================================
 // File Sync Functions
 // ============================================================================

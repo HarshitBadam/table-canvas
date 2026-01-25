@@ -82,7 +82,7 @@ function GridHeaderComponent({
       onContextMenu={onContextMenu}
       className={`
         relative flex items-center gap-1 px-2 text-xs font-medium cursor-pointer select-none
-        border-r border-border group text-green-700 dark:text-green-400
+        border-r border-border group text-green-700 dark:text-[#8fc4a3]
         ${bgClass}
       `}
       style={{ width, minWidth: width, maxWidth: width, height: HEADER_HEIGHT }}

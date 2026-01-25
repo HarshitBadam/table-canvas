@@ -51,6 +51,9 @@ export const groupByAggregationRule: SuggestionRule = {
     
     const groupCol = groupableCols[0]
     const valueCol = numericCols[0]
+    // Use column name (what DuckDB expects) for derived tables
+    const groupColRef = groupCol.name || groupCol.id
+    const valueColRef = valueCol.name || valueCol.id
     
     return {
       id: createSuggestionId('group_by', ctx.tableId, groupCol.id, valueCol.id),
@@ -63,11 +66,11 @@ export const groupByAggregationRule: SuggestionRule = {
         tableId: ctx.tableId,
         tableVersionHash: getVersionHash(ctx),
         aggregationSuggestion: {
-          groupBy: [groupCol.id],
+          groupBy: [groupColRef],
           measures: [
-            { columnId: valueCol.id, aggregation: 'sum' },
-            { columnId: valueCol.id, aggregation: 'avg' },
-            { columnId: valueCol.id, aggregation: 'count' },
+            { columnId: valueColRef, aggregation: 'sum' },
+            { columnId: valueColRef, aggregation: 'avg' },
+            { columnId: valueColRef, aggregation: 'count' },
           ],
         },
       },
@@ -85,11 +88,11 @@ export const groupByAggregationRule: SuggestionRule = {
         transform: {
           type: 'group_summarize',
           sourceTableId: ctx.tableId,
-          groupByColumns: [groupCol.id],
+          groupByColumns: [groupColRef],
           aggregations: [
-            { columnId: valueCol.id, operation: 'sum', alias: `total_${valueCol.name}` },
-            { columnId: valueCol.id, operation: 'avg', alias: `avg_${valueCol.name}` },
-            { columnId: valueCol.id, operation: 'count', alias: 'count' },
+            { columnId: valueColRef, operation: 'sum', alias: `total_${valueCol.name}` },
+            { columnId: valueColRef, operation: 'avg', alias: `avg_${valueCol.name}` },
+            { columnId: valueColRef, operation: 'count', alias: 'count' },
           ],
         },
         tableName: `${ctx.tableName} by ${groupCol.name}`,
@@ -127,41 +130,45 @@ export const countByCategoryRule: SuggestionRule = {
     return isGroupableCategory(meta.column, meta.columnProfile)
   },
   
-  build: (ctx, meta) => ({
-    id: createSuggestionId('count_by', ctx.tableId, meta.column!.id),
-    category: 'analysis',
-    scope: 'column',
-    title: `Count by ${meta.column!.name}`,
-    description: `Show how many rows exist for each ${meta.column!.name} value.`,
-    confidence: 'medium',
-    context: {
-      tableId: ctx.tableId,
-      columnId: meta.column!.id,
-      tableVersionHash: getVersionHash(ctx),
-    },
-    why: [
-      'Categorical column with reasonable cardinality',
-      'Count shows distribution of values',
-      'Useful for understanding data composition',
-    ],
-    impact: {
-      kind: 'derivedTable',
-      summary: `Creates count table by ${meta.column!.name}`,
-    },
-    action: {
-      kind: 'createDerivedTable',
-      transform: {
-        type: 'group_summarize',
-        sourceTableId: ctx.tableId,
-        groupByColumns: [meta.column!.id],
-        aggregations: [
-          { columnId: meta.column!.id, operation: 'count', alias: 'count' },
-        ],
+  build: (ctx, meta) => {
+    // Use column name (what DuckDB expects) for derived tables
+    const colRef = meta.column!.name || meta.column!.id;
+    return {
+      id: createSuggestionId('count_by', ctx.tableId, meta.column!.id),
+      category: 'analysis',
+      scope: 'column',
+      title: `Count by ${meta.column!.name}`,
+      description: `Show how many rows exist for each ${meta.column!.name} value.`,
+      confidence: 'medium',
+      context: {
+        tableId: ctx.tableId,
+        columnId: meta.column!.id,
+        tableVersionHash: getVersionHash(ctx),
       },
-      tableName: `Count by ${meta.column!.name}`,
-      openAfterApply: true,
-    },
-  }),
+      why: [
+        'Categorical column with reasonable cardinality',
+        'Count shows distribution of values',
+        'Useful for understanding data composition',
+      ],
+      impact: {
+        kind: 'derivedTable',
+        summary: `Creates count table by ${meta.column!.name}`,
+      },
+      action: {
+        kind: 'createDerivedTable',
+        transform: {
+          type: 'group_summarize',
+          sourceTableId: ctx.tableId,
+          groupByColumns: [colRef],
+          aggregations: [
+            { columnId: colRef, operation: 'count', alias: 'count' },
+          ],
+        },
+        tableName: `Count by ${meta.column!.name}`,
+        openAfterApply: true,
+      },
+    };
+  },
   
   score: (_ctx, meta) => {
     const distinctCount = meta.columnProfile?.distinctCount ?? 100

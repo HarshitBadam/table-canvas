@@ -23,6 +23,9 @@ registerRule({
   build: (ctx, meta) => {
     const dateCol = meta.schema.columns.find(c => c.type === 'date' || c.type === 'datetime')!;
     const numericCol = meta.schema.columns.find(c => c.type === 'number')!;
+    // Use column name (what DuckDB expects) for derived tables
+    const dateColRef = dateCol.name || dateCol.id;
+    const numericColRef = numericCol.name || numericCol.id;
     
     return {
       id: createSuggestionId('trend_chart', ctx.tableId, numericCol.id),
@@ -51,8 +54,8 @@ registerRule({
           sourceTableId: ctx.tableId,
           title: `${numericCol.name} over ${dateCol.name}`,
           config: {
-            xAxis: dateCol.id,
-            yAxis: numericCol.id,
+            xAxis: dateColRef,
+            yAxis: numericColRef,
             aggregation: 'sum',
           },
         },
@@ -107,6 +110,10 @@ registerRule({
       return classification === 'continuous_numeric' || classification === 'discrete_numeric';
     })!;
     
+    // Use column name (what DuckDB expects) for derived tables
+    const catColRef = catCol.name || catCol.id;
+    const numericColRef = numericCol.name || numericCol.id;
+    
     return {
       id: createSuggestionId('category_breakdown', ctx.tableId, catCol.id),
       category: 'analysis',
@@ -134,10 +141,10 @@ registerRule({
           sourceTableId: ctx.tableId,
           title: `${numericCol.name} by ${catCol.name}`,
           config: {
-            xAxis: catCol.id,
-            yAxis: numericCol.id,
+            xAxis: catColRef,
+            yAxis: numericColRef,
             aggregation: 'sum',
-            groupBy: catCol.id,
+            groupBy: catColRef,
           },
         },
         addToDashboard: false,
@@ -170,41 +177,45 @@ registerRule({
     // Only suggest histogram for continuous numeric data (not IDs or discrete)
     return classification === 'continuous_numeric';
   },
-  build: (ctx, meta) => ({
-    id: createSuggestionId('distribution_histogram', ctx.tableId, meta.column!.id),
-    category: 'analysis',
-    scope: 'column',
-    title: `Distribution of ${meta.column!.name}`,
-    description: `Analyze the distribution from ${meta.columnProfile!.min?.toLocaleString()} to ${meta.columnProfile!.max?.toLocaleString()}.`,
-    confidence: 'high',
-    context: {
-      tableId: ctx.tableId,
-      columnId: meta.column!.id,
-      tableVersionHash: getVersionHash(ctx),
-    },
-    why: [
-      'Numeric column with defined range',
-      'Understand value distribution',
-      'Identify outliers and patterns',
-    ],
-    impact: {
-      kind: 'chart',
-      summary: `Creates histogram`,
-    },
-    action: {
-      kind: 'createChart',
-      chart: {
-        chartType: 'histogram',
-        sourceTableId: ctx.tableId,
-        title: `Distribution of ${meta.column!.name}`,
-        config: {
-          xAxis: meta.column!.id,
-          aggregation: 'count',
-        },
+  build: (ctx, meta) => {
+    // Use column name (what DuckDB expects) for derived tables
+    const colRef = meta.column!.name || meta.column!.id;
+    return {
+      id: createSuggestionId('distribution_histogram', ctx.tableId, meta.column!.id),
+      category: 'analysis',
+      scope: 'column',
+      title: `Distribution of ${meta.column!.name}`,
+      description: `Analyze the distribution from ${meta.columnProfile!.min?.toLocaleString()} to ${meta.columnProfile!.max?.toLocaleString()}.`,
+      confidence: 'high',
+      context: {
+        tableId: ctx.tableId,
+        columnId: meta.column!.id,
+        tableVersionHash: getVersionHash(ctx),
       },
-      addToDashboard: false,
-    },
-  }),
+      why: [
+        'Numeric column with defined range',
+        'Understand value distribution',
+        'Identify outliers and patterns',
+      ],
+      impact: {
+        kind: 'chart',
+        summary: `Creates histogram`,
+      },
+      action: {
+        kind: 'createChart',
+        chart: {
+          chartType: 'histogram',
+          sourceTableId: ctx.tableId,
+          title: `Distribution of ${meta.column!.name}`,
+          config: {
+            xAxis: colRef,
+            aggregation: 'count',
+          },
+        },
+        addToDashboard: false,
+      },
+    };
+  },
   score: (_ctx, _meta) => 70,
 });
 
@@ -230,6 +241,9 @@ registerRule({
       (meta.profile?.columns.find(p => p.columnId === c.id)?.distinctCount ?? 100) < 50
     )!;
     const numericCol = meta.schema.columns.find(c => c.type === 'number')!;
+    // Use column name (what DuckDB expects) for derived tables
+    const catColRef = catCol.name || catCol.id;
+    const numericColRef = numericCol.name || numericCol.id;
     
     return {
       id: createSuggestionId('top_n_analysis', ctx.tableId, numericCol.id),
@@ -256,9 +270,9 @@ registerRule({
         transform: {
           type: 'group_summarize',
           sourceTableId: ctx.tableId,
-          groupByColumns: [catCol.id],
+          groupByColumns: [catColRef],
           aggregations: [{
-            columnId: numericCol.id,
+            columnId: numericColRef,
             operation: 'sum',
             alias: `total_${numericCol.name}`,
           }],
@@ -315,6 +329,10 @@ registerRule({
       return classification === 'continuous_numeric' || classification === 'discrete_numeric';
     })!;
     
+    // Use column name (what DuckDB expects) for derived tables
+    const stringColRef = stringCol.name || stringCol.id;
+    const numericColRef = numericCol.name || numericCol.id;
+    
     return {
       id: createSuggestionId('create_summary_fallback', ctx.tableId, stringCol.id, numericCol.id),
       category: 'analysis',
@@ -340,10 +358,10 @@ registerRule({
         transform: {
           type: 'group_summarize',
           sourceTableId: ctx.tableId,
-          groupByColumns: [stringCol.id],
+          groupByColumns: [stringColRef],
           aggregations: [
-            { columnId: numericCol.id, operation: 'sum', alias: `Total ${numericCol.name}` },
-            { columnId: numericCol.id, operation: 'count', alias: 'Count' },
+            { columnId: numericColRef, operation: 'sum', alias: `Total ${numericCol.name}` },
+            { columnId: numericColRef, operation: 'count', alias: 'Count' },
           ],
         },
         tableName: `${ctx.tableName} (Summary)`,
@@ -398,6 +416,10 @@ registerRule({
       return classification === 'continuous_numeric' || classification === 'discrete_numeric';
     })!;
     
+    // Use column name (what DuckDB expects) for derived tables
+    const stringColRef = stringCol.name || stringCol.id;
+    const numericColRef = numericCol.name || numericCol.id;
+    
     return {
       id: createSuggestionId('bar_chart_fallback', ctx.tableId, stringCol.id, numericCol.id),
       category: 'analysis',
@@ -425,8 +447,8 @@ registerRule({
           sourceTableId: ctx.tableId,
           title: `${numericCol.name} by ${stringCol.name}`,
           config: {
-            xAxis: stringCol.id,
-            yAxis: numericCol.id,
+            xAxis: stringColRef,
+            yAxis: numericColRef,
             aggregation: 'sum',
           },
         },
