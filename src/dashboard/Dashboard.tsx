@@ -28,10 +28,9 @@ import {
 interface DashboardProps {
   onOpenTable?: (tableId: string) => void
   onOpenChart?: (chartId: string) => void
-  onOpenSuggestions?: (tableId: string) => void
 }
 
-export function Dashboard({ onOpenTable, onOpenChart, onOpenSuggestions }: DashboardProps) {
+export function Dashboard({ onOpenTable, onOpenChart }: DashboardProps) {
   const selectNode = useProjectStore((state) => state.selectNode)
   const nodes = useProjectStore((state) => state.nodes)
   

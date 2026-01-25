@@ -411,9 +411,6 @@ function NumericStats({ profile, rowCount }: { profile: ColumnProfile; rowCount:
       <Stat label="Minimum" value={fmt(profile.min)} />
       <Stat label="Maximum" value={fmt(profile.max)} />
       <Stat label="Average" value={fmt(profile.mean)} />
-      {profile.sum !== undefined && Math.abs(profile.sum) > 0 && (
-        <Stat label="Sum" value={fmt(profile.sum)} />
-      )}
       {profile.stdDev !== undefined && (
         <Stat label="Std Dev" value={fmt(profile.stdDev)} />
       )}

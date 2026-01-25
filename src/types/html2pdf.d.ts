@@ -22,12 +22,15 @@ declare module 'html2pdf.js' {
     };
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type PdfDocument = any;
+
   interface Html2Pdf {
     set(options: Html2PdfOptions): Html2Pdf;
     from(element: HTMLElement): Html2Pdf;
     toPdf(): Html2Pdf;
     get(type: string): Html2Pdf;
-    then(callback: (pdf: any) => void): Html2Pdf;
+    then(callback: (pdf: PdfDocument) => void): Html2Pdf;
     save(): Promise<void>;
   }
 

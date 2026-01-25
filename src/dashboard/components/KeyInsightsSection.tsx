@@ -18,15 +18,17 @@ function getInsightDescription(insight: Insight): string {
   switch (insight.type) {
     case 'key_candidate':
       return `"${insight.columnName}" could be a unique identifier (all values are distinct)`
-    case 'date_range':
+    case 'date_range': {
       const data = insight.data as { min?: string; max?: string } | undefined
       if (data?.min && data?.max) {
         return `"${insight.columnName}" contains dates from ${formatDate(data.min)} to ${formatDate(data.max)}`
       }
       return `"${insight.columnName}" contains date values`
-    case 'category_distribution':
+    }
+    case 'category_distribution': {
       const catData = insight.data as { distinctCount?: number } | undefined
       return `"${insight.columnName}" has ${catData?.distinctCount || 'several'} different values`
+    }
     case 'high_missing':
       return `"${insight.columnName}" has missing values that may need attention`
     case 'outliers':
@@ -145,7 +147,7 @@ export function KeyInsightsSection({
 
               {/* Insights for this table */}
               <ul className="space-y-1">
-                {tableInsights.slice(0, 3).map((insight, idx) => (
+                {tableInsights.slice(0, 3).map((insight) => (
                   <li key={insight.id} className="flex items-start gap-2 text-xs text-text-secondary">
                     <span className="text-text-tertiary mt-0.5">•</span>
                     <span>{getInsightDescription(insight)}</span>

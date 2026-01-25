@@ -67,7 +67,7 @@ function parseInlineFormatting(text: string): JSONContent[] {
     }
 
     // Plain text
-    match = remaining.match(/^[^*`\[]+/);
+    match = remaining.match(/^[^*`[]+/);
     if (match && match[0]) {
       nodes.push({ type: 'text', text: match[0] });
       remaining = remaining.slice(match[0].length);

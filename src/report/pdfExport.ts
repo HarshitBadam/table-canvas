@@ -16,23 +16,6 @@ interface ExportOptions {
 }
 
 /**
- * Resolve CSS variable to actual value
- */
-function resolveCSSVar(varString: string, fallback: string): string {
-  // If it's a CSS variable, try to resolve it
-  if (varString.startsWith('var(')) {
-    const match = varString.match(/var\(([^,)]+)(?:,\s*([^)]+))?\)/);
-    if (match) {
-      const varName = match[1].trim();
-      const varFallback = match[2]?.trim() || fallback;
-      const computed = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-      return computed || varFallback;
-    }
-  }
-  return varString || fallback;
-}
-
-/**
  * Apply minimal inline styles to tables for PDF rendering
  * CRITICAL: Preserves overflow/wrapping fixes while minimizing cosmetic changes
  */
@@ -318,9 +301,9 @@ export async function exportReportToPDF(
 
   // PDF configuration
   const opt = {
-    margin: [0.8, 0.6, 0.9, 0.6], // top, left, bottom, right
+    margin: [0.8, 0.6, 0.9, 0.6] as [number, number, number, number], // top, left, bottom, right
     filename: `${reportName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
+    image: { type: 'jpeg' as const, quality: 0.98 },
     html2canvas: { 
       scale: 2, 
       useCORS: true, 
@@ -342,6 +325,7 @@ export async function exportReportToPDF(
   // Generate PDF with header and footer on every page
   const pdf = html2pdf().set(opt).from(wrapper);
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await pdf.toPdf().get('pdf').then((pdfDoc: any) => {
     const totalPages = pdfDoc.internal.getNumberOfPages();
     const pageWidth = pdfDoc.internal.pageSize.getWidth();
@@ -388,7 +372,9 @@ export async function exportReportToPDF(
       pdfDoc.setFontSize(7);
       pdfDoc.text(timestamp, pageWidth - 0.5, pageHeight - 0.4, { align: 'right' });
     }
-  }).save();
+  });
+  
+  await pdf.save();
 }
 
 export default exportReportToPDF;

@@ -41,13 +41,17 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
   // Count word estimate (more user-friendly than block count)
   const getWordCount = () => {
     if (!activeReport?.tiptapContent?.content) return 0;
-    const extractText = (node: any): string => {
+    interface TipTapTextNode {
+      text?: string;
+      content?: TipTapTextNode[];
+    }
+    const extractText = (node: TipTapTextNode): string => {
       if (!node) return '';
       if (node.text) return node.text;
       if (node.content) return node.content.map(extractText).join(' ');
       return '';
     };
-    const text = extractText(activeReport.tiptapContent);
+    const text = extractText(activeReport.tiptapContent as TipTapTextNode);
     return text.split(/\s+/).filter(Boolean).length;
   };
   const wordCount = getWordCount();
