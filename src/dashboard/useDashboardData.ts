@@ -443,7 +443,8 @@ export function useAllProfiles() {
   }, [tableNodes, profiles, loading])
 
   const isLoading = useMemo(() => {
-    return tableNodes.some(t => loading[t.id] && !profiles[t.id])
+    // Loading if any table is actively loading OR any table is missing a profile
+    return tableNodes.some(t => loading[t.id] || !profiles[t.id])
   }, [tableNodes, profiles, loading])
 
   return { profiles, isLoading }

@@ -54,12 +54,11 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
     ],
     outputs: ['Summary table with period totals', 'Line chart showing trend'],
     buildTransform: (bindings, tableId, columns) => {
-      const dateCol = columns?.find(c => c.id === bindings.dateColumnId)
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const valueName = valueCol?.name || 'Value'
-      // Use column name (what DuckDB expects) for derived tables, fall back to ID
-      const dateColRef = dateCol?.name || bindings.dateColumnId
-      const valueColRef = valueCol?.name || bindings.valueColumnId
+      // Use column ID (what DuckDB uses internally) for derived tables
+      const dateColRef = bindings.dateColumnId
+      const valueColRef = bindings.valueColumnId
       return {
         type: 'group_summarize',
         sourceTableId: tableId,
@@ -87,12 +86,11 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
     ],
     outputs: ['Summary table ranked by contribution', 'Bar chart showing breakdown', 'Cumulative percentage'],
     buildTransform: (bindings, tableId, columns) => {
-      const categoryCol = columns?.find(c => c.id === bindings.categoryColumnId)
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const valueName = valueCol?.name || 'Value'
-      // Use column name (what DuckDB expects) for derived tables, fall back to ID
-      const categoryColRef = categoryCol?.name || bindings.categoryColumnId
-      const valueColRef = valueCol?.name || bindings.valueColumnId
+      // Use column ID (what DuckDB uses internally) for derived tables
+      const categoryColRef = bindings.categoryColumnId
+      const valueColRef = bindings.valueColumnId
       return {
         type: 'group_summarize',
         sourceTableId: tableId,
@@ -126,9 +124,9 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
       const budgetCol = columns?.find(c => c.id === bindings.budgetColumnId)
       const actualName = actualCol?.name || 'Actual'
       const budgetName = budgetCol?.name || 'Budget'
-      // Use column name (what DuckDB expects) for derived tables, fall back to ID
-      const actualColRef = actualCol?.name || bindings.actualColumnId
-      const budgetColRef = budgetCol?.name || bindings.budgetColumnId
+      // Use column ID (what DuckDB uses internally) for derived tables
+      const actualColRef = bindings.actualColumnId
+      const budgetColRef = bindings.budgetColumnId
       return {
         type: 'calculated_column',
         sourceTableId: tableId,
@@ -182,12 +180,11 @@ const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
     ],
     outputs: ['Table with period comparisons', 'Growth rate calculations'],
     buildTransform: (bindings, tableId, columns) => {
-      const dateCol = columns?.find(c => c.id === bindings.dateColumnId)
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const valueName = valueCol?.name || 'Value'
-      // Use column name (what DuckDB expects) for derived tables, fall back to ID
-      const dateColRef = dateCol?.name || bindings.dateColumnId
-      const valueColRef = valueCol?.name || bindings.valueColumnId
+      // Use column ID (what DuckDB uses internally) for derived tables
+      const dateColRef = bindings.dateColumnId
+      const valueColRef = bindings.valueColumnId
       return {
         type: 'group_summarize',
         sourceTableId: tableId,

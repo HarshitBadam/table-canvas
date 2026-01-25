@@ -51,9 +51,9 @@ export const groupByAggregationRule: SuggestionRule = {
     
     const groupCol = groupableCols[0]
     const valueCol = numericCols[0]
-    // Use column name (what DuckDB expects) for derived tables
-    const groupColRef = groupCol.name || groupCol.id
-    const valueColRef = valueCol.name || valueCol.id
+    // Use column ID (what DuckDB uses internally) for derived tables
+    const groupColRef = groupCol.id
+    const valueColRef = valueCol.id
     
     return {
       id: createSuggestionId('group_by', ctx.tableId, groupCol.id, valueCol.id),
@@ -131,8 +131,8 @@ export const countByCategoryRule: SuggestionRule = {
   },
   
   build: (ctx, meta) => {
-    // Use column name (what DuckDB expects) for derived tables
-    const colRef = meta.column!.name || meta.column!.id;
+    // Use column ID (what DuckDB uses internally) for derived tables
+    const colRef = meta.column!.id;
     return {
       id: createSuggestionId('count_by', ctx.tableId, meta.column!.id),
       category: 'analysis',
