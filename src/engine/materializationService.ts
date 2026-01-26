@@ -12,7 +12,7 @@ import { getEngine } from './EngineAdapter'
 import { getComputationOrder } from './dependencyGraph'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
-import { loadFile } from '@/persistence/db'
+import { loadFileWithSync } from '@/persistence/syncService'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import type { 
@@ -169,11 +169,11 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
       }
     }
     
-    // Load data from IndexedDB
+    // Load data from local cache or backend
     let rows: TableRow[] = []
     
     if (node.plan.fileRef) {
-      const fileData = await loadFile(node.plan.fileRef)
+      const fileData = await loadFileWithSync(node.plan.fileRef)
       if (fileData) {
         // Parse file data based on type, passing schema for proper column mapping
         rows = await parseFileData(fileData, node.plan.fileType, node.plan.sheetName, node.schema)
@@ -183,6 +183,9 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
           ...row,
           __rowId: row.__rowId || `row_${idx}`,
         }))
+        
+        // Update dataStore with loaded rows from file
+        dataStore.setTableData(tableId, rows)
       } else {
         // File not in IndexedDB - user needs to re-import the data
         projectStore.updateCacheInfo(tableId, {
@@ -196,10 +199,15 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
           error: 'Data file not found. Please re-import the file.',
         }
       }
+    } else {
+      // No file - this is a manually created table
+      // Preserve existing data from dataStore (if any), don't overwrite
+      rows = existingData?.rows ?? []
+      if (!existingData?.rows) {
+        // Only set if no existing data
+        dataStore.setTableData(tableId, rows)
+      }
     }
-    
-    // Update dataStore with loaded rows
-    dataStore.setTableData(tableId, rows)
     
     // Load into engine (applies patches internally)
     if (node.schema) {
@@ -437,29 +445,36 @@ async function computeDerivedTable(tableId: string): Promise<MaterializationResu
       }
     }
     
-    // Execute the transform
-    const result = await engine.executeTransform(node.plan.transformDef, tableId)
+    // Build mappings from upstream tables BEFORE executing transform:
+    // - nameToId: human-readable name -> original column ID (e.g., "Date" -> "col_5_date")
+    // - idToName: original column ID -> human-readable name (e.g., "col_5_date" -> "Date")
+    const nameToId = new Map<string, string>()
+    const idToName = new Map<string, string>()
+    
+    for (const upstreamId of node.plan.upstreamNodeIds) {
+      const upstreamNode = projectStore.getTableNode(upstreamId)
+      if (upstreamNode?.schema?.columns) {
+        for (const col of upstreamNode.schema.columns) {
+          // Map both directions for lookups
+          nameToId.set(col.name, col.id)
+          idToName.set(col.id, col.name)
+          // Also map by lowercase for case-insensitive matching
+          nameToId.set(col.name.toLowerCase(), col.id)
+        }
+      }
+    }
+    
+    // Convert idToName map to plain object for passing to worker
+    const columnIdToName: Record<string, string> = {}
+    idToName.forEach((name, id) => {
+      columnIdToName[id] = name
+    })
+    
+    // Execute the transform with column mappings
+    const result = await engine.executeTransform(node.plan.transformDef, tableId, columnIdToName)
     
     // Update schema if changed, with proper column ID mapping
     if (result.schema) {
-      // Build mappings from upstream tables:
-      // - nameToId: human-readable name -> original column ID (e.g., "Date" -> "col_5_date")
-      // - idToName: original column ID -> human-readable name (e.g., "col_5_date" -> "Date")
-      const nameToId = new Map<string, string>()
-      const idToName = new Map<string, string>()
-      
-      for (const upstreamId of node.plan.upstreamNodeIds) {
-        const upstreamNode = projectStore.getTableNode(upstreamId)
-        if (upstreamNode?.schema?.columns) {
-          for (const col of upstreamNode.schema.columns) {
-            // Map both directions for lookups
-            nameToId.set(col.name, col.id)
-            idToName.set(col.id, col.name)
-            // Also map by lowercase for case-insensitive matching
-            nameToId.set(col.name.toLowerCase(), col.id)
-          }
-        }
-      }
       
       // Update schema columns with proper IDs preserved from upstream
       // DuckDB returns human-readable names, we need to map back to original IDs
