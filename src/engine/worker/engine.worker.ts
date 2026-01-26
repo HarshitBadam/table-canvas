@@ -744,13 +744,14 @@ function formatValueWithType(value: CellValue, columnType: string): string {
   
   // Handle date/datetime values
   if (columnType === 'date' || columnType === 'datetime') {
-    // If it's already a Date object
-    if (value instanceof Date) {
-      if (isNaN(value.getTime())) return 'NULL'
+    // If it's already a Date object (runtime check, CellValue type doesn't include Date)
+    if (typeof value === 'object' && value !== null && 'getTime' in value) {
+      const dateValue = value as unknown as Date
+      if (isNaN(dateValue.getTime())) return 'NULL'
       if (columnType === 'datetime') {
-        return `'${value.toISOString()}'`
+        return `'${dateValue.toISOString()}'`
       }
-      return `'${value.toISOString().split('T')[0]}'`
+      return `'${dateValue.toISOString().split('T')[0]}'`
     }
     
     // Try to parse string as date
