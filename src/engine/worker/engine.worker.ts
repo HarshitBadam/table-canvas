@@ -54,10 +54,11 @@ async function loadTable(request: LoadTableRequest): Promise<void> {
   // Drop existing table if exists
   await conn.query(`DROP TABLE IF EXISTS "${tableName}"`)
   
-  // Build CREATE TABLE statement
-  const columnDefs = data.columnIds.map((id, i) => {
+  // Build CREATE TABLE statement using human-readable column names
+  // This allows transforms to reference columns by their display names
+  const columnDefs = data.columns.map((name, i) => {
     const type = mapTypeToDuckDB(data.types[i])
-    return `"${id}" ${type}`
+    return `"${name}" ${type}`
   }).join(', ')
   
   await conn.query(`CREATE TABLE "${tableName}" (${columnDefs})`)
@@ -68,10 +69,10 @@ async function loadTable(request: LoadTableRequest): Promise<void> {
     for (let i = 0; i < data.rows.length; i += batchSize) {
       const batch = data.rows.slice(i, i + batchSize)
       const values = batch.map(row => 
-        '(' + row.map(v => formatValue(v)).join(', ') + ')'
+        '(' + row.map((v, colIdx) => formatValueWithType(v, data.types[colIdx])).join(', ') + ')'
       ).join(', ')
       
-      const columns = data.columnIds.map(id => `"${id}"`).join(', ')
+      const columns = data.columns.map(name => `"${name}"`).join(', ')
       await conn.query(`INSERT INTO "${tableName}" (${columns}) VALUES ${values}`)
     }
   }
@@ -208,12 +209,17 @@ async function buildJoinColumnSelection(
 
 // Execute a transform and create a new derived table
 async function executeTransform(
-  transformDef: TransformDef & { outputTableId: string }
+  transformDef: TransformDef & { outputTableId: string; columnIdToName?: Record<string, string> }
 ): Promise<TransformResult> {
   if (!conn) throw new Error('DuckDB not initialized')
   
-  const { outputTableId } = transformDef
+  const { outputTableId, columnIdToName = {} } = transformDef
   const outputTableName = sanitizeTableName(outputTableId)
+  
+  // Helper to translate column ID to name (for DuckDB which uses names)
+  const toColName = (colId: string): string => {
+    return columnIdToName[colId] || colId
+  }
   
   // Build SQL based on transform type
   let sql: string
@@ -224,14 +230,18 @@ async function executeTransform(
       const rightTable = sanitizeTableName(transformDef.rightTableId)
       const joinType = transformDef.joinType.toUpperCase()
       
+      // Translate join keys from IDs to names
+      const leftKey = toColName(transformDef.leftKey)
+      const rightKey = toColName(transformDef.rightKey)
+      
       // Build explicit column selection for better naming and performance
       const { selectClause } = await buildJoinColumnSelection(
         leftTable,
         rightTable,
-        transformDef.leftKey,
-        transformDef.rightKey,
-        transformDef.leftColumns,
-        transformDef.rightColumns,
+        leftKey,
+        rightKey,
+        transformDef.leftColumns?.map(toColName),
+        transformDef.rightColumns?.map(toColName),
         transformDef.columnPrefix,
         transformDef.leftTableName,
         transformDef.rightTableName
@@ -243,7 +253,7 @@ async function executeTransform(
           ${selectClause}
         FROM "${leftTable}" AS l
         ${joinType} JOIN "${rightTable}" AS r
-        ON l."${transformDef.leftKey}" = r."${transformDef.rightKey}"
+        ON l."${leftKey}" = r."${rightKey}"
       `
       break
     }
@@ -251,7 +261,7 @@ async function executeTransform(
     case 'filter': {
       const sourceTable = sanitizeTableName(transformDef.sourceTableId)
       const conditions = transformDef.conditions.map(cond => {
-        const col = `"${cond.columnId}"`
+        const col = `"${toColName(cond.columnId)}"`
         const val = cond.value ?? null
         const val2 = cond.value2 ?? null
         switch (cond.operator) {
@@ -279,10 +289,11 @@ async function executeTransform(
       const selectedCols = transformDef.columns
         .filter(c => c.include)
         .map(c => {
+          const colName = toColName(c.sourceColumnId)
           if (c.newName && c.newName !== c.sourceColumnId) {
-            return `"${c.sourceColumnId}" AS "${c.newName}"`
+            return `"${colName}" AS "${c.newName}"`
           }
-          return `"${c.sourceColumnId}"`
+          return `"${colName}"`
         })
         .join(', ')
       
@@ -292,10 +303,17 @@ async function executeTransform(
     
     case 'calculated_column': {
       const sourceTable = sanitizeTableName(transformDef.sourceTableId)
-      // Note: In production, expression should be validated/parsed
+      // Translate column IDs in the expression to column names
+      // Replace quoted column IDs like "col_3_actual" with their names like "Actual"
+      let expression = transformDef.expression
+      for (const [colId, colName] of Object.entries(columnIdToName)) {
+        // Replace "colId" with "colName" (quoted references)
+        const quotedIdPattern = new RegExp(`"${colId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`, 'g')
+        expression = expression.replace(quotedIdPattern, `"${colName}"`)
+      }
       sql = `
         CREATE TABLE "${outputTableName}" AS
-        SELECT *, (${transformDef.expression}) AS "${transformDef.newColumnName}"
+        SELECT *, (${expression}) AS "${transformDef.newColumnName}"
         FROM "${sourceTable}"
       `
       break
@@ -303,13 +321,14 @@ async function executeTransform(
     
     case 'group_summarize': {
       const sourceTable = sanitizeTableName(transformDef.sourceTableId)
-      const groupCols = transformDef.groupByColumns.map(c => `"${c}"`).join(', ')
+      const groupCols = transformDef.groupByColumns.map(c => `"${toColName(c)}"`).join(', ')
       const aggs = transformDef.aggregations.map(agg => {
         const op = agg.operation.toUpperCase()
+        const colName = toColName(agg.columnId)
         if (op === 'COUNT_DISTINCT') {
-          return `COUNT(DISTINCT "${agg.columnId}") AS "${agg.alias}"`
+          return `COUNT(DISTINCT "${colName}") AS "${agg.alias}"`
         }
-        return `${op}("${agg.columnId}") AS "${agg.alias}"`
+        return `${op}("${colName}") AS "${agg.alias}"`
       }).join(', ')
       
       sql = `
@@ -683,6 +702,72 @@ function formatValue(value: CellValue): string {
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
   if (typeof value === 'number') return String(value)
   // Escape single quotes in strings
+  return `'${String(value).replace(/'/g, "''")}'`
+}
+
+/**
+ * Format a value with knowledge of the expected column type.
+ * This handles cases where empty strings need to be converted to NULL for numeric types.
+ */
+function formatValueWithType(value: CellValue, columnType: string): string {
+  // Handle null/undefined
+  if (value === null || value === undefined) return 'NULL'
+  
+  // Handle empty strings based on column type
+  if (value === '' || (typeof value === 'string' && value.trim() === '')) {
+    if (columnType === 'number' || columnType === 'boolean' || columnType === 'date' || columnType === 'datetime') {
+      return 'NULL'
+    }
+    return "''"
+  }
+  
+  // Handle booleans
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
+  
+  // Handle numbers
+  if (typeof value === 'number') return String(value)
+  
+  // Handle string values that should be numbers
+  if (columnType === 'number') {
+    const num = parseFloat(String(value))
+    if (!isNaN(num)) return String(num)
+    return 'NULL'  // Can't parse as number, use NULL
+  }
+  
+  // Handle string values that should be booleans
+  if (columnType === 'boolean') {
+    const lower = String(value).toLowerCase()
+    if (lower === 'true' || lower === '1' || lower === 'yes') return 'TRUE'
+    if (lower === 'false' || lower === '0' || lower === 'no') return 'FALSE'
+    return 'NULL'
+  }
+  
+  // Handle date/datetime values
+  if (columnType === 'date' || columnType === 'datetime') {
+    // If it's already a Date object
+    if (value instanceof Date) {
+      if (isNaN(value.getTime())) return 'NULL'
+      if (columnType === 'datetime') {
+        return `'${value.toISOString()}'`
+      }
+      return `'${value.toISOString().split('T')[0]}'`
+    }
+    
+    // Try to parse string as date
+    const dateStr = String(value)
+    const parsed = new Date(dateStr)
+    if (!isNaN(parsed.getTime())) {
+      if (columnType === 'datetime') {
+        return `'${parsed.toISOString()}'`
+      }
+      return `'${parsed.toISOString().split('T')[0]}'`
+    }
+    
+    // Can't parse as date, return NULL
+    return 'NULL'
+  }
+  
+  // Default: escape as string
   return `'${String(value).replace(/'/g, "''")}'`
 }
 

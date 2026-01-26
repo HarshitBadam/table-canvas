@@ -359,8 +359,11 @@ export function GridView({ tableId }: GridViewProps) {
       return
     }
     
-    // Materialize if dirty or no data
-    const needsMaterialization = isDirty || !tableData || !tableData.rows || tableData.rows.length === 0
+    // Materialize if dirty or no data loaded yet
+    // Note: Don't rematerialize just because rows.length === 0 - empty tables are valid
+    const hasBeenComputed = cacheInfo?.lastComputedAt && !cacheInfo?.error
+    const needsMaterialization = isDirty || !tableData || !tableData.rows || 
+      (tableData.rows.length === 0 && !hasBeenComputed)
     
     if (needsMaterialization && (node.kind === 'source_table' || node.kind === 'derived_table')) {
       setIsMaterializing(true)
@@ -381,7 +384,7 @@ export function GridView({ tableId }: GridViewProps) {
           setIsMaterializing(false)
         })
     }
-  }, [tableId, node, isDirty, isComputing, isMaterializing, tableData])
+  }, [tableId, node, isDirty, isComputing, isMaterializing, tableData, cacheInfo])
 
   // Close context menu on click outside
   useEffect(() => {
@@ -1171,8 +1174,8 @@ export function GridView({ tableId }: GridViewProps) {
     )
   }
 
-  // Show loading state for tables being materialized
-  if ((isMaterializing || isComputing) && (!tableData || !tableData.rows || tableData.rows.length === 0)) {
+  // Show loading state for tables being materialized (only if no data loaded yet)
+  if ((isMaterializing || isComputing) && (!tableData || !tableData.rows)) {
     const loadingMessage = node.kind === 'derived_table' 
       ? 'Executing transform and loading data...'
       : 'Loading table data...'

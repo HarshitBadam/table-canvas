@@ -11,14 +11,16 @@
 
 ## Installation Methods
 
-### Method 1: Frontend Only (Local Development)
+### Method 1: Frontend Only (Local Development) — Recommended
+
+> **Easiest way to get started!** Just Node.js required - no Docker, no database, no additional configuration.
 
 This mode runs the application entirely in the browser using IndexedDB for persistence. No server required.
 
 ```bash
 # Clone repository
-git clone <repo-url>
-cd excel-table-app
+git clone https://github.com/HarshitBadam/table-canvas.git
+cd table-canvas
 
 # Install dependencies
 npm install
@@ -29,10 +31,12 @@ npm run dev
 
 Access the application at `http://localhost:5173`.
 
+The app automatically detects that no backend is available and enables **local mode** - you'll be logged in automatically as "Local User" without needing any credentials.
+
 **Limitations in this mode:**
-- Data persists only in browser storage
-- No user authentication
+- Data persists only in browser storage (IndexedDB)
 - No cross-device sync
+- Projects are stored locally per browser
 
 ### Method 2: Full Stack with Docker
 

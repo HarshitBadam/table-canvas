@@ -61,7 +61,9 @@ The application follows a **Headless UI** pattern where the calculation engine i
 - npm 9+
 - Docker and Docker Compose (optional, for full-stack setup)
 
-### Local Development (Frontend Only)
+### Local Development (Frontend Only) — Recommended
+
+> **Easiest way to get started!** No Docker, no database, no configuration needed.
 
 ```bash
 # Install dependencies
@@ -71,7 +73,7 @@ npm install
 npm run dev
 ```
 
-The application runs at `http://localhost:5173`. This mode uses IndexedDB for local persistence.
+The application runs at `http://localhost:5173`. This mode uses IndexedDB for local persistence. No login required - you'll be automatically signed in as "Local User".
 
 ### Full Stack with Docker
 
