@@ -18,13 +18,13 @@ interface QuickActionsSectionProps {
 function getActionLabel(suggestion: Suggestion): string {
   const action = suggestion.action
   
-  if (action.type === 'create_chart') {
+  if (action.kind === 'createChart') {
     return 'Create Chart'
   }
-  if (action.type === 'create_derived_table') {
+  if (action.kind === 'createDerivedTable') {
     return 'Create Table'
   }
-  if (action.type === 'apply_patch') {
+  if (action.kind === 'applyPatch') {
     return 'Fix Data'
   }
   
@@ -152,10 +152,10 @@ export function QuickActionsSection({
                   {suggestion.title}
                 </h4>
                 <button
-                  onClick={() => onOpenTable(suggestion.tableId)}
+                  onClick={() => onOpenTable(suggestion.context.tableId)}
                   className="text-xs text-text-tertiary hover:text-accent-green transition-colors"
                 >
-                  {suggestion.tableName || 'table'}
+                  View table
                 </button>
               </div>
             </div>

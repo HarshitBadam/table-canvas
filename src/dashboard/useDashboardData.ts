@@ -14,10 +14,7 @@ import { generateTableVersionHash } from '@/suggestions/suggestionsStore'
 import type { 
   TableNode, 
   ChartNode, 
-  ProjectNode, 
-  Edge,
   Suggestion,
-  ColumnProfile,
   TableSchema,
 } from '@/lib/types'
 import type { ProfileResult } from '@/engine/types'
@@ -680,7 +677,7 @@ export function useLineageData(): {
       name: chart.name || 'Chart',
       kind: 'chart' as const,
       rowCount: 0,
-      chartType: chart.chartConfig?.type || 'bar',
+      chartType: chart.plan?.chartType || 'bar',
     }))
 
     const nodes = [...tableLineageNodes, ...chartLineageNodes]

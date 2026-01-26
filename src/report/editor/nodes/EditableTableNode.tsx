@@ -63,7 +63,7 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
   // Close context menu on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as globalThis.Node)) {
         setContextMenu(null);
       }
     };

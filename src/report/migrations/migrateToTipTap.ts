@@ -185,7 +185,7 @@ function parseInlineContent(text: string): TipTapNode[] {
     }
 
     // Plain text - take characters until next special character
-    const plainMatch = remaining.match(/^[^*`\[]+/);
+    const plainMatch = remaining.match(/^[^*`[]+/);
     if (plainMatch) {
       nodes.push({
         type: 'text',

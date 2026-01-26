@@ -24,11 +24,14 @@ import type { TableNode as TableNodeType } from '@/lib/types';
 // Types
 // ============================================================================
 
+import type { Editor } from '@tiptap/react';
+import type { Range } from '@tiptap/core';
+
 interface SlashCommandItem {
   title: string;
   description: string;
   icon: React.ReactNode;
-  command: (props: { editor: any; range: any }) => void;
+  command: (props: { editor: Editor; range: Range }) => void;
   category: string;
 }
 

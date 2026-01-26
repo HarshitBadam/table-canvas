@@ -39,7 +39,8 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
 
   // Handle content changes - just save content, name is managed separately via toolbar
   const handleContentChange = useCallback((content: JSONContent) => {
-    updateReport(reportId, { tiptapContent: content as any });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    updateReport(reportId, { tiptapContent: content as unknown as any });
   }, [reportId, updateReport]);
 
   // Focus editor on mount
