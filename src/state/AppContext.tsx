@@ -180,15 +180,23 @@ export function AppProvider({ children }: AppProviderProps) {
         let user = await checkAuth();
         
         if (!user) {
-          // Check if backend is reachable
+          // Check if backend is reachable with a short timeout
+          // This prevents long waits in environments without a backend (e.g., local-only mode, CI)
           const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
           let backendReachable = false;
           
           try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+            
             const response = await fetch(`${API_BASE_URL}/auth/me`, {
               method: 'GET',
               credentials: 'include',
+              signal: controller.signal,
             });
+            
+            clearTimeout(timeoutId);
+            
             // If we get any response (even 401), backend is reachable
             backendReachable = true;
             // If 401, user just needs to login
@@ -203,7 +211,7 @@ export function AppProvider({ children }: AppProviderProps) {
               return;
             }
           } catch {
-            // Network error - backend is not reachable
+            // Network error or timeout - backend is not reachable
             backendReachable = false;
           }
           
