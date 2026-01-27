@@ -110,18 +110,20 @@ test.describe('Canvas View and Table Nodes', () => {
     const sidebar = page.locator('aside')
     await expect(sidebar).toBeVisible()
     
-    // Import button should exist
-    const importButton = page.locator('button:has-text("Import Data")')
+    // Import button should exist in the sidebar
+    const importButton = sidebar.locator('button:has-text("Import Data")')
     await expect(importButton).toBeVisible()
   })
 
   test('should show New Table button in sidebar', async ({ page }) => {
-    const newTableButton = page.locator('button:has-text("New Table")')
+    const sidebar = page.locator('aside')
+    const newTableButton = sidebar.locator('button:has-text("New Table")')
     await expect(newTableButton).toBeVisible()
   })
   
   test('should open New Table modal when clicking New Table button', async ({ page }) => {
-    const newTableButton = page.locator('button:has-text("New Table")')
+    const sidebar = page.locator('aside')
+    const newTableButton = sidebar.locator('button:has-text("New Table")')
     await newTableButton.click()
     
     // Modal should appear
@@ -241,8 +243,8 @@ test.describe('View Navigation', () => {
     const header = page.locator('header')
     await expect(header).toBeVisible()
     
-    // Should show "Table Canvas" text
-    const canvasTitle = page.locator('text=Table Canvas')
+    // Should show "Table Canvas" text in the header specifically
+    const canvasTitle = header.locator('text=Table Canvas')
     await expect(canvasTitle).toBeVisible()
   })
 
