@@ -177,18 +177,56 @@ export function AppProvider({ children }: AppProviderProps) {
 
         // Phase 2: Check Authentication
         setPhase('checking_auth');
-        const user = await checkAuth();
+        let user = await checkAuth();
         
         if (!user) {
-          // Not authenticated - go to ready state (will show login)
-          setState((prev) => ({
-            ...prev,
-            phase: 'ready',
-            phaseMessage: PHASE_MESSAGES.ready,
-            user: null,
-            isAuthenticated: false,
-          }));
-          return;
+          // Check if backend is reachable
+          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+          let backendReachable = false;
+          
+          try {
+            const response = await fetch(`${API_BASE_URL}/auth/me`, {
+              method: 'GET',
+              credentials: 'include',
+            });
+            // If we get any response (even 401), backend is reachable
+            backendReachable = true;
+            // If 401, user just needs to login
+            if (response.status === 401) {
+              setState((prev) => ({
+                ...prev,
+                phase: 'ready',
+                phaseMessage: PHASE_MESSAGES.ready,
+                user: null,
+                isAuthenticated: false,
+              }));
+              return;
+            }
+          } catch {
+            // Network error - backend is not reachable
+            backendReachable = false;
+          }
+          
+          if (!backendReachable) {
+            // Local mode - no backend available, proceed with mock user
+            console.log('[AppContext] Backend not reachable, enabling local mode');
+            user = {
+              id: 'local-user',
+              email: 'local@tablecanvas.app',
+              name: 'Local User',
+              createdAt: new Date(),
+            };
+          } else {
+            // Backend is reachable but user not authenticated - show login
+            setState((prev) => ({
+              ...prev,
+              phase: 'ready',
+              phaseMessage: PHASE_MESSAGES.ready,
+              user: null,
+              isAuthenticated: false,
+            }));
+            return;
+          }
         }
 
         setState((prev) => ({

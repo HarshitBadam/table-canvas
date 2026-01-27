@@ -106,16 +106,19 @@ export class EngineAdapter {
 
   /**
    * Execute a transform and create a derived table
+   * @param columnIdToName - Optional mapping from column IDs to human-readable names
    */
   async executeTransform(
     transformDef: TransformDef,
-    outputTableId: string
+    outputTableId: string,
+    columnIdToName?: Record<string, string>
   ): Promise<TransformResult> {
     await this.ensureInitialized()
     
     return this.rpc.call<TransformResult>('executeTransform', {
       ...transformDef,
       outputTableId,
+      columnIdToName,
     })
   }
 
