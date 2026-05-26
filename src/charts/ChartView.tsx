@@ -6,7 +6,7 @@ import { useMemo, useCallback, useState } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { ChartRenderer } from './ChartRenderer'
 import { useChartData } from './useChartData'
-import type { ChartNode, ChartConfig, AggregationType, TableNode } from '@/lib/types'
+import type { ChartNode, ChartConfig, AggregationType, TableNode } from '@/types'
 
 interface ChartViewProps {
   chartId: string

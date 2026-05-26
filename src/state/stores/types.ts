@@ -1,7 +1,3 @@
-/**
- * Store types and shared interfaces
- */
-
 import type { 
   ProjectNode, 
   Edge, 
@@ -11,12 +7,9 @@ import type {
   NodeViewMode,
   ViewFilterConfig,
   ChartConfig,
+  Patches,
+  CellValue,
 } from '@/types'
-import type { Patches, CellValue } from '@/types'
-
-// ============================================================================
-// History Types
-// ============================================================================
 
 export interface HistoryEntry {
   nodes: Record<string, ProjectNode>
@@ -30,14 +23,9 @@ export interface HistoryState {
   future: HistoryEntry[]
 }
 
-// ============================================================================
-// Slice State Interfaces
-// ============================================================================
-
 export interface NodesSliceState {
   nodes: Record<string, ProjectNode>
   
-  // Actions
   addNode: (node: ProjectNode) => void
   updateNode: (id: string, updates: Partial<ProjectNode>) => void
   deleteNode: (id: string) => void
@@ -74,7 +62,6 @@ export interface NodesSliceState {
   updateCacheInfo: (nodeId: string, cacheInfo: Partial<CacheInfo>) => void
   clearNodeError: (nodeId: string) => void
   
-  // Selectors
   getNode: (id: string) => ProjectNode | undefined
   getTableNode: (id: string) => import('@/types').TableNode | undefined
   getUpstreamNodes: (nodeId: string) => ProjectNode[]
@@ -84,7 +71,6 @@ export interface NodesSliceState {
 export interface EdgesSliceState {
   edges: Record<string, Edge>
   
-  // Actions
   addEdge: (edge: Omit<Edge, 'id'>) => void
   deleteEdge: (id: string) => void
   wouldCreateCycle: (sourceId: string, targetId: string) => boolean
@@ -93,7 +79,6 @@ export interface EdgesSliceState {
 export interface PatchesSliceState {
   patches: Record<string, Patches>
   
-  // Actions
   setCellValue: (tableId: string, rowId: string, columnId: string, value: CellValue) => void
   deleteRow: (tableId: string, rowId: string) => void
   insertRow: (tableId: string, rowId: string, values: Record<string, CellValue>, index: number) => void
@@ -108,7 +93,6 @@ export interface SelectionSliceState {
   selectedNodeId: string | null
   selectedEdgeId: string | null
   
-  // Actions
   selectNode: (id: string | null) => void
   selectEdge: (id: string | null) => void
 }
@@ -116,7 +100,6 @@ export interface SelectionSliceState {
 export interface HistorySliceState {
   history: HistoryState
   
-  // Actions
   undo: () => void
   redo: () => void
   canUndo: () => boolean
@@ -124,17 +107,12 @@ export interface HistorySliceState {
   saveSnapshot: (description: string) => void
 }
 
-// ============================================================================
-// Combined Store State
-// ============================================================================
-
 export interface ProjectStoreState extends 
   NodesSliceState, 
   EdgesSliceState, 
   PatchesSliceState, 
   SelectionSliceState, 
   HistorySliceState {
-  // Project metadata
   projectId: string
   projectName: string
 }

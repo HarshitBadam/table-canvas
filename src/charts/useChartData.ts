@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { CellValue, ChartConfig, ColumnSchema } from '@/lib/types'
+import { CellValue, ChartConfig, ColumnSchema } from '@/types'
 import { getEngine } from '@/engine/EngineAdapter'
 import { ensureTableMaterialized } from '@/engine/materializationService'
 

@@ -1,9 +1,3 @@
-/**
- * History Slice
- * 
- * Manages undo/redo functionality.
- */
-
 import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, HistorySliceState, HistoryEntry } from './types'
 import type { Patches } from '@/types'

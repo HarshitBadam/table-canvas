@@ -9,9 +9,6 @@ import { Project, IProjectDocument } from '../models/Project.js';
 import { File, IFileDocument } from '../models/File.js';
 import type { ProjectNode, Edge, SerializedPatches } from '../types/index.js';
 
-// ============================================================================
-// Mock User Context
-// ============================================================================
 
 /**
  * Generate a mock user ID for testing
@@ -34,9 +31,6 @@ export function createMockAuthContext(userId?: Types.ObjectId) {
   };
 }
 
-// ============================================================================
-// Project Factories
-// ============================================================================
 
 export interface CreateTestProjectOptions {
   userId?: Types.ObjectId;
@@ -132,9 +126,6 @@ export function createSampleEdge(
   };
 }
 
-// ============================================================================
-// File Factories
-// ============================================================================
 
 export interface CreateTestFileOptions {
   userId?: Types.ObjectId;
@@ -200,9 +191,6 @@ export async function createTestFiles(
   return files;
 }
 
-// ============================================================================
-// Database Utilities
-// ============================================================================
 
 /**
  * Clear all documents from a specific collection
@@ -241,9 +229,6 @@ export async function getCollectionCount(
   return 0;
 }
 
-// ============================================================================
-// Assertion Helpers
-// ============================================================================
 
 /**
  * Assert that a project has expected structure
@@ -269,9 +254,6 @@ export function assertFileStructure(file: Record<string, unknown>): void {
   if (!file.createdAt) throw new Error('File missing createdAt');
 }
 
-// ============================================================================
-// Time Utilities
-// ============================================================================
 
 /**
  * Wait for a specified number of milliseconds

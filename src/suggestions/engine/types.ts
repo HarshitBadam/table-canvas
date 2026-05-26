@@ -11,7 +11,7 @@ import type {
   TableSchema,
   ColumnSchema,
   ColumnProfile,
-} from '@/lib/types'
+} from '@/types'
 
 /**
  * Context passed to suggestion rules for evaluation and building.
@@ -116,9 +116,6 @@ export interface SuggestionGenerationResult {
   }
 }
 
-// ============================================================================
-// Detector Types
-// ============================================================================
 
 /**
  * Outlier detection result.

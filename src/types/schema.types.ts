@@ -1,10 +1,3 @@
-/**
- * Schema-related types for table and column definitions
- */
-
-// ============================================================================
-// Column Types
-// ============================================================================
 
 /** Supported data types for columns */
 export type ColumnType = 
@@ -27,9 +20,6 @@ export type SemanticHint =
   | 'country'
   | 'category'
 
-// ============================================================================
-// Schema Definitions
-// ============================================================================
 
 /** Schema definition for a single column */
 export interface ColumnSchema {

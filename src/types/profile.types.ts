@@ -1,13 +1,6 @@
-/**
- * Profiling types for table and column statistics
- */
-
 import type { SemanticHint } from './schema.types'
 import type { CellValue } from './common.types'
 
-// ============================================================================
-// Column Classification
-// ============================================================================
 
 /** Cardinality classification for columns */
 export type CardinalityClass = 'unique' | 'high' | 'low'
@@ -33,9 +26,6 @@ export type ColumnClassification =
   /** Boolean values - good for pie/bar charts */
   | 'boolean'
 
-// ============================================================================
-// Column Profile
-// ============================================================================
 
 /** Statistical profile for a single column */
 export interface ColumnProfile {
@@ -77,9 +67,6 @@ export interface ColumnProfile {
   isKeyCandidate?: boolean
 }
 
-// ============================================================================
-// Table Profile
-// ============================================================================
 
 /** Statistical profile for an entire table */
 export interface TableProfile {

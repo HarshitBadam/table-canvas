@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach, type Mock } from 'vitest'
-import type { SourceTableNode, DerivedTableNode, TableSchema, CellValue } from '@/lib/types'
+import type { SourceTableNode, DerivedTableNode, TableSchema, CellValue } from '@/types'
 
 // ============================================================================
 // Mock Setup

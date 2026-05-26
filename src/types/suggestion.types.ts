@@ -1,14 +1,7 @@
-/**
- * Suggestion types for context-aware recommendations
- */
-
 import type { CellValue, PatchOp } from './common.types'
 import type { TransformDef } from './transform.types'
 import type { ChartConfig } from './node.types'
 
-// ============================================================================
-// Suggestion Metadata
-// ============================================================================
 
 /** Categories of suggestions */
 export type SuggestionCategory = 'cleaning' | 'analysis' | 'recipe'
@@ -19,9 +12,6 @@ export type SuggestionScope = 'table' | 'column'
 /** Confidence level for suggestions */
 export type SuggestionConfidence = 'high' | 'medium' | 'low'
 
-// ============================================================================
-// Preview Data
-// ============================================================================
 
 /** Preview data types for lazy loading */
 export type PreviewData =
@@ -37,9 +27,6 @@ export interface SuggestionPreview {
   error?: string
 }
 
-// ============================================================================
-// Cleaning Operations
-// ============================================================================
 
 /** Types of cleaning operations that can be applied */
 export type CleaningOperation =
@@ -57,9 +44,6 @@ export type CleaningOperation =
   | { type: 'remove_outliers'; lowerBound: number; upperBound: number }
   | { type: 'highlight_outliers'; lowerBound: number; upperBound: number }
 
-// ============================================================================
-// Suggestion Context
-// ============================================================================
 
 /** Context for a suggestion */
 export interface SuggestionContext {
@@ -76,9 +60,6 @@ export interface SuggestionImpact {
   summary: string
 }
 
-// ============================================================================
-// Suggestion Actions
-// ============================================================================
 
 /** Chart definition for creating charts from suggestions */
 export interface ChartDef {
@@ -117,9 +98,6 @@ export type SuggestionAction =
       target: 'source'
     }
 
-// ============================================================================
-// Suggestion
-// ============================================================================
 
 /** Complete suggestion object */
 export interface Suggestion {
@@ -136,9 +114,6 @@ export interface Suggestion {
   action: SuggestionAction
 }
 
-// ============================================================================
-// Legacy Types (for backward compatibility)
-// ============================================================================
 
 /** @deprecated Legacy action types for migration */
 export type LegacySuggestionAction = 

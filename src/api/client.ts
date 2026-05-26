@@ -4,9 +4,6 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-// ============================================================================
-// Types
-// ============================================================================
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -20,9 +17,6 @@ export interface RequestOptions extends RequestInit {
   skipAuth?: boolean;
 }
 
-// ============================================================================
-// Error Classes
-// ============================================================================
 
 export class ApiError extends Error {
   statusCode: number;
@@ -43,9 +37,6 @@ export class AuthError extends ApiError {
   }
 }
 
-// ============================================================================
-// Token Refresh Queue
-// ============================================================================
 
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
@@ -85,9 +76,6 @@ async function handleTokenRefresh(): Promise<boolean> {
   }
 }
 
-// ============================================================================
-// API Client
-// ============================================================================
 
 async function request<T>(
   endpoint: string,
@@ -159,9 +147,6 @@ async function request<T>(
   return data.data as T;
 }
 
-// ============================================================================
-// HTTP Methods
-// ============================================================================
 
 export const api = {
   get: <T>(endpoint: string, options?: RequestOptions): Promise<T> =>

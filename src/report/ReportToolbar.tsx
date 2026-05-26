@@ -15,9 +15,6 @@ interface ReportToolbarProps {
   onInsertTable?: () => void;
 }
 
-// ============================================================================
-// Main Toolbar Component
-// ============================================================================
 
 export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: ReportToolbarProps) {
   const reports = useReportStore((state) => state.reports);
@@ -56,7 +53,6 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
   };
   const wordCount = getWordCount();
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (listRef.current && !listRef.current.contains(e.target as Node)) {
@@ -67,7 +63,6 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Focus input when editing
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
@@ -114,7 +109,6 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
     }
   };
 
-  // Format date
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });

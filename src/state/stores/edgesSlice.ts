@@ -1,9 +1,3 @@
-/**
- * Edges Slice
- * 
- * Manages edge CRUD operations and cycle detection.
- */
-
 import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, EdgesSliceState } from './types'
 import type { Edge } from '@/types'
@@ -39,10 +33,6 @@ export const createEdgesSlice: StateCreator<
     return checkCycle(state.edges, sourceId, targetId)
   },
 })
-
-// ============================================================================
-// Edge Utility Functions (used by selectors)
-// ============================================================================
 
 /**
  * Get edges where the node is the target (incoming).

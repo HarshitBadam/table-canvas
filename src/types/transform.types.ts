@@ -1,10 +1,3 @@
-/**
- * Transform and edge types for data transformations
- */
-
-// ============================================================================
-// Edge Types
-// ============================================================================
 
 /** Types of transformations that can be applied */
 export type TransformType = 
@@ -23,9 +16,6 @@ export interface Edge {
   transformType: TransformType
 }
 
-// ============================================================================
-// Transform Definitions
-// ============================================================================
 
 /** Union type of all transform definitions */
 export type TransformDef = 
@@ -65,9 +55,6 @@ export interface JoinTransformDef {
   keepRightColumns?: string[]
 }
 
-// ============================================================================
-// Filter Types
-// ============================================================================
 
 /** Filter comparison operators */
 export type FilterOperator = 
@@ -102,9 +89,6 @@ export interface FilterTransformDef {
   logic: 'and' | 'or'
 }
 
-// ============================================================================
-// Select Transform
-// ============================================================================
 
 /** Column selection for select transform */
 export interface SelectColumn {
@@ -120,9 +104,6 @@ export interface SelectTransformDef {
   columns: SelectColumn[]
 }
 
-// ============================================================================
-// Calculated Column
-// ============================================================================
 
 /** Calculated column transform definition */
 export interface CalculatedColumnDef {
@@ -133,9 +114,6 @@ export interface CalculatedColumnDef {
   expression: string
 }
 
-// ============================================================================
-// Group/Summarize Transform
-// ============================================================================
 
 /** Aggregation function types */
 export type AggregationType = 'sum' | 'avg' | 'min' | 'max' | 'count' | 'count_distinct'
@@ -155,9 +133,6 @@ export interface GroupSummarizeDef {
   aggregations: Aggregation[]
 }
 
-// ============================================================================
-// Union Transform
-// ============================================================================
 
 /** Union transform definition */
 export interface UnionTransformDef {
@@ -165,9 +140,6 @@ export interface UnionTransformDef {
   sourceTableIds: string[]
 }
 
-// ============================================================================
-// View Filter Configuration
-// ============================================================================
 
 /** View filter configuration (persisted per table) */
 export interface ViewFilterConfig {

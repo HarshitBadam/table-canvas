@@ -8,18 +8,12 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, NodeViewProps } from '@tiptap/react';
 import { useState, useCallback, memo } from 'react';
 
-// ============================================================================
-// Types
-// ============================================================================
 
 interface ToggleNodeAttrs {
   title: string;
   isExpanded: boolean;
 }
 
-// ============================================================================
-// React Component
-// ============================================================================
 
 const ToggleNodeView = memo(function ToggleNodeView({
   node,
@@ -99,9 +93,6 @@ const ToggleNodeView = memo(function ToggleNodeView({
   );
 });
 
-// ============================================================================
-// TipTap Node Definition
-// ============================================================================
 
 export const ToggleNode = Node.create({
   name: 'toggle',

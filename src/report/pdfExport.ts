@@ -334,7 +334,7 @@ export async function exportReportToPDF(
     for (let i = 1; i <= totalPages; i++) {
       pdfDoc.setPage(i);
       
-      // ===== HEADER (on every page) =====
+      // Header
       pdfDoc.setDrawColor(33, 115, 70);
       pdfDoc.setLineWidth(0.015);
       pdfDoc.line(0.5, 0.55, pageWidth - 0.5, 0.55);
@@ -351,7 +351,7 @@ export async function exportReportToPDF(
       pdfDoc.setFont('helvetica', 'normal');
       pdfDoc.text(`Page ${i} of ${totalPages}`, pageWidth - 0.5, 0.4, { align: 'right' });
       
-      // ===== FOOTER (on every page) =====
+      // Footer
       pdfDoc.setDrawColor(33, 115, 70);
       pdfDoc.setLineWidth(0.015);
       pdfDoc.line(0.5, pageHeight - 0.6, pageWidth - 0.5, pageHeight - 0.6);

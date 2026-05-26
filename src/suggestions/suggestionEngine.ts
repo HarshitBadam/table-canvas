@@ -11,7 +11,6 @@
  * - engine/rules/*.ts - Individual rule modules
  */
 
-// Re-export everything from the modular engine
 export { 
   generateSuggestions, 
   getColumnSuggestions,
@@ -51,7 +50,6 @@ export {
   detectComparisonOpportunities,
 } from './engine';
 
-// Re-export types
 export type { 
   SuggestionEngineContext,
   MetadataBundle,
@@ -63,7 +61,6 @@ export type {
   ComparisonOpportunity,
 } from './engine';
 
-// Import from engine for __testing export
 import {
   hasMixedCase,
   findPlaceholders,
@@ -79,9 +76,6 @@ import {
 
 import { PLACEHOLDER_VALUES } from './cleaningConstants';
 
-// ============================================================================
-// Exports for testing
-// ============================================================================
 
 export const __testing = {
   hasMixedCase,
@@ -91,7 +85,6 @@ export const __testing = {
   hasSequentialPattern,
   hasLeadingTrailingWhitespace,
   PLACEHOLDER_VALUES,
-  // Column classification functions
   classifyColumn,
   isUniqueIdentifier,
   classifyNumericColumn,

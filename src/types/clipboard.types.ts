@@ -1,8 +1,4 @@
-/**
- * Clipboard Types for Grid-to-Report Copy/Paste
- */
-
-import type { CellValue } from '@/lib/types';
+import type { CellValue } from '@/types';
 
 export interface GridClipboardData {
   headers: string[];

@@ -3,7 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
 import { generateId } from '@/lib/utils'
-import { ColumnType, ColumnSchema, TableSchema, CellValue } from '@/lib/types'
+import { ColumnType, ColumnSchema, TableSchema, CellValue } from '@/types'
 
 interface NewTableModalProps {
   isOpen: boolean

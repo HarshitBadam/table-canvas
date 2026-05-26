@@ -1,14 +1,7 @@
-/**
- * Data Overview Section
- * 
- * Shows comprehensive data profiling information for analysts.
- * Priority: 1) Data makes sense, 2) Logic works, 3) Easy to understand
- */
-
 import { useState } from 'react'
 import { useProfilingStore } from '@/profiling/profiler'
 import type { TableQualityMetrics } from '../useDashboardData'
-import type { ColumnProfile, TableSchema } from '@/lib/types'
+import type { ColumnProfile, TableSchema } from '@/types'
 import { useProjectStore } from '@/state/projectStore'
 
 interface TableStatsSectionProps {
@@ -71,9 +64,6 @@ export function TableStatsSection({
   )
 }
 
-// ============================================================================
-// Table Section
-// ============================================================================
 
 function TableSection({
   title,
@@ -112,9 +102,6 @@ function TableSection({
   )
 }
 
-// ============================================================================
-// Table Card
-// ============================================================================
 
 function TableCard({
   table,
@@ -197,9 +184,6 @@ function TableCard({
   )
 }
 
-// ============================================================================
-// Column List
-// ============================================================================
 
 function ColumnList({
   schema,
@@ -250,9 +234,6 @@ function ColumnList({
   )
 }
 
-// ============================================================================
-// Column Row - The heart of the data display
-// ============================================================================
 
 function ColumnRow({
   column,
@@ -314,9 +295,6 @@ function ColumnRow({
   )
 }
 
-// ============================================================================
-// Stat Component - Clean label/value display
-// ============================================================================
 
 function Stat({ label, value, subtext }: { label: string; value: string; subtext?: string }) {
   return (
@@ -334,9 +312,6 @@ function Stat({ label, value, subtext }: { label: string; value: string; subtext
   )
 }
 
-// ============================================================================
-// Type Badge
-// ============================================================================
 
 function TypeBadge({ type }: { type: string }) {
   const t = type.toLowerCase()
@@ -359,9 +334,6 @@ function TypeBadge({ type }: { type: string }) {
   )
 }
 
-// ============================================================================
-// Completeness Bar
-// ============================================================================
 
 function CompletenessBar({ value }: { value: number }) {
   const color = value >= 95 ? 'bg-green-500' : value >= 80 ? 'bg-amber-500' : 'bg-red-500'
@@ -381,9 +353,6 @@ function CompletenessBar({ value }: { value: number }) {
   )
 }
 
-// ============================================================================
-// Numeric Stats
-// ============================================================================
 
 function NumericStats({ profile, rowCount }: { profile: ColumnProfile; rowCount: number }) {
   const fmt = (n: number | undefined) => {
@@ -418,9 +387,6 @@ function NumericStats({ profile, rowCount }: { profile: ColumnProfile; rowCount:
   )
 }
 
-// ============================================================================
-// String Stats
-// ============================================================================
 
 function StringStats({ profile, rowCount }: { profile: ColumnProfile; rowCount: number }) {
   const isUnique = profile.distinctCount === rowCount && rowCount > 0
@@ -472,9 +438,6 @@ function StringStats({ profile, rowCount }: { profile: ColumnProfile; rowCount: 
   )
 }
 
-// ============================================================================
-// Boolean Stats
-// ============================================================================
 
 function BooleanStats({ profile }: { profile: ColumnProfile }) {
   const topValues = profile.topValues || []
@@ -497,9 +460,6 @@ function BooleanStats({ profile }: { profile: ColumnProfile }) {
   )
 }
 
-// ============================================================================
-// Date Stats
-// ============================================================================
 
 function DateStats({ profile }: { profile: ColumnProfile }) {
   const fmtDate = (val: number | string | undefined) => {

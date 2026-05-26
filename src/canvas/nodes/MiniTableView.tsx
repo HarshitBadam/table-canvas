@@ -1,6 +1,6 @@
 import { memo, useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { useDataStore } from '@/state/dataStore'
-import { ColumnSchema, CellValue, ViewFilterConfig } from '@/lib/types'
+import { ColumnSchema, CellValue, ViewFilterConfig } from '@/types'
 import { formatNumber } from '@/lib/utils'
 import { evaluateFormula, FormulaValue } from '@/formula'
 import { applyFilters, hasActiveFilters } from '@/grid/filterUtils'

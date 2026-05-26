@@ -1,4 +1,4 @@
-import { CellValue, ColumnSchema, FilterCondition, FilterOperator, ColumnType } from '@/lib/types'
+import { CellValue, ColumnSchema, FilterCondition, FilterOperator, ColumnType } from '@/types'
 
 // Grid row type (matches GridView)
 interface GridRow {

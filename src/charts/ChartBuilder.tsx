@@ -5,7 +5,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
-import type { AggregationType, TableNode, ProjectNode } from '@/lib/types'
+import type { AggregationType, TableNode, ProjectNode } from '@/types'
 import { generateId } from '@/lib/utils'
 
 type ChartType = 'bar' | 'line' | 'pie' | 'scatter'

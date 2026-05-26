@@ -15,7 +15,7 @@ import {
   getRootNodes,
   getLeafNodes,
 } from './dependencyGraph'
-import type { Edge, ProjectNode, SourceTableNode, DerivedTableNode } from '@/lib/types'
+import type { Edge, ProjectNode, SourceTableNode, DerivedTableNode } from '@/types'
 
 // ============================================================================
 // Test Fixtures

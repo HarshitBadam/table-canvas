@@ -9,11 +9,8 @@ import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/r
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useDataStore } from '@/state/dataStore';
 import { useProjectStore } from '@/state/projectStore';
-import type { TableNode as TableNodeType, ColumnSchema } from '@/lib/types';
+import type { TableNode as TableNodeType, ColumnSchema } from '@/types';
 
-// ============================================================================
-// Types
-// ============================================================================
 
 type RowSelectionMode = 'all' | 'first_n' | 'last_n';
 
@@ -30,9 +27,6 @@ interface EmbeddedTableNodeOptions {
   onOpenTable?: (tableId: string) => void;
 }
 
-// ============================================================================
-// React Component
-// ============================================================================
 
 const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
   node,
@@ -213,13 +207,7 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
   );
 });
 
-// ============================================================================
-// Table Selector Component
-// ============================================================================
 
-// ============================================================================
-// Table Picker Modal
-// ============================================================================
 
 function TablePickerModal({ onSelect, onClose }: { onSelect: (tableId: string) => void; onClose: () => void }) {
   const nodes = useProjectStore((state) => state.nodes);
@@ -275,9 +263,6 @@ function TablePickerModal({ onSelect, onClose }: { onSelect: (tableId: string) =
   );
 }
 
-// ============================================================================
-// Config Panel
-// ============================================================================
 
 interface TableConfigPanelProps {
   attrs: EmbeddedTableNodeAttrs;
@@ -363,9 +348,6 @@ function TableConfigPanel({
   );
 }
 
-// ============================================================================
-// TipTap Node Definition
-// ============================================================================
 
 export const EmbeddedTableNode = Node.create<EmbeddedTableNodeOptions>({
   name: 'embeddedTable',

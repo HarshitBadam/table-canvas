@@ -4,7 +4,7 @@ import { useApp } from '@/state/AppContext'
 import { ImportButton } from '@/components/ImportButton'
 import { NewTableModal } from '@/canvas/modals/NewTableModal'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import type { ProjectNode, TableNode, ChartNode } from '@/lib/types'
+import type { ProjectNode, TableNode, ChartNode } from '@/types'
 
 interface SidebarProps {
   onOpenTable: (tableId: string) => void

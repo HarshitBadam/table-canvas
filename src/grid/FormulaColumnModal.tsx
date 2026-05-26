@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { ColumnSchema } from '@/lib/types'
+import { ColumnSchema } from '@/types'
 import {
   suggestFormulasFromName,
   inferFormulaType,

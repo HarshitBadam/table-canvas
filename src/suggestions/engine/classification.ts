@@ -5,12 +5,9 @@
  * Determines what types of analysis/charts make sense for each column.
  */
 
-import type { ColumnSchema, ColumnProfile, ColumnClassification } from '@/lib/types';
+import type { ColumnSchema, ColumnProfile, ColumnClassification } from '@/types';
 import { hasSequentialPattern } from './detection';
 
-// ============================================================================
-// Main Classification Function
-// ============================================================================
 
 /**
  * Classify a column for intelligent suggestion generation.
@@ -43,9 +40,6 @@ export function classifyColumn(
   return 'text';
 }
 
-// ============================================================================
-// Unique Identifier Detection
-// ============================================================================
 
 /**
  * Check if a column is a unique identifier (should not be analyzed/charted)
@@ -125,9 +119,6 @@ export function isUniqueIdentifier(
   return false;
 }
 
-// ============================================================================
-// Numeric Column Classification
-// ============================================================================
 
 /**
  * Classify a numeric column as continuous or discrete
@@ -163,9 +154,6 @@ export function classifyNumericColumn(
   return 'continuous_numeric';
 }
 
-// ============================================================================
-// String Column Classification
-// ============================================================================
 
 /**
  * Classify a string column by cardinality
@@ -198,9 +186,6 @@ export function classifyStringColumn(
   return 'text';
 }
 
-// ============================================================================
-// Analysis Helpers
-// ============================================================================
 
 /**
  * Check if a numeric column is meaningful for analysis (not an ID, has variance)

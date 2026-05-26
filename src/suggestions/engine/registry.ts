@@ -11,11 +11,8 @@ import type {
   TableSchema, 
   ColumnSchema,
   ColumnProfile,
-} from '@/lib/types';
+} from '@/types';
 
-// ============================================================================
-// Types
-// ============================================================================
 
 export interface SuggestionEngineContext {
   tableId: string;
@@ -56,9 +53,6 @@ export interface SuggestionRule {
   score: (ctx: SuggestionEngineContext, meta: MetadataBundle) => number;
 }
 
-// ============================================================================
-// Rule Registry
-// ============================================================================
 
 const suggestionRules: SuggestionRule[] = [];
 
@@ -78,9 +72,6 @@ export function getColumnRules(): SuggestionRule[] {
   return suggestionRules.filter(r => r.scope === 'column');
 }
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
 
 import { generateTableVersionHash } from '../suggestionsStore';
 

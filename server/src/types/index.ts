@@ -1,9 +1,6 @@
 import { Request } from 'express';
 import { Types } from 'mongoose';
 
-// ============================================================================
-// Base Types
-// ============================================================================
 
 /**
  * Base interface for soft-deletable entities
@@ -20,9 +17,6 @@ export interface Timestamped {
   updatedAt: Date;
 }
 
-// ============================================================================
-// User Types
-// ============================================================================
 
 export interface IRefreshToken {
   token: string;
@@ -46,9 +40,6 @@ export interface IUserPublic {
   createdAt: Date;
 }
 
-// ============================================================================
-// Project Types (matching frontend types)
-// ============================================================================
 
 export type NodeKind = 'source_table' | 'derived_table' | 'chart' | 'dashboard';
 
@@ -110,9 +101,6 @@ export interface IProjectPublic {
   updatedAt: Date;
 }
 
-// ============================================================================
-// File Types
-// ============================================================================
 
 export interface IFile extends SoftDeletable, Timestamped {
   _id: Types.ObjectId;
@@ -149,9 +137,6 @@ export interface UploadedFile {
   uploadDate: Date;
 }
 
-// ============================================================================
-// Auth Types
-// ============================================================================
 
 export interface JwtPayload {
   userId: string;
@@ -166,9 +151,6 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
-// ============================================================================
-// API Response Types
-// ============================================================================
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -187,9 +169,6 @@ export interface RegisterResponse {
   message: string;
 }
 
-// ============================================================================
-// Pagination Types
-// ============================================================================
 
 export interface PaginationOptions {
   page?: number;

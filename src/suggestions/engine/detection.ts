@@ -4,12 +4,9 @@
  * Helper functions for detecting data patterns in column values.
  */
 
-import { ColumnSchema, ColumnProfile } from '@/lib/types';
+import { ColumnSchema, ColumnProfile } from '@/types';
 import { isPlaceholder } from '../cleaningConstants';
 
-// ============================================================================
-// Whitespace Detection
-// ============================================================================
 
 export function hasLeadingTrailingWhitespace(value: unknown): boolean {
   if (value === null || value === undefined) return false;
@@ -17,9 +14,6 @@ export function hasLeadingTrailingWhitespace(value: unknown): boolean {
   return str !== str.trim();
 }
 
-// ============================================================================
-// Number Detection
-// ============================================================================
 
 export function looksLikeNumber(value: unknown): boolean {
   if (value === null || value === undefined) return false;
@@ -27,9 +21,6 @@ export function looksLikeNumber(value: unknown): boolean {
   return !isNaN(Number(str)) && str.length > 0;
 }
 
-// ============================================================================
-// ID Column Detection
-// ============================================================================
 
 /**
  * Check if a column looks like an ID column (should not have typo detection applied)
@@ -81,9 +72,6 @@ export function hasSequentialPattern(values: string[]): boolean {
   return sequential >= (sorted.length - 1) * 0.7;
 }
 
-// ============================================================================
-// Case Detection
-// ============================================================================
 
 export function hasMixedCase(values: Array<{ value: unknown; count?: number }>): boolean {
   const strings = values
@@ -138,9 +126,6 @@ export function getMixedCaseVariants(values: Array<{ value: unknown; count: numb
   return mappings;
 }
 
-// ============================================================================
-// Date Detection
-// ============================================================================
 
 export function looksLikeDate(value: unknown): boolean {
   if (value === null || value === undefined) return false;
@@ -186,9 +171,6 @@ export function detectDateFormats(topValues: Array<{ value: unknown }>): Set<str
   return formats;
 }
 
-// ============================================================================
-// Timestamp Detection
-// ============================================================================
 
 /**
  * Check if numeric column looks like timestamps
@@ -214,9 +196,6 @@ export function looksLikeTimestamp(min: number | undefined, max: number | undefi
   return null;
 }
 
-// ============================================================================
-// Delimiter Detection
-// ============================================================================
 
 export function hasConsistentDelimiter(values: Array<{ value: unknown }>): string | null {
   const delimiters = [',', '|', ';', '-', '_'];
@@ -234,9 +213,6 @@ export function hasConsistentDelimiter(values: Array<{ value: unknown }>): strin
   return null;
 }
 
-// ============================================================================
-// Typo Detection
-// ============================================================================
 
 /**
  * Levenshtein distance for typo detection
@@ -308,9 +284,6 @@ export function findTypos(topValues: Array<{ value: unknown; count: number }>): 
   return results;
 }
 
-// ============================================================================
-// Placeholder Detection
-// ============================================================================
 
 /**
  * Find placeholder values in topValues (for quick detection)
@@ -330,9 +303,6 @@ export function findPlaceholders(topValues: Array<{ value: unknown; count: numbe
   return { placeholders: found, totalCount };
 }
 
-// ============================================================================
-// Outlier Detection
-// ============================================================================
 
 export interface OutlierResult {
   hasOutliers: boolean;

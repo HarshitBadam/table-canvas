@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand'
-import type { Suggestion, SuggestionCategory } from '@/lib/types'
+import type { Suggestion, SuggestionCategory } from '@/types'
 
 // Context key format: tableVersionHash:columnId|table
 export function createContextKey(
@@ -78,7 +78,6 @@ interface SuggestionsState {
 }
 
 export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
-  // Initial state
   isOpen: false,
   activeTab: 'all',
   selectedTableId: null,
@@ -90,19 +89,16 @@ export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
   error: null,
   currentRequestId: null,
   
-  // Panel actions
   setOpen: (isOpen) => set({ isOpen }),
   toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
   setActiveTab: (tab) => set({ activeTab: tab }),
   
-  // Selection actions
   setSelection: (tableId, columnId) => set({
     selectedTableId: tableId,
     selectedColumnId: columnId ?? null,
     error: null,
   }),
   
-  // Cache actions
   setSuggestions: (contextKey, suggestions) => {
     set((state) => {
       const newCache = new Map(state.suggestionsCache)
@@ -132,7 +128,6 @@ export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
     })
   },
   
-  // Dismiss actions
   dismissSuggestion: (contextKey, suggestionId) => {
     set((state) => {
       const newDismissed = new Map(state.dismissed)
@@ -159,7 +154,6 @@ export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
     return get().dismissed.get(contextKey)?.has(suggestionId) ?? false
   },
   
-  // Consumed suggestion actions
   consumeSuggestion: (suggestionId) => {
     set((state) => {
       const newConsumed = new Set(state.consumed)
@@ -180,18 +174,15 @@ export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
     return get().consumed.has(suggestionId)
   },
   
-  // Loading state
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error, isLoading: false }),
   
-  // Request cancellation
   setCurrentRequestId: (requestId) => set({ currentRequestId: requestId }),
   shouldCancelRequest: (requestId) => {
     return get().currentRequestId !== requestId
   },
 }))
 
-// Debounce helper for selection changes
 let debounceTimeout: ReturnType<typeof setTimeout> | null = null
 
 export function debouncedSetSelection(
@@ -209,7 +200,6 @@ export function debouncedSetSelection(
   }, delay)
 }
 
-// Hook to get filtered suggestions (excluding dismissed and consumed)
 export function useFilteredSuggestions(contextKey: string): Suggestion[] {
   const suggestions = useSuggestionsStore((state) => 
     state.suggestionsCache.get(contextKey) ?? []
@@ -221,20 +211,14 @@ export function useFilteredSuggestions(contextKey: string): Suggestion[] {
   const activeTab = useSuggestionsStore((state) => state.activeTab)
   
   return suggestions.filter((s) => {
-    // Filter out dismissed
     if (dismissed.has(s.id)) return false
-    
-    // Filter out consumed (recipes/analysis that have been applied)
     if (consumed.has(s.id)) return false
-    
-    // Filter by category if not 'all'
     if (activeTab !== 'all' && s.category !== activeTab) return false
     
     return true
   })
 }
 
-// Hook to get category counts
 export function useCategoryCounts(contextKey: string): Record<SuggestionCategory | 'all', number> {
   const suggestions = useSuggestionsStore((state) => 
     state.suggestionsCache.get(contextKey) ?? []

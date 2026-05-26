@@ -2,7 +2,7 @@
  * Excel-like autofill pattern detection and value generation
  */
 
-import { CellValue } from '@/lib/types'
+import { CellValue } from '@/types'
 
 // Pattern types we can detect
 export type PatternType = 

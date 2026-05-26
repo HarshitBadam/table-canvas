@@ -1,6 +1,6 @@
 import { memo, useCallback, useState, useRef, useEffect } from 'react'
 import { Handle, Position, NodeProps } from 'reactflow'
-import { TableSchema, CacheInfo, NodeUI, NodeViewMode, CellValue, ViewFilterConfig } from '@/lib/types'
+import { TableSchema, CacheInfo, NodeUI, NodeViewMode, CellValue, ViewFilterConfig } from '@/types'
 import { formatNumber } from '@/lib/utils'
 import { MiniTableView } from './MiniTableView'
 
@@ -22,9 +22,6 @@ interface TableNodeData {
   onSetViewMode?: (nodeId: string, mode: NodeViewMode) => void
 }
 
-// ============================================================================
-// iOS-Inspired Table Card Design System
-// ============================================================================
 
 // Type badge colors - refined, muted tones (no green)
 function getTypeBadgeStyle(type: string): { bg: string; text: string } {

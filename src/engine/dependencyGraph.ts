@@ -8,11 +8,8 @@
  * - Finding ancestors/descendants for dirty propagation
  */
 
-import type { Edge, ProjectNode } from '@/lib/types'
+import type { Edge, ProjectNode } from '@/types'
 
-// ============================================================================
-// Types
-// ============================================================================
 
 export interface DependencyGraph {
   // Maps nodeId -> Set of nodeIds that this node depends on (upstream/parents)
@@ -24,9 +21,6 @@ export interface DependencyGraph {
 // Color marking for DFS cycle detection
 type NodeColor = 'white' | 'gray' | 'black'
 
-// ============================================================================
-// Graph Construction
-// ============================================================================
 
 /**
  * Build a dependency graph from edges
@@ -58,9 +52,6 @@ export function buildDependencyGraph(edges: Record<string, Edge>): DependencyGra
   return { upstream, downstream }
 }
 
-// ============================================================================
-// Cycle Detection
-// ============================================================================
 
 /**
  * Check if adding an edge from sourceId to targetId would create a cycle.
@@ -197,9 +188,6 @@ export function detectCycles(
   return cycleNodes
 }
 
-// ============================================================================
-// Topological Sort
-// ============================================================================
 
 /**
  * Get nodes in topological order (dependencies before dependents).
@@ -291,9 +279,6 @@ export function getComputationOrder(
   return result
 }
 
-// ============================================================================
-// Ancestor/Descendant Queries
-// ============================================================================
 
 /**
  * Get all descendants of a node (nodes that depend on this node, directly or indirectly).
@@ -375,9 +360,6 @@ export function getDirectDownstream(
   return graph.downstream.get(nodeId) ?? new Set()
 }
 
-// ============================================================================
-// Graph Analysis Utilities
-// ============================================================================
 
 /**
  * Get the depth of a node in the dependency graph.

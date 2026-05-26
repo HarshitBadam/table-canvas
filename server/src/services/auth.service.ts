@@ -6,11 +6,6 @@ import { JwtPayload } from '../types/index.js';
 
 const SALT_ROUNDS = 12;
 
-// ============================================================================
-// Duration Parsing (needed by JWT and cookies)
-// ============================================================================
-
-// Parse duration string to milliseconds
 function parseDuration(duration: string): number {
   const match = duration.match(/^(\d+)([smhd])$/);
   if (!match) {
@@ -34,10 +29,6 @@ function parseDuration(duration: string): number {
   }
 }
 
-// ============================================================================
-// Password Hashing
-// ============================================================================
-
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
@@ -48,10 +39,6 @@ export async function comparePassword(
 ): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
-
-// ============================================================================
-// Password Validation
-// ============================================================================
 
 export interface PasswordValidationResult {
   valid: boolean;
@@ -83,10 +70,6 @@ export function validatePassword(password: string): PasswordValidationResult {
   };
 }
 
-// ============================================================================
-// JWT Token Generation
-// ============================================================================
-
 export function generateAccessToken(userId: string, email: string): string {
   const payload: JwtPayload = {
     userId,
@@ -94,7 +77,6 @@ export function generateAccessToken(userId: string, email: string): string {
     type: 'access',
   };
 
-  // Use parseDuration to convert string to milliseconds for jwt
   const expiresInMs = parseDuration(config.jwtAccessExpiresIn);
   const expiresInSeconds = Math.floor(expiresInMs / 1000);
 
@@ -110,7 +92,6 @@ export function generateRefreshToken(userId: string, email: string): string {
     type: 'refresh',
   };
 
-  // Use parseDuration to convert string to milliseconds for jwt
   const expiresInMs = parseDuration(config.jwtRefreshExpiresIn);
   const expiresInSeconds = Math.floor(expiresInMs / 1000);
 
@@ -118,10 +99,6 @@ export function generateRefreshToken(userId: string, email: string): string {
     expiresIn: expiresInSeconds,
   });
 }
-
-// ============================================================================
-// JWT Token Verification
-// ============================================================================
 
 export function verifyAccessToken(token: string): JwtPayload | null {
   try {
@@ -147,10 +124,6 @@ export function verifyRefreshToken(token: string): JwtPayload | null {
   }
 }
 
-// ============================================================================
-// Cookie Management
-// ============================================================================
-
 const ACCESS_TOKEN_COOKIE = 'access_token';
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 
@@ -162,7 +135,6 @@ export function setAuthCookies(
   const accessMaxAge = parseDuration(config.jwtAccessExpiresIn);
   const refreshMaxAge = parseDuration(config.jwtRefreshExpiresIn);
 
-  // Set access token cookie
   res.cookie(ACCESS_TOKEN_COOKIE, accessToken, {
     httpOnly: true,
     secure: config.cookieSecure,
@@ -171,7 +143,6 @@ export function setAuthCookies(
     path: '/',
   });
 
-  // Set refresh token cookie
   res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
     httpOnly: true,
     secure: config.cookieSecure,
@@ -204,10 +175,6 @@ export function getAccessTokenFromCookie(cookies: Record<string, string>): strin
 export function getRefreshTokenFromCookie(cookies: Record<string, string>): string | undefined {
   return cookies[REFRESH_TOKEN_COOKIE];
 }
-
-// ============================================================================
-// Refresh Token Expiry Date
-// ============================================================================
 
 export function getRefreshTokenExpiryDate(): Date {
   const expiresIn = parseDuration(config.jwtRefreshExpiresIn);

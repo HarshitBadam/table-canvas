@@ -6,7 +6,7 @@
 import { useState, useMemo } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
-import type { Suggestion, ColumnSchema, TransformDef } from '@/lib/types'
+import type { Suggestion, ColumnSchema, TransformDef } from '@/types'
 
 interface RecipeWizardProps {
   isOpen: boolean

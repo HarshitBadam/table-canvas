@@ -6,9 +6,6 @@ import {
 } from '../services/auth.service.js';
 import { AuthenticationError } from './errorHandler.js';
 
-// ============================================================================
-// Authentication Middleware
-// ============================================================================
 
 export function requireAuth(
   req: AuthenticatedRequest,
@@ -16,10 +13,8 @@ export function requireAuth(
   next: NextFunction
 ): void {
   try {
-    // Get token from cookie or Authorization header
     let token = getAccessTokenFromCookie(req.cookies || {});
 
-    // Fallback to Authorization header
     if (!token) {
       const authHeader = req.headers.authorization;
       if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -31,13 +26,11 @@ export function requireAuth(
       throw new AuthenticationError('No authentication token provided');
     }
 
-    // Verify the token
     const payload = verifyAccessToken(token);
     if (!payload) {
       throw new AuthenticationError('Invalid or expired token');
     }
 
-    // Attach user info to request
     req.user = {
       userId: payload.userId,
       email: payload.email,
@@ -49,9 +42,6 @@ export function requireAuth(
   }
 }
 
-// ============================================================================
-// Optional Auth Middleware (for routes that work with or without auth)
-// ============================================================================
 
 export function optionalAuth(
   req: AuthenticatedRequest,
@@ -59,10 +49,8 @@ export function optionalAuth(
   next: NextFunction
 ): void {
   try {
-    // Get token from cookie or Authorization header
     let token = getAccessTokenFromCookie(req.cookies || {});
 
-    // Fallback to Authorization header
     if (!token) {
       const authHeader = req.headers.authorization;
       if (authHeader && authHeader.startsWith('Bearer ')) {

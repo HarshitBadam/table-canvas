@@ -3,11 +3,8 @@
  */
 
 import { api } from './client';
-import type { ProjectNode, Edge, Patches } from '@/lib/types';
+import type { ProjectNode, Edge, Patches } from '@/types';
 
-// ============================================================================
-// Types
-// ============================================================================
 
 export interface ProjectSummary {
   id: string;
@@ -47,9 +44,6 @@ export interface UpdateProjectData {
   patches?: Record<string, SerializedPatches>;
 }
 
-// ============================================================================
-// Helper: Serialize Patches
-// ============================================================================
 
 export function serializePatches(
   patches: Record<string, Patches>
@@ -75,9 +69,9 @@ export function deserializePatches(
   
   for (const [tableId, patch] of Object.entries(serialized)) {
     patches[tableId] = {
-      cellPatches: patch.cellPatches as Record<string, Record<string, import('@/lib/types').CellValue>>,
+      cellPatches: patch.cellPatches as Record<string, Record<string, import('@/types').CellValue>>,
       deletedRows: new Set(patch.deletedRows),
-      insertedRows: patch.insertedRows as import('@/lib/types').InsertedRow[],
+      insertedRows: patch.insertedRows as import('@/types').InsertedRow[],
       highlightedCells: new Set(patch.highlightedCells || []),
     };
   }
@@ -85,9 +79,6 @@ export function deserializePatches(
   return patches;
 }
 
-// ============================================================================
-// Projects API Functions
-// ============================================================================
 
 /**
  * List all projects for the current user

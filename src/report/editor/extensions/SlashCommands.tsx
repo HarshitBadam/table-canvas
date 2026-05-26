@@ -18,11 +18,8 @@ import {
   memo 
 } from 'react';
 import { useProjectStore } from '@/state/projectStore';
-import type { TableNode as TableNodeType } from '@/lib/types';
+import type { TableNode as TableNodeType } from '@/types';
 
-// ============================================================================
-// Types
-// ============================================================================
 
 import type { Editor } from '@tiptap/react';
 import type { Range } from '@tiptap/core';
@@ -50,9 +47,6 @@ interface CommandListRef {
   onKeyDown: (props: { event: KeyboardEvent }) => boolean;
 }
 
-// ============================================================================
-// Icons
-// ============================================================================
 
 const TextIcon = () => (
   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -138,9 +132,6 @@ const EmbedIcon = () => (
   </svg>
 );
 
-// ============================================================================
-// Command List Component
-// ============================================================================
 
 const CommandList = memo(forwardRef<CommandListRef, CommandListProps>(
   function CommandList({ items, command }, ref) {
@@ -229,9 +220,6 @@ const CommandList = memo(forwardRef<CommandListRef, CommandListProps>(
   }
 ));
 
-// ============================================================================
-// Command Definitions
-// ============================================================================
 
 function getCommands(_options: SlashCommandsOptions): SlashCommandItem[] {
   const tables = Object.values(useProjectStore.getState().nodes)
@@ -401,9 +389,6 @@ function getCommands(_options: SlashCommandsOptions): SlashCommandItem[] {
   ];
 }
 
-// ============================================================================
-// Suggestion Plugin Configuration
-// ============================================================================
 
 function getSuggestionConfig(options: SlashCommandsOptions): Partial<SuggestionOptions<SlashCommandItem>> {
   return {
@@ -499,9 +484,6 @@ function getSuggestionConfig(options: SlashCommandsOptions): Partial<SuggestionO
   };
 }
 
-// ============================================================================
-// TipTap Extension
-// ============================================================================
 
 export const SlashCommands = Extension.create<SlashCommandsOptions>({
   name: 'slashCommands',

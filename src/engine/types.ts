@@ -7,11 +7,8 @@ import {
   TableSchema, 
   ColumnProfile,
   AggregationType 
-} from '@/lib/types'
+} from '@/types'
 
-// ============================================================================
-// Engine Message Types (for Worker communication)
-// ============================================================================
 
 export type WorkerRequestType = 
   | 'init'
@@ -35,9 +32,6 @@ export interface WorkerResponse {
   error?: string
 }
 
-// ============================================================================
-// Table Data Types
-// ============================================================================
 
 export interface RawTableData {
   columns: string[]
@@ -53,9 +47,6 @@ export interface TableSlice {
   totalRows: number
 }
 
-// ============================================================================
-// Aggregation Types
-// ============================================================================
 
 export interface AggregationDef {
   groupBy?: string[]
@@ -71,9 +62,6 @@ export interface AggregationResult {
   rows: CellValue[][]
 }
 
-// ============================================================================
-// Profiling Types
-// ============================================================================
 
 export interface ProfileResult {
   tableId: string
@@ -83,9 +71,6 @@ export interface ProfileResult {
   computedAt: string
 }
 
-// ============================================================================
-// Transform Result
-// ============================================================================
 
 export interface TransformResult {
   tableId: string
@@ -94,9 +79,6 @@ export interface TransformResult {
   preview: Record<string, CellValue>[]
 }
 
-// ============================================================================
-// Load Table Request
-// ============================================================================
 
 export interface LoadTableRequest {
   tableId: string

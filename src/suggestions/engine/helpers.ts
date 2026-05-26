@@ -7,9 +7,6 @@
 import type { SuggestionEngineContext } from './types'
 import { generateTableVersionHash } from '../suggestionsStore'
 
-// ============================================================================
-// ID Generation
-// ============================================================================
 
 /**
  * Generate a deterministic suggestion ID based on rule and context.
@@ -27,9 +24,6 @@ export function createSuggestionId(
   return parts.join(':')
 }
 
-// ============================================================================
-// Version Hash
-// ============================================================================
 
 /**
  * Get or compute the version hash for a table.
@@ -43,9 +37,6 @@ export function getVersionHash(ctx: SuggestionEngineContext): string {
   )
 }
 
-// ============================================================================
-// Confidence Scoring
-// ============================================================================
 
 /**
  * Convert a numeric score to a confidence level.
