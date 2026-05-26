@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { enableMapSet } from 'immer'
 import './styles/index.css'
 import App from './app/App'
-import { ErrorBoundary } from './components/ErrorBoundary'
+import { ErrorBoundary } from '@/design/components'
 import { ThemeProvider } from './components/ThemeToggle'
 import { AppProvider } from './state/AppContext'
 

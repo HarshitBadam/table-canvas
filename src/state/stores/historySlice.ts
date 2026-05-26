@@ -7,7 +7,7 @@
 import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, HistorySliceState, HistoryEntry } from './types'
 import type { Patches } from '@/types'
-import { MAX_UNDO_HISTORY } from '@/config/constants'
+const MAX_UNDO_HISTORY = 50
 
 export const createHistorySlice: StateCreator<
   ProjectStoreState,
