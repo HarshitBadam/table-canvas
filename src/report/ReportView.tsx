@@ -8,7 +8,7 @@
 
 import { useCallback, useRef, useEffect } from 'react';
 import { useReportStore } from './reportStore';
-import { TipTapEditor, TipTapEditorHandle } from './editor';
+import { TipTapEditor, type TipTapEditorHandle } from './editor/TipTapEditor';
 import { ReportToolbar } from './ReportToolbar';
 import { migrateReport, needsMigration } from './migrations/migrateToTipTap';
 import type { JSONContent } from '@tiptap/react';

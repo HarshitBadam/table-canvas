@@ -4,7 +4,7 @@
  * Types for the Notion-like report editor with block-based content.
  */
 
-import type { AggregationType } from '@/core/types/node.types';
+import type { AggregationType } from '@/types';
 
 // ============================================================================
 // Block Types

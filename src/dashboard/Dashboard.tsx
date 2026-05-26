@@ -10,12 +10,9 @@ import { useProjectStore } from '@/state/projectStore'
 import { applySuggestion, setToastHandler, type ToastNotification } from '@/suggestions/commands'
 import type { Suggestion } from '@/lib/types'
 
-// Import dashboard components
-import { 
-  LineageMiniMap,
-  TableStatsSection,
-  QuickActionsSection,
-} from './components'
+import { LineageMiniMap } from './components/LineageMiniMap'
+import { TableStatsSection } from './components/TableStatsSection'
+import { QuickActionsSection } from './components/QuickActionsSection'
 
 // Import dashboard hooks
 import {
