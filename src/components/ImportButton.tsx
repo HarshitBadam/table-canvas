@@ -2,14 +2,13 @@ import { useRef, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
-import { ColumnSchema, ColumnType, TableSchema, CellValue } from '@/lib/types'
+import { ColumnSchema, ColumnType, TableSchema, CellValue } from '@/types'
 import { generateId, readFileAsText, readFileAsArrayBuffer, inferValueType } from '@/lib/utils'
 import { getEngine } from '@/engine'
 import { saveFile } from '@/persistence/db'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 
-// Helper to load table data into the DuckDB engine and mark as fresh
 async function loadTableIntoEngine(
   tableId: string,
   schema: TableSchema,
@@ -31,7 +30,6 @@ async function loadTableIntoEngine(
     
     return true
   } catch (error) {
-    // Mark error state
     useProjectStore.getState().updateCacheInfo(tableId, {
       isDirty: true,
       isComputing: false,
@@ -107,7 +105,6 @@ export function ImportButton() {
 
           const { schema, rows } = processData(results.data, results.meta.fields || [])
           
-          // Generate fileRef and save file blob to IndexedDB
           const fileRef = generateId()
           await saveFile(fileRef, file.name, file.type || 'text/csv', buffer)
           
@@ -174,7 +171,6 @@ export function ImportButton() {
 
     const { schema, rows } = processData(dataRows, headers)
     
-    // Generate fileRef and save file blob to IndexedDB if buffer provided
     const fileRef = generateId()
     if (fileBuffer) {
       await saveFile(fileRef, fName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileBuffer)
@@ -329,7 +325,6 @@ export function ImportButton() {
   )
 }
 
-// Helper function to process parsed data into schema and rows
 function processData(
   data: Record<string, string>[],
   fields: string[]

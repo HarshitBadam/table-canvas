@@ -5,7 +5,7 @@
  * Limited to 3 suggestions for focus.
  */
 
-import type { Suggestion } from '@/lib/types'
+import type { Suggestion } from '@/types'
 
 interface QuickActionsSectionProps {
   suggestions: Suggestion[]

@@ -1,10 +1,3 @@
-/**
- * Type definitions barrel export
- * 
- * Domain-organized type system for Table Canvas
- */
-
-// Common types
 export type {
   CellValue,
   Position,
@@ -14,7 +7,6 @@ export type {
   ProjectState,
 } from './common.types'
 
-// Schema types
 export type {
   ColumnType,
   SemanticHint,
@@ -22,7 +14,6 @@ export type {
   TableSchema,
 } from './schema.types'
 
-// Node types
 export type {
   NodeKind,
   NodeViewMode,
@@ -42,7 +33,6 @@ export type {
   ProjectNode,
 } from './node.types'
 
-// Transform types
 export type {
   TransformType,
   Edge,
@@ -62,7 +52,6 @@ export type {
   ViewFilterConfig,
 } from './transform.types'
 
-// Profile types
 export type {
   CardinalityClass,
   ColumnClassification,
@@ -70,7 +59,6 @@ export type {
   TableProfile,
 } from './profile.types'
 
-// Suggestion types
 export type {
   SuggestionCategory,
   SuggestionScope,

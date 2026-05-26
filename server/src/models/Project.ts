@@ -1,14 +1,9 @@
 import mongoose, { Schema, Document, Model, Types } from 'mongoose';
 import { IProject, ProjectNode, Edge, SerializedPatches } from '../types/index.js';
 
-// ============================================================================
-// Project Schema
-// ============================================================================
-
 export interface IProjectDocument extends Omit<IProject, '_id'>, Document {
   deletedAt: Date | null;
   
-  // Instance methods
   toPublic(): {
     id: string;
     name: string;
@@ -90,22 +85,12 @@ const ProjectSchema = new Schema<IProjectDocument, IProjectModel>(
   }
 );
 
-// ============================================================================
-// Indexes
-// ============================================================================
-
 // Primary query pattern: user's active projects sorted by last update
 ProjectSchema.index({ userId: 1, deletedAt: 1, updatedAt: -1 });
 
-// Search by name within user's projects
 ProjectSchema.index({ userId: 1, name: 1 });
 
-// Cleanup jobs: find old deleted projects
 ProjectSchema.index({ deletedAt: 1 }, { sparse: true });
-
-// ============================================================================
-// Instance Methods
-// ============================================================================
 
 ProjectSchema.methods.toPublic = function () {
   return {
@@ -141,10 +126,6 @@ ProjectSchema.methods.restore = async function (): Promise<IProjectDocument> {
 ProjectSchema.methods.isDeleted = function (): boolean {
   return this.deletedAt !== null;
 };
-
-// ============================================================================
-// Static Methods
-// ============================================================================
 
 /**
  * Find all active (non-deleted) projects for a user
@@ -192,21 +173,12 @@ ProjectSchema.statics.findByUserWithDeleted = function (
     .sort({ updatedAt: -1 });
 };
 
-// ============================================================================
-// Pre-save Hooks
-// ============================================================================
-
 ProjectSchema.pre('save', function (next) {
-  // Ensure nodes, edges, and patches are objects
   if (!this.nodes) this.nodes = {};
   if (!this.edges) this.edges = {};
   if (!this.patches) this.patches = {};
   next();
 });
-
-// ============================================================================
-// Export Model
-// ============================================================================
 
 export const Project = mongoose.model<IProjectDocument, IProjectModel>(
   'Project',

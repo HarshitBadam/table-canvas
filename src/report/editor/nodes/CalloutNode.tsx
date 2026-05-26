@@ -8,9 +8,6 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, NodeViewProps } from '@tiptap/react';
 import { useState, useCallback, memo } from 'react';
 
-// ============================================================================
-// Types
-// ============================================================================
 
 type CalloutVariant = 'info' | 'success' | 'warning' | 'error' | 'note';
 
@@ -26,9 +23,6 @@ const CALLOUT_LABELS: Record<CalloutVariant, string> = {
   note: 'Note',
 };
 
-// ============================================================================
-// SVG Icons
-// ============================================================================
 
 function InfoIcon() {
   return (
@@ -78,9 +72,6 @@ const CALLOUT_ICONS: Record<CalloutVariant, () => JSX.Element> = {
   note: NoteIcon,
 };
 
-// ============================================================================
-// React Component
-// ============================================================================
 
 const CalloutNodeView = memo(function CalloutNodeView({
   node,
@@ -145,9 +136,6 @@ const CalloutNodeView = memo(function CalloutNodeView({
   );
 });
 
-// ============================================================================
-// TipTap Node Definition
-// ============================================================================
 
 export const CalloutNode = Node.create({
   name: 'callout',

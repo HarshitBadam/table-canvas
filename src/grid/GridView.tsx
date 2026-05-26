@@ -1,18 +1,22 @@
 import { useMemo, useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
-import { CellValue, ColumnSchema } from '@/lib/types'
-import { formatNumber, generateId } from '@/lib/utils'
+import type { CellValue } from '@/types'
+import { generateId } from '@/lib/utils'
 import { detectPattern, generateNextValues } from './autofill'
 import { useTheme } from '@/components/ThemeToggle'
 import { FilterPanel } from './FilterPanel'
-import { GridFilterConfig, applyFilters, createEmptyFilterConfig, hasActiveFilters, countActiveFilters } from './filterUtils'
+import { GridFilterConfig, applyFilters, createEmptyFilterConfig, hasActiveFilters } from './filterUtils'
 import { FormulaColumnModal } from './FormulaColumnModal'
 import { evaluateFormula, FormulaValue } from '@/formula'
 import { ensureTableMaterialized } from '@/engine/materializationService'
+import { ColumnHeader } from './ColumnHeader'
+import { GridCell } from './GridCell'
+import { GridContextMenu } from './GridContextMenu'
+import { GridToolbar } from './GridToolbar'
+import type { ContextMenuState } from './GridContextMenu'
 import type { GridClipboardData } from '@/types/clipboard.types'
 
-// Lazy loaded components for code splitting
 const SuggestionsPanel = lazy(() => import('@/suggestions/SuggestionsPanel').then(m => ({ default: m.SuggestionsPanel })))
 const ChartBuilder = lazy(() => import('@/charts/ChartBuilder').then(m => ({ default: m.ChartBuilder })))
 
@@ -41,14 +45,7 @@ type SelectionType =
   | { type: 'corner' }  // Top-left corner - can insert both at position 0
   | null
 
-// Context menu position
-interface ContextMenuState {
-  x: number
-  y: number
-  type: 'cell' | 'row' | 'column' | 'header' | 'index' | 'corner'
-  rowIndex?: number
-  columnId?: string
-}
+// Context menu position - type imported from GridContextMenu
 
 export function GridView({ tableId }: GridViewProps) {
   const node = useProjectStore((state) => state.getTableNode(tableId))
@@ -88,25 +85,19 @@ export function GridView({ tableId }: GridViewProps) {
   const [scrollTop, setScrollTop] = useState(0)
   const [containerHeight, setContainerHeight] = useState(0)
   
-  // Editing state
   const [editingCell, setEditingCell] = useState<{ rowIndex: number; columnId: string } | null>(null)
   const [editValue, setEditValue] = useState<string>('')
   const [editError, setEditError] = useState<string | null>(null)
   
-  // Column name editing state
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null)
   const [editColumnName, setEditColumnName] = useState<string>('')
   
-  // Unified selection state
   const [selection, setSelection] = useState<SelectionType>(null)
   
-  // Context menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   
-  // Suggestions panel state
   const [showSuggestions, setShowSuggestions] = useState(false)
   
-  // Filter panel state
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   
   // Filters are persisted on the node - convert ViewFilterConfig to GridFilterConfig
@@ -125,30 +116,23 @@ export function GridView({ tableId }: GridViewProps) {
     setTableFilters(tableId, newFilters.conditions.length > 0 ? newFilters : null)
   }, [tableId, setTableFilters])
   
-  // New column modal state
   const [newColumnModal, setNewColumnModal] = useState<{ isOpen: boolean; insertIndex: number }>({ isOpen: false, insertIndex: 0 })
   
-  // Chart builder modal state
   const [chartBuilderOpen, setChartBuilderOpen] = useState(false)
   const [chartPreselectedColumn, setChartPreselectedColumn] = useState<string | undefined>(undefined)
   
-  // Column widths state (columnId -> width in pixels)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
   
-  // Resizing state
   const [resizingColumn, setResizingColumn] = useState<string | null>(null)
   const [resizeStartX, setResizeStartX] = useState(0)
   const [resizeStartWidth, setResizeStartWidth] = useState(0)
   
-  // Theme
   const { theme, toggleTheme } = useTheme()
   
-  // Default column width
   const DEFAULT_COLUMN_WIDTH = 150
   const MIN_COLUMN_WIDTH = 60
   const MAX_COLUMN_WIDTH = 500
   
-  // Get column width helper
   const getColumnWidth = useCallback((columnId: string) => {
     return columnWidths[columnId] || DEFAULT_COLUMN_WIDTH
   }, [columnWidths])
@@ -165,17 +149,14 @@ export function GridView({ tableId }: GridViewProps) {
   const isDraggingSelectionRef = useRef(false)
   const dragSelectionStart = useRef<{ rowIndex: number; colIndex: number } | null>(null)
   
-  // Autofill state
   const [autofillDragging, setAutofillDragging] = useState(false)
   const [autofillEndRow, setAutofillEndRow] = useState<number | null>(null)
   const [autofillPreview, setAutofillPreview] = useState<{ rowIndex: number; value: CellValue }[]>([])
   const autofillColumnId = useRef<string | null>(null)
   
-  // Materialization state (for derived tables)
   const [isMaterializing, setIsMaterializing] = useState(false)
   const [materializationError, setMaterializationError] = useState<string | null>(null)
   
-  // Get cache info for dirty state
   const cacheInfo = node && (node.kind === 'source_table' || node.kind === 'derived_table') 
     ? node.cacheInfo 
     : undefined
@@ -254,12 +235,10 @@ export function GridView({ tableId }: GridViewProps) {
     return baseValue
   }, [patches, columns])
 
-  // Check if row is deleted
   const isRowDeleted = useCallback((rowId: string): boolean => {
     return patches?.deletedRows?.has(rowId) ?? false
   }, [patches])
 
-  // Apply filters to rows
   const filteredRows = useMemo(() => {
     // First filter out deleted rows
     const nonDeletedRows = rows.filter(row => !isRowDeleted(row.__rowId))
@@ -282,7 +261,6 @@ export function GridView({ tableId }: GridViewProps) {
   // Use filteredRows which already excludes deleted rows
   const visibleRows = filteredRows.slice(startIndex, endIndex)
 
-  // Derive selection state for rendering
   const selectedCell = selection?.type === 'cell' ? { rowIndex: selection.rowIndex, columnId: selection.columnId } : null
   const selectedColumn = selection?.type === 'column' ? selection.columnId : (selection?.type === 'cell' ? selection.columnId : null)
   const isHeaderRowSelected = selection?.type === 'header-row' || selection?.type === 'corner'
@@ -331,7 +309,6 @@ export function GridView({ tableId }: GridViewProps) {
     }
   }, [selection, columns])
 
-  // Handle scroll
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setScrollTop(e.currentTarget.scrollTop)
   }, [])
@@ -435,7 +412,6 @@ export function GridView({ tableId }: GridViewProps) {
     }
   }, [])
 
-  // Start editing a cell
   const startEditing = useCallback((rowIndex: number, columnId: string, currentValue: CellValue) => {
     if (!isEditable) return
     setEditingCell({ rowIndex, columnId })
@@ -455,7 +431,6 @@ export function GridView({ tableId }: GridViewProps) {
     setEditError(null)
   }, [isEditable, columns])
 
-  // Commit edit
   const commitEdit = useCallback(() => {
     if (!editingCell) return
     
@@ -481,7 +456,6 @@ export function GridView({ tableId }: GridViewProps) {
     setEditError(null)
   }, [editingCell, rows, tableId, editValue, setCellValue, saveSnapshot, columns, validateValue])
 
-  // Cancel edit
   const cancelEdit = useCallback(() => {
     setEditingCell(null)
     setEditValue('')
@@ -575,7 +549,6 @@ export function GridView({ tableId }: GridViewProps) {
     setSelection({ type: 'column', columnId })
   }, [])
 
-  // Column name editing handlers
   const handleColumnDoubleClick = useCallback((columnId: string, currentName: string) => {
     if (!isEditable) return
     setEditingColumnId(columnId)
@@ -600,7 +573,6 @@ export function GridView({ tableId }: GridViewProps) {
     setEditColumnName('')
   }, [])
 
-  // Column resize handlers
   const handleResizeStart = useCallback((columnId: string, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -609,7 +581,6 @@ export function GridView({ tableId }: GridViewProps) {
     setResizeStartWidth(getColumnWidth(columnId))
   }, [getColumnWidth])
 
-  // Global mouse move/up for resizing
   useEffect(() => {
     if (!resizingColumn) return
 
@@ -640,7 +611,6 @@ export function GridView({ tableId }: GridViewProps) {
     setSelection({ type: 'corner' })
   }, [])
 
-  // Context menu handlers
   const handleContextMenu = useCallback((
     e: React.MouseEvent, 
     type: 'cell' | 'row' | 'column' | 'header' | 'index' | 'corner', 
@@ -653,7 +623,6 @@ export function GridView({ tableId }: GridViewProps) {
     setContextMenu({ x: e.clientX, y: e.clientY, type, rowIndex, columnId })
   }, [isEditable])
 
-  // Insert row at specific position
   const doInsertRow = useCallback((index: number) => {
     if (!isEditable) return
     saveSnapshot('Insert row')
@@ -665,13 +634,11 @@ export function GridView({ tableId }: GridViewProps) {
     insertRow(tableId, newRowId, values, index)
   }, [isEditable, saveSnapshot, columns, insertRow, tableId])
 
-  // Open new column modal
   const openNewColumnModal = useCallback((index: number) => {
     if (!isEditable) return
     setNewColumnModal({ isOpen: true, insertIndex: index })
   }, [isEditable])
 
-  // Insert column at specific position (called from modal)
   const doInsertColumn = useCallback((
     index: number, 
     name: string, 
@@ -691,7 +658,6 @@ export function GridView({ tableId }: GridViewProps) {
     }
   }, [isEditable, saveSnapshot, insertColumnAt, addColumn, addFormulaColumn, tableId])
 
-  // Confirm new column creation (now handled by FormulaColumnModal)
   const handleNewColumnConfirm = useCallback((
     name: string,
     type: 'string' | 'number' | 'boolean' | 'date',
@@ -701,12 +667,10 @@ export function GridView({ tableId }: GridViewProps) {
     setNewColumnModal({ isOpen: false, insertIndex: 0 })
   }, [newColumnModal.insertIndex, doInsertColumn])
 
-  // Cancel new column
   const handleNewColumnCancel = useCallback(() => {
     setNewColumnModal({ isOpen: false, insertIndex: 0 })
   }, [])
 
-  // Context menu actions
   const handleInsertRowAbove = useCallback(() => {
     if (contextMenu?.rowIndex !== undefined) {
       doInsertRow(contextMenu.rowIndex)
@@ -758,7 +722,6 @@ export function GridView({ tableId }: GridViewProps) {
     setContextMenu(null)
   }, [contextMenu, columns, openNewColumnModal])
 
-  // Toolbar button handlers - use selection-aware position
   const handleAddRow = useCallback(() => {
     const insertIndex = getRowInsertionIndex()
     doInsertRow(insertIndex)
@@ -769,12 +732,10 @@ export function GridView({ tableId }: GridViewProps) {
     openNewColumnModal(insertIndex)
   }, [getColumnInsertionIndex, openNewColumnModal])
 
-  // Toggle suggestions panel
   const handleToggleSuggestions = useCallback(() => {
     setShowSuggestions(prev => !prev)
   }, [])
 
-  // Toggle filter panel
   const handleToggleFilters = useCallback(() => {
     setShowFilterPanel(prev => !prev)
   }, [])
@@ -922,7 +883,6 @@ export function GridView({ tableId }: GridViewProps) {
     autofillColumnId.current = null
   }, [autofillDragging, autofillEndRow, cellRangeSelection, selection, rows, getDisplayValue, saveSnapshot, setCellValue, tableId])
 
-  // Global mouse event handlers for autofill
   useEffect(() => {
     if (!autofillDragging) return
 
@@ -934,7 +894,6 @@ export function GridView({ tableId }: GridViewProps) {
     return () => document.removeEventListener('mouseup', handleMouseUp)
   }, [autofillDragging, handleAutofillEnd])
 
-  // Global mouse event handlers for drag selection
   useEffect(() => {
     const handleMouseUp = () => {
       if (isDraggingSelectionRef.current) {
@@ -1030,7 +989,6 @@ export function GridView({ tableId }: GridViewProps) {
     return [headerRow, ...dataRows].join('\n');
   }, []);
 
-  // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Copy handler (Cmd+C / Ctrl+C)
@@ -1208,134 +1166,33 @@ export function GridView({ tableId }: GridViewProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-surface">
-        <div className="text-sm text-text-secondary">
-          {hasActiveFilters(filters) ? (
-            <>
-              <span className="font-medium text-green-600 dark:text-green-400">{formatNumber(totalRows)}</span>
-              <span className="text-text-tertiary"> of {formatNumber(unfilteredTotalRows)}</span>
-              {' '}rows × {columns.length} columns
-            </>
-          ) : (
-            <>{formatNumber(totalRows)} rows × {columns.length} columns</>
-          )}
-          {/* Show dirty indicator */}
-          {isDirty && !isMaterializing && !isComputing && (
-            <span className="ml-2 text-amber-600 dark:text-amber-400 text-xs">
-              (needs refresh)
-            </span>
-          )}
-          {(isMaterializing || isComputing) && (
-            <span className="ml-2 text-blue-600 dark:text-blue-400 text-xs animate-pulse">
-              (computing...)
-            </span>
-          )}
-        </div>
-        <div className="flex-1" />
-        
-        {isEditable && (
-          <>
-            <button 
-              onClick={handleAddRow}
-              className="btn btn-primary text-xs gap-1.5"
-              title={`Insert row ${getRowInsertionDescription()}`}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Row<span className="text-[10px] opacity-60 font-normal ml-1">{getRowInsertionDescription()}</span>
-            </button>
-            <button 
-              onClick={handleAddColumn}
-              className="btn btn-primary text-xs gap-1.5"
-              title={`Insert column ${getColumnInsertionDescription()}`}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Column<span className="text-[10px] opacity-60 font-normal ml-1">{getColumnInsertionDescription()}</span>
-            </button>
-            <span className="badge badge-blue">Editable</span>
-          </>
-        )}
-        {!isEditable && (
-          <span className="badge badge-orange">View only (Derived table)</span>
-        )}
-        
-        <button 
-          onClick={handleToggleFilters}
-          className={`btn text-xs ${showFilterPanel || hasActiveFilters(filters) ? 'btn-primary' : 'btn-ghost'}`}
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-          </svg>
-          Filter
-          {hasActiveFilters(filters) && (
-            <span className="ml-1 px-1.5 py-0.5 text-[10px] font-medium bg-white/20 rounded-full">
-              {countActiveFilters(filters)}
-            </span>
-          )}
-        </button>
-        
-        {/* Create Chart button */}
-        <button 
-          onClick={() => {
-            setChartPreselectedColumn(undefined)
-            setChartBuilderOpen(true)
-          }}
-          className="btn btn-secondary text-xs gap-1.5"
-          title="Create chart from this table"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-          Create Chart
-        </button>
-        {/* Clear Highlights button - only show when there are highlights */}
-        {highlightedCells && highlightedCells.size > 0 && (
-          <button 
-            onClick={() => clearHighlights(tableId)}
-            className="btn btn-ghost text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
-            title="Clear all highlighted cells"
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Clear {highlightedCells.size} Highlight{highlightedCells.size !== 1 ? 's' : ''}
-          </button>
-        )}
-        
-        <button 
-          onClick={handleToggleSuggestions}
-          className={`btn text-xs ${showSuggestions ? 'btn-primary' : 'btn-ghost'}`}
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
-          Suggestions
-        </button>
-        
-        {/* Theme Toggle */}
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={toggleTheme}
-            className="btn btn-ghost text-xs p-2"
-            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          >
-            {theme === 'dark' ? (
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-              </svg>
-            )}
-          </button>
-        </div>
-      </div>
+      <GridToolbar
+        totalRows={totalRows}
+        unfilteredTotalRows={unfilteredTotalRows}
+        columnCount={columns.length}
+        filters={filters}
+        isEditable={isEditable}
+        isDirty={isDirty}
+        isMaterializing={isMaterializing}
+        isComputing={isComputing}
+        showFilterPanel={showFilterPanel}
+        showSuggestions={showSuggestions}
+        highlightedCells={highlightedCells}
+        tableId={tableId}
+        theme={theme}
+        rowInsertionDescription={getRowInsertionDescription()}
+        columnInsertionDescription={getColumnInsertionDescription()}
+        onAddRow={handleAddRow}
+        onAddColumn={handleAddColumn}
+        onToggleFilters={handleToggleFilters}
+        onToggleSuggestions={handleToggleSuggestions}
+        onOpenChartBuilder={() => {
+          setChartPreselectedColumn(undefined)
+          setChartBuilderOpen(true)
+        }}
+        onClearHighlights={clearHighlights}
+        onToggleTheme={toggleTheme}
+      />
 
 
       {/* Empty state for new tables */}
@@ -1514,8 +1371,8 @@ export function GridView({ tableId }: GridViewProps) {
                       // Check if cell is highlighted
                       const isCellHighlighted = highlightedCells?.has(`${row.__rowId}:${column.id}`) ?? false
 
-                      return (
-                        <Cell
+                        return (
+                        <GridCell
                           key={column.id}
                           value={value}
                           column={column}
@@ -1559,183 +1416,24 @@ export function GridView({ tableId }: GridViewProps) {
       )}
 
       {/* Context Menu */}
-      {contextMenu && (
-        <div 
-          className="fixed bg-surface rounded-lg shadow-xl border border-border py-1 z-50 min-w-[180px]"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Row operations */}
-          {(contextMenu.type === 'cell' || contextMenu.type === 'row') && (
-            <>
-              <button
-                onClick={handleInsertRowAbove}
-                className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                </svg>
-                Insert Row Above
-              </button>
-              <button
-                onClick={handleInsertRowBelow}
-                className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                </svg>
-                Insert Row Below
-              </button>
-              <div className="border-t border-border my-1" />
-              <button
-                onClick={handleDeleteRow}
-                className="w-full px-3 py-2 text-sm text-left hover:bg-red-50 text-red-600 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Delete Row
-              </button>
-            </>
-          )}
-          
-          {/* Highlight cell option - only for cells */}
-          {contextMenu.type === 'cell' && contextMenu.rowIndex !== undefined && contextMenu.columnId && (
-            <>
-              <div className="border-t border-border my-1" />
-              {(() => {
-                const row = filteredRows[contextMenu.rowIndex]
-                const cellKey = row ? `${row.__rowId}:${contextMenu.columnId}` : ''
-                const isCurrentlyHighlighted = highlightedCells?.has(cellKey) ?? false
-                return (
-                  <button
-                    onClick={() => {
-                      if (cellRangeSelection) {
-                        // Toggle highlight for entire selection
-                        toggleHighlightForSelection()
-                      } else if (row) {
-                        toggleCellHighlight(tableId, row.__rowId, contextMenu.columnId!)
-                      }
-                      setContextMenu(null)
-                    }}
-                    className={`w-full px-3 py-2 text-sm text-left flex items-center gap-2 ${
-                      isCurrentlyHighlighted 
-                        ? 'hover:bg-surface-secondary text-text-secondary' 
-                        : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      {isCurrentlyHighlighted ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      ) : (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                      )}
-                    </svg>
-                    {cellRangeSelection 
-                      ? 'Toggle Highlight (Ctrl+H)' 
-                      : isCurrentlyHighlighted ? 'Remove Highlight' : 'Highlight Cell'
-                    }
-                  </button>
-                )
-              })()}
-            </>
-          )}
-          
-          {/* Column operations from header context menu */}
-          {contextMenu.type === 'header' && (
-            <>
-              <button
-                onClick={handleInsertRowAbove}
-                className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Insert Row at Beginning
-              </button>
-            </>
-          )}
-          
-          {/* Corner context menu */}
-          {contextMenu.type === 'corner' && (
-            <>
-              <button
-                onClick={() => { doInsertRow(0); setContextMenu(null); }}
-                className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Insert Row at Beginning
-              </button>
-              <button
-                onClick={() => { openNewColumnModal(0); setContextMenu(null); }}
-                className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Insert Column at Beginning
-              </button>
-            </>
-          )}
-          
-          {/* Index column context menu */}
-          {contextMenu.type === 'index' && (
-            <>
-              <button
-                onClick={() => { openNewColumnModal(0); setContextMenu(null); }}
-                className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Insert Column at Beginning
-              </button>
-            </>
-          )}
-          
-          {/* Column operations */}
-          {(contextMenu.type === 'cell' || contextMenu.type === 'column') && contextMenu.columnId && (
-            <>
-              {contextMenu.type === 'cell' && <div className="border-t border-border my-1" />}
-              <button
-                onClick={handleInsertColumnLeft}
-                className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Insert Column Left
-              </button>
-              <button
-                onClick={handleInsertColumnRight}
-                className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-                Insert Column Right
-              </button>
-              <div className="border-t border-border my-1" />
-              <button
-                onClick={() => {
-                  setChartPreselectedColumn(contextMenu.columnId)
-                  setChartBuilderOpen(true)
-                  setContextMenu(null)
-                }}
-                className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                Create Chart
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      <GridContextMenu
+        contextMenu={contextMenu}
+        filteredRows={filteredRows}
+        cellRangeSelection={cellRangeSelection}
+        highlightedCells={highlightedCells}
+        onInsertRowAbove={handleInsertRowAbove}
+        onInsertRowBelow={handleInsertRowBelow}
+        onDeleteRow={handleDeleteRow}
+        onInsertColumnLeft={handleInsertColumnLeft}
+        onInsertColumnRight={handleInsertColumnRight}
+        onInsertRowAtBeginning={() => { doInsertRow(0); setContextMenu(null) }}
+        onInsertColumnAtBeginning={() => { openNewColumnModal(0); setContextMenu(null) }}
+        onToggleHighlight={toggleHighlightForSelection}
+        onToggleCellHighlight={toggleCellHighlight}
+        onCreateChart={(columnId) => { setChartPreselectedColumn(columnId); setChartBuilderOpen(true) }}
+        onClose={() => setContextMenu(null)}
+        tableId={tableId}
+      />
 
       {/* Suggestions Panel - Lazy Loaded */}
       {showSuggestions && (
@@ -1816,303 +1514,3 @@ export function GridView({ tableId }: GridViewProps) {
   )
 }
 
-// Column Header Component
-function ColumnHeader({ 
-  column, 
-  width,
-  isSelected, 
-  isHeaderRowSelected,
-  isEditing,
-  editValue,
-  isEditable,
-  isResizing,
-  isFiltered,
-  onClick,
-  onDoubleClick,
-  onContextMenu,
-  onEditChange,
-  onEditCommit,
-  onEditCancel,
-  onResizeStart,
-  onFilterClick,
-}: { 
-  column: ColumnSchema
-  width: number
-  isSelected: boolean
-  isHeaderRowSelected: boolean
-  isEditing: boolean
-  editValue: string
-  isEditable: boolean
-  isResizing: boolean
-  isFiltered: boolean
-  onClick: () => void
-  onDoubleClick: () => void
-  onContextMenu: (e: React.MouseEvent) => void
-  onEditChange: (value: string) => void
-  onEditCommit: () => void
-  onEditCancel: () => void
-  onResizeStart: (e: React.MouseEvent) => void
-  onFilterClick: () => void
-}) {
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus()
-      inputRef.current.select()
-    }
-  }, [isEditing])
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      onEditCommit()
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      onEditCancel()
-    }
-  }
-
-  // Determine background based on selection state
-  const isHighlighted = isSelected || isHeaderRowSelected
-  const bgClass = isResizing 
-    ? 'bg-green-200 dark:bg-green-800/50' 
-    : isHighlighted
-      ? 'bg-green-100 dark:bg-green-900/40'
-      : ''
-
-  return (
-    <div
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu}
-      className={`
-        relative flex items-center gap-1 px-2 text-xs font-medium cursor-pointer select-none
-        border-r border-border group text-green-700 dark:text-[#8fc4a3]
-        ${bgClass}
-      `}
-      style={{ width, minWidth: width, maxWidth: width, height: HEADER_HEIGHT }}
-      title={isEditable ? `"${column.name}" - Double-click to rename, drag edge to resize` : `"${column.name}"`}
-    >
-      {isEditing ? (
-        <input
-          ref={inputRef}
-          type="text"
-          value={editValue}
-          onChange={(e) => onEditChange(e.target.value)}
-          onBlur={onEditCommit}
-          onKeyDown={handleKeyDown}
-          className="absolute inset-0 w-full h-full px-2 text-xs font-medium bg-transparent outline-none border-none text-text-primary"
-          onClick={(e) => e.stopPropagation()}
-        />
-      ) : (
-        <>
-          <span className="truncate flex-1 min-w-0">{column.name}</span>
-          {column.isComputed && (
-            <span 
-              className="px-1 py-0.5 text-[9px] font-mono bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 rounded flex-shrink-0"
-              title={`Formula: ${column.formula}`}
-            >
-              fx
-            </span>
-          )}
-          {isFiltered && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onFilterClick()
-              }}
-              className="p-0.5 text-green-500 hover:text-green-600 flex-shrink-0"
-              title={`Column "${column.name}" is filtered`}
-            >
-              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-              </svg>
-            </button>
-          )}
-          <span className="text-[10px] font-mono text-text-tertiary uppercase flex-shrink-0">
-            {column.type}
-          </span>
-        </>
-      )}
-      {/* Resize handle */}
-      <div
-        onMouseDown={onResizeStart}
-        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-500/50 transition-colors z-10"
-        onClick={(e) => e.stopPropagation()}
-      />
-    </div>
-  )
-}
-
-// Cell Component
-function Cell({
-  value,
-  column,
-  width,
-  rowIndex: _rowIndex,
-  isEditing,
-  isSelected,
-  isColumnSelected,
-  isRowSelected,
-  isEditable,
-  isHighlighted,
-  editValue,
-  editError,
-  autofillPreviewValue,
-  isInAutofillRange,
-  isInCellRange,
-  isSelectionTopEdge,
-  isSelectionBottomEdge,
-  isSelectionLeftEdge,
-  isSelectionRightEdge,
-  showFillHandle,
-  onEditChange,
-  onMouseDown,
-  onDoubleClick,
-  onContextMenu,
-  onBlur,
-  onFillHandleMouseDown,
-  onMouseEnter,
-}: {
-  value: CellValue
-  column: ColumnSchema
-  width: number
-  rowIndex: number
-  isEditing: boolean
-  isSelected: boolean
-  isColumnSelected: boolean
-  isRowSelected: boolean
-  isEditable: boolean
-  isHighlighted?: boolean
-  editValue: string
-  editError: string | null
-  autofillPreviewValue?: CellValue
-  isInAutofillRange?: boolean
-  isInCellRange?: boolean
-  isSelectionTopEdge?: boolean
-  isSelectionBottomEdge?: boolean
-  isSelectionLeftEdge?: boolean
-  isSelectionRightEdge?: boolean
-  showFillHandle?: boolean
-  onEditChange: (value: string) => void
-  onMouseDown: (e: React.MouseEvent) => void
-  onDoubleClick: () => void
-  onContextMenu: (e: React.MouseEvent) => void
-  onBlur: () => void
-  onFillHandleMouseDown?: () => void
-  onMouseEnter?: () => void
-}) {
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus()
-      inputRef.current.select()
-    }
-  }, [isEditing])
-
-  const formattedValue = useMemo(() => {
-    if (value === null || value === undefined) return ''
-    if (column.type === 'number' && typeof value === 'number') {
-      return formatNumber(value)
-    }
-    // Display booleans as "True" / "False"
-    if (column.type === 'boolean' || typeof value === 'boolean') {
-      if (value === true || value === 'true' || value === 'True') return 'True'
-      if (value === false || value === 'false' || value === 'False') return 'False'
-    }
-    return String(value)
-  }, [value, column.type])
-
-  const formattedPreviewValue = useMemo(() => {
-    if (autofillPreviewValue === null || autofillPreviewValue === undefined) return ''
-    if (column.type === 'number' && typeof autofillPreviewValue === 'number') {
-      return formatNumber(autofillPreviewValue)
-    }
-    // Display booleans as "True" / "False"
-    if (column.type === 'boolean' || typeof autofillPreviewValue === 'boolean') {
-      if (autofillPreviewValue === true || autofillPreviewValue === 'true' || autofillPreviewValue === 'True') return 'True'
-      if (autofillPreviewValue === false || autofillPreviewValue === 'false' || autofillPreviewValue === 'False') return 'False'
-    }
-    return String(autofillPreviewValue)
-  }, [autofillPreviewValue, column.type])
-
-  const isFormulaColumn = column.isComputed
-
-  return (
-    <div
-      onMouseDown={onMouseDown}
-      onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu}
-      onMouseEnter={onMouseEnter}
-      className={`
-        relative flex items-center px-2 text-sm overflow-hidden box-border
-        ${isEditable && !isFormulaColumn ? 'cursor-cell' : 'cursor-default'}
-        ${isHighlighted && !isSelected && !isInCellRange ? 'bg-emerald-100 dark:bg-emerald-900/50 outline outline-2 outline-emerald-500' : ''}
-        ${isSelected && !isInCellRange && !editError ? 'bg-accent-green/20 dark:bg-accent-green/30 outline outline-2 outline-accent-green' : ''}
-        ${isInCellRange ? 'bg-accent-green/20 dark:bg-accent-green/30' : ''}
-        ${editError ? 'outline outline-2 outline-red-500 bg-red-50 dark:bg-red-900/30' : ''}
-        ${isInAutofillRange ? 'bg-accent-green/10 dark:bg-accent-green/20' : ''}
-        ${(isColumnSelected || isRowSelected) && !isSelected && !isInAutofillRange && !isInCellRange && !isHighlighted ? 'bg-accent-green/5 dark:bg-accent-green/10' : ''}
-        ${column.type === 'number' ? 'justify-end font-mono' : ''}
-        ${isFormulaColumn && !isSelected && !isInCellRange && !isHighlighted ? 'bg-purple-50/30 dark:bg-purple-900/10' : ''}
-        ${isEditable && !isEditing && !isSelected && !isInCellRange && !isFormulaColumn && !isHighlighted ? 'hover:bg-gray-50 dark:hover:bg-gray-800/50' : ''}
-        ${!isInCellRange && !isSelected && !isHighlighted ? 'border-r border-border-subtle' : ''}
-        ${isSelectionTopEdge ? 'border-t-2 border-t-accent-green' : ''}
-        ${isSelectionBottomEdge ? 'border-b-2 border-b-accent-green' : ''}
-        ${isSelectionLeftEdge ? 'border-l-2 border-l-accent-green' : ''}
-        ${isSelectionRightEdge ? 'border-r-2 border-r-accent-green' : ''}
-      `}
-      style={{ width, minWidth: width, maxWidth: width }}
-      title={isFormulaColumn ? `Computed: ${column.formula}` : undefined}
-    >
-      {isEditing ? (
-        <div className="absolute inset-0 flex items-center">
-          <input
-            ref={inputRef}
-            type="text"
-            value={editValue}
-            onChange={(e) => onEditChange(e.target.value)}
-            onBlur={onBlur}
-            className={`w-full h-full px-2 border-none outline-none text-sm bg-transparent ${
-              column.type === 'number' ? 'text-right font-mono' : ''
-            } ${editError ? 'text-red-700 dark:text-red-300' : 'text-text-primary'}`}
-          />
-          {editError && (
-            <div className="absolute left-0 top-full mt-1 z-20 px-2 py-1 bg-red-500 text-white text-xs rounded shadow-lg whitespace-nowrap">
-              {editError}
-            </div>
-          )}
-        </div>
-      ) : (
-        <>
-          {/* Show preview value if in autofill range, otherwise actual value */}
-          {isInAutofillRange && autofillPreviewValue !== undefined ? (
-            <span className="truncate w-full text-green-400 dark:text-green-300 italic">
-              {formattedPreviewValue || '(empty)'}
-            </span>
-          ) : (
-            <span className={`truncate w-full ${value === null || value === undefined || value === '' ? 'text-text-tertiary italic' : ''}`}>
-          {value === null || value === undefined || value === '' ? '(empty)' : formattedValue}
-        </span>
-          )}
-          
-          {/* Fill handle - small square at bottom-right corner */}
-          {showFillHandle && (
-            <div
-              onMouseDown={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                onFillHandleMouseDown?.()
-              }}
-              className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 cursor-crosshair z-10 hover:bg-green-600"
-              style={{ transform: 'translate(50%, 50%)' }}
-              title="Drag to fill cells below"
-            />
-          )}
-        </>
-      )}
-    </div>
-  )
-}

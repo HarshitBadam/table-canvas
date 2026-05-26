@@ -216,11 +216,9 @@ export class FormulaParser {
     return this.parsePrimary()
   }
 
-  // Primary expressions
   private parsePrimary(): ASTNode {
     const token = this.peek()
 
-    // Number literal
     if (this.match('NUMBER')) {
       return {
         type: 'NumberLiteral',
@@ -229,7 +227,6 @@ export class FormulaParser {
       }
     }
 
-    // String literal
     if (this.match('STRING')) {
       return {
         type: 'StringLiteral',
@@ -238,7 +235,6 @@ export class FormulaParser {
       }
     }
 
-    // Boolean literal
     if (this.match('BOOLEAN')) {
       return {
         type: 'BooleanLiteral',
@@ -247,7 +243,6 @@ export class FormulaParser {
       }
     }
 
-    // Column reference
     if (this.match('COLUMN_REF')) {
       return {
         type: 'ColumnReference',
@@ -256,7 +251,6 @@ export class FormulaParser {
       }
     }
 
-    // Function call
     if (this.match('FUNCTION')) {
       const functionName = this.previous().value as string
       const functionPos = this.previous().position
@@ -271,7 +265,6 @@ export class FormulaParser {
 
       const args: ASTNode[] = []
 
-      // Parse arguments
       if (!this.check('RPAREN')) {
         do {
           args.push(this.parseExpression())
@@ -312,7 +305,6 @@ export class FormulaParser {
       }
     }
 
-    // Grouped expression
     if (this.match('LPAREN')) {
       const expr = this.parseExpression()
       if (!this.match('RPAREN')) {
@@ -332,7 +324,6 @@ export class FormulaParser {
     )
   }
 
-  // Helper methods
   private peek(): Token {
     return this.tokens[this.position]
   }

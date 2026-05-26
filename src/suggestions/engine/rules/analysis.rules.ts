@@ -7,9 +7,6 @@
 import { registerRule, createSuggestionId, getVersionHash } from '../registry';
 import { classifyColumn } from '../classification';
 
-// ============================================================================
-// Trend Chart Rule
-// ============================================================================
 
 registerRule({
   id: 'trend_chart',
@@ -66,9 +63,6 @@ registerRule({
   score: (_ctx, _meta) => 85,
 });
 
-// ============================================================================
-// Category Breakdown Rule
-// ============================================================================
 
 registerRule({
   id: 'category_breakdown',
@@ -154,9 +148,6 @@ registerRule({
   score: (_ctx, _meta) => 80,
 });
 
-// ============================================================================
-// Distribution Histogram Rule
-// ============================================================================
 
 registerRule({
   id: 'distribution_histogram',
@@ -219,9 +210,6 @@ registerRule({
   score: (_ctx, _meta) => 70,
 });
 
-// ============================================================================
-// Top N Analysis Rule
-// ============================================================================
 
 registerRule({
   id: 'top_n_analysis',
@@ -285,9 +273,6 @@ registerRule({
   score: (_ctx, _meta) => 65,
 });
 
-// ============================================================================
-// Fallback: Create Summary Table Rule
-// ============================================================================
 
 registerRule({
   id: 'create_summary_fallback',
@@ -372,9 +357,6 @@ registerRule({
   score: (_ctx, _meta) => 60,
 });
 
-// ============================================================================
-// Fallback: Bar Chart Rule
-// ============================================================================
 
 registerRule({
   id: 'bar_chart_fallback',
@@ -459,9 +441,6 @@ registerRule({
   score: (_ctx, _meta) => 55,
 });
 
-// ============================================================================
-// Fallback: Detect Type Issues Rule
-// ============================================================================
 
 registerRule({
   id: 'detect_type_issues_fallback',

@@ -25,7 +25,7 @@ import {
   createEmptyFilterConfig,
   quickDateOptions,
 } from './filterUtils'
-import type { ColumnSchema } from '@/lib/types'
+import type { ColumnSchema } from '@/types'
 
 // ============================================================================
 // Test Fixtures

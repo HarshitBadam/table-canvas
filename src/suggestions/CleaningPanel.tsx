@@ -10,7 +10,7 @@ import { useSuggestionsStore } from './suggestionsStore'
 import { computeSuggestionEffect } from './computeEffects'
 import { isPlaceholder } from './cleaningConstants'
 import { loadProfileForTable, useProfilingStore } from '@/profiling/profiler'
-import type { Suggestion, CellValue } from '@/lib/types'
+import type { Suggestion, CellValue } from '@/types'
 
 // Types
 interface CellChange {

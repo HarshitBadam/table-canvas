@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { CellValue } from '@/lib/types'
+import { CellValue } from '@/types'
 
 // Row data with stable row ID
 export interface TableRow {

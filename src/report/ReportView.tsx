@@ -1,11 +1,3 @@
-/**
- * ReportView Component
- * 
- * Main view for displaying and editing a report with TipTap.
- * Single seamless page - title is part of the content.
- * Includes toolbar for multi-report navigation and quick actions.
- */
-
 import { useCallback, useRef, useEffect } from 'react';
 import { useReportStore } from './reportStore';
 import { TipTapEditor, type TipTapEditorHandle } from './editor/TipTapEditor';

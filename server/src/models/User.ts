@@ -1,10 +1,6 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 import { IUser, IRefreshToken } from '../types/index.js';
 
-// ============================================================================
-// Refresh Token Sub-Schema
-// ============================================================================
-
 const RefreshTokenSchema = new Schema<IRefreshToken>(
   {
     token: {
@@ -19,12 +15,7 @@ const RefreshTokenSchema = new Schema<IRefreshToken>(
   { _id: false }
 );
 
-// ============================================================================
-// User Schema
-// ============================================================================
-
 export interface IUserDocument extends Omit<IUser, '_id'>, Document {
-  // Instance methods can be added here
   toPublic(): {
     id: string;
     email: string;
@@ -34,7 +25,6 @@ export interface IUserDocument extends Omit<IUser, '_id'>, Document {
 }
 
 interface IUserModel extends Model<IUserDocument> {
-  // Static methods can be added here
   findByEmail(email: string): Promise<IUserDocument | null>;
 }
 
@@ -75,16 +65,8 @@ const UserSchema = new Schema<IUserDocument, IUserModel>(
   }
 );
 
-// ============================================================================
-// Indexes
-// ============================================================================
-
 // Note: email index is already created by `unique: true` in schema definition
 UserSchema.index({ 'refreshTokens.token': 1 });
-
-// ============================================================================
-// Instance Methods
-// ============================================================================
 
 UserSchema.methods.toPublic = function () {
   return {
@@ -95,20 +77,11 @@ UserSchema.methods.toPublic = function () {
   };
 };
 
-// ============================================================================
-// Static Methods
-// ============================================================================
-
 UserSchema.statics.findByEmail = function (email: string) {
   return this.findOne({ email: email.toLowerCase() });
 };
 
-// ============================================================================
-// Pre-save Hooks
-// ============================================================================
-
 UserSchema.pre('save', function (next) {
-  // Clean up expired refresh tokens before saving
   if (this.refreshTokens && this.refreshTokens.length > 0) {
     const now = new Date();
     this.refreshTokens = this.refreshTokens.filter(
@@ -122,9 +95,5 @@ UserSchema.pre('save', function (next) {
   }
   next();
 });
-
-// ============================================================================
-// Export Model
-// ============================================================================
 
 export const User = mongoose.model<IUserDocument, IUserModel>('User', UserSchema);

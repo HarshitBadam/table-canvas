@@ -21,11 +21,7 @@ import type {
   NewBlock,
 } from './types';
 
-// ============================================================================
-// Persistence Helpers
-// ============================================================================
 
-// Debounced save to IndexedDB
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function debouncedSave(report: Report) {
@@ -37,19 +33,11 @@ function debouncedSave(report: Report) {
   }, 500);
 }
 
-// ============================================================================
-// Store Implementation
-// ============================================================================
 
 export const useReportStore = create<ReportStoreState>()(
   immer((set, get) => ({
-    // State
     reports: {},
     selectedReportId: null,
-
-    // ========================================================================
-    // Report Actions
-    // ========================================================================
 
     addReport: (name?: string) => {
       const id = generateId();
@@ -68,7 +56,6 @@ export const useReportStore = create<ReportStoreState>()(
         state.selectedReportId = id;
       });
 
-      // Persist to IndexedDB
       debouncedSave(report);
 
       return id;
@@ -90,12 +77,10 @@ export const useReportStore = create<ReportStoreState>()(
       set((state) => {
         delete state.reports[id];
         if (state.selectedReportId === id) {
-          // Select another report or null
           const remainingIds = Object.keys(state.reports);
           state.selectedReportId = remainingIds.length > 0 ? remainingIds[0] : null;
         }
       });
-      // Delete from IndexedDB
       deleteReportDB(id).catch(console.error);
     },
 
@@ -104,10 +89,6 @@ export const useReportStore = create<ReportStoreState>()(
         state.selectedReportId = id;
       });
     },
-
-    // ========================================================================
-    // Block Actions
-    // ========================================================================
 
     addBlock: (reportId, blockData, index) => {
       const blockId = generateId();
@@ -196,7 +177,6 @@ export const useReportStore = create<ReportStoreState>()(
       const newBlockId = generateId();
       const now = new Date().toISOString();
 
-      // Deep clone the block
       const newBlock: ReportBlock = {
         ...JSON.parse(JSON.stringify(originalBlock)),
         id: newBlockId,
@@ -243,10 +223,6 @@ export const useReportStore = create<ReportStoreState>()(
       });
     },
 
-    // ========================================================================
-    // Selectors
-    // ========================================================================
-
     getReport: (id) => {
       return get().reports[id];
     },
@@ -258,9 +234,6 @@ export const useReportStore = create<ReportStoreState>()(
   }))
 );
 
-// ============================================================================
-// Convenience Hooks
-// ============================================================================
 
 /**
  * Hook to get the currently selected report
@@ -289,9 +262,6 @@ export const useHasReports = () => {
   return useReportStore((state) => Object.keys(state.reports).length > 0);
 };
 
-// ============================================================================
-// Block Factory Functions
-// ============================================================================
 
 export function createTextBlock(content: string = ''): NewBlock {
   return {
@@ -347,9 +317,6 @@ export function createDividerBlock(): NewBlock {
   };
 }
 
-// ============================================================================
-// Initialization
-// ============================================================================
 
 /**
  * Initialize the report store with data from IndexedDB

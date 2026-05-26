@@ -8,9 +8,6 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 import { useState, useCallback, memo, useRef, useEffect } from 'react';
 
-// ============================================================================
-// Types
-// ============================================================================
 
 interface InlineTableNodeAttrs {
   headers: string[];
@@ -35,9 +32,6 @@ interface ContextMenuState {
   colIndex?: number;
 }
 
-// ============================================================================
-// React Component
-// ============================================================================
 
 const InlineTableNodeView = memo(function InlineTableNodeView({
   node,
@@ -367,9 +361,6 @@ const InlineTableNodeView = memo(function InlineTableNodeView({
   );
 });
 
-// ============================================================================
-// TipTap Node Definition
-// ============================================================================
 
 export const InlineTableNode = Node.create<InlineTableNodeOptions>({
   name: 'inlineTable',

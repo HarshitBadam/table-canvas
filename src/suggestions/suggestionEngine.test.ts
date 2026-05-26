@@ -12,7 +12,7 @@ import {
   generateSuggestions,
   SuggestionEngineContext 
 } from './suggestionEngine'
-import type { ColumnSchema, ColumnProfile, TableSchema } from '@/lib/types'
+import type { ColumnSchema, ColumnProfile, TableSchema } from '@/types'
 
 const {
   hasMixedCase,

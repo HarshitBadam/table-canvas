@@ -1,14 +1,7 @@
-/**
- * Node types for the project graph (tables, charts, dashboards)
- */
-
 import type { TableSchema } from './schema.types'
 import type { TransformDef, AggregationType, ViewFilterConfig } from './transform.types'
 import type { Position } from './common.types'
 
-// ============================================================================
-// Node Kind & View Modes
-// ============================================================================
 
 /** Types of nodes in the project graph */
 export type NodeKind = 'source_table' | 'derived_table' | 'chart' | 'dashboard'
@@ -16,9 +9,6 @@ export type NodeKind = 'source_table' | 'derived_table' | 'chart' | 'dashboard'
 /** View modes for table nodes on canvas */
 export type NodeViewMode = 'collapsed' | 'data'
 
-// ============================================================================
-// Node UI State
-// ============================================================================
 
 /** UI state for a node */
 export interface NodeUI {
@@ -32,9 +22,6 @@ export interface NodeUI {
   height?: number
 }
 
-// ============================================================================
-// Base Node Interface
-// ============================================================================
 
 /** Base interface shared by all node types */
 interface BaseNode {
@@ -46,9 +33,6 @@ interface BaseNode {
   updatedAt: string
 }
 
-// ============================================================================
-// Cache Information
-// ============================================================================
 
 /** Cache state for computed nodes */
 export interface CacheInfo {
@@ -76,9 +60,6 @@ export interface CacheInfo {
   isComputing?: boolean
 }
 
-// ============================================================================
-// Source Table Node
-// ============================================================================
 
 /** Plan for source table (imported file) */
 export interface SourceTablePlan {
@@ -100,9 +81,6 @@ export interface SourceTableNode extends BaseNode {
   viewFilters?: ViewFilterConfig
 }
 
-// ============================================================================
-// Derived Table Node
-// ============================================================================
 
 /** Plan for derived table (transform result) */
 export interface DerivedTablePlan {
@@ -119,9 +97,6 @@ export interface DerivedTableNode extends BaseNode {
   viewFilters?: ViewFilterConfig
 }
 
-// ============================================================================
-// Chart Node
-// ============================================================================
 
 /** Chart configuration */
 export interface ChartConfig {
@@ -149,9 +124,6 @@ export interface ChartNode extends BaseNode {
   plan: ChartPlan
 }
 
-// ============================================================================
-// Dashboard Node
-// ============================================================================
 
 /** Single card in a dashboard layout */
 export interface DashboardCard {
@@ -175,9 +147,6 @@ export interface DashboardNode extends BaseNode {
   layout: DashboardLayout
 }
 
-// ============================================================================
-// Union Types
-// ============================================================================
 
 /** Union of table node types */
 export type TableNode = SourceTableNode | DerivedTableNode

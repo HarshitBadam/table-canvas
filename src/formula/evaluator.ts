@@ -52,7 +52,6 @@ export class FormulaEvaluator {
   }
 
   private evaluateColumnReference(columnName: string): FormulaValue {
-    // Try to find column by name first
     const column = this.context.columns.find(
       c => c.name.toLowerCase() === columnName.toLowerCase() || c.id === columnName
     )
@@ -63,7 +62,6 @@ export class FormulaEvaluator {
 
     const value = this.context.row[column.id]
     
-    // Handle empty/undefined values
     if (value === undefined || value === null || value === '') {
       return null
     }
@@ -164,7 +162,6 @@ export class FormulaEvaluator {
       throw new Error(`Unknown function: ${name}`)
     }
 
-    // Check argument count
     if (argumentNodes.length < func.minArgs) {
       throw new Error(`${name} requires at least ${func.minArgs} argument(s)`)
     }
@@ -172,7 +169,6 @@ export class FormulaEvaluator {
       throw new Error(`${name} accepts at most ${func.maxArgs} argument(s)`)
     }
 
-    // Evaluate arguments
     const args = argumentNodes.map(arg => this.evaluate(arg))
 
     return executeFunction(name, args, this.context)
@@ -209,7 +205,6 @@ export function evaluateFormula(
     const evaluator = new FormulaEvaluator(context)
     const value = evaluator.evaluate(parseResult.ast)
 
-    // Infer result type
     let inferredType: 'string' | 'number' | 'boolean' | 'date' | undefined
     if (typeof value === 'number') {
       inferredType = 'number'

@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useProjectStore } from '@/state/projectStore'
 import { getComputationOrder } from './dependencyGraph'
-import type { TableSchema, SourceTableNode, DerivedTableNode } from '@/lib/types'
+import type { TableSchema, SourceTableNode, DerivedTableNode } from '@/types'
 
 // ============================================================================
 // Test Fixtures

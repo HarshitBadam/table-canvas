@@ -6,17 +6,11 @@
 
 import type { AggregationType } from '@/types';
 
-// ============================================================================
-// Block Types
-// ============================================================================
 
 export type BlockType = 'text' | 'heading' | 'chart' | 'table_snippet' | 'table_inline' | 'table_blank' | 'divider';
 
 export type HeadingLevel = 1 | 2 | 3;
 
-// ============================================================================
-// Enhanced Chart Configuration
-// ============================================================================
 
 export interface ChartAnnotation {
   id: string;
@@ -46,9 +40,6 @@ export interface EnhancedChartConfig {
   annotations?: ChartAnnotation[];
 }
 
-// ============================================================================
-// Base Block Interface
-// ============================================================================
 
 export interface BaseBlock {
   id: string;
@@ -57,18 +48,12 @@ export interface BaseBlock {
   updatedAt: string;
 }
 
-// ============================================================================
-// Text Block
-// ============================================================================
 
 export interface TextBlock extends BaseBlock {
   type: 'text';
   content: string; // Markdown content
 }
 
-// ============================================================================
-// Heading Block
-// ============================================================================
 
 export interface HeadingBlock extends BaseBlock {
   type: 'heading';
@@ -76,9 +61,6 @@ export interface HeadingBlock extends BaseBlock {
   content: string;
 }
 
-// ============================================================================
-// Chart Block
-// ============================================================================
 
 export interface ChartBlock extends BaseBlock {
   type: 'chart';
@@ -87,9 +69,6 @@ export interface ChartBlock extends BaseBlock {
   config: EnhancedChartConfig;
 }
 
-// ============================================================================
-// Table Snippet Block
-// ============================================================================
 
 export type RowSelectionMode = 'all' | 'first_n' | 'last_n' | 'selected';
 
@@ -107,17 +86,11 @@ export interface TableSnippetBlock extends BaseBlock {
   displayMode?: TableDisplayMode; // 'full' (default) or 'embedded' (MiniTableView style)
 }
 
-// ============================================================================
-// Divider Block
-// ============================================================================
 
 export interface DividerBlock extends BaseBlock {
   type: 'divider';
 }
 
-// ============================================================================
-// Inline Table Block (for pasted data from grid)
-// ============================================================================
 
 export interface InlineTableBlock extends BaseBlock {
   type: 'table_inline';
@@ -132,9 +105,6 @@ export interface InlineTableBlock extends BaseBlock {
   caption?: string;
 }
 
-// ============================================================================
-// Blank Table Block (user-defined empty table)
-// ============================================================================
 
 export interface BlankTableBlock extends BaseBlock {
   type: 'table_blank';
@@ -147,9 +117,6 @@ export interface BlankTableBlock extends BaseBlock {
   caption?: string;
 }
 
-// ============================================================================
-// Union Block Type
-// ============================================================================
 
 export type ReportBlock = 
   | TextBlock 
@@ -160,9 +127,6 @@ export type ReportBlock =
   | BlankTableBlock
   | DividerBlock;
 
-// ============================================================================
-// TipTap Content Type
-// ============================================================================
 
 export interface TipTapContent {
   type: 'doc';
@@ -182,9 +146,6 @@ export interface TipTapMark {
   attrs?: Record<string, unknown>;
 }
 
-// ============================================================================
-// Report Interface
-// ============================================================================
 
 export interface Report {
   id: string;
@@ -197,9 +158,6 @@ export interface Report {
   updatedAt: string;
 }
 
-// ============================================================================
-// Report Store State Types
-// ============================================================================
 
 export interface ReportStoreState {
   reports: Record<string, Report>;
@@ -224,9 +182,6 @@ export interface ReportStoreState {
   getBlock: (reportId: string, blockId: string) => ReportBlock | undefined;
 }
 
-// ============================================================================
-// Block Creation Helpers
-// ============================================================================
 
 export type NewTextBlock = Omit<TextBlock, 'id' | 'createdAt' | 'updatedAt'>;
 export type NewHeadingBlock = Omit<HeadingBlock, 'id' | 'createdAt' | 'updatedAt'>;
@@ -245,9 +200,6 @@ export type NewBlock =
   | NewBlankTableBlock
   | NewDividerBlock;
 
-// ============================================================================
-// Color Schemes
-// ============================================================================
 
 export const CHART_COLOR_SCHEMES = {
   default: ['#217346', '#2D8B57', '#0EA5E9', '#8B5CF6', '#F59E0B', '#EF4444'],

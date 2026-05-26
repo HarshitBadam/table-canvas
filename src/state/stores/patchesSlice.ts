@@ -1,9 +1,3 @@
-/**
- * Patches Slice
- * 
- * Manages cell editing patches for source tables.
- */
-
 import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, PatchesSliceState } from './types'
 import type { Patches } from '@/types'

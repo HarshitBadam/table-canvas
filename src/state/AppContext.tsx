@@ -1,15 +1,3 @@
-/**
- * AppContext - Centralized application state machine
- * 
- * Orchestrates initialization in sequence:
- * 1. Initialize DuckDB engine
- * 2. Check authentication
- * 3. Load project from backend
- * 4. Materialize all tables
- * 
- * Also provides centralized delete functionality with backend sync.
- */
-
 import {
   createContext,
   useContext,
@@ -39,12 +27,8 @@ import {
 } from '@/persistence/syncService';
 import { deleteFile } from '@/persistence/db';
 import { ProjectSummary } from '@/api/projects.api';
-import type { SourceTableNode } from '@/lib/types';
+import type { SourceTableNode, ProjectNode } from '@/types';
 import { initializeReportStore } from '@/report/reportStore';
-
-// ============================================================================
-// Types
-// ============================================================================
 
 export type AppPhase =
   | 'idle'
@@ -69,19 +53,12 @@ interface AppState {
 }
 
 interface AppContextValue extends AppState {
-  // Auth actions
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => Promise<void>;
-  
-  // Project actions
   createNewProject: (name?: string) => Promise<void>;
   loadProject: (projectId: string) => Promise<void>;
   refreshProjects: () => Promise<void>;
-  
-  // Node actions
   deleteNodeWithSync: (nodeId: string) => Promise<void>;
-  
-  // Computed
   isReady: boolean;
   isLoading: boolean;
 }
@@ -96,18 +73,56 @@ const PHASE_MESSAGES: Record<AppPhase, string> = {
   error: 'Something went wrong',
 };
 
-// ============================================================================
-// Context
-// ============================================================================
-
 const AppContext = createContext<AppContextValue | null>(null);
-
-// ============================================================================
-// Provider
-// ============================================================================
 
 interface AppProviderProps {
   children: ReactNode;
+}
+
+/**
+ * Materializes all tables in dependency order: source tables first, then derived.
+ * Failures are swallowed per-table so one bad table doesn't block the rest.
+ */
+async function materializeProjectTables(nodes: Record<string, ProjectNode>) {
+  const sourceTableIds = Object.entries(nodes)
+    .filter(([, node]) => node.kind === 'source_table')
+    .map(([id]) => id);
+
+  const derivedTableIds = Object.entries(nodes)
+    .filter(([, node]) => node.kind === 'derived_table')
+    .map(([id]) => id);
+
+  for (const tableId of sourceTableIds) {
+    try { await ensureTableMaterialized(tableId); } catch { /* per-table failure */ }
+  }
+  for (const tableId of derivedTableIds) {
+    try { await ensureTableMaterialized(tableId); } catch { /* per-table failure */ }
+  }
+}
+
+/**
+ * Loads or creates a project from the backend, hydrates Zustand, and returns metadata.
+ */
+async function loadOrCreateProject() {
+  const projectList = await fetchProjects();
+
+  let project;
+  if (projectList.length > 0) {
+    project = await loadProjectWithSync(projectList[0].id);
+  }
+  if (!project) {
+    project = await createProjectWithSync('Untitled Project');
+  }
+
+  useProjectStore.setState({
+    projectId: project.id,
+    projectName: project.name,
+    nodes: project.nodes,
+    edges: project.edges,
+    patches: project.patches,
+  });
+
+  return { project, projectList };
 }
 
 export function AppProvider({ children }: AppProviderProps) {
@@ -124,18 +139,15 @@ export function AppProvider({ children }: AppProviderProps) {
     error: null,
   });
 
-  // Refs
   const initRef = useRef(false);
   const isSavingRef = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Get store state for auto-save
   const nodes = useProjectStore((s) => s.nodes);
   const edges = useProjectStore((s) => s.edges);
   const patches = useProjectStore((s) => s.patches);
   const projectName = useProjectStore((s) => s.projectName);
 
-  // Helper to update phase
   const setPhase = useCallback((phase: AppPhase, error?: string) => {
     setState((prev) => ({
       ...prev,
@@ -145,61 +157,44 @@ export function AppProvider({ children }: AppProviderProps) {
     }));
   }, []);
 
-  // Handle auth errors from API client (e.g., session expired)
   const handleAuthError = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      user: null,
-      isAuthenticated: false,
-    }));
+    setState((prev) => ({ ...prev, user: null, isAuthenticated: false }));
   }, []);
 
-  // Set up auth error handler
   useEffect(() => {
     setAuthErrorHandler(handleAuthError);
   }, [handleAuthError]);
 
-  // ========================================================================
-  // Initialization Sequence
-  // ========================================================================
-
+  // Initialization sequence
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
 
     const initialize = async () => {
       try {
-        // Phase 1: Initialize Engine
         setPhase('initializing_engine');
         const engine = getEngine();
         await engine.init();
         setState((prev) => ({ ...prev, engineReady: true }));
 
-        // Phase 2: Check Authentication
         setPhase('checking_auth');
         let user = await checkAuth();
-        
+
         if (!user) {
-          // Check if backend is reachable with a short timeout
-          // This prevents long waits in environments without a backend (e.g., local-only mode, CI)
           const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
           let backendReachable = false;
-          
+
           try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-            
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
             const response = await fetch(`${API_BASE_URL}/auth/me`, {
               method: 'GET',
               credentials: 'include',
               signal: controller.signal,
             });
-            
             clearTimeout(timeoutId);
-            
-            // If we get any response (even 401), backend is reachable
             backendReachable = true;
-            // If 401, user just needs to login
+
             if (response.status === 401) {
               setState((prev) => ({
                 ...prev,
@@ -211,13 +206,10 @@ export function AppProvider({ children }: AppProviderProps) {
               return;
             }
           } catch {
-            // Network error or timeout - backend is not reachable
             backendReachable = false;
           }
-          
+
           if (!backendReachable) {
-            // Local mode - no backend available, proceed with mock user
-            console.log('[AppContext] Backend not reachable, enabling local mode');
             user = {
               id: 'local-user',
               email: 'local@tablecanvas.app',
@@ -225,7 +217,6 @@ export function AppProvider({ children }: AppProviderProps) {
               createdAt: new Date(),
             };
           } else {
-            // Backend is reachable but user not authenticated - show login
             setState((prev) => ({
               ...prev,
               phase: 'ready',
@@ -237,34 +228,10 @@ export function AppProvider({ children }: AppProviderProps) {
           }
         }
 
-        setState((prev) => ({
-          ...prev,
-          user,
-          isAuthenticated: true,
-        }));
+        setState((prev) => ({ ...prev, user, isAuthenticated: true }));
 
-        // Phase 3: Load Project
         setPhase('loading_project');
-        const projectList = await fetchProjects();
-        
-        let project;
-        if (projectList.length > 0) {
-          project = await loadProjectWithSync(projectList[0].id);
-        }
-        
-        if (!project) {
-          // No projects or failed to load - create new
-          project = await createProjectWithSync('Untitled Project');
-        }
-
-        // Update Zustand store
-        useProjectStore.setState({
-          projectId: project.id,
-          projectName: project.name,
-          nodes: project.nodes,
-          edges: project.edges,
-          patches: project.patches,
-        });
+        const { project, projectList } = await loadOrCreateProject();
 
         setState((prev) => ({
           ...prev,
@@ -275,48 +242,21 @@ export function AppProvider({ children }: AppProviderProps) {
           ],
         }));
 
-        // Initialize reports from IndexedDB
         try {
           await initializeReportStore();
         } catch (err) {
           console.error('[AppContext] Failed to initialize reports:', err);
         }
 
-        // Phase 4: Materialize Tables (source tables first, then derived)
-        const sourceTableIds = Object.entries(project.nodes)
-          .filter(([, node]) => node.kind === 'source_table')
-          .map(([id]) => id);
-
-        const derivedTableIds = Object.entries(project.nodes)
-          .filter(([, node]) => node.kind === 'derived_table')
-          .map(([id]) => id);
-
-        const totalTables = sourceTableIds.length + derivedTableIds.length;
-
-        if (totalTables > 0) {
+        const hasTables = Object.values(project.nodes).some(
+          (n) => n.kind === 'source_table' || n.kind === 'derived_table'
+        );
+        if (hasTables) {
           setPhase('materializing');
-          
-          // First materialize source tables
-          for (const tableId of sourceTableIds) {
-            try {
-              await ensureTableMaterialized(tableId);
-            } catch {
-              // Table materialization failed, will show error state
-            }
-          }
-          
-          // Then materialize derived tables (ensureTableMaterialized handles dependency ordering)
-          for (const tableId of derivedTableIds) {
-            try {
-              await ensureTableMaterialized(tableId);
-            } catch {
-              // Table materialization failed, will show error state
-            }
-          }
+          await materializeProjectTables(project.nodes);
         }
 
         setPhase('ready');
-
       } catch (error) {
         setPhase('error', error instanceof Error ? error.message : 'Initialization failed');
       }
@@ -325,83 +265,36 @@ export function AppProvider({ children }: AppProviderProps) {
     initialize();
   }, [setPhase]);
 
-  // ========================================================================
-  // Auto-save Effect
-  // ========================================================================
-
+  // Auto-save
   useEffect(() => {
-    // Don't save if not ready or not authenticated
-    if (state.phase !== 'ready' || !state.isAuthenticated || !state.projectId) {
-      return;
-    }
+    if (state.phase !== 'ready' || !state.isAuthenticated || !state.projectId) return;
 
-    // Debounce saves
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
     saveTimeoutRef.current = setTimeout(async () => {
       if (isSavingRef.current) return;
-
       isSavingRef.current = true;
       setState((prev) => ({ ...prev, isSaving: true }));
 
       try {
-        await saveProjectWithSync(
-          state.projectId!,
-          projectName,
-          nodes,
-          edges,
-          patches
-        );
-      } catch {
-        // Auto-save failed, will retry on next change
-      } finally {
+        await saveProjectWithSync(state.projectId!, projectName, nodes, edges, patches);
+      } catch { /* auto-save retry on next change */ } finally {
         isSavingRef.current = false;
         setState((prev) => ({ ...prev, isSaving: false }));
       }
-    }, 1500); // 1.5 second debounce
+    }, 1500);
 
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
   }, [nodes, edges, patches, projectName, state.phase, state.isAuthenticated, state.projectId]);
 
-  // ========================================================================
-  // Auth Actions
-  // ========================================================================
-
   const login = useCallback(async (credentials: LoginCredentials) => {
     const { user } = await apiLogin(credentials);
-    
-    setState((prev) => ({
-      ...prev,
-      user,
-      isAuthenticated: true,
-    }));
+    setState((prev) => ({ ...prev, user, isAuthenticated: true }));
 
-    // Load project after login
     setPhase('loading_project');
-    const projectList = await fetchProjects();
-    
-    let project;
-    if (projectList.length > 0) {
-      project = await loadProjectWithSync(projectList[0].id);
-    }
-    
-    if (!project) {
-      project = await createProjectWithSync('Untitled Project');
-    }
-
-    useProjectStore.setState({
-      projectId: project.id,
-      projectName: project.name,
-      nodes: project.nodes,
-      edges: project.edges,
-      patches: project.patches,
-    });
+    const { project, projectList } = await loadOrCreateProject();
 
     setState((prev) => ({
       ...prev,
@@ -412,43 +305,19 @@ export function AppProvider({ children }: AppProviderProps) {
       ],
     }));
 
-    // Materialize tables (source first, then derived)
-    const sourceTableIds = Object.entries(project.nodes)
-      .filter(([, node]) => node.kind === 'source_table')
-      .map(([id]) => id);
-
-    const derivedTableIds = Object.entries(project.nodes)
-      .filter(([, node]) => node.kind === 'derived_table')
-      .map(([id]) => id);
-
-    if (sourceTableIds.length > 0 || derivedTableIds.length > 0) {
+    const hasTables = Object.values(project.nodes).some(
+      (n) => n.kind === 'source_table' || n.kind === 'derived_table'
+    );
+    if (hasTables) {
       setPhase('materializing');
-      for (const tableId of sourceTableIds) {
-        try {
-          await ensureTableMaterialized(tableId);
-        } catch {
-          // Materialization failed
-        }
-      }
-      for (const tableId of derivedTableIds) {
-        try {
-          await ensureTableMaterialized(tableId);
-        } catch {
-          // Materialization failed
-        }
-      }
+      await materializeProjectTables(project.nodes);
     }
 
     setPhase('ready');
   }, [setPhase]);
 
   const logout = useCallback(async () => {
-    try {
-      await apiLogout();
-    } catch {
-      // Ignore logout errors
-    } finally {
-      // Clear state
+    try { await apiLogout(); } catch { /* ignore */ } finally {
       setState((prev) => ({
         ...prev,
         user: null,
@@ -457,8 +326,6 @@ export function AppProvider({ children }: AppProviderProps) {
         projectName: 'Untitled Project',
         projects: [],
       }));
-
-      // Clear stores
       useProjectStore.setState({
         projectId: '',
         projectName: 'Untitled Project',
@@ -467,20 +334,13 @@ export function AppProvider({ children }: AppProviderProps) {
         patches: {},
         selectedNodeId: null,
       });
-
-      useDataStore.setState({
-        tableData: {},
-      });
+      useDataStore.setState({ tableData: {} });
     }
   }, []);
 
-  // ========================================================================
-  // Project Actions
-  // ========================================================================
-
   const createNewProject = useCallback(async (name?: string) => {
     const project = await createProjectWithSync(name || 'Untitled Project');
-    
+
     useProjectStore.setState({
       projectId: project.id,
       projectName: project.name,
@@ -503,11 +363,9 @@ export function AppProvider({ children }: AppProviderProps) {
   const loadProject = useCallback(async (projectId: string) => {
     try {
       setPhase('loading_project');
-      
+
       const project = await loadProjectWithSync(projectId);
-      if (!project) {
-        throw new Error('Project not found');
-      }
+      if (!project) throw new Error('Project not found');
 
       useProjectStore.setState({
         projectId: project.id,
@@ -523,31 +381,12 @@ export function AppProvider({ children }: AppProviderProps) {
         projectName: project.name,
       }));
 
-      // Materialize tables (source first, then derived)
-      const sourceTableIds = Object.entries(project.nodes)
-        .filter(([, node]) => node.kind === 'source_table')
-        .map(([id]) => id);
-
-      const derivedTableIds = Object.entries(project.nodes)
-        .filter(([, node]) => node.kind === 'derived_table')
-        .map(([id]) => id);
-
-      if (sourceTableIds.length > 0 || derivedTableIds.length > 0) {
+      const hasTables = Object.values(project.nodes).some(
+        (n) => n.kind === 'source_table' || n.kind === 'derived_table'
+      );
+      if (hasTables) {
         setPhase('materializing');
-        for (const tableId of sourceTableIds) {
-          try {
-            await ensureTableMaterialized(tableId);
-          } catch {
-            // Materialization failed
-          }
-        }
-        for (const tableId of derivedTableIds) {
-          try {
-            await ensureTableMaterialized(tableId);
-          } catch {
-            // Materialization failed
-          }
-        }
+        await materializeProjectTables(project.nodes);
       }
 
       setPhase('ready');
@@ -560,56 +399,31 @@ export function AppProvider({ children }: AppProviderProps) {
     try {
       const projectList = await fetchProjects();
       setState((prev) => ({ ...prev, projects: projectList }));
-    } catch {
-      // Refresh failed
-    }
+    } catch { /* refresh failed */ }
   }, []);
-
-  // ========================================================================
-  // Delete Node with Sync
-  // ========================================================================
 
   const deleteNodeWithSync = useCallback(async (nodeId: string) => {
     const currentNodes = useProjectStore.getState().nodes;
     const node = currentNodes[nodeId];
-    
-    if (!node) {
-      return;
-    }
+    if (!node) return;
 
-    // Get file reference before deleting (for source tables)
     let fileRef: string | null = null;
     if (node.kind === 'source_table') {
       fileRef = (node as SourceTableNode).plan.fileRef;
     }
 
-    // 1. Delete from Zustand store (this handles edges too)
     useProjectStore.getState().deleteNode(nodeId);
-
-    // 2. Clear from data store (in-memory)
     useDataStore.getState().clearTableData(nodeId);
 
-    // 3. Delete file from IndexedDB if exists
     if (fileRef) {
-      try {
-        await deleteFile(fileRef);
-      } catch {
-        // File deletion failed
-      }
+      try { await deleteFile(fileRef); } catch { /* file cleanup failed */ }
     }
 
-    // 4. Drop from DuckDB engine
     try {
       const engine = getEngine();
       await engine.dropTable(nodeId);
-    } catch {
-      // Engine cleanup failed
-    }
+    } catch { /* engine cleanup failed */ }
   }, []);
-
-  // ========================================================================
-  // Context Value
-  // ========================================================================
 
   const value: AppContextValue = {
     ...state,
@@ -626,21 +440,14 @@ export function AppProvider({ children }: AppProviderProps) {
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
-// ============================================================================
-// Hook
-// ============================================================================
-
 export function useApp(): AppContextValue {
   const context = useContext(AppContext);
-  
   if (!context) {
     throw new Error('useApp must be used within an AppProvider');
   }
-  
   return context;
 }
 
-// Convenience hooks
 export function useAppReady(): boolean {
   return useApp().isReady;
 }

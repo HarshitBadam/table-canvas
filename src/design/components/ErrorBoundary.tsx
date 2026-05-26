@@ -6,9 +6,6 @@
 
 import { Component, ReactNode, ErrorInfo } from 'react';
 
-// ============================================================================
-// Types
-// ============================================================================
 
 export interface ErrorBoundaryProps {
   children: ReactNode;
@@ -28,9 +25,6 @@ interface ErrorBoundaryState {
   errorInfo: ErrorInfo | null;
 }
 
-// ============================================================================
-// Error Boundary Class Component
-// ============================================================================
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
@@ -89,9 +83,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 }
 
-// ============================================================================
-// Default Fallback Component
-// ============================================================================
 
 interface DefaultErrorFallbackProps {
   error: Error;
@@ -157,9 +148,6 @@ function DefaultErrorFallback({ error, onReset, compact, name }: DefaultErrorFal
   );
 }
 
-// ============================================================================
-// Icons
-// ============================================================================
 
 function ErrorIcon({ className }: { className?: string }) {
   return (
@@ -187,9 +175,6 @@ function RefreshIcon({ className }: { className?: string }) {
   );
 }
 
-// ============================================================================
-// HOC for functional components
-// ============================================================================
 
 export function withErrorBoundary<P extends object>(
   WrappedComponent: React.ComponentType<P>,

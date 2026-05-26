@@ -1,9 +1,3 @@
-/**
- * Nodes Slice
- * 
- * Manages node CRUD operations, schema updates, and dirty state propagation.
- */
-
 import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, NodesSliceState } from './types'
 import type { 
@@ -24,10 +18,6 @@ export const createNodesSlice: StateCreator<
   NodesSliceState
 > = (set, get) => ({
   nodes: {},
-
-  // ========================================================================
-  // Basic Node Actions
-  // ========================================================================
 
   addNode: (node) => {
     set((state) => {
@@ -87,10 +77,6 @@ export const createNodesSlice: StateCreator<
       }
     })
   },
-
-  // ========================================================================
-  // Table Creation Actions
-  // ========================================================================
 
   addNewTable: () => {
     const state = get()
@@ -234,10 +220,6 @@ export const createNodesSlice: StateCreator<
 
     return id
   },
-
-  // ========================================================================
-  // Schema Updates
-  // ========================================================================
 
   updateTableSchema: (tableId, schema) => {
     set((state) => {
@@ -396,10 +378,6 @@ export const createNodesSlice: StateCreator<
     get().markNodeAndDescendantsDirty(tableId)
   },
 
-  // ========================================================================
-  // View Filters (Persistent Filters per Table)
-  // ========================================================================
-
   setTableFilters: (tableId, filters) => {
     set((state) => {
       const node = state.nodes[tableId]
@@ -425,10 +403,6 @@ export const createNodesSlice: StateCreator<
     return undefined
   },
 
-  // ========================================================================
-  // Chart Actions
-  // ========================================================================
-
   updateChartConfig: (chartId, updates) => {
     set((state) => {
       const node = state.nodes[chartId]
@@ -452,10 +426,6 @@ export const createNodesSlice: StateCreator<
       }
     })
   },
-
-  // ========================================================================
-  // Dependency Graph & Dirty State
-  // ========================================================================
 
   markNodeDirty: (nodeId) => {
     set((state) => {
@@ -522,10 +492,6 @@ export const createNodesSlice: StateCreator<
       }
     })
   },
-
-  // ========================================================================
-  // Selectors
-  // ========================================================================
 
   getNode: (id) => get().nodes[id],
 

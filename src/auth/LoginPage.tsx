@@ -3,9 +3,6 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useApp } from '@/state/AppContext';
 import { ApiError } from '@/api/client';
 
-// ============================================================================
-// Login Page Component
-// ============================================================================
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
