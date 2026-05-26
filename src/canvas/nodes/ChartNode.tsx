@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react'
 import { Handle, Position, NodeProps } from 'reactflow'
-import { ChartNode as ChartNodeType, TableNode } from '@/lib/types'
+import { ChartNode as ChartNodeType, TableNode } from '@/types'
 import { MiniChart } from '@/charts/ChartRenderer'
 import { useChartData } from '@/charts/useChartData'
 import { useProjectStore } from '@/state/projectStore'

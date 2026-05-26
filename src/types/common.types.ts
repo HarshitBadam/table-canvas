@@ -1,10 +1,3 @@
-/**
- * Common types used across the application
- */
-
-// ============================================================================
-// Primitive Types
-// ============================================================================
 
 /** Value that can be stored in a cell */
 export type CellValue = string | number | boolean | null
@@ -15,9 +8,6 @@ export interface Position {
   y: number
 }
 
-// ============================================================================
-// Edit Patches (for source table editing)
-// ============================================================================
 
 /** Patches for tracking edits to source tables */
 export interface Patches {
@@ -48,9 +38,6 @@ export interface PatchOp {
   newValue: CellValue
 }
 
-// ============================================================================
-// Project State
-// ============================================================================
 
 import type { ProjectNode } from './node.types'
 import type { Edge } from './transform.types'

@@ -2,7 +2,7 @@
  * Compute effects (changes and highlights) for cleaning suggestions
  */
 
-import type { Suggestion, CellValue, CleaningOperation } from '@/lib/types'
+import type { Suggestion, CellValue, CleaningOperation } from '@/types'
 import type { TableRow } from '@/state/dataStore'
 import { isPlaceholder } from './cleaningConstants'
 

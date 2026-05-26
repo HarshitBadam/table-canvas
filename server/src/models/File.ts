@@ -1,9 +1,5 @@
 import mongoose, { Schema, Document, Model, Types } from 'mongoose';
 
-// ============================================================================
-// File Metadata Schema
-// ============================================================================
-
 /**
  * File metadata document interface.
  * This model tracks files stored in GridFS with additional metadata
@@ -22,7 +18,6 @@ export interface IFileDocument extends Document {
   createdAt: Date;
   updatedAt: Date;
 
-  // Instance methods
   toPublic(): IFilePublic;
   softDelete(): Promise<IFileDocument>;
   restore(): Promise<IFileDocument>;
@@ -97,22 +92,12 @@ const FileSchema = new Schema<IFileDocument, IFileModel>(
   }
 );
 
-// ============================================================================
-// Indexes
-// ============================================================================
-
 // Primary query pattern: user's active files
 FileSchema.index({ userId: 1, deletedAt: 1, createdAt: -1 });
 
-// Files by project
 FileSchema.index({ projectId: 1, deletedAt: 1 });
 
-// Cleanup jobs: find orphaned or old deleted files
 FileSchema.index({ deletedAt: 1 }, { sparse: true });
-
-// ============================================================================
-// Instance Methods
-// ============================================================================
 
 FileSchema.methods.toPublic = function (): IFilePublic {
   return {
@@ -148,10 +133,6 @@ FileSchema.methods.restore = async function (): Promise<IFileDocument> {
 FileSchema.methods.isDeleted = function (): boolean {
   return this.deletedAt !== null;
 };
-
-// ============================================================================
-// Static Methods
-// ============================================================================
 
 /**
  * Find all active (non-deleted) files for a user
@@ -192,9 +173,5 @@ FileSchema.statics.findWithDeleted = function (
 ) {
   return this.find(filter).sort({ createdAt: -1 });
 };
-
-// ============================================================================
-// Export Model
-// ============================================================================
 
 export const File = mongoose.model<IFileDocument, IFileModel>('File', FileSchema);

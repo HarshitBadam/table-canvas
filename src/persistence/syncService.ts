@@ -26,11 +26,8 @@ import {
   loadFile as loadFileLocal,
   deleteFile as deleteFileLocal,
 } from './db';
-import type { ProjectNode, Edge, Patches } from '@/lib/types';
+import type { ProjectNode, Edge, Patches } from '@/types';
 
-// ============================================================================
-// Types
-// ============================================================================
 
 export interface SyncStatus {
   isSyncing: boolean;
@@ -48,9 +45,6 @@ export interface ProjectWithSync {
   needsSync?: boolean;
 }
 
-// ============================================================================
-// Sync State
-// ============================================================================
 
 let syncStatus: SyncStatus = {
   isSyncing: false,
@@ -60,7 +54,6 @@ let syncStatus: SyncStatus = {
 
 let isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
-// Listen for online/offline events
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     isOnline = true;
@@ -78,9 +71,6 @@ export function isNetworkOnline(): boolean {
   return isOnline;
 }
 
-// ============================================================================
-// Project Sync Functions
-// ============================================================================
 
 /**
  * Fetch all projects - from backend if online, from local storage if offline
@@ -113,7 +103,6 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
     try {
       const project = await getProject(projectId);
       
-      // Cache locally
       await saveProjectLocal(
         project.id,
         project.name,
@@ -136,7 +125,6 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
     }
   }
   
-  // Fallback to local storage
   const localProject = await loadProjectLocal(projectId);
   if (!localProject) return null;
   
@@ -161,7 +149,6 @@ export async function createProjectWithSync(name?: string): Promise<ProjectWithS
     try {
       const project = await createProject({ name: defaultName });
       
-      // Cache locally
       await saveProjectLocal(
         project.id,
         project.name,
@@ -184,7 +171,6 @@ export async function createProjectWithSync(name?: string): Promise<ProjectWithS
     }
   }
   
-  // Create locally only
   const localId = `local_${Date.now()}`;
   const project: ProjectWithSync = {
     id: localId,
@@ -281,10 +267,8 @@ export async function saveProjectWithSync(
  * Delete a project
  */
 export async function deleteProjectWithSync(projectId: string): Promise<void> {
-  // Delete locally
   await deleteProjectLocal(projectId);
   
-  // Delete from backend if online and not a local-only project
   if (isOnline && !projectId.startsWith('local_')) {
     try {
       await apiDeleteProject(projectId);
@@ -360,9 +344,6 @@ export async function importProjectWithSync(
   };
 }
 
-// ============================================================================
-// File Sync Functions
-// ============================================================================
 
 /**
  * Upload a file - to backend if online, to local storage if offline
@@ -446,9 +427,6 @@ export async function deleteFileWithSync(fileId: string): Promise<void> {
   }
 }
 
-// ============================================================================
-// Sync Local Projects to Backend
-// ============================================================================
 
 /**
  * Sync all local-only projects to backend (call when coming online)
@@ -491,7 +469,6 @@ export async function syncLocalProjectsToBackend(): Promise<void> {
   }
 }
 
-// Auto-sync when coming online
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     syncLocalProjectsToBackend();

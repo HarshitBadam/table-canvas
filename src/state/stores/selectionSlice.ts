@@ -1,9 +1,3 @@
-/**
- * Selection Slice
- * 
- * Manages UI selection state for nodes and edges.
- */
-
 import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, SelectionSliceState } from './types'
 

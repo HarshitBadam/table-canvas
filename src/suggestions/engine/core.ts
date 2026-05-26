@@ -4,7 +4,7 @@
  * Main generation functions for producing suggestions.
  */
 
-import type { Suggestion, TransformDef } from '@/lib/types';
+import type { Suggestion, TransformDef } from '@/types';
 import { 
   SuggestionEngineContext, 
   MetadataBundle,
@@ -15,18 +15,12 @@ import {
 // Import rules to ensure they're registered
 import './rules';
 
-// ============================================================================
-// Types
-// ============================================================================
 
 interface ScoredSuggestion {
   suggestion: Suggestion;
   score: number;
 }
 
-// ============================================================================
-// Main Generation Functions
-// ============================================================================
 
 /**
  * Generate all suggestions for a table

@@ -25,9 +25,6 @@ import { SlashCommands } from './extensions/SlashCommands';
 
 import './EditorStyles.css';
 
-// ============================================================================
-// Markdown Parser
-// ============================================================================
 
 function parseInlineFormatting(text: string): JSONContent[] {
   const nodes: JSONContent[] = [];
@@ -298,9 +295,6 @@ function parseMarkdownTable(lines: string[], startIndex: number): { rows: string
   return { rows: normalizedRows, endIndex: i };
 }
 
-// ============================================================================
-// Table Data Parser (TSV/CSV)
-// ============================================================================
 
 function isTabularData(text: string): boolean {
   const lines = text.trim().split('\n');
@@ -337,9 +331,6 @@ function parseTabularData(text: string): { headers: string[]; rows: string[][] }
   return { headers, rows: normalizedRows };
 }
 
-// ============================================================================
-// Types
-// ============================================================================
 
 export interface TipTapEditorProps {
   content: JSONContent | null;
@@ -360,9 +351,6 @@ export interface TipTapEditorHandle {
   insertTable: () => void;
 }
 
-// ============================================================================
-// Component
-// ============================================================================
 
 export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
   function TipTapEditor(

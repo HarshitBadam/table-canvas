@@ -17,7 +17,7 @@ import 'reactflow/dist/style.css'
 import { useProjectStore } from '@/state/projectStore'
 import { useApp } from '@/state/AppContext'
 import { useProfilingStore, loadProfileForTable } from '@/profiling/profiler'
-import type { NodeViewMode, ProjectNode, Edge as ProjectEdge } from '@/lib/types'
+import type { NodeViewMode, ProjectNode, Edge as ProjectEdge } from '@/types'
 import { wouldCreateCycle } from '@/engine/dependencyGraph'
 import { TableNodeComponent } from './nodes/TableNode'
 import { ChartNodeComponent } from './nodes/ChartNode'
@@ -52,24 +52,19 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const undo = useProjectStore((state) => state.undo)
   const redo = useProjectStore((state) => state.redo)
   
-  // Get profiling data for all tables
   const profiles = useProfilingStore((state) => state.profiles)
   const profilesLoading = useProfilingStore((state) => state.loading)
   
-  // Modal state for creating transforms
   const [transformModalOpen, setTransformModalOpen] = useState(false)
   const [pendingConnection, setPendingConnection] = useState<{
     source: string
     target: string
   } | null>(null)
   
-  // Modal state for creating new tables
   const [newTableModalOpen, setNewTableModalOpen] = useState(false)
   
-  // Cycle warning toast state
   const [cycleWarning, setCycleWarning] = useState<string | null>(null)
   
-  // Throttle ref for drag updates
   const lastDragUpdate = useRef(0)
   const DRAG_THROTTLE_MS = 16 // ~60fps
 
@@ -126,7 +121,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     }
   }, [projectNodes, updateNodeUI])
 
-  // Convert project nodes to React Flow nodes
   const initialNodes: Node[] = useMemo(() => {
     return (Object.values(projectNodes) as ProjectNode[]).map((node) => ({
       id: node.id,
@@ -154,7 +148,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     }))
   }, [projectNodes, selectedNodeId, profiles, profilesLoading, patches, handleToggleExpanded, handleCycleViewMode, handleSetViewMode])
 
-  // Base edges without handle computation (for reuse during drag)
   const baseEdges: Edge[] = useMemo(() => {
     return (Object.values(projectEdges) as ProjectEdge[]).map((edge) => ({
       id: edge.id,
@@ -190,7 +183,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     }))
   }, [projectEdges])
 
-  // Convert project edges to React Flow edges with smart handle selection
   const initialEdges: SmartEdge[] = useMemo(() => {
     const rfNodes: Node[] = (Object.values(projectNodes) as ProjectNode[]).map((node) => ({
       id: node.id,
@@ -204,17 +196,14 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
 
-  // Sync nodes when project nodes change
   useEffect(() => {
     setNodes(initialNodes)
   }, [initialNodes, setNodes])
 
-  // Sync edges when project edges change
   useEffect(() => {
     setEdges(initialEdges)
   }, [initialEdges, setEdges])
 
-  // Handle real-time edge updates during node drag (throttled)
   const onNodeDrag: NodeDragHandler = useCallback(
     (_, node) => {
       const now = Date.now()
@@ -235,7 +224,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     [baseEdges, setNodes, setEdges]
   )
 
-  // Handle node position changes - persist to store
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
       updateNodePosition(node.id, node.position)
@@ -243,7 +231,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     [updateNodePosition]
   )
 
-  // Handle node selection - charts open on single click
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       selectNode(node.id)
@@ -257,7 +244,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     [selectNode, projectNodes, onNodeDoubleClickProp]
   )
 
-  // Handle node double click to open grid (tables only now, charts use single click)
   const handleNodeDoubleClick: NodeMouseHandler = useCallback(
     (_event, node) => {
       const projectNode = projectNodes[node.id]
@@ -269,7 +255,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     [onNodeDoubleClickProp, projectNodes]
   )
 
-  // Handle new connections - opens transform modal
   const onConnect = useCallback((connection: Connection) => {
     if (connection.source && connection.target) {
       // Check for cycles before allowing the connection
@@ -294,15 +279,12 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     }
   }, [projectEdges, projectNodes])
 
-  // Handle pane click to deselect
   const onPaneClick = useCallback(() => {
     selectNode(null)
   }, [selectNode])
 
-  // Get delete function from AppContext
   const { deleteNodeWithSync } = useApp()
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check if user is typing in an input/textarea
@@ -335,7 +317,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [undo, redo, selectedNodeId, deleteNodeWithSync])
 
-  // Auto-arrange nodes using dagre layout
   const handleAutoArrange = useCallback((direction: LayoutDirection = 'LR') => {
     if (nodes.length === 0) return
     
@@ -355,7 +336,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     setEdges(smartEdges)
   }, [nodes, edges, baseEdges, updateNodePosition, setNodes, setEdges])
 
-  // Handle transform modal close
   const handleTransformModalClose = () => {
     setTransformModalOpen(false)
     setPendingConnection(null)

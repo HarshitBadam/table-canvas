@@ -1,9 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config/env.js';
 
-// ============================================================================
-// Custom Error Classes
-// ============================================================================
 
 export class AppError extends Error {
   statusCode: number;
@@ -51,9 +48,6 @@ export class ConflictError extends AppError {
   }
 }
 
-// ============================================================================
-// Error Handler Middleware
-// ============================================================================
 
 export function errorHandler(
   err: Error,
@@ -71,7 +65,6 @@ export function errorHandler(
     }
   }
 
-  // Handle AppError (our custom errors)
   if (err instanceof AppError) {
     if (err instanceof ValidationError) {
       res.status(err.statusCode).json({
@@ -89,7 +82,6 @@ export function errorHandler(
     return;
   }
 
-  // Handle Mongoose validation errors
   if (err.name === 'ValidationError') {
     const mongooseError = err as unknown as {
       errors: Record<string, { message: string }>;
@@ -104,7 +96,6 @@ export function errorHandler(
     return;
   }
 
-  // Handle Mongoose CastError (invalid ObjectId)
   if (err.name === 'CastError') {
     res.status(400).json({
       success: false,
@@ -113,7 +104,6 @@ export function errorHandler(
     return;
   }
 
-  // Handle MongoDB duplicate key error
   if ((err as unknown as { code?: number }).code === 11000) {
     res.status(409).json({
       success: false,
@@ -122,7 +112,6 @@ export function errorHandler(
     return;
   }
 
-  // Handle JWT errors
   if (err.name === 'JsonWebTokenError') {
     res.status(401).json({
       success: false,
@@ -139,7 +128,6 @@ export function errorHandler(
     return;
   }
 
-  // Default error response
   const statusCode = 500;
   const message =
     config.nodeEnv === 'production'
@@ -153,9 +141,6 @@ export function errorHandler(
   });
 }
 
-// ============================================================================
-// Async Handler Wrapper
-// ============================================================================
 
 type AsyncHandler = (
   req: Request,

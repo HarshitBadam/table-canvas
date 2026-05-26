@@ -1,14 +1,7 @@
-/**
- * Dashboard Component
- * 
- * Project Overview - comprehensive view of workspace state.
- * Data Flow hero at top, followed by Your Data and Suggested Actions.
- */
-
 import { useState, useCallback, useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { applySuggestion, setToastHandler, type ToastNotification } from '@/suggestions/commands'
-import type { Suggestion } from '@/lib/types'
+import type { Suggestion } from '@/types'
 
 import { LineageMiniMap } from './components/LineageMiniMap'
 import { TableStatsSection } from './components/TableStatsSection'
@@ -31,16 +24,13 @@ export function Dashboard({ onOpenTable, onOpenChart }: DashboardProps) {
   const selectNode = useProjectStore((state) => state.selectNode)
   const nodes = useProjectStore((state) => state.nodes)
   
-  // Dashboard data hooks
   const healthMetrics = useProjectHealthMetrics()
   const { tableMetrics } = useDataQualityMetrics()
   const { suggestions, isLoading: suggestionsLoading } = useTopSuggestions(3)
   const lineageData = useLineageData()
   
-  // Toast notification state
   const [toast, setToast] = useState<ToastNotification | null>(null)
   
-  // Set up toast handler
   useEffect(() => {
     setToastHandler((notification) => {
       setToast(notification)
@@ -48,7 +38,6 @@ export function Dashboard({ onOpenTable, onOpenChart }: DashboardProps) {
     })
   }, [])
 
-  // Navigation handlers - detect if it's a table or chart
   const handleNodeClick = useCallback((nodeId: string) => {
     const node = nodes[nodeId]
     if (!node) return
@@ -68,7 +57,6 @@ export function Dashboard({ onOpenTable, onOpenChart }: DashboardProps) {
     }
   }, [nodes, onOpenTable, onOpenChart, selectNode])
 
-  // Direct table handler (for table-specific actions)
   const handleOpenTable = useCallback((tableId: string) => {
     if (onOpenTable) {
       onOpenTable(tableId)
@@ -77,7 +65,6 @@ export function Dashboard({ onOpenTable, onOpenChart }: DashboardProps) {
     }
   }, [onOpenTable, selectNode])
 
-  // Apply suggestion handler
   const handleApplySuggestion = useCallback(async (suggestion: Suggestion) => {
     await applySuggestion(suggestion)
   }, [])
@@ -151,10 +138,6 @@ export function Dashboard({ onOpenTable, onOpenChart }: DashboardProps) {
   )
 }
 
-// ============================================================================
-// Helper Components
-// ============================================================================
-
 function Stat({ value, label }: { value: string | number; label: string }) {
   return (
     <span className="text-text-secondary">
@@ -198,10 +181,6 @@ function formatNumber(num: number): string {
   return num.toLocaleString()
 }
 
-// ============================================================================
-// Empty State Component
-// ============================================================================
-
 function EmptyState() {
   return (
     <div className="h-full flex items-center justify-center">
@@ -229,10 +208,6 @@ function EmptyState() {
     </div>
   )
 }
-
-// ============================================================================
-// Toast Component
-// ============================================================================
 
 function Toast({ 
   notification, 

@@ -4,12 +4,9 @@
  * Functions for detecting analysis opportunities in data.
  */
 
-import type { TableSchema, ColumnSchema, ColumnProfile } from '@/lib/types';
+import type { TableSchema, ColumnSchema, ColumnProfile } from '@/types';
 import { isAnalyzableNumeric, isGroupableCategory } from './classification';
 
-// ============================================================================
-// Aggregation Opportunities
-// ============================================================================
 
 export interface AggregationOpportunity {
   valueColumn: ColumnSchema;
@@ -53,9 +50,6 @@ export function detectAggregationOpportunities(
   return opportunities;
 }
 
-// ============================================================================
-// Time Series Opportunities
-// ============================================================================
 
 export interface TimeSeriesOpportunity {
   dateColumn: ColumnSchema;
@@ -102,9 +96,6 @@ export function detectTimeSeriesOpportunities(
   return opportunities;
 }
 
-// ============================================================================
-// Comparison Opportunities
-// ============================================================================
 
 export interface ComparisonOpportunity {
   column1: ColumnSchema;

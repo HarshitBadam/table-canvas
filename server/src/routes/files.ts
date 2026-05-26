@@ -17,14 +17,12 @@ import {
 
 const router = Router();
 
-// Configure multer for memory storage
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB limit
   },
   fileFilter: (_req, file, cb) => {
-    // Allow CSV and Excel files
     const allowedMimes = [
       'text/csv',
       'application/vnd.ms-excel',
@@ -43,12 +41,7 @@ const upload = multer({
   },
 });
 
-// All file routes require authentication
 router.use(requireAuth);
-
-// ============================================================================
-// GET /api/files - List user's files
-// ============================================================================
 
 router.get(
   '/',
@@ -68,10 +61,6 @@ router.get(
   })
 );
 
-// ============================================================================
-// POST /api/files/upload - Upload a file
-// ============================================================================
-
 router.post(
   '/upload',
   upload.single('file'),
@@ -83,7 +72,6 @@ router.post(
       throw new ValidationError(['No file uploaded']);
     }
 
-    // Determine content type
     let contentType = file.mimetype;
     const ext = file.originalname.toLowerCase();
     
@@ -117,10 +105,6 @@ router.post(
   })
 );
 
-// ============================================================================
-// GET /api/files/:id - Download a file
-// ============================================================================
-
 router.get(
   '/:id',
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -133,7 +117,6 @@ router.get(
       throw new NotFoundError('File');
     }
 
-    // Set headers
     res.setHeader('Content-Type', fileDownload.contentType);
     res.setHeader('Content-Length', fileDownload.size);
     res.setHeader(
@@ -141,14 +124,9 @@ router.get(
       `attachment; filename="${encodeURIComponent(fileDownload.filename)}"`
     );
 
-    // Pipe the stream to response
     fileDownload.stream.pipe(res);
   })
 );
-
-// ============================================================================
-// GET /api/files/:id/metadata - Get file metadata
-// ============================================================================
 
 router.get(
   '/:id/metadata',
@@ -172,10 +150,6 @@ router.get(
     res.json(response);
   })
 );
-
-// ============================================================================
-// DELETE /api/files/:id - Delete a file
-// ============================================================================
 
 router.delete(
   '/:id',

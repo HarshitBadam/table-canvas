@@ -12,10 +12,9 @@ import type {
   ProfileResult,
   TransformResult,
 } from './types'
-import type { TransformDef, CellValue, TableSchema, Patches } from '@/lib/types'
+import type { TransformDef, CellValue, TableSchema, Patches } from '@/types'
 import EngineWorker from './worker/engine.worker?worker'
 
-// Singleton instance
 let engineInstance: EngineAdapter | null = null
 
 export class EngineAdapter {
@@ -23,7 +22,6 @@ export class EngineAdapter {
   private initialized = false
 
   private constructor() {
-    // Create worker instance
     const worker = new EngineWorker()
     this.rpc = new WorkerRPC(worker)
   }
@@ -60,22 +58,18 @@ export class EngineAdapter {
   ): Promise<void> {
     await this.ensureInitialized()
 
-    // Convert rows to array format
     const columns = schema.columns.map(c => c.name)
     const columnIds = schema.columns.map(c => c.id)
     const types = schema.columns.map(c => c.type)
     
-    // Apply patches if any
     const processedRows = rows.map((row, rowIndex) => {
       const rowId = row.__rowId as string || `row_${rowIndex}`
       
-      // Skip deleted rows
       if (patches?.deletedRows?.has(rowId)) {
         return null
       }
       
       return columnIds.map(colId => {
-        // Check for patched value
         if (patches?.cellPatches?.[colId]?.[rowId] !== undefined) {
           return patches.cellPatches[colId][rowId]
         }
@@ -83,7 +77,6 @@ export class EngineAdapter {
       })
     }).filter(row => row !== null) as CellValue[][]
 
-    // Add inserted rows
     if (patches?.insertedRows) {
       for (const inserted of patches.insertedRows) {
         const rowValues = columnIds.map(colId => inserted.values[colId] ?? null)
@@ -168,6 +161,5 @@ export class EngineAdapter {
   }
 }
 
-// Export singleton getter
 export const getEngine = () => EngineAdapter.getInstance()
 

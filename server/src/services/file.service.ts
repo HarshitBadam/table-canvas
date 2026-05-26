@@ -5,10 +5,6 @@ import { FileMetadata, UploadedFile } from '../types/index.js';
 
 let bucket: GridFSBucket | null = null;
 
-// ============================================================================
-// Initialize GridFS Bucket
-// ============================================================================
-
 export function getGridFSBucket(): GridFSBucket {
   if (!bucket) {
     const db = mongoose.connection.db;
@@ -21,10 +17,6 @@ export function getGridFSBucket(): GridFSBucket {
   }
   return bucket;
 }
-
-// ============================================================================
-// Upload File to GridFS
-// ============================================================================
 
 export async function uploadFile(
   buffer: Buffer,
@@ -57,10 +49,6 @@ export async function uploadFile(
   });
 }
 
-// ============================================================================
-// Download File from GridFS
-// ============================================================================
-
 export interface FileDownload {
   stream: NodeJS.ReadableStream;
   filename: string;
@@ -79,7 +67,6 @@ export async function downloadFile(
     throw new Error('Database connection not established');
   }
 
-  // Find file metadata
   const fileDoc = await db.collection('files.files').findOne({
     _id: new ObjectId(fileId),
   });
@@ -88,7 +75,6 @@ export async function downloadFile(
     return null;
   }
 
-  // Check ownership
   if (fileDoc.metadata?.userId !== userId) {
     return null;
   }
@@ -103,10 +89,6 @@ export async function downloadFile(
   };
 }
 
-// ============================================================================
-// Delete File from GridFS
-// ============================================================================
-
 export async function deleteFile(
   fileId: string,
   userId: string
@@ -118,7 +100,6 @@ export async function deleteFile(
     throw new Error('Database connection not established');
   }
 
-  // Find file metadata to verify ownership
   const fileDoc = await db.collection('files.files').findOne({
     _id: new ObjectId(fileId),
   });
@@ -127,7 +108,6 @@ export async function deleteFile(
     return false;
   }
 
-  // Check ownership
   if (fileDoc.metadata?.userId !== userId) {
     return false;
   }
@@ -136,9 +116,6 @@ export async function deleteFile(
   return true;
 }
 
-// ============================================================================
-// List User's Files
-// ============================================================================
 
 export async function listUserFiles(userId: string): Promise<UploadedFile[]> {
   const db = mongoose.connection.db;
@@ -161,9 +138,6 @@ export async function listUserFiles(userId: string): Promise<UploadedFile[]> {
   }));
 }
 
-// ============================================================================
-// Get File Metadata
-// ============================================================================
 
 export async function getFileMetadata(
   fileId: string,

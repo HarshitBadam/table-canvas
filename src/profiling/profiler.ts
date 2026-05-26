@@ -7,11 +7,10 @@ import { useCallback } from 'react'
 import { create } from 'zustand'
 import { getEngine } from '@/engine'
 import type { ProfileResult } from '@/engine/types'
-import type { CellValue, ColumnProfile, SemanticHint } from '@/lib/types'
+import type { CellValue, ColumnProfile, SemanticHint } from '@/types'
 import { useDataStore } from '@/state/dataStore'
 import { useProjectStore } from '@/state/projectStore'
 
-// Semantic pattern detectors
 const PATTERNS = {
   currency: /^\$?[\d,]+\.?\d*$/,
   percentage: /^\d+\.?\d*%$/,
@@ -38,7 +37,6 @@ export function detectSemanticHints(
   const sampleSize = Math.min(100, nonNullValues.length)
   const sample = nonNullValues.slice(0, sampleSize).map(v => String(v))
 
-  // Name-based hints
   const lowerName = columnName.toLowerCase()
   
   // ID detection - be more specific to avoid false positives like "valid", "ividual"
@@ -78,34 +76,28 @@ export function detectSemanticHints(
     hints.push('category')
   }
 
-  // Pattern-based hints for string columns
   if (type === 'string') {
-    // Check currency
     const currencyMatches = sample.filter(v => PATTERNS.currency.test(v)).length
     if (currencyMatches / sampleSize > 0.8) {
       hints.push('currency')
     }
 
-    // Check percentage
     const percentMatches = sample.filter(v => PATTERNS.percentage.test(v)).length
     if (percentMatches / sampleSize > 0.8) {
       hints.push('percentage')
     }
 
-    // Check email
     const emailMatches = sample.filter(v => PATTERNS.email.test(v)).length
     if (emailMatches / sampleSize > 0.8 && !hints.includes('email')) {
       hints.push('email')
     }
 
-    // Check URL
     const urlMatches = sample.filter(v => PATTERNS.url.test(v)).length
     if (urlMatches / sampleSize > 0.8 && !hints.includes('url')) {
       hints.push('url')
     }
   }
 
-  // Cardinality-based hints
   const uniqueValues = new Set(sample)
   const uniqueRatio = uniqueValues.size / sampleSize
 

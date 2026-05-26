@@ -8,9 +8,6 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 import { useState, useCallback, memo, useRef, useEffect } from 'react';
 
-// ============================================================================
-// Types
-// ============================================================================
 
 interface EditableTableNodeAttrs {
   headers: string[];
@@ -32,9 +29,6 @@ interface ContextMenuState {
   colIndex?: number;
 }
 
-// ============================================================================
-// React Component
-// ============================================================================
 
 const EditableTableNodeView = memo(function EditableTableNodeView({
   node,
@@ -366,9 +360,6 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
   );
 });
 
-// ============================================================================
-// Dimension Picker Modal Component
-// ============================================================================
 
 function DimensionPickerModal({ onSelect, onCancel }: { onSelect: (rows: number, cols: number) => void; onCancel: () => void }) {
   const [rows, setRows] = useState(3);
@@ -427,9 +418,6 @@ function DimensionPickerModal({ onSelect, onCancel }: { onSelect: (rows: number,
   );
 }
 
-// ============================================================================
-// TipTap Node Definition
-// ============================================================================
 
 export const EditableTableNode = Node.create<EditableTableNodeOptions>({
   name: 'editableTable',

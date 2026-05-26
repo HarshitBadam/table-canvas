@@ -3,9 +3,6 @@
  * Type definitions for the formula parser and evaluator
  */
 
-// ============================================================================
-// Token Types
-// ============================================================================
 
 export type TokenType =
   | 'NUMBER'
@@ -28,9 +25,6 @@ export interface Token {
   length: number
 }
 
-// ============================================================================
-// AST Node Types
-// ============================================================================
 
 export type ASTNodeType =
   | 'NumberLiteral'
@@ -104,9 +98,6 @@ export type ASTNode =
   | FunctionCallNode
   | ConditionalExpressionNode
 
-// ============================================================================
-// Evaluation Types
-// ============================================================================
 
 export type FormulaValue = string | number | boolean | null | Date
 
@@ -129,9 +120,6 @@ export interface FormulaResult {
   inferredType?: 'string' | 'number' | 'boolean' | 'date'
 }
 
-// ============================================================================
-// Function Types
-// ============================================================================
 
 export type FunctionCategory = 'math' | 'text' | 'logic' | 'date' | 'aggregate'
 
@@ -146,9 +134,6 @@ export interface FunctionDefinition {
   evaluate: (args: FormulaValue[], context: EvaluationContext) => FormulaValue
 }
 
-// ============================================================================
-// Suggestion Types
-// ============================================================================
 
 export interface FormulaSuggestion {
   formula: string

@@ -3,7 +3,7 @@
  * Single source of truth for placeholder values and cleaning utilities
  */
 
-import type { CellValue } from '@/lib/types'
+import type { CellValue } from '@/types'
 
 /**
  * Placeholder/sentinel values that should be converted to NULL

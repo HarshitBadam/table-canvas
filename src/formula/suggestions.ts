@@ -1,8 +1,3 @@
-/**
- * Formula Suggestion Engine
- * Smart formula inference based on column names and data patterns
- */
-
 import { FormulaSuggestion, AutocompleteItem } from './types'
 import { getAllFunctions } from './functions'
 
@@ -12,9 +7,6 @@ interface ColumnInfo {
   type: string
 }
 
-// ============================================================================
-// Name Pattern Matching
-// ============================================================================
 
 interface NamePattern {
   patterns: RegExp[]
@@ -56,9 +48,6 @@ function findNumericColumns(columns: ColumnInfo[]): ColumnInfo[] {
 }
 
 
-// ============================================================================
-// Pattern Definitions
-// ============================================================================
 
 const namePatterns: NamePattern[] = [
   // Total patterns (multiplication)
@@ -570,9 +559,6 @@ const namePatterns: NamePattern[] = [
   },
 ]
 
-// ============================================================================
-// Main Suggestion Function
-// ============================================================================
 
 /**
  * Suggest formulas based on the column name being created
@@ -615,9 +601,6 @@ export function suggestFormulasFromName(
   })
 }
 
-// ============================================================================
-// Autocomplete Functions
-// ============================================================================
 
 /**
  * Get autocomplete items for columns

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
-import { JoinType, ColumnSchema, CellValue } from '@/lib/types'
+import { JoinType, ColumnSchema, CellValue } from '@/types'
 import { ensureTableMaterialized } from '@/engine/materializationService'
 
 interface TransformModalProps {
@@ -12,9 +12,6 @@ interface TransformModalProps {
   targetNodeId: string
 }
 
-// ============================================================================
-// Column Selector Dropdown
-// ============================================================================
 
 function ColumnSelect({
   value,
@@ -114,9 +111,6 @@ function ColumnSelect({
   )
 }
 
-// ============================================================================
-// Helpers
-// ============================================================================
 
 function analyzeMatch(
   leftData: Record<string, CellValue>[],
@@ -156,9 +150,6 @@ function findBestKeys(
   return best && best.score > 15 ? best : null
 }
 
-// ============================================================================
-// Main Component
-// ============================================================================
 
 export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: TransformModalProps) {
   const nodes = useProjectStore(s => s.nodes)
