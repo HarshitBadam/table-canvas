@@ -2,7 +2,6 @@ import type { SemanticHint } from './schema.types'
 import type { CellValue } from './common.types'
 
 
-/** Cardinality classification for columns */
 export type CardinalityClass = 'unique' | 'high' | 'low'
 
 /**
@@ -27,7 +26,6 @@ export type ColumnClassification =
   | 'boolean'
 
 
-/** Statistical profile for a single column */
 export interface ColumnProfile {
   columnId: string
   missingCount: number
@@ -36,7 +34,6 @@ export interface ColumnProfile {
   distinctCountExact?: boolean
   topValues?: Array<{ value: CellValue; count: number }>
   
-  // Numeric stats
   min?: number
   max?: number
   mean?: number
@@ -51,12 +48,10 @@ export interface ColumnProfile {
   iqr?: number
   histogram?: Array<{ bucket: string; count: number }>
   
-  // String stats
   minLength?: number
   maxLength?: number
   avgLength?: number
   
-  // Enhanced profile fields
   /** 100 - missingPercent */
   completeness: number
   /** Based on distinctCount/rowCount ratio */
@@ -68,14 +63,3 @@ export interface ColumnProfile {
 }
 
 
-/** Statistical profile for an entire table */
-export interface TableProfile {
-  tableId: string
-  rowCount: number
-  columns: ColumnProfile[]
-  /** Columns that could be primary key */
-  keyCandidate?: string[]
-  computedAt: string
-  /** Profiling phase (1 = basic, 2 = advanced) */
-  phase: 1 | 2
-}

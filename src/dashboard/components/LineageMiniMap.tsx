@@ -1,11 +1,3 @@
-/**
- * Data Flow Hero Component
- * 
- * Visual centerpiece showing table relationships with polished aesthetics.
- * Features blueprint grid background, card-style nodes, and smooth bezier connections.
- * Uses Dagre for automatic DAG layout.
- */
-
 import { useMemo } from 'react'
 import dagre from 'dagre'
 import type { LineageNode, LineageEdge } from '../useDashboardData'
@@ -17,19 +9,16 @@ interface LineageMiniMapProps {
 }
 
 export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProps) {
-  // Separate node types
   const sourceNodes = useMemo(() => nodes.filter(n => n.kind === 'source_table'), [nodes])
   const derivedNodes = useMemo(() => nodes.filter(n => n.kind === 'derived_table'), [nodes])
   const chartNodes = useMemo(() => nodes.filter(n => n.kind === 'chart'), [nodes])
 
-  // Don't render if no meaningful lineage to show
   if (nodes.length === 0 || (derivedNodes.length === 0 && chartNodes.length === 0 && edges.length === 0)) {
     return null
   }
 
   return (
     <div className="bg-surface rounded-xl border border-border overflow-hidden">
-      {/* Header */}
       <div className="px-5 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h3 className="text-sm font-semibold text-text-primary">Data Flow</h3>
@@ -37,8 +26,6 @@ export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProp
             {sourceNodes.length} source{sourceNodes.length !== 1 ? 's' : ''}, {derivedNodes.length} derived{chartNodes.length > 0 ? `, ${chartNodes.length} chart${chartNodes.length !== 1 ? 's' : ''}` : ''}
           </span>
         </div>
-        
-        {/* Inline Legend */}
         <div className="flex items-center gap-4 text-xs text-text-tertiary">
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded bg-accent-green" />
@@ -57,9 +44,7 @@ export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProp
         </div>
       </div>
 
-      {/* Visualization with blueprint grid background */}
       <div className="relative">
-        {/* Blueprint grid background */}
         <div 
           className="absolute inset-0"
           style={{
@@ -72,7 +57,6 @@ export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProp
           }}
         />
         
-        {/* Content */}
         <div className="relative p-8">
           <LineageVisualization 
             nodes={nodes}
@@ -85,11 +69,9 @@ export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProp
   )
 }
 
-// Node dimensions for Dagre layout
-const NODE_WIDTH = 140
-const NODE_HEIGHT = 60
+const MINIMAP_NODE_WIDTH = 140
+const MINIMAP_NODE_HEIGHT = 60
 
-// Polished lineage visualization with card-style nodes using Dagre layout
 function LineageVisualization({ 
   nodes, 
   edges, 
@@ -99,16 +81,13 @@ function LineageVisualization({
   edges: LineageEdge[]
   onNodeClick: (nodeId: string) => void
 }) {
-  // Use Dagre for automatic DAG layout
   const { nodePositions, graphWidth, graphHeight } = useMemo(() => {
-    // Create a new directed graph
     const g = new dagre.graphlib.Graph()
     
-    // Set graph options: top-to-bottom, with generous spacing
     g.setGraph({ 
       rankdir: 'TB', 
-      nodesep: 60,   // Horizontal spacing between nodes
-      ranksep: 80,   // Vertical spacing between layers
+      nodesep: 60,
+      ranksep: 80,
       marginx: 40,
       marginy: 40,
     })
@@ -116,24 +95,20 @@ function LineageVisualization({
     // Default edge label (required by Dagre)
     g.setDefaultEdgeLabel(() => ({}))
     
-    // Add nodes to the graph
     nodes.forEach(node => {
       g.setNode(node.id, { 
-        width: NODE_WIDTH, 
-        height: NODE_HEIGHT,
+        width: MINIMAP_NODE_WIDTH, 
+        height: MINIMAP_NODE_HEIGHT,
         label: node.name,
       })
     })
     
-    // Add edges to the graph
     edges.forEach(edge => {
       g.setEdge(edge.from, edge.to)
     })
     
-    // Run the layout algorithm
     dagre.layout(g)
     
-    // Extract computed positions
     const positions: Map<string, { x: number; y: number }> = new Map()
     nodes.forEach(node => {
       const nodeData = g.node(node.id)
@@ -145,7 +120,6 @@ function LineageVisualization({
       }
     })
     
-    // Get graph dimensions
     const graphData = g.graph()
     const width = (graphData?.width || 400) + 80
     const height = (graphData?.height || 200) + 80
@@ -157,17 +131,14 @@ function LineageVisualization({
     }
   }, [nodes, edges])
 
-  // Container height with max cap
   const containerHeight = Math.min(graphHeight, 400)
 
   return (
     <div 
-      className="relative overflow-auto scrollbar-none flex justify-center" 
+      className="relative overflow-auto scrollbar-hide flex justify-center" 
       style={{ height: `${containerHeight}px`, minHeight: '200px' }}
     >
-      {/* Centered container for graph */}
       <div className="relative" style={{ width: graphWidth, height: graphHeight }}>
-        {/* SVG container with computed dimensions */}
         <svg 
           className="absolute pointer-events-none"
           width={graphWidth}
@@ -175,7 +146,6 @@ function LineageVisualization({
           style={{ overflow: 'visible' }}
         >
         <defs>
-          {/* Gradient for edges */}
           <linearGradient id="flowEdgeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#217346" stopOpacity="0.5" />
             <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0.5" />
@@ -187,7 +157,6 @@ function LineageVisualization({
             <stop offset="100%" stopColor="#6B7280" />
           </linearGradient>
           
-          {/* Arrow marker */}
           <marker
             id="flowArrowhead"
             markerWidth="10"
@@ -210,12 +179,10 @@ function LineageVisualization({
           
           if (!fromPos || !toPos) return null
           
-          // Calculate bezier control points for smooth curve (pixel positions)
-          const fromY = fromPos.y + NODE_HEIGHT / 2 // bottom of source card
-          const toY = toPos.y - NODE_HEIGHT / 2 // top of target card
+          const fromY = fromPos.y + MINIMAP_NODE_HEIGHT / 2
+          const toY = toPos.y - MINIMAP_NODE_HEIGHT / 2
           const midY = (fromY + toY) / 2
           
-          // Create smooth bezier path using pixel coordinates
           const path = `
             M ${fromPos.x} ${fromY}
             C ${fromPos.x} ${midY}, 
@@ -225,7 +192,6 @@ function LineageVisualization({
           
           return (
             <g key={edge.id}>
-              {/* Glow effect (hidden in print) */}
               <path
                 d={path}
                 fill="none"
@@ -235,7 +201,6 @@ function LineageVisualization({
                 strokeLinecap="round"
                 className="lineage-glow print:hidden"
               />
-              {/* Main path */}
               <path
                 d={path}
                 fill="none"
@@ -250,7 +215,6 @@ function LineageVisualization({
         })}
       </svg>
 
-      {/* Card-style Nodes */}
       {nodes.map((node) => {
         const pos = nodePositions.get(node.id)
         if (!pos) return null
@@ -258,7 +222,6 @@ function LineageVisualization({
         const isSource = node.kind === 'source_table'
         const isChart = node.kind === 'chart'
 
-        // Get node colors based on type
         const borderClass = isSource 
           ? 'border-[#217346]/30 hover:border-[#217346] focus:ring-[#217346]'
           : isChart
@@ -301,16 +264,13 @@ function LineageVisualization({
             }}
             title={isChart ? node.name : `${node.name} (${node.rowCount.toLocaleString()} rows)`}
           >
-            {/* Header with icon */}
             <div className="flex items-center gap-2">
               <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBgClass}`}>
                 {isChart ? (
-                  // Chart icon
                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M3 13h2v8H3v-8zm4-6h2v14H7V7zm4 3h2v11h-2V10zm4-6h2v17h-2V4zm4 8h2v9h-2v-9z" />
                   </svg>
                 ) : (
-                  // Table icon
                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2zm2 0h14v4H5V5zm0 6h4v8H5v-8zm6 0h8v8h-8v-8z" />
                   </svg>
@@ -321,7 +281,6 @@ function LineageVisualization({
               </span>
             </div>
             
-            {/* Subtitle */}
             <div className="text-[11px] text-text-tertiary mt-1 text-left">
               {isChart ? (node.chartType || 'Chart') : `${node.rowCount.toLocaleString()} rows`}
             </div>

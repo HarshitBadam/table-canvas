@@ -1,10 +1,3 @@
-/**
- * Shared hook for fetching chart data with reactivity
- * 
- * This hook fetches data for charts from DuckDB and automatically
- * re-fetches when the source table's data changes (via version hash).
- */
-
 import { useState, useEffect } from 'react'
 import { CellValue, ChartConfig, ColumnSchema } from '@/types'
 import { getEngine } from '@/engine/EngineAdapter'
@@ -18,10 +11,7 @@ export interface ChartDataResult {
 }
 
 /**
- * Hook to fetch chart data from a source table
- * 
- * @param sourceTableId - The ID of the source table
- * @param config - Chart configuration (xAxis, yAxis, aggregation, groupBy) - uses column IDs
+ * @param config - Chart configuration (xAxis, yAxis, aggregation, groupBy) — uses column IDs
  * @param sourceVersionHash - Optional version hash for reactivity (triggers re-fetch when changed)
  * @param columns - Optional column schema for converting IDs to names for DuckDB queries
  */
@@ -38,15 +28,12 @@ export function useChartData(
 
   const refetch = () => setRefetchTrigger(prev => prev + 1)
 
-  // Resolve a column reference (id or name) to get the duckDbName for queries.
-  // Returns the duckDbName (what DuckDB actually uses) and the display name.
   const getColumnForDuckDB = (columnRef: string): { duckDbName: string; name: string } | null => {
     if (!columns || columns.length === 0) {
       // If no columns schema, assume columnRef is what we need
       return { duckDbName: columnRef, name: columnRef }
     }
     
-    // First try to find by ID
     const colById = columns.find(c => c.id === columnRef)
     if (colById) {
       return { 
@@ -73,7 +60,6 @@ export function useChartData(
       }
     }
     
-    // Column not found
     return null
   }
 
@@ -97,18 +83,15 @@ export function useChartData(
       setError(null)
 
       try {
-        // Ensure source table is materialized first
         await ensureTableMaterialized(sourceTableId)
 
         const engine = getEngine()
         await engine.init()
 
-        // Resolve column references to get duckDbName for queries
         const xAxisCol = getColumnForDuckDB(config.xAxis)
         const yAxisCol = getColumnForDuckDB(config.yAxis)
         const groupByCol = config.groupBy ? getColumnForDuckDB(config.groupBy) : undefined
 
-        // Validate columns were resolved
         if (!xAxisCol) {
           throw new Error(`X-axis column "${config.xAxis}" not found. Available columns: ${columns?.map(c => `${c.name} (${c.duckDbName || c.id})`).join(', ')}`)
         }
@@ -124,7 +107,6 @@ export function useChartData(
         const yAxisDuckDb = yAxisCol.duckDbName
         const groupByDuckDb = groupByCol?.duckDbName
 
-        // If there's a groupBy or aggregation, use aggregation query
         if (groupByDuckDb || config.aggregation) {
           const aggResult = await engine.getAggregation(sourceTableId, {
             groupBy: groupByDuckDb ? [groupByDuckDb] : [xAxisDuckDb],
@@ -136,8 +118,6 @@ export function useChartData(
           })
 
           if (!cancelled) {
-            // Convert to chart data format
-            // The result columns are duckDbNames, map back to config keys for chart rendering
             const chartData = aggResult.rows.map(row => {
               const obj: Record<string, CellValue> = {}
               aggResult.columns.forEach((col, i) => {
@@ -163,7 +143,6 @@ export function useChartData(
           console.error('[useChartData] Config:', { xAxis: config.xAxis, yAxis: config.yAxis, aggregation: config.aggregation })
           console.error('[useChartData] Available columns:', columns?.map(c => ({ id: c.id, name: c.name })))
           
-          // Provide clearer error for DuckDB binder errors
           if (errorMsg.includes('Binder Error') || errorMsg.includes('not found in FROM clause') || errorMsg.includes('does not exist')) {
             setError(`Column reference error: The chart configuration references a column that no longer exists. Please reconfigure the chart axes.`)
           } else if (errorMsg.includes('not found')) {

@@ -1,15 +1,10 @@
-/**
- * EmbeddedTableNode - TipTap Custom Node for Embedded Tables
- * 
- * Renders table snippets from source tables with configuration.
- */
-
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useDataStore } from '@/state/dataStore';
 import { useProjectStore } from '@/state/projectStore';
 import type { TableNode as TableNodeType, ColumnSchema } from '@/types';
+import { TablePickerModal } from './TablePickerModal';
 
 
 type RowSelectionMode = 'all' | 'first_n' | 'last_n';
@@ -24,7 +19,6 @@ interface EmbeddedTableNodeAttrs {
 
 interface EmbeddedTableNodeOptions {
   reportId?: string;
-  onOpenTable?: (tableId: string) => void;
 }
 
 
@@ -38,11 +32,15 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
   const tableDataEntry = useDataStore((state) => state.tableData[attrs.sourceTableId]);
   const tableData = tableDataEntry?.rows || [];
   const tableNode = useProjectStore((state) => state.nodes[attrs.sourceTableId]) as TableNodeType | undefined;
-  
+  const tables = useProjectStore((state) =>
+    Object.values(state.nodes).filter(
+      (n): n is TableNodeType => n.kind === 'source_table' || n.kind === 'derived_table'
+    )
+  );
+
   const [showConfig, setShowConfig] = useState(false);
   const [showTablePicker, setShowTablePicker] = useState(false);
 
-  // Get columns from schema
   const schemaColumns: ColumnSchema[] = useMemo(() => {
     return tableNode?.schema?.columns || [];
   }, [tableNode]);
@@ -59,7 +57,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
     return map;
   }, [schemaColumns]);
 
-  // Filter and slice data
   const displayData = useMemo(() => {
     let data = tableData;
     const limit = attrs.rowLimit || 10;
@@ -82,7 +79,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
     updateAttributes({ selectedColumns: newColumns });
   }, [attrs.selectedColumns, updateAttributes]);
 
-  // No source table - empty state with popup
   if (!attrs.sourceTableId) {
     return (
       <NodeViewWrapper className="editable-table-block">
@@ -99,9 +95,9 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
           </div>
         </div>
         
-        {/* Table Picker Modal */}
         {showTablePicker && (
-          <TablePickerModal 
+          <TablePickerModal
+            tables={tables}
             onSelect={(tableId) => {
               updateAttributes({ sourceTableId: tableId });
               setShowTablePicker(false);
@@ -113,7 +109,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
     );
   }
 
-  // No data state
   if (!tableData.length) {
     return (
       <NodeViewWrapper className="editable-table-block">
@@ -133,7 +128,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
   return (
     <NodeViewWrapper className="editable-table-block">
       <div className={`embedded-table-window ${selected ? 'is-selected' : ''}`}>
-        {/* Window Header */}
         <div className="embedded-table-header">
           <div className="embedded-table-title">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -147,7 +141,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
           </span>
         </div>
 
-        {/* Scrollable Table Content */}
         <div className="embedded-table-scroll">
           <table className="editable-table">
             <thead>
@@ -177,7 +170,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
           </table>
         </div>
 
-        {/* Footer */}
         <div className="embedded-table-footer">
           <span>
             Showing {displayData.length} of {tableData.length} rows
@@ -192,7 +184,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
           )}
         </div>
 
-        {/* Config Panel */}
         {showConfig && (
           <TableConfigPanel
             attrs={attrs}
@@ -208,60 +199,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
 });
 
 
-
-function TablePickerModal({ onSelect, onClose }: { onSelect: (tableId: string) => void; onClose: () => void }) {
-  const nodes = useProjectStore((state) => state.nodes);
-  const tables = Object.values(nodes).filter(
-    n => n.kind === 'source_table' || n.kind === 'derived_table'
-  ) as TableNodeType[];
-
-  return (
-    <div className="table-picker-overlay" onClick={onClose}>
-      <div className="table-picker-modal" onClick={e => e.stopPropagation()}>
-        <div className="table-picker-header">
-          <h3>Select a Table</h3>
-          <button onClick={onClose} className="table-picker-close">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        
-        <div className="table-picker-content">
-          {tables.length === 0 ? (
-            <div className="table-picker-empty">
-              <p>No tables available</p>
-              <p className="text-xs text-text-tertiary">Create a table first to embed it here</p>
-            </div>
-          ) : (
-            <div className="table-picker-list">
-              {tables.map(table => (
-                <button
-                  key={table.id}
-                  onClick={() => onSelect(table.id)}
-                  className="table-picker-item"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  <div className="table-picker-item-info">
-                    <span className="table-picker-item-name">{table.name}</span>
-                    <span className="table-picker-item-meta">
-                      {table.kind === 'source_table' ? 'Source Table' : 'Derived Table'}
-                    </span>
-                  </div>
-                  <span className="table-picker-item-badge">
-                    {table.kind === 'source_table' ? 'SOURCE' : 'DERIVED'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 
 interface TableConfigPanelProps {
@@ -290,7 +227,6 @@ function TableConfigPanel({
         </button>
       </div>
 
-      {/* Columns */}
       <div className="block-config-section">
         <label className="block-config-label">Columns</label>
         <div className="space-y-1 max-h-32 overflow-y-auto">
@@ -308,7 +244,6 @@ function TableConfigPanel({
         </div>
       </div>
 
-      {/* Row Selection */}
       <div className="block-config-section">
         <label className="block-config-label">Rows</label>
         <select
@@ -333,7 +268,6 @@ function TableConfigPanel({
         )}
       </div>
 
-      {/* Caption */}
       <div className="block-config-section">
         <label className="block-config-label">Caption</label>
         <input
@@ -361,7 +295,6 @@ export const EmbeddedTableNode = Node.create<EmbeddedTableNodeOptions>({
   addOptions() {
     return {
       reportId: undefined,
-      onOpenTable: undefined,
     };
   },
 
@@ -388,4 +321,3 @@ export const EmbeddedTableNode = Node.create<EmbeddedTableNodeOptions>({
   },
 });
 
-export default EmbeddedTableNode;

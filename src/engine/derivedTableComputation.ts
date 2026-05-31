@@ -104,7 +104,6 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
       projectStore.updateTableSchema(tableId, schemaWithIds)
     }
 
-    // Fetch full data and remap DuckDB column names to our schema IDs
     try {
       const fullData = await engine.getSlice(tableId, 0, Math.max(result.rowCount, 10000))
       const updatedSchema = projectStore.getTableNode(tableId)?.schema
@@ -116,7 +115,8 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
         return transformedRow
       })
       dataStore.setTableData(tableId, rows)
-    } catch {
+    } catch (error) {
+      console.error('[derivedTableComputation] Failed to fetch full data slice, falling back to preview:', error);
       if (result.preview && result.preview.length > 0) {
         const updatedSchema = projectStore.getTableNode(tableId)?.schema
         const rows: TableRow[] = result.preview.map((row, idx) => {

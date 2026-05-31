@@ -1,10 +1,5 @@
-/**
- * FormulaColumnModal
- * Clean professional design
- */
-
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { ColumnSchema } from '@/types'
+import { ColumnSchema, type UserColumnType } from '@/types'
 import {
   suggestFormulasFromName,
   inferFormulaType,
@@ -21,7 +16,7 @@ interface FormulaColumnModalProps {
   rows: Array<Record<string, FormulaValue>>
   onConfirm: (
     name: string,
-    type: 'string' | 'number' | 'boolean' | 'date',
+    type: UserColumnType,
     formula?: string
   ) => void
   onCancel: () => void
@@ -38,7 +33,7 @@ export function FormulaColumnModal({
   const [columnName, setColumnName] = useState('')
   const [isFormula, setIsFormula] = useState(false)
   const [formula, setFormula] = useState('')
-  const [staticType, setStaticType] = useState<'string' | 'number' | 'boolean' | 'date'>('string')
+  const [staticType, setStaticType] = useState<UserColumnType>('string')
   
   const [formulaSuggestions, setFormulaSuggestions] = useState<FormulaSuggestion[]>([])
   const [formulaErrors, setFormulaErrors] = useState<string[]>([])
@@ -81,10 +76,8 @@ export function FormulaColumnModal({
       return
     }
     
-    // Clear errors immediately when typing
     setFormulaErrors([])
     
-    // Validate after a delay
     const timeout = setTimeout(() => {
       const errors = validateFormulaWithColumns(formula, columnInfo)
       setFormulaErrors(errors.map(e => e.message))
@@ -140,14 +133,12 @@ export function FormulaColumnModal({
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        {/* Header */}
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
           <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">New Column</h3>
           <p className="text-xs text-gray-500 mt-0.5">Add a new column to your table</p>
         </div>
         
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Column Name */}
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Column Name
@@ -162,7 +153,6 @@ export function FormulaColumnModal({
             />
           </div>
 
-          {/* Type Toggle */}
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Column Type
@@ -195,7 +185,6 @@ export function FormulaColumnModal({
             </div>
           </div>
 
-          {/* Static: Data Type Selection */}
           {!isFormula && (
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -244,10 +233,8 @@ export function FormulaColumnModal({
             </div>
           )}
 
-          {/* Formula Mode */}
           {isFormula && (
             <>
-              {/* Suggestions */}
               {formulaSuggestions.length > 0 && (
                 <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800">
                   <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide mb-2">
@@ -272,7 +259,6 @@ export function FormulaColumnModal({
                 </div>
               )}
 
-              {/* Formula Input */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Formula</label>
@@ -299,9 +285,7 @@ export function FormulaColumnModal({
                 )}
               </div>
 
-              {/* Columns & Functions Side by Side */}
               <div className="flex gap-3" style={{ height: '200px' }}>
-                {/* Columns Panel */}
                 <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Columns</span>
@@ -328,7 +312,6 @@ export function FormulaColumnModal({
                   </div>
                 </div>
 
-                {/* Functions Panel */}
                 <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Functions</span>
@@ -365,7 +348,6 @@ export function FormulaColumnModal({
           )}
         </div>
         
-        {/* Footer */}
         <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex gap-2 bg-gray-50 dark:bg-gray-800/50">
           <button
             type="button"

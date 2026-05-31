@@ -1,10 +1,5 @@
 import mongoose, { Schema, Document, Model, Types } from 'mongoose';
 
-/**
- * File metadata document interface.
- * This model tracks files stored in GridFS with additional metadata
- * and soft-delete support.
- */
 export interface IFileDocument extends Document {
   _id: Types.ObjectId;
   gridFsId: Types.ObjectId;
@@ -83,7 +78,6 @@ const FileSchema = new Schema<IFileDocument, IFileModel>(
     deletedAt: {
       type: Date,
       default: null,
-      // Index defined below with sparse option
     },
   },
   {
@@ -111,32 +105,20 @@ FileSchema.methods.toPublic = function (): IFilePublic {
   };
 };
 
-/**
- * Soft delete the file by setting deletedAt timestamp
- */
 FileSchema.methods.softDelete = async function (): Promise<IFileDocument> {
   this.deletedAt = new Date();
   return this.save();
 };
 
-/**
- * Restore a soft-deleted file by clearing deletedAt
- */
 FileSchema.methods.restore = async function (): Promise<IFileDocument> {
   this.deletedAt = null;
   return this.save();
 };
 
-/**
- * Check if file is soft-deleted
- */
 FileSchema.methods.isDeleted = function (): boolean {
   return this.deletedAt !== null;
 };
 
-/**
- * Find all active (non-deleted) files for a user
- */
 FileSchema.statics.findByUser = function (userId: string | Types.ObjectId) {
   return this.find({
     userId,
@@ -144,9 +126,6 @@ FileSchema.statics.findByUser = function (userId: string | Types.ObjectId) {
   }).sort({ createdAt: -1 });
 };
 
-/**
- * Find all active (non-deleted) files for a project
- */
 FileSchema.statics.findByProject = function (projectId: string | Types.ObjectId) {
   return this.find({
     projectId,
@@ -154,9 +133,6 @@ FileSchema.statics.findByProject = function (projectId: string | Types.ObjectId)
   }).sort({ createdAt: -1 });
 };
 
-/**
- * Find a specific active (non-deleted) file by ID and user
- */
 FileSchema.statics.findByIdAndUser = function (fileId: string, userId: string) {
   return this.findOne({
     _id: new Types.ObjectId(fileId),
@@ -165,9 +141,6 @@ FileSchema.statics.findByIdAndUser = function (fileId: string, userId: string) {
   });
 };
 
-/**
- * Find all files including soft-deleted (for admin/recovery)
- */
 FileSchema.statics.findWithDeleted = function (
   filter: mongoose.FilterQuery<IFileDocument> = {}
 ) {

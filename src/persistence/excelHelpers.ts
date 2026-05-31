@@ -1,7 +1,8 @@
 import * as XLSX from 'xlsx'
 import Papa from 'papaparse'
 import { loadFile } from './db'
-import type { ProjectNode, TableNode, SourceTableNode } from '@/types'
+import type { SourceTableNode } from '@/types'
+import { getTableNodes } from '@/lib/utils'
 
 /**
  * Excel sheet names: max 31 chars, no []:*?/\
@@ -38,15 +39,7 @@ export function makeSheetNamesUnique(names: string[]): string[] {
   return result
 }
 
-export function getTableNodes(nodes: Record<string, ProjectNode>): TableNode[] {
-  return Object.values(nodes)
-    .filter((node): node is TableNode =>
-      node.kind === 'source_table' || node.kind === 'derived_table'
-    )
-    .sort((a, b) =>
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    )
-}
+export { getTableNodes }
 
 function parseCSVForExport(fileData: ArrayBuffer): Promise<Record<string, unknown>[]> {
   return new Promise((resolve) => {

@@ -241,7 +241,8 @@ export async function getProfile(
                 count: Number(r.cnt)
               }
             })
-          } catch {
+          } catch (error) {
+            console.error('[tableOperations] Histogram generation failed for column:', colName, error)
             // Histogram generation can fail for edge-case data distributions
           }
         }
@@ -262,7 +263,8 @@ export async function getProfile(
           profile.minLength = Number(strStats.min_len)
           profile.maxLength = Number(strStats.max_len)
           profile.avgLength = Number(strStats.avg_len)
-        } catch {
+        } catch (error) {
+          console.error('[tableOperations] String length stats failed for column:', colName, error)
           // String stats can fail for certain column types
         }
       }

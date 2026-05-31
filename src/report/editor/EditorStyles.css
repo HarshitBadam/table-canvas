@@ -5,9 +5,7 @@
  * Uses CSS variables from the design system for theming.
  */
 
-/* ============================================================================
-   Editor Container
-   ============================================================================ */
+/* Editor Container */
 
 .tiptap-editor {
   min-height: 200px;
@@ -26,9 +24,7 @@
   outline: none;
 }
 
-/* ============================================================================
-   Typography
-   ============================================================================ */
+/* Typography */
 
 .tiptap-editor-content {
   color: var(--color-text-primary, #18181b);
@@ -103,9 +99,7 @@
   pointer-events: none;
 }
 
-/* ============================================================================
-   Placeholder
-   ============================================================================ */
+/* Placeholder */
 
 .tiptap-editor-content .is-editor-empty:first-child::before {
   color: var(--color-text-tertiary, #a1a1aa);
@@ -134,9 +128,7 @@
   display: none !important;
 }
 
-/* ============================================================================
-   Lists
-   ============================================================================ */
+/* Lists */
 
 .tiptap-editor-content ul,
 .tiptap-editor-content ol {
@@ -168,9 +160,7 @@
   margin: 0.25rem 0;
 }
 
-/* ============================================================================
-   Blockquote
-   ============================================================================ */
+/* Blockquote */
 
 .tiptap-editor-content blockquote {
   border-left: 3px solid var(--color-border, #e4e4e7);
@@ -184,9 +174,7 @@
   color: var(--color-text-secondary, #a1a1aa);
 }
 
-/* ============================================================================
-   Code
-   ============================================================================ */
+/* Code */
 
 .tiptap-editor-content code {
   background: var(--color-surface-secondary, #f4f4f5);
@@ -222,9 +210,7 @@
   line-height: 1.5;
 }
 
-/* ============================================================================
-   Horizontal Rule (Divider)
-   ============================================================================ */
+/* Horizontal Rule (Divider) */
 
 .tiptap-editor-content hr {
   border: none;
@@ -236,9 +222,7 @@
   border-top-color: rgba(255, 255, 255, 0.1);
 }
 
-/* ============================================================================
-   Inline Formatting
-   ============================================================================ */
+/* Inline Formatting */
 
 .tiptap-editor-content strong {
   font-weight: 600;
@@ -267,35 +251,29 @@
   background-color: rgba(255, 235, 59, 0.3);
 }
 
-/* ============================================================================
-   Links
-   ============================================================================ */
+/* Links */
 
 .tiptap-editor-content a {
-  color: var(--color-accent-green, #217346);
+  color: var(--color-accent-green);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .tiptap-editor-content a:hover {
-  color: var(--color-accent-green-dark, #1a5c38);
+  color: var(--color-accent-green-dark);
 }
 
 [data-theme="dark"] .tiptap-editor-content a:hover {
-  color: var(--color-accent-green-light, #2d8b57);
+  color: var(--color-accent-green-light);
 }
 
-/* ============================================================================
-   Selection
-   ============================================================================ */
+/* Selection */
 
 .tiptap-editor-content ::selection {
   background: rgba(33, 115, 70, 0.2);
 }
 
-/* ============================================================================
-   Custom Block Wrapper Styles
-   ============================================================================ */
+/* Custom Block Wrapper Styles */
 
 .tiptap-block-wrapper {
   position: relative;
@@ -320,7 +298,7 @@
 /* Selected state */
 .tiptap-block-wrapper.is-selected {
   background: rgba(33, 115, 70, 0.05);
-  box-shadow: inset 3px 0 0 var(--color-accent-green, #217346);
+  box-shadow: inset 3px 0 0 var(--color-accent-green);
 }
 
 /* Dragging state */
@@ -328,9 +306,7 @@
   opacity: 0.5;
 }
 
-/* ============================================================================
-   Block Toolbar (Floating)
-   ============================================================================ */
+/* Block Toolbar (Floating) */
 
 .block-toolbar {
   position: absolute;
@@ -382,9 +358,7 @@
   cursor: grabbing;
 }
 
-/* ============================================================================
-   Empty States for Custom Blocks
-   ============================================================================ */
+/* Empty States for Custom Blocks */
 
 .block-empty-state {
   display: flex;
@@ -406,7 +380,7 @@
 }
 
 .block-empty-state:hover {
-  border-color: var(--color-accent-green, #217346);
+  border-color: var(--color-accent-green);
   background: rgba(33, 115, 70, 0.03);
 }
 
@@ -415,7 +389,7 @@
 }
 
 .block-empty-state.is-selected {
-  border-color: var(--color-accent-green, #217346);
+  border-color: var(--color-accent-green);
   border-style: solid;
   background: rgba(33, 115, 70, 0.03);
 }
@@ -425,12 +399,12 @@
 }
 
 .block-empty-state svg {
-  color: var(--color-accent-green, #217346);
+  color: var(--color-accent-green);
   margin-bottom: 8px;
 }
 
 [data-theme="dark"] .block-empty-state svg {
-  color: var(--color-accent-green, #4ade80);
+  color: var(--color-accent-green);
 }
 
 .block-empty-state-icon {
@@ -455,9 +429,7 @@
   color: var(--color-text-tertiary, #a1a1aa);
 }
 
-/* ============================================================================
-   Configuration Panels
-   ============================================================================ */
+/* Configuration Panels */
 
 .block-config-panel {
   position: absolute;
@@ -509,9 +481,7 @@
   letter-spacing: 0.05em;
 }
 
-/* ============================================================================
-   Callout Block Styles
-   ============================================================================ */
+/* Callout Block Styles */
 
 .callout-block {
   display: flex;
@@ -603,9 +573,7 @@
   display: none;
 }
 
-/* ============================================================================
-   Toggle Block Styles
-   ============================================================================ */
+/* Toggle Block Styles */
 
 .toggle-block {
   margin: 0.5rem 0;
@@ -669,9 +637,7 @@
   padding: 0.25rem 0;
 }
 
-/* ============================================================================
-   Chart and Table Block Styles
-   ============================================================================ */
+/* Chart and Table Block Styles */
 
 .chart-block,
 .table-block {
@@ -791,9 +757,7 @@
   background: var(--color-surface-hover, rgba(255, 255, 255, 0.02));
 }
 
-/* ============================================================================
-   Report Table Block - Grid-matching design
-   ============================================================================ */
+/* Report Table Block - Grid-matching design */
 
 .editable-table-block {
   margin: 1rem 0;
@@ -804,7 +768,7 @@
 }
 
 .editable-table-outer.is-selected .editable-table-container {
-  outline: 2px solid var(--color-accent-green, #217346);
+  outline: 2px solid var(--color-accent-green);
   outline-offset: -1px;
 }
 
@@ -819,7 +783,7 @@
 }
 
 .editable-table-wrapper.is-selected .editable-table-container {
-  outline: 2px solid var(--color-accent-green, #217346);
+  outline: 2px solid var(--color-accent-green);
   outline-offset: -1px;
 }
 
@@ -971,7 +935,7 @@
   background: transparent;
   border: none;
   border-radius: 3px;
-  color: var(--color-accent-green, #217346);
+  color: var(--color-accent-green);
   cursor: pointer;
   transition: all 100ms ease;
   opacity: 0.5;
@@ -983,7 +947,7 @@
 }
 
 [data-theme="dark"] .table-add-btn {
-  color: var(--color-accent-green, #4ade80);
+  color: var(--color-accent-green);
 }
 
 [data-theme="dark"] .table-add-btn:hover {
@@ -1040,7 +1004,7 @@
 }
 
 .table-context-menu button svg {
-  color: var(--color-accent-green, #217346);
+  color: var(--color-accent-green);
   flex-shrink: 0;
 }
 
@@ -1053,7 +1017,7 @@
 }
 
 [data-theme="dark"] .table-context-menu button svg {
-  color: var(--color-accent-green, #4ade80);
+  color: var(--color-accent-green);
 }
 
 [data-theme="dark"] .table-context-menu button:hover {
@@ -1237,11 +1201,11 @@
 
 .table-picker-item:hover {
   background: rgba(33, 115, 70, 0.08);
-  border-color: var(--color-accent-green, #217346);
+  border-color: var(--color-accent-green);
 }
 
 .table-picker-item svg {
-  color: var(--color-accent-green, #217346);
+  color: var(--color-accent-green);
   flex-shrink: 0;
 }
 
@@ -1251,11 +1215,11 @@
 
 [data-theme="dark"] .table-picker-item:hover {
   background: rgba(33, 115, 70, 0.15);
-  border-color: var(--color-accent-green, #4ade80);
+  border-color: var(--color-accent-green);
 }
 
 [data-theme="dark"] .table-picker-item svg {
-  color: var(--color-accent-green, #4ade80);
+  color: var(--color-accent-green);
 }
 
 .table-picker-item-info {
@@ -1283,7 +1247,7 @@
 .table-picker-item-badge {
   font-size: 10px;
   font-weight: 600;
-  color: var(--color-accent-green, #217346);
+  color: var(--color-accent-green);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 3px 8px;
@@ -1293,7 +1257,7 @@
 }
 
 [data-theme="dark"] .table-picker-item-badge {
-  color: var(--color-accent-green, #4ade80);
+  color: var(--color-accent-green);
   background: rgba(33, 115, 70, 0.2);
 }
 
@@ -1435,7 +1399,7 @@
 
 .dimension-stepper button:hover:not(:disabled) {
   background: var(--color-surface-secondary, #f4f4f5);
-  color: var(--color-accent-green, #217346);
+  color: var(--color-accent-green);
 }
 
 .dimension-stepper button:disabled {
@@ -1509,7 +1473,7 @@
   font-size: 14px;
   font-weight: 500;
   color: #fff;
-  background: var(--color-accent-green, #217346);
+  background: var(--color-accent-green);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -1518,7 +1482,7 @@
 }
 
 .dimension-btn-create:hover {
-  background: var(--color-accent-green-hover, #1a5c38);
+  background: var(--color-accent-green-hover);
 }
 
 /* Embedded Table - Scrollable Window Style */
@@ -1535,7 +1499,7 @@
 }
 
 .embedded-table-window.is-selected {
-  outline: 2px solid var(--color-accent-green, #217346);
+  outline: 2px solid var(--color-accent-green);
   outline-offset: -1px;
 }
 
@@ -1563,7 +1527,7 @@
 }
 
 .embedded-table-title svg {
-  color: var(--color-accent-green, #217346);
+  color: var(--color-accent-green);
 }
 
 [data-theme="dark"] .embedded-table-title {
@@ -1571,13 +1535,13 @@
 }
 
 [data-theme="dark"] .embedded-table-title svg {
-  color: var(--color-accent-green, #4ade80);
+  color: var(--color-accent-green);
 }
 
 .embedded-table-badge {
   font-size: 10px;
   font-weight: 600;
-  color: var(--color-accent-green, #217346);
+  color: var(--color-accent-green);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 2px 6px;
@@ -1586,7 +1550,7 @@
 }
 
 [data-theme="dark"] .embedded-table-badge {
-  color: var(--color-accent-green, #4ade80);
+  color: var(--color-accent-green);
   background: rgba(33, 115, 70, 0.2);
 }
 
@@ -1620,7 +1584,7 @@
 .embedded-table-config-btn {
   font-size: 11px;
   font-weight: 500;
-  color: var(--color-accent-green, #217346);
+  color: var(--color-accent-green);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -1634,16 +1598,14 @@
 }
 
 [data-theme="dark"] .embedded-table-config-btn {
-  color: var(--color-accent-green, #4ade80);
+  color: var(--color-accent-green);
 }
 
 [data-theme="dark"] .embedded-table-config-btn:hover {
   background: rgba(33, 115, 70, 0.2);
 }
 
-/* ============================================================================
-   Slash Command Menu
-   ============================================================================ */
+/* Slash Command Menu */
 
 .slash-command-menu {
   min-width: 280px;
@@ -1749,13 +1711,9 @@
   color: var(--color-text-tertiary, #a1a1aa);
 }
 
-/* ============================================================================
-   Print Styles
-   ============================================================================ */
+/* Print Styles */
 
-/* ============================================================================
-   Tippy.js Theme for Slash Commands
-   ============================================================================ */
+/* Tippy.js Theme for Slash Commands */
 
 .tippy-box[data-theme~='slash-command'] {
   background: transparent;
@@ -1772,13 +1730,9 @@
   display: none;
 }
 
-/* ============================================================================
-   Report Toolbar
-   ============================================================================ */
+/* Report Toolbar */
 
-/* ============================================================================
-   Report Toolbar V2 - Grid View Inspired Design
-   ============================================================================ */
+/* Report Toolbar V2 - Grid View Inspired Design */
 
 .report-toolbar-v2 {
   display: flex;
@@ -2210,7 +2164,7 @@
 }
 
 .report-dropdown-item.is-active .report-dropdown-item-name {
-  color: var(--color-accent-green, #217346);
+  color: var(--color-accent-green);
 }
 
 [data-theme="dark"] .report-dropdown-item-name {
@@ -2218,16 +2172,16 @@
 }
 
 [data-theme="dark"] .report-dropdown-item.is-active .report-dropdown-item-name {
-  color: var(--color-accent-green, #4ade80);
+  color: var(--color-accent-green);
 }
 
 .report-dropdown-check {
-  color: var(--color-accent-green, #217346);
+  color: var(--color-accent-green);
   flex-shrink: 0;
 }
 
 [data-theme="dark"] .report-dropdown-check {
-  color: var(--color-accent-green, #4ade80);
+  color: var(--color-accent-green);
 }
 
 .report-dropdown-actions {
@@ -2283,7 +2237,7 @@
   font-size: 13px;
   font-weight: 500;
   padding: 4px 8px;
-  border: 1px solid var(--color-accent-green, #217346);
+  border: 1px solid var(--color-accent-green);
   border-radius: 4px;
   background: var(--color-surface, #fff);
   color: var(--color-text-primary, #18181b);
@@ -2293,7 +2247,7 @@
 [data-theme="dark"] .report-dropdown-input {
   background: var(--color-surface-secondary, #27272a);
   color: var(--color-text-primary, #fafafa);
-  border-color: var(--color-accent-green, #4ade80);
+  border-color: var(--color-accent-green);
 }
 
 /* Legacy Action Buttons - hidden, using v2 styles */
@@ -2301,9 +2255,7 @@
   display: none;
 }
 
-/* ============================================================================
-   Print Styles
-   ============================================================================ */
+/* Print Styles */
 
 @media print {
   .report-toolbar {

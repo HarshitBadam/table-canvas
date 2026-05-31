@@ -1,11 +1,7 @@
-/**
- * Pattern Detection Utilities
- * 
- * Helper functions for detecting data patterns in column values.
- */
-
 import { ColumnSchema, ColumnProfile } from '@/types';
 import { isPlaceholder } from '../cleaningConstants';
+import { EPOCH_MS_MIN, EPOCH_MS_MAX } from '@/charts/chartShared';
+export { looksLikeDate } from '@/lib/utils';
 
 
 export function hasLeadingTrailingWhitespace(value: unknown): boolean {
@@ -22,17 +18,11 @@ export function looksLikeNumber(value: unknown): boolean {
 }
 
 
-/**
- * Check if a column looks like an ID column (should not have typo detection applied)
- */
 export function looksLikeIdColumn(col: ColumnSchema, profile?: ColumnProfile): boolean {
-  // Check semantic hints
   if (col.semanticHints?.includes('id')) return true;
   
-  // Check if values are unique or near-unique (key candidate)
   if (profile?.isKeyCandidate) return true;
   
-  // Check column name patterns
   const name = col.name.toLowerCase();
   if (name.endsWith('_id') || name.endsWith('id') || 
       name === 'id' || name.includes('code') || 
@@ -40,7 +30,6 @@ export function looksLikeIdColumn(col: ColumnSchema, profile?: ColumnProfile): b
       name.includes('order_id') || name.includes('user_id') ||
       name.includes('customer_id') || name.includes('item_id')) return true;
   
-  // Check for sequential numeric pattern in string values
   if (profile?.topValues && profile.topValues.length >= 3) {
     const values = profile.topValues.map(v => String(v.value));
     if (hasSequentialPattern(values)) return true;
@@ -53,7 +42,6 @@ export function looksLikeIdColumn(col: ColumnSchema, profile?: ColumnProfile): b
  * Check if values follow a sequential pattern like PROD001, PROD002, etc.
  */
 export function hasSequentialPattern(values: string[]): boolean {
-  // Check if values follow pattern like PROD001, PROD002, etc.
   const numericSuffixes = values.map(v => {
     const match = v.match(/(\d+)$/);
     return match ? parseInt(match[1]) : null;
@@ -61,7 +49,6 @@ export function hasSequentialPattern(values: string[]): boolean {
   
   if (numericSuffixes.length < 3) return false;
   
-  // Check if they're roughly sequential (allow small gaps)
   const sorted = [...numericSuffixes].sort((a, b) => a - b);
   let sequential = 0;
   for (let i = 1; i < sorted.length; i++) {
@@ -78,7 +65,6 @@ export function hasMixedCase(values: Array<{ value: unknown; count?: number }>):
     .map(v => String(v.value).trim())
     .filter(s => s && s.length > 0);
   
-  // Check if the same value appears with different casing
   const normalizedValues = new Map<string, Set<string>>();
   for (const s of strings) {
     const lower = s.toLowerCase();
@@ -88,7 +74,6 @@ export function hasMixedCase(values: Array<{ value: unknown; count?: number }>):
     normalizedValues.get(lower)!.add(s);
   }
   
-  // Return true if any value has multiple case variants
   return Array.from(normalizedValues.values()).some(variants => variants.size > 1);
 }
 
@@ -127,24 +112,6 @@ export function getMixedCaseVariants(values: Array<{ value: unknown; count: numb
 }
 
 
-export function looksLikeDate(value: unknown): boolean {
-  if (value === null || value === undefined) return false;
-  const str = String(value);
-  
-  // Check common date patterns
-  const datePatterns = [
-    /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/,  // MM/DD/YYYY or DD-MM-YYYY
-    /^\d{4}[/-]\d{1,2}[/-]\d{1,2}$/,     // YYYY-MM-DD
-    /^[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4}$/,   // Month DD, YYYY
-    /^\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}$/,     // DD Month YYYY
-  ];
-  
-  return datePatterns.some(p => p.test(str));
-}
-
-/**
- * Detect multiple date formats in same column
- */
 export function detectDateFormats(topValues: Array<{ value: unknown }>): Set<string> {
   const formats = new Set<string>();
   
@@ -172,24 +139,16 @@ export function detectDateFormats(topValues: Array<{ value: unknown }>): Set<str
 }
 
 
-/**
- * Check if numeric column looks like timestamps
- */
 export function looksLikeTimestamp(min: number | undefined, max: number | undefined): 'milliseconds' | 'seconds' | null {
   if (min === undefined || max === undefined) return null;
   
-  // Epoch milliseconds range: 2000-01-01 to 2100-01-01
-  const epochMsMin = 946684800000;
-  const epochMsMax = 4102444800000;
+  const epochSecMin = EPOCH_MS_MIN / 1000;
+  const epochSecMax = EPOCH_MS_MAX / 1000;
   
-  // Epoch seconds range
-  const epochSecMin = 946684800;
-  const epochSecMax = 4102444800;
-  
-  if (min > epochMsMin && max < epochMsMax) {
+  if (min > EPOCH_MS_MIN && max < EPOCH_MS_MAX) {
     return 'milliseconds';
   }
-  if (min > epochSecMin && max < epochSecMax && max < epochMsMin) {
+  if (min > epochSecMin && max < epochSecMax && max < EPOCH_MS_MIN) {
     return 'seconds';
   }
   
@@ -239,9 +198,6 @@ export interface TypoMatch {
   toCount: number;
 }
 
-/**
- * Find near-duplicate values that might be typos
- */
 export function findTypos(topValues: Array<{ value: unknown; count: number }>): TypoMatch[] {
   const results: TypoMatch[] = [];
   const strings = topValues
@@ -253,9 +209,7 @@ export function findTypos(topValues: Array<{ value: unknown; count: number }>): 
       const a = strings[i].str.toLowerCase();
       const b = strings[j].str.toLowerCase();
       
-      // Skip if too different in length
       if (Math.abs(a.length - b.length) > 2) continue;
-      // Skip short strings
       if (a.length < 3 || b.length < 3) continue;
       
       const distance = levenshteinDistance(a, b);
@@ -285,10 +239,6 @@ export function findTypos(topValues: Array<{ value: unknown; count: number }>): 
 }
 
 
-/**
- * Find placeholder values in topValues (for quick detection)
- * Uses shared isPlaceholder function from cleaningConstants
- */
 export function findPlaceholders(topValues: Array<{ value: unknown; count: number }>): { placeholders: string[]; totalCount: number } {
   const found: string[] = [];
   let totalCount = 0;
@@ -310,9 +260,7 @@ export interface OutlierResult {
   upperBound: number;
 }
 
-/**
- * Check for outliers using IQR method
- */
+/** Uses the IQR method: outliers are values outside [Q1 - 1.5·IQR, Q3 + 1.5·IQR]. */
 export function detectOutliers(profile: { min?: number; max?: number; q1?: number; q3?: number; iqr?: number }): OutlierResult | null {
   const { min, max, q1, q3, iqr } = profile;
   if (q1 === undefined || q3 === undefined || iqr === undefined || iqr === 0) {

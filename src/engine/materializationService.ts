@@ -10,6 +10,11 @@
 
 import { getEngine } from './EngineAdapter'
 import { getComputationOrder } from './dependencyGraph'
+// Accessed via .getState() (Zustand's non-hook static API) — not called as React hooks.
+// Injecting these as parameters would require changing the signatures of all public
+// functions (ensureTableMaterialized, needsMaterialization, …) and updating 8+ call
+// sites across the codebase; the coupling is intentional and acceptable in a service
+// module as long as the hook form (useProjectStore()) is never invoked here.
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
 import { loadFileWithSync } from '@/persistence/syncService'
@@ -44,9 +49,6 @@ const inProgressMaterializations = new Map<string, Promise<MaterializationResult
 let materializationQueue = Promise.resolve()
 
 
-/**
- * Load a source table from IndexedDB and apply patches.
- */
 async function loadSourceTable(tableId: string): Promise<MaterializationResult> {
   const projectStore = useProjectStore.getState()
   const dataStore = useDataStore.getState()
@@ -273,9 +275,6 @@ async function materializeTableInternal(tableId: string): Promise<Materializatio
 }
 
 
-/**
- * Check if a table needs materialization.
- */
 export function needsMaterialization(tableId: string): boolean {
   const projectStore = useProjectStore.getState()
   const dataStore = useDataStore.getState()
@@ -289,18 +288,12 @@ export function needsMaterialization(tableId: string): boolean {
   return false
 }
 
-/**
- * Force recomputation of a table and its descendants.
- */
 export async function forceMaterialize(tableId: string): Promise<MaterializationResult> {
   const projectStore = useProjectStore.getState()
   projectStore.markNodeAndDescendantsDirty(tableId)
   return ensureTableMaterialized(tableId)
 }
 
-/**
- * Get the materialization status of a table.
- */
 export function getMaterializationStatus(tableId: string): {
   needsComputation: boolean
   isComputing: boolean
@@ -329,10 +322,6 @@ export function getMaterializationStatus(tableId: string): {
   }
 }
 
-/**
- * Get the full slice of data for a table.
- * Used by GridView and other components to get paginated data.
- */
 export async function getTableData(
   tableId: string,
   offset: number = 0,

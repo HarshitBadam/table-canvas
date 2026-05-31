@@ -1,7 +1,3 @@
-/**
- * Engine types for the data processing layer
- */
-
 import { 
   CellValue, 
   TableSchema, 
@@ -33,11 +29,6 @@ export interface WorkerResponse {
 }
 
 
-export interface RawTableData {
-  columns: string[]
-  types: string[]
-  rows: CellValue[][]
-}
 
 export interface TableSlice {
   tableId: string

@@ -1,7 +1,3 @@
-/**
- * Sync Service - Manages syncing project data between local state and backend
- */
-
 import {
   listProjects,
   getProject,
@@ -13,7 +9,7 @@ import {
   deserializePatches,
 } from '@/api/projects.api';
 import {
-  uploadFile as apiUploadFile,
+  uploadFile,
   getFileAsArrayBuffer,
   deleteFile as apiDeleteFile,
 } from '@/api/files.api';
@@ -29,7 +25,7 @@ import {
 import type { ProjectNode, Edge, Patches } from '@/types';
 
 
-export interface SyncStatus {
+interface SyncStatus {
   isSyncing: boolean;
   lastSyncedAt: Date | null;
   error: string | null;
@@ -63,29 +59,19 @@ if (typeof window !== 'undefined') {
   });
 }
 
-export function getSyncStatus(): SyncStatus {
-  return { ...syncStatus };
-}
-
-export function isNetworkOnline(): boolean {
-  return isOnline;
-}
 
 
-/**
- * Fetch all projects - from backend if online, from local storage if offline
- */
 export async function fetchProjects(): Promise<ProjectSummary[]> {
   if (isOnline) {
     try {
       const projects = await listProjects();
       return projects;
-    } catch {
+    } catch (error) {
+      console.error('[syncService] Failed to fetch projects from backend:', error);
       // Fallback to local storage
     }
   }
   
-  // Fallback to local storage
   const localProjects = await listProjectsLocal();
   return localProjects.map((p) => ({
     id: p.id,
@@ -95,9 +81,6 @@ export async function fetchProjects(): Promise<ProjectSummary[]> {
   }));
 }
 
-/**
- * Load a project - from backend if online, from local storage if offline
- */
 export async function loadProjectWithSync(projectId: string): Promise<ProjectWithSync | null> {
   if (isOnline) {
     try {
@@ -120,7 +103,8 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
         isLocalOnly: false,
         needsSync: false,
       };
-    } catch {
+    } catch (error) {
+      console.error('[syncService] Failed to load project from backend:', error);
       // Fallback to local storage
     }
   }
@@ -139,9 +123,6 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
   };
 }
 
-/**
- * Create a new project
- */
 export async function createProjectWithSync(name?: string): Promise<ProjectWithSync> {
   const defaultName = name || 'Untitled Project';
   
@@ -166,7 +147,8 @@ export async function createProjectWithSync(name?: string): Promise<ProjectWithS
         isLocalOnly: false,
         needsSync: false,
       };
-    } catch {
+    } catch (error) {
+      console.error('[syncService] Failed to create project on backend:', error);
       // Fallback to local-only project
     }
   }
@@ -193,9 +175,6 @@ export async function createProjectWithSync(name?: string): Promise<ProjectWithS
   return project;
 }
 
-/**
- * Save project state - debounced auto-save to backend
- */
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 async function saveToBackendImpl(
@@ -259,20 +238,17 @@ export async function saveProjectWithSync(
   // Always save locally first (immediate)
   await saveProjectLocal(projectId, name, nodes, edges, patches);
   
-  // Then sync to backend (debounced)
   saveToBackend(projectId, name, nodes, edges, patches);
 }
 
-/**
- * Delete a project
- */
 export async function deleteProjectWithSync(projectId: string): Promise<void> {
   await deleteProjectLocal(projectId);
   
   if (isOnline && !projectId.startsWith('local_')) {
     try {
       await apiDeleteProject(projectId);
-    } catch {
+    } catch (error) {
+      console.error('[syncService] Failed to delete project from backend:', error);
       // Backend deletion failed, but local is already removed
     }
   }
@@ -294,11 +270,9 @@ export async function importProjectWithSync(
   
   if (isOnline) {
     try {
-      // Create a new project on the server to get a valid ID
       const serverProject = await createProject({ name });
       const projectId = serverProject.id;
       
-      // Now update the project with the imported data
       await updateProject(projectId, {
         name,
         nodes,
@@ -306,7 +280,6 @@ export async function importProjectWithSync(
         patches: serializePatches(patches),
       });
       
-      // Save locally with the server-assigned ID
       await saveProjectLocal(projectId, name, nodes, edges, patches);
       
       console.log(`[Sync] Imported project with server ID: ${projectId}`);
@@ -345,54 +318,13 @@ export async function importProjectWithSync(
 }
 
 
-/**
- * Upload a file - to backend if online, to local storage if offline
- */
-export async function uploadFileWithSync(
-  file: File,
-  projectId?: string
-): Promise<{ id: string; name: string; type: string }> {
-  if (isOnline) {
-    try {
-      const uploaded = await apiUploadFile(file, projectId);
-      
-      // Also cache locally
-      const buffer = await file.arrayBuffer();
-      await saveFileLocal(uploaded.id, file.name, file.type, buffer);
-      
-      return {
-        id: uploaded.id,
-        name: uploaded.filename,
-        type: uploaded.contentType,
-      };
-    } catch {
-      // Fallback to local-only storage
-    }
-  }
-  
-  // Save locally only
-  const localId = `local_file_${Date.now()}`;
-  const buffer = await file.arrayBuffer();
-  await saveFileLocal(localId, file.name, file.type, buffer);
-  
-  return {
-    id: localId,
-    name: file.name,
-    type: file.type,
-  };
-}
 
-/**
- * Load a file - from backend if online, from local cache if available
- */
 export async function loadFileWithSync(fileId: string): Promise<ArrayBuffer | null> {
-  // Try local cache first
   const localFile = await loadFileLocal(fileId);
   if (localFile) {
     return localFile;
   }
   
-  // If not in cache and online, fetch from backend
   if (isOnline && !fileId.startsWith('local_file_')) {
     try {
       const buffer = await getFileAsArrayBuffer(fileId);
@@ -402,7 +334,8 @@ export async function loadFileWithSync(fileId: string): Promise<ArrayBuffer | nu
       await saveFileLocal(fileId, fileId, 'application/octet-stream', buffer);
       
       return buffer;
-    } catch {
+    } catch (error) {
+      console.error('[syncService] Failed to load file from backend:', error);
       // File not available from backend
     }
   }
@@ -410,27 +343,8 @@ export async function loadFileWithSync(fileId: string): Promise<ArrayBuffer | nu
   return null;
 }
 
-/**
- * Delete a file
- */
-export async function deleteFileWithSync(fileId: string): Promise<void> {
-  // Delete locally
-  await deleteFileLocal(fileId);
-  
-  // Delete from backend if online and not a local-only file
-  if (isOnline && !fileId.startsWith('local_file_')) {
-    try {
-      await apiDeleteFile(fileId);
-    } catch {
-      // Backend deletion failed, but local is already removed
-    }
-  }
-}
 
 
-/**
- * Sync all local-only projects to backend (call when coming online)
- */
 export async function syncLocalProjectsToBackend(): Promise<void> {
   if (!isOnline) return;
   
@@ -442,7 +356,6 @@ export async function syncLocalProjectsToBackend(): Promise<void> {
       if (!project) continue;
       
       try {
-        // Create on backend
         const created = await createProject({
           name: project.name,
           nodes: project.nodes,
@@ -450,10 +363,8 @@ export async function syncLocalProjectsToBackend(): Promise<void> {
           patches: project.patches,
         });
         
-        // Delete old local version
         await deleteProjectLocal(summary.id);
         
-        // Save with new ID
         await saveProjectLocal(
           created.id,
           created.name,
@@ -462,7 +373,8 @@ export async function syncLocalProjectsToBackend(): Promise<void> {
           deserializePatches(created.patches)
         );
         
-      } catch {
+      } catch (error) {
+        console.error('[syncService] Failed to sync local project to backend:', error);
         // Failed to sync this project, will retry on next online event
       }
     }
@@ -473,4 +385,56 @@ if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     syncLocalProjectsToBackend();
   });
+}
+
+export interface FileWithSync {
+  id: string;
+  name: string;
+  contentType: string;
+}
+
+/**
+ * Upload a file — to server when online, otherwise save locally with a local_ prefix
+ */
+export async function uploadFileWithSync(
+  file: File,
+  projectId?: string
+): Promise<FileWithSync> {
+  if (isOnline) {
+    try {
+      const uploaded = await uploadFile(file, projectId);
+      const buffer = await file.arrayBuffer();
+      await saveFileLocal(uploaded.id, uploaded.filename, uploaded.contentType, buffer);
+      return { id: uploaded.id, name: uploaded.filename, contentType: uploaded.contentType };
+    } catch (error) {
+      console.error('[syncService] Failed to upload file to backend:', error);
+      // Fall through to local-only upload
+    }
+  }
+
+  const localId = `local_file_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const buffer = await file.arrayBuffer();
+  await saveFileLocal(localId, file.name, file.type, buffer);
+  return { id: localId, name: file.name, contentType: file.type };
+}
+
+export async function deleteFileWithSync(fileId: string): Promise<void> {
+  await deleteFileLocal(fileId);
+
+  if (isOnline && !fileId.startsWith('local_file_')) {
+    try {
+      await apiDeleteFile(fileId);
+    } catch (error) {
+      console.error('[syncService] Failed to delete file from backend:', error);
+      // Backend deletion failed, but local is already removed
+    }
+  }
+}
+
+export function getSyncStatus(): typeof syncStatus {
+  return { ...syncStatus };
+}
+
+export function isNetworkOnline(): boolean {
+  return isOnline;
 }

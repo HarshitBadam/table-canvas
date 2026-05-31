@@ -38,6 +38,3 @@ export function getFunctionsByCategory(): Record<FunctionCategory, FunctionDefin
   return result
 }
 
-export function getAllFunctions(): FunctionDefinition[] {
-  return Object.values(builtInFunctions).sort((a, b) => a.name.localeCompare(b.name))
-}

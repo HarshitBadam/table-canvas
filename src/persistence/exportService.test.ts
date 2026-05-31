@@ -1,14 +1,3 @@
-/**
- * Unit tests for Export Service
- * 
- * Tests the full project export functionality including:
- * - ZIP archive creation with project JSON
- * - Excel workbook generation with table data
- * - Report HTML export
- * - Helper functions (sheet name sanitization, TipTap/block to HTML)
- * - Edge cases and error handling
- */
-
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import 'fake-indexeddb/auto'
 import { IDBFactory } from 'fake-indexeddb'
@@ -26,11 +15,7 @@ if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
   }
 }
 
-// ============================================================================
-// Mocks
-// ============================================================================
 
-// Mock the db module
 vi.mock('./db', () => ({
   exportProjectFile: vi.fn(),
   loadProject: vi.fn(),
@@ -38,13 +23,11 @@ vi.mock('./db', () => ({
   loadFile: vi.fn(),
 }))
 
-// Mock the materialization service
 vi.mock('@/engine/materializationService', () => ({
   getTableData: vi.fn(),
   ensureTableMaterialized: vi.fn(),
 }))
 
-// Mock the data store
 vi.mock('@/state/dataStore', () => ({
   useDataStore: {
     getState: vi.fn(() => ({
@@ -53,20 +36,16 @@ vi.mock('@/state/dataStore', () => ({
   },
 }))
 
-// Import after mocks are set up
 import {
   exportProjectAsZip,
   downloadBlob,
   exportAndDownloadProject,
-  type ZipExportOptions,
 } from './exportService'
 import * as db from './db'
+import type { StoredProject } from './db'
 import * as materializationService from '@/engine/materializationService'
 import { useDataStore } from '@/state/dataStore'
 
-// ============================================================================
-// Test Fixtures
-// ============================================================================
 
 function createMockSourceTableNode(id: string, name: string, fileRef?: string) {
   return {
@@ -82,8 +61,8 @@ function createMockSourceTableNode(id: string, name: string, fileRef?: string) {
     },
     schema: {
       columns: [
-        { id: 'col_1', name: 'ID', type: 'string', nullable: false },
-        { id: 'col_2', name: 'Value', type: 'number', nullable: true },
+        { id: 'col_1', name: 'ID', type: 'string' as const, nullable: false },
+        { id: 'col_2', name: 'Value', type: 'number' as const, nullable: true },
       ],
       rowCount: 3,
     },
@@ -100,17 +79,17 @@ function createMockDerivedTableNode(id: string, name: string, sourceId: string) 
     ui: { position: { x: 200, y: 0 } },
     plan: {
       transformDef: {
-        type: 'filter',
+        type: 'filter' as const,
         sourceTableId: sourceId,
         conditions: [],
-        logic: 'and',
+        logic: 'and' as const,
       },
       upstreamNodeIds: [sourceId],
     },
     schema: {
       columns: [
-        { id: 'col_1', name: 'ID', type: 'string', nullable: false },
-        { id: 'col_2', name: 'Value', type: 'number', nullable: true },
+        { id: 'col_1', name: 'ID', type: 'string' as const, nullable: false },
+        { id: 'col_2', name: 'Value', type: 'number' as const, nullable: true },
       ],
       rowCount: 2,
     },
@@ -167,16 +146,17 @@ function createMockReport(id: string, name: string, options?: { useTipTap?: bool
     }
   }
 
+  const blockDate = '2024-01-01T00:00:00.000Z'
   return {
     ...base,
     blocks: [
-      { id: 'block_1', type: 'heading', level: 1, content: 'Monthly Report' },
-      { id: 'block_2', type: 'text', content: 'This is the summary.' },
-      { id: 'block_3', type: 'divider' },
-      { id: 'block_4', type: 'chart', chartType: 'bar' },
+      { id: 'block_1', type: 'heading' as const, level: 1 as const, content: 'Monthly Report', createdAt: blockDate, updatedAt: blockDate },
+      { id: 'block_2', type: 'text' as const, content: 'This is the summary.', createdAt: blockDate, updatedAt: blockDate },
+      { id: 'block_3', type: 'divider' as const, createdAt: blockDate, updatedAt: blockDate },
+      { id: 'block_4', type: 'chart' as const, chartType: 'bar' as const, sourceTableId: '', config: {}, createdAt: blockDate, updatedAt: blockDate },
       {
         id: 'block_5',
-        type: 'table_inline',
+        type: 'table_inline' as const,
         data: {
           headers: ['Name', 'Value'],
           rows: [
@@ -184,6 +164,8 @@ function createMockReport(id: string, name: string, options?: { useTipTap?: bool
             ['Item B', 200],
           ],
         },
+        createdAt: blockDate,
+        updatedAt: blockDate,
       },
     ],
   }
@@ -200,49 +182,42 @@ function createCSVContent(rows: Record<string, unknown>[]): ArrayBuffer {
   return new TextEncoder().encode(lines.join('\n')).buffer
 }
 
-// ============================================================================
-// Setup
-// ============================================================================
 
 beforeEach(() => {
   vi.clearAllMocks()
-  // @ts-expect-error - fake-indexeddb global assignment
-  globalThis.indexedDB = new IDBFactory()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(globalThis as any).indexedDB = new IDBFactory()
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
 })
 
-// ============================================================================
-// exportProjectAsZip - Happy Path Tests
-// ============================================================================
 
 describe('exportProjectAsZip', () => {
   describe('Happy Path', () => {
     it('creates a ZIP blob with project.tablecanvas.json', async () => {
-      // Arrange
       const mockProject = {
         id: 'test-project',
         name: 'Test Project',
         nodes: {},
         edges: {},
         patches: {},
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
       }
 
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-      // Act
       const zipBlob = await exportProjectAsZip('test-project', {
         includeExcel: false,
         includeReportHtml: false,
       })
 
-      // Assert
       expect(zipBlob).toBeInstanceOf(Blob)
       expect(zipBlob.size).toBeGreaterThan(0)
 
@@ -252,7 +227,6 @@ describe('exportProjectAsZip', () => {
     })
 
     it('includes data.xlsx when includeExcel is true with source tables', async () => {
-      // Arrange
       const csvData = [
         { ID: '1', Value: 100 },
         { ID: '2', Value: 200 },
@@ -273,24 +247,21 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadFile).mockResolvedValue(csvBuffer)
       vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-      // Act
       const zipBlob = await exportProjectAsZip('test-project', {
         includeExcel: true,
         includeReportHtml: false,
       })
 
-      // Assert
       const zip = await JSZip.loadAsync(zipBlob)
       expect(zip.files['project.tablecanvas.json']).toBeDefined()
       expect(zip.files['data.xlsx']).toBeDefined()
     })
 
     it('includes reports folder when includeReportHtml is true', async () => {
-      // Arrange
       const mockProject = {
         id: 'test-project',
         name: 'Test Project',
@@ -307,23 +278,20 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadAllReports).mockResolvedValue(mockReports)
 
-      // Act
       const zipBlob = await exportProjectAsZip('test-project', {
         includeExcel: false,
         includeReportHtml: true,
       })
 
-      // Assert
       const zip = await JSZip.loadAsync(zipBlob)
       expect(zip.files['reports/Monthly Report.html']).toBeDefined()
       expect(zip.files['reports/Quarterly Summary.html']).toBeDefined()
     })
 
     it('calls onProgress callback with status updates', async () => {
-      // Arrange
       const mockProject = {
         id: 'test-project',
         name: 'Test Project',
@@ -335,19 +303,17 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadAllReports).mockResolvedValue({})
 
       const progressCallback = vi.fn()
 
-      // Act
       await exportProjectAsZip('test-project', {
         includeExcel: false,
         includeReportHtml: false,
         onProgress: progressCallback,
       })
 
-      // Assert
       expect(progressCallback).toHaveBeenCalled()
       expect(progressCallback).toHaveBeenCalledWith(expect.any(String), expect.any(Number))
       
@@ -357,12 +323,11 @@ describe('exportProjectAsZip', () => {
     })
 
     it('exports derived tables by materializing them', async () => {
-      // Arrange
       const sourceData = [
         { ID: '1', Value: 100 },
         { ID: '2', Value: 200 },
       ]
-      const derivedData = [{ ID: '1', Value: 100 }]
+      const derivedData = [{ __rowId: 'r1', ID: '1', Value: 100 }]
 
       const mockProject = {
         id: 'test-project',
@@ -372,7 +337,7 @@ describe('exportProjectAsZip', () => {
           table_2: createMockDerivedTableNode('table_2', 'Derived', 'table_1'),
         },
         edges: {
-          edge_1: { id: 'edge_1', fromNodeId: 'table_1', toNodeId: 'table_2', transformType: 'filter' },
+          edge_1: { id: 'edge_1', fromNodeId: 'table_1', toNodeId: 'table_2', transformType: 'filter' as const },
         },
         patches: {},
       }
@@ -380,11 +345,11 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadFile).mockResolvedValue(createCSVContent(sourceData))
       vi.mocked(db.loadAllReports).mockResolvedValue({})
       vi.mocked(materializationService.ensureTableMaterialized).mockResolvedValue({
-        status: 'fresh',
+        status: 'computed',
         tableId: 'table_2',
       })
       vi.mocked(materializationService.getTableData).mockResolvedValue({
@@ -392,13 +357,11 @@ describe('exportProjectAsZip', () => {
         totalRows: 1,
       })
 
-      // Act
       const zipBlob = await exportProjectAsZip('test-project', {
         includeExcel: true,
         includeReportHtml: false,
       })
 
-      // Assert
       expect(materializationService.ensureTableMaterialized).toHaveBeenCalledWith('table_2')
       expect(materializationService.getTableData).toHaveBeenCalledWith('table_2', 0, 100000)
       
@@ -409,7 +372,6 @@ describe('exportProjectAsZip', () => {
 
   describe('Edge Cases', () => {
     it('handles project with no tables gracefully', async () => {
-      // Arrange
       const mockProject = {
         id: 'empty-project',
         name: 'Empty Project',
@@ -421,15 +383,13 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-      // Act - should not throw
       const zipBlob = await exportProjectAsZip('empty-project', {
         includeExcel: true,
       })
 
-      // Assert
       expect(zipBlob).toBeInstanceOf(Blob)
       const zip = await JSZip.loadAsync(zipBlob)
       expect(zip.files['project.tablecanvas.json']).toBeDefined()
@@ -438,7 +398,6 @@ describe('exportProjectAsZip', () => {
     })
 
     it('handles project with only chart nodes (no tables)', async () => {
-      // Arrange
       const mockProject = {
         id: 'chart-only',
         name: 'Chart Only Project',
@@ -452,21 +411,18 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-      // Act
       const zipBlob = await exportProjectAsZip('chart-only', {
         includeExcel: true,
       })
 
-      // Assert
       const zip = await JSZip.loadAsync(zipBlob)
       expect(zip.files['data.xlsx']).toBeUndefined()
     })
 
     it('handles missing source file data gracefully', async () => {
-      // Arrange
       const mockProject = {
         id: 'missing-file',
         name: 'Missing File Project',
@@ -480,16 +436,14 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadFile).mockResolvedValue(null) // File not found
       vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-      // Act - should not throw
       const zipBlob = await exportProjectAsZip('missing-file', {
         includeExcel: true,
       })
 
-      // Assert
       expect(zipBlob).toBeInstanceOf(Blob)
       const zip = await JSZip.loadAsync(zipBlob)
       // Should still have Excel with empty sheet
@@ -497,7 +451,6 @@ describe('exportProjectAsZip', () => {
     })
 
     it('handles source table with no fileRef', async () => {
-      // Arrange
       const tableWithoutFileRef = {
         ...createMockSourceTableNode('table_1', 'No File'),
         plan: {
@@ -519,20 +472,17 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-      // Act
       const zipBlob = await exportProjectAsZip('no-fileref', {
         includeExcel: true,
       })
 
-      // Assert - should not throw, should produce valid ZIP
       expect(zipBlob).toBeInstanceOf(Blob)
     })
 
     it('handles derived table materialization error gracefully', async () => {
-      // Arrange
       const mockProject = {
         id: 'mat-error',
         name: 'Materialization Error Project',
@@ -547,7 +497,7 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadFile).mockResolvedValue(createCSVContent([{ ID: '1', Value: 100 }]))
       vi.mocked(db.loadAllReports).mockResolvedValue({})
       vi.mocked(materializationService.ensureTableMaterialized).mockResolvedValue({
@@ -556,12 +506,10 @@ describe('exportProjectAsZip', () => {
         error: 'Upstream table not found',
       })
 
-      // Act - should not throw
       const zipBlob = await exportProjectAsZip('mat-error', {
         includeExcel: true,
       })
 
-      // Assert
       expect(zipBlob).toBeInstanceOf(Blob)
       // Excel should still be generated with error sheet
       const zip = await JSZip.loadAsync(zipBlob)
@@ -569,7 +517,6 @@ describe('exportProjectAsZip', () => {
     })
 
     it('handles tables with duplicate names by making sheet names unique', async () => {
-      // Arrange
       const mockProject = {
         id: 'dup-names',
         name: 'Duplicate Names Project',
@@ -586,23 +533,20 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadFile).mockResolvedValue(createCSVContent(csvData))
       vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-      // Act
       const zipBlob = await exportProjectAsZip('dup-names', {
         includeExcel: true,
       })
 
-      // Assert - should create unique sheet names
       expect(zipBlob).toBeInstanceOf(Blob)
       const zip = await JSZip.loadAsync(zipBlob)
       expect(zip.files['data.xlsx']).toBeDefined()
     })
 
     it('handles table names with special characters', async () => {
-      // Arrange
       const mockProject = {
         id: 'special-chars',
         name: 'Special Chars Project',
@@ -617,21 +561,18 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadFile).mockResolvedValue(createCSVContent([{ ID: '1', Value: 100 }]))
       vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-      // Act - should sanitize sheet names
       const zipBlob = await exportProjectAsZip('special-chars', {
         includeExcel: true,
       })
 
-      // Assert
       expect(zipBlob).toBeInstanceOf(Blob)
     })
 
     it('handles very long table names (Excel 31 char limit)', async () => {
-      // Arrange
       const longName = 'This is a very long table name that exceeds the Excel sheet name limit of 31 characters'
       const mockProject = {
         id: 'long-name',
@@ -646,21 +587,18 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadFile).mockResolvedValue(createCSVContent([{ ID: '1', Value: 100 }]))
       vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-      // Act
       const zipBlob = await exportProjectAsZip('long-name', {
         includeExcel: true,
       })
 
-      // Assert - should truncate to 31 chars
       expect(zipBlob).toBeInstanceOf(Blob)
     })
 
     it('skips Excel generation when includeExcel is false', async () => {
-      // Arrange
       const mockProject = {
         id: 'no-excel',
         name: 'No Excel Project',
@@ -674,15 +612,13 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-      // Act
       const zipBlob = await exportProjectAsZip('no-excel', {
         includeExcel: false,
       })
 
-      // Assert
       const zip = await JSZip.loadAsync(zipBlob)
       expect(zip.files['project.tablecanvas.json']).toBeDefined()
       expect(zip.files['data.xlsx']).toBeUndefined()
@@ -691,7 +627,6 @@ describe('exportProjectAsZip', () => {
     })
 
     it('skips reports when includeReportHtml is false', async () => {
-      // Arrange
       const mockProject = {
         id: 'no-reports',
         name: 'No Reports Project',
@@ -703,17 +638,15 @@ describe('exportProjectAsZip', () => {
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
-      vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+      vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
       vi.mocked(db.loadAllReports).mockResolvedValue({
         r1: createMockReport('r1', 'Skipped Report'),
       })
 
-      // Act
       const zipBlob = await exportProjectAsZip('no-reports', {
         includeReportHtml: false,
       })
 
-      // Assert
       const zip = await JSZip.loadAsync(zipBlob)
       expect(zip.files['reports/']).toBeUndefined()
     })
@@ -721,21 +654,17 @@ describe('exportProjectAsZip', () => {
 
   describe('Error Handling', () => {
     it('throws when project does not exist', async () => {
-      // Arrange
       vi.mocked(db.exportProjectFile).mockRejectedValue(new Error('Project not found'))
 
-      // Act & Assert
       await expect(exportProjectAsZip('nonexistent')).rejects.toThrow('Project not found')
     })
 
     it('throws when loadProject returns null with includeExcel', async () => {
-      // Arrange
       vi.mocked(db.exportProjectFile).mockResolvedValue(
         new Blob(['{}'], { type: 'application/json' })
       )
       vi.mocked(db.loadProject).mockResolvedValue(null)
 
-      // Act & Assert
       await expect(
         exportProjectAsZip('invalid', { includeExcel: true })
       ).rejects.toThrow('Project not found')
@@ -743,13 +672,9 @@ describe('exportProjectAsZip', () => {
   })
 })
 
-// ============================================================================
-// Report HTML Generation Tests
-// ============================================================================
 
 describe('Report HTML Generation', () => {
   it('generates HTML for reports with legacy blocks', async () => {
-    // Arrange
     const mockProject = {
       id: 'test',
       name: 'Test',
@@ -763,16 +688,14 @@ describe('Report HTML Generation', () => {
     vi.mocked(db.exportProjectFile).mockResolvedValue(
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
     )
-    vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+    vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
     vi.mocked(db.loadAllReports).mockResolvedValue({ r1: mockReport })
 
-    // Act
     const zipBlob = await exportProjectAsZip('test', {
       includeExcel: false,
       includeReportHtml: true,
     })
 
-    // Assert
     const zip = await JSZip.loadAsync(zipBlob)
     const htmlFile = zip.files['reports/Test Report.html']
     expect(htmlFile).toBeDefined()
@@ -786,7 +709,6 @@ describe('Report HTML Generation', () => {
   })
 
   it('generates HTML for reports with TipTap content', async () => {
-    // Arrange
     const mockProject = {
       id: 'test',
       name: 'Test',
@@ -800,16 +722,14 @@ describe('Report HTML Generation', () => {
     vi.mocked(db.exportProjectFile).mockResolvedValue(
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
     )
-    vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+    vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
     vi.mocked(db.loadAllReports).mockResolvedValue({ r1: mockReport })
 
-    // Act
     const zipBlob = await exportProjectAsZip('test', {
       includeExcel: false,
       includeReportHtml: true,
     })
 
-    // Assert
     const zip = await JSZip.loadAsync(zipBlob)
     const htmlFile = zip.files['reports/TipTap Report.html']
     expect(htmlFile).toBeDefined()
@@ -820,7 +740,6 @@ describe('Report HTML Generation', () => {
   })
 
   it('generates empty report placeholder for reports with no content', async () => {
-    // Arrange
     const mockProject = {
       id: 'test',
       name: 'Test',
@@ -840,16 +759,14 @@ describe('Report HTML Generation', () => {
     vi.mocked(db.exportProjectFile).mockResolvedValue(
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
     )
-    vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+    vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
     vi.mocked(db.loadAllReports).mockResolvedValue({ empty: emptyReport })
 
-    // Act
     const zipBlob = await exportProjectAsZip('test', {
       includeExcel: false,
       includeReportHtml: true,
     })
 
-    // Assert
     const zip = await JSZip.loadAsync(zipBlob)
     const htmlFile = zip.files['reports/Empty Report.html']
     const html = await htmlFile.async('string')
@@ -857,7 +774,6 @@ describe('Report HTML Generation', () => {
   })
 
   it('sanitizes report filenames with special characters', async () => {
-    // Arrange
     const mockProject = {
       id: 'test',
       name: 'Test',
@@ -869,7 +785,7 @@ describe('Report HTML Generation', () => {
     const reportWithSpecialChars = {
       id: 'special',
       name: 'Report: Q1/Q2 <2024>',
-      blocks: [{ id: 'b1', type: 'text', content: 'Test' }],
+      blocks: [{ id: 'b1', type: 'text' as const, content: 'Test', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }],
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
     }
@@ -877,18 +793,15 @@ describe('Report HTML Generation', () => {
     vi.mocked(db.exportProjectFile).mockResolvedValue(
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
     )
-    vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+    vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
     vi.mocked(db.loadAllReports).mockResolvedValue({ special: reportWithSpecialChars })
 
-    // Act
     const zipBlob = await exportProjectAsZip('test', {
       includeExcel: false,
       includeReportHtml: true,
     })
 
-    // Assert - filename should be sanitized
     const zip = await JSZip.loadAsync(zipBlob)
-    // Filter for actual HTML files (not the folder entry)
     const htmlFiles = Object.keys(zip.files).filter(f => f.startsWith('reports/') && f.endsWith('.html'))
     expect(htmlFiles.length).toBe(1)
     // The filename (after 'reports/') should not contain special chars
@@ -899,13 +812,9 @@ describe('Report HTML Generation', () => {
   })
 })
 
-// ============================================================================
-// downloadBlob Tests
-// ============================================================================
 
 describe('downloadBlob', () => {
   it('creates download link and triggers click', () => {
-    // Arrange
     const mockClick = vi.fn()
     const mockAnchor = {
       href: '',
@@ -919,18 +828,15 @@ describe('downloadBlob', () => {
     const mockCreateObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test-url')
     const mockRevokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
 
-    // Act
     const blob = new Blob(['test content'], { type: 'text/plain' })
     downloadBlob(blob, 'test-file.txt')
 
-    // Assert
     expect(mockCreateObjectURL).toHaveBeenCalledWith(blob)
     expect(mockAnchor.href).toBe('blob:test-url')
     expect(mockAnchor.download).toBe('test-file.txt')
     expect(mockClick).toHaveBeenCalled()
     expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:test-url')
 
-    // Cleanup
     mockAppendChild.mockRestore()
     mockRemoveChild.mockRestore()
     mockCreateElement.mockRestore()
@@ -939,13 +845,9 @@ describe('downloadBlob', () => {
   })
 })
 
-// ============================================================================
-// exportAndDownloadProject Tests
-// ============================================================================
 
 describe('exportAndDownloadProject', () => {
   it('creates ZIP and triggers download with formatted filename', async () => {
-    // Arrange
     const mockProject = {
       id: 'test-project',
       name: 'My Project',
@@ -957,10 +859,9 @@ describe('exportAndDownloadProject', () => {
     vi.mocked(db.exportProjectFile).mockResolvedValue(
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
     )
-    vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+    vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
     vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-    // Mock download
     const mockClick = vi.fn()
     const mockAnchor = { href: '', download: '', click: mockClick }
     vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockAnchor as unknown as Node)
@@ -969,16 +870,13 @@ describe('exportAndDownloadProject', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
 
-    // Act
     await exportAndDownloadProject('test-project', 'My Project')
 
-    // Assert
     expect(mockClick).toHaveBeenCalled()
     expect(mockAnchor.download).toMatch(/^My_Project_\d{4}-\d{2}-\d{2}\.tablecanvas\.zip$/)
   })
 
   it('sanitizes project name in filename', async () => {
-    // Arrange
     const mockProject = {
       id: 'test-project',
       name: 'My Project!@#$%',
@@ -990,7 +888,7 @@ describe('exportAndDownloadProject', () => {
     vi.mocked(db.exportProjectFile).mockResolvedValue(
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
     )
-    vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+    vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
     vi.mocked(db.loadAllReports).mockResolvedValue({})
 
     const mockAnchor = { href: '', download: '', click: vi.fn() }
@@ -1000,23 +898,17 @@ describe('exportAndDownloadProject', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
 
-    // Act
     await exportAndDownloadProject('test-project', 'My Project!@#$%')
 
-    // Assert - filename should not contain special chars
     expect(mockAnchor.download).not.toContain('!')
     expect(mockAnchor.download).not.toContain('@')
     expect(mockAnchor.download).not.toContain('#')
   })
 })
 
-// ============================================================================
-// Data Store Fallback Tests
-// ============================================================================
 
 describe('Data Store Fallback', () => {
   it('falls back to data store when materialization returns empty rows', async () => {
-    // Arrange
     const storeData = {
       table_2: {
         rows: [{ ID: 'store-1', Value: 999 }],
@@ -1025,7 +917,7 @@ describe('Data Store Fallback', () => {
 
     vi.mocked(useDataStore.getState).mockReturnValue({
       tableData: storeData,
-    } as ReturnType<typeof useDataStore.getState>)
+    } as unknown as ReturnType<typeof useDataStore.getState>)
 
     const mockProject = {
       id: 'fallback-test',
@@ -1041,11 +933,11 @@ describe('Data Store Fallback', () => {
     vi.mocked(db.exportProjectFile).mockResolvedValue(
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
     )
-    vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+    vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
     vi.mocked(db.loadFile).mockResolvedValue(createCSVContent([{ ID: '1', Value: 100 }]))
     vi.mocked(db.loadAllReports).mockResolvedValue({})
     vi.mocked(materializationService.ensureTableMaterialized).mockResolvedValue({
-      status: 'fresh',
+      status: 'computed',
       tableId: 'table_2',
     })
     vi.mocked(materializationService.getTableData).mockResolvedValue({
@@ -1053,25 +945,19 @@ describe('Data Store Fallback', () => {
       totalRows: 0,
     })
 
-    // Act
     const zipBlob = await exportProjectAsZip('fallback-test', {
       includeExcel: true,
       includeReportHtml: false,
     })
 
-    // Assert
     expect(useDataStore.getState).toHaveBeenCalled()
     expect(zipBlob).toBeInstanceOf(Blob)
   })
 })
 
-// ============================================================================
-// CSV and Excel Parsing Tests
-// ============================================================================
 
 describe('File Parsing', () => {
   it('parses CSV data correctly', async () => {
-    // Arrange
     const csvContent = 'Name,Age,City\nAlice,30,NYC\nBob,25,LA'
     const csvBuffer = new TextEncoder().encode(csvContent).buffer
 
@@ -1098,24 +984,21 @@ describe('File Parsing', () => {
     vi.mocked(db.exportProjectFile).mockResolvedValue(
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
     )
-    vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+    vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
     vi.mocked(db.loadFile).mockResolvedValue(csvBuffer)
     vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-    // Act
     const zipBlob = await exportProjectAsZip('csv-test', {
       includeExcel: true,
       includeReportHtml: false,
     })
 
-    // Assert
     expect(zipBlob).toBeInstanceOf(Blob)
     const zip = await JSZip.loadAsync(zipBlob)
     expect(zip.files['data.xlsx']).toBeDefined()
   })
 
   it('handles Excel source files', async () => {
-    // Arrange - Create a simple mock for xlsx file type
     const mockProject = {
       id: 'xlsx-test',
       name: 'Excel Test',
@@ -1140,16 +1023,14 @@ describe('File Parsing', () => {
     vi.mocked(db.exportProjectFile).mockResolvedValue(
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
     )
-    vi.mocked(db.loadProject).mockResolvedValue(mockProject)
+    vi.mocked(db.loadProject).mockResolvedValue(mockProject as unknown as StoredProject)
     vi.mocked(db.loadFile).mockResolvedValue(null) // Simulating file not found
     vi.mocked(db.loadAllReports).mockResolvedValue({})
 
-    // Act - should not throw
     const zipBlob = await exportProjectAsZip('xlsx-test', {
       includeExcel: true,
     })
 
-    // Assert
     expect(zipBlob).toBeInstanceOf(Blob)
   })
 })

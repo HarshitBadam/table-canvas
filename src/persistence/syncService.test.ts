@@ -12,11 +12,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-// ============================================================================
-// Mock Setup
-// ============================================================================
 
-// Mock the API modules
 const mockListProjects = vi.fn()
 const mockGetProject = vi.fn()
 const mockCreateProject = vi.fn()
@@ -43,7 +39,6 @@ vi.mock('@/api/files.api', () => ({
   deleteFile: (id: string) => mockDeleteFile(id),
 }))
 
-// Mock the local DB modules
 const mockSaveProjectLocal = vi.fn()
 const mockLoadProjectLocal = vi.fn()
 const mockListProjectsLocal = vi.fn()
@@ -62,7 +57,6 @@ vi.mock('./db', () => ({
   deleteFile: (id: string) => mockDeleteFileLocal(id),
 }))
 
-// Import after mocks are set up
 import {
   fetchProjects,
   loadProjectWithSync,
@@ -76,9 +70,6 @@ import {
   isNetworkOnline,
 } from './syncService'
 
-// ============================================================================
-// Test Helpers
-// ============================================================================
 
 function createMockProject(id: string, name: string) {
   return {
@@ -92,9 +83,6 @@ function createMockProject(id: string, name: string) {
   }
 }
 
-// ============================================================================
-// Reset Mocks
-// ============================================================================
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -108,9 +96,6 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-// ============================================================================
-// fetchProjects Tests
-// ============================================================================
 
 describe('fetchProjects', () => {
   it('fetches from API when online', async () => {
@@ -145,9 +130,6 @@ describe('fetchProjects', () => {
   // local storage when API fails' test above for the effective offline path.
 })
 
-// ============================================================================
-// loadProjectWithSync Tests
-// ============================================================================
 
 describe('loadProjectWithSync', () => {
   it('loads from API and caches locally when online', async () => {
@@ -192,9 +174,6 @@ describe('loadProjectWithSync', () => {
   })
 })
 
-// ============================================================================
-// createProjectWithSync Tests
-// ============================================================================
 
 describe('createProjectWithSync', () => {
   it('creates on server and caches locally when online', async () => {
@@ -240,23 +219,17 @@ describe('createProjectWithSync', () => {
   })
 })
 
-// ============================================================================
-// saveProjectWithSync Tests
-// ============================================================================
 
 describe('saveProjectWithSync', () => {
   it('saves locally immediately and debounces backend save', async () => {
     await saveProjectWithSync('proj_1', 'Test', {}, {}, {})
 
-    // Local save should be immediate
     expect(mockSaveProjectLocal).toHaveBeenCalledWith(
       'proj_1', 'Test', {}, {}, {}
     )
 
-    // Backend save should be debounced (2000ms)
     expect(mockUpdateProject).not.toHaveBeenCalled()
 
-    // Advance timers
     await vi.advanceTimersByTimeAsync(2000)
 
     expect(mockUpdateProject).toHaveBeenCalledWith(
@@ -268,26 +241,20 @@ describe('saveProjectWithSync', () => {
   it('does not sync local-only projects to backend', async () => {
     await saveProjectWithSync('local_123', 'Local Project', {}, {}, {})
 
-    // Local save happens
     expect(mockSaveProjectLocal).toHaveBeenCalled()
 
-    // Advance timers past debounce
     await vi.advanceTimersByTimeAsync(3000)
 
-    // Backend save should NOT happen for local_ projects
     expect(mockUpdateProject).not.toHaveBeenCalled()
   })
 
   it('debounces multiple rapid saves', async () => {
-    // Rapid saves
     await saveProjectWithSync('proj_1', 'Version 1', {}, {}, {})
     await saveProjectWithSync('proj_1', 'Version 2', {}, {}, {})
     await saveProjectWithSync('proj_1', 'Version 3', {}, {}, {})
 
-    // Advance past debounce
     await vi.advanceTimersByTimeAsync(2500)
 
-    // Should only call backend once with final version
     expect(mockUpdateProject).toHaveBeenCalledTimes(1)
     expect(mockUpdateProject).toHaveBeenCalledWith(
       'proj_1',
@@ -296,9 +263,6 @@ describe('saveProjectWithSync', () => {
   })
 })
 
-// ============================================================================
-// deleteProjectWithSync Tests
-// ============================================================================
 
 describe('deleteProjectWithSync', () => {
   it('deletes locally and from backend', async () => {
@@ -324,9 +288,6 @@ describe('deleteProjectWithSync', () => {
   })
 })
 
-// ============================================================================
-// uploadFileWithSync Tests
-// ============================================================================
 
 describe('uploadFileWithSync', () => {
   // Create a mock file with arrayBuffer method
@@ -367,9 +328,6 @@ describe('uploadFileWithSync', () => {
   })
 })
 
-// ============================================================================
-// loadFileWithSync Tests
-// ============================================================================
 
 describe('loadFileWithSync', () => {
   it('loads from local cache first', async () => {
@@ -392,7 +350,7 @@ describe('loadFileWithSync', () => {
 
     expect(mockLoadFileLocal).toHaveBeenCalled()
     expect(mockGetFileAsArrayBuffer).toHaveBeenCalledWith('file_123')
-    expect(mockSaveFileLocal).toHaveBeenCalled() // Should cache
+    expect(mockSaveFileLocal).toHaveBeenCalled()
     expect(result).toBe(mockBuffer)
   })
 
@@ -406,9 +364,6 @@ describe('loadFileWithSync', () => {
   })
 })
 
-// ============================================================================
-// deleteFileWithSync Tests
-// ============================================================================
 
 describe('deleteFileWithSync', () => {
   it('deletes locally and from backend', async () => {
@@ -426,9 +381,6 @@ describe('deleteFileWithSync', () => {
   })
 })
 
-// ============================================================================
-// Sync Status Tests
-// ============================================================================
 
 describe('getSyncStatus', () => {
   it('returns initial sync status', () => {
@@ -449,13 +401,9 @@ describe('isNetworkOnline', () => {
   })
 })
 
-// ============================================================================
-// Edge Cases
-// ============================================================================
 
 describe('Edge Cases', () => {
   it('handles concurrent save operations gracefully', async () => {
-    // Start multiple saves
     const saves = Promise.all([
       saveProjectWithSync('proj_1', 'A', {}, {}, {}),
       saveProjectWithSync('proj_1', 'B', {}, {}, {}),
@@ -464,7 +412,6 @@ describe('Edge Cases', () => {
 
     await saves
 
-    // All local saves should complete
     expect(mockSaveProjectLocal).toHaveBeenCalledTimes(3)
   })
 

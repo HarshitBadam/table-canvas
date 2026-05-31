@@ -1,48 +1,38 @@
 import { useRef, useEffect } from 'react'
 import type { ColumnSchema } from '@/types'
-
-const HEADER_HEIGHT = 44
+import { HEADER_HEIGHT } from './constants'
+import { useGridContext } from './GridContext'
 
 interface ColumnHeaderProps {
   column: ColumnSchema
-  width: number
-  isSelected: boolean
-  isHeaderRowSelected: boolean
-  isEditing: boolean
-  editValue: string
-  isEditable: boolean
-  isResizing: boolean
-  isFiltered: boolean
-  onClick: () => void
-  onDoubleClick: () => void
-  onContextMenu: (e: React.MouseEvent) => void
-  onEditChange: (value: string) => void
-  onEditCommit: () => void
-  onEditCancel: () => void
-  onResizeStart: (e: React.MouseEvent) => void
-  onFilterClick: () => void
 }
 
-export function ColumnHeader({
-  column,
-  width,
-  isSelected,
-  isHeaderRowSelected,
-  isEditing,
-  editValue,
-  isEditable,
-  isResizing,
-  isFiltered,
-  onClick,
-  onDoubleClick,
-  onContextMenu,
-  onEditChange,
-  onEditCommit,
-  onEditCancel,
-  onResizeStart,
-  onFilterClick,
-}: ColumnHeaderProps) {
+export function ColumnHeader({ column }: ColumnHeaderProps) {
+  const {
+    isEditable,
+    getColumnWidth,
+    selectedColumn,
+    isHeaderRowSelected,
+    editingColumnId,
+    editColumnName,
+    setEditColumnName,
+    commitColumnNameEdit,
+    cancelColumnNameEdit,
+    handleColumnClick,
+    handleColumnDoubleClick,
+    handleContextMenu,
+    resizingColumn,
+    handleResizeStart,
+    filters,
+    handleToggleFilters,
+  } = useGridContext()
+
   const inputRef = useRef<HTMLInputElement>(null)
+  const width = getColumnWidth(column.id)
+  const isSelected = selectedColumn === column.id || isHeaderRowSelected
+  const isEditing = editingColumnId === column.id
+  const isResizing = resizingColumn === column.id
+  const isFiltered = filters.conditions.some(c => c.columnId === column.id)
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -54,10 +44,10 @@ export function ColumnHeader({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      onEditCommit()
+      commitColumnNameEdit()
     } else if (e.key === 'Escape') {
       e.preventDefault()
-      onEditCancel()
+      cancelColumnNameEdit()
     }
   }
 
@@ -70,9 +60,9 @@ export function ColumnHeader({
 
   return (
     <div
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu}
+      onClick={() => handleColumnClick(column.id)}
+      onDoubleClick={() => handleColumnDoubleClick(column.id, column.name)}
+      onContextMenu={(e) => handleContextMenu(e, 'column', undefined, column.id)}
       className={`
         relative flex items-center gap-1 px-2 text-xs font-medium cursor-pointer select-none
         border-r border-border group text-green-700 dark:text-[#8fc4a3]
@@ -85,9 +75,9 @@ export function ColumnHeader({
         <input
           ref={inputRef}
           type="text"
-          value={editValue}
-          onChange={(e) => onEditChange(e.target.value)}
-          onBlur={onEditCommit}
+          value={editColumnName}
+          onChange={(e) => setEditColumnName(e.target.value)}
+          onBlur={commitColumnNameEdit}
           onKeyDown={handleKeyDown}
           className="absolute inset-0 w-full h-full px-2 text-xs font-medium bg-transparent outline-none border-none text-text-primary"
           onClick={(e) => e.stopPropagation()}
@@ -107,7 +97,7 @@ export function ColumnHeader({
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                onFilterClick()
+                handleToggleFilters()
               }}
               className="p-0.5 text-green-500 hover:text-green-600 flex-shrink-0"
               title={`Column "${column.name}" is filtered`}
@@ -123,7 +113,7 @@ export function ColumnHeader({
         </>
       )}
       <div
-        onMouseDown={onResizeStart}
+        onMouseDown={(e) => handleResizeStart(column.id, e)}
         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-500/50 transition-colors z-10"
         onClick={(e) => e.stopPropagation()}
       />

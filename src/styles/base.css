@@ -5,9 +5,6 @@
  * This file establishes the design system foundation.
  */
 
-/* ============================================================================
-   CSS Custom Properties for Runtime Theming
-   ============================================================================ */
 
 :root {
   /* Light mode colors (default) - Excel Green Theme */
@@ -23,6 +20,10 @@
   --color-text-tertiary: #86868b;
   --color-accent: #217346;
   --color-accent-hover: #185c37;
+  --color-accent-green: #217346;
+  --color-accent-green-dark: #1a5c38;
+  --color-accent-green-light: #2d8b57;
+  --color-accent-green-hover: #1a5c38;
   --color-success: #107c41;
   --color-warning: #ff9500;
   --color-error: #ff3b30;
@@ -104,6 +105,10 @@
   /* Accent colors - Muted professional green */
   --color-accent: #3d6b52;
   --color-accent-hover: #4a7d60;
+  --color-accent-green: #2d8b57;
+  --color-accent-green-dark: #217346;
+  --color-accent-green-light: #3da86b;
+  --color-accent-green-hover: #217346;
   --color-success: #4a7d60;
   --color-warning: #d4a04a;
   --color-error: #e06b6b;
@@ -134,65 +139,10 @@
   --grid-line-subtle: rgba(61, 107, 82, 0.1);
 }
 
-/* System preference dark mode - Excel Green Theme (Professional dark palette) */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    /* Surfaces - Better layering with visible hierarchy */
-    --color-canvas: #111113;
-    --color-surface: #1a1a1d;
-    --color-surface-secondary: #232326;
-    --color-surface-tertiary: #2c2c30;
-    
-    /* Borders - Higher contrast for better definition */
-    --color-border: #3d3d42;
-    --color-border-subtle: #2c2c30;
-    --color-border-focus: #3d6b52;
-    
-    /* Elevation border (subtle light border for cards) */
-    --color-border-elevation: rgba(255, 255, 255, 0.06);
-    
-    /* Text - Slightly softer white for reduced eye strain */
-    --color-text-primary: #ececef;
-    --color-text-secondary: #a1a1a6;
-    --color-text-tertiary: #6e6e73;
-    
-    /* Accent colors - Muted professional green */
-    --color-accent: #3d6b52;
-    --color-accent-hover: #4a7d60;
-    --color-success: #4a7d60;
-    --color-warning: #d4a04a;
-    --color-error: #e06b6b;
+/* Theme is resolved to a data-theme attribute before first paint via an
+ * inline script in index.html (covering OS preference), so no duplicate
+ * prefers-color-scheme token block is needed here. */
 
-    /* Shadows with subtle glow for elevation */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    
-    /* Chart colors for dark mode */
-    --color-chart-grid: #3d3d42;
-    --color-chart-axis: #4a4a50;
-    --color-chart-text: #a1a1a6;
-    
-    /* Node colors for canvas - Dark mode (richer, darker versions) */
-    --color-node-source: #1a2f22;
-    --color-node-source-border: #7ab892;
-    --color-node-derived: #2a1f3d;
-    --color-node-derived-border: #c9a8f7;
-    --color-node-chart: #1a2f22;
-    --color-node-chart-border: #7ab892;
-    
-    /* Edge color for dark mode */
-    --edge-color: #3d6b52;
-    
-    /* Grid line colors for canvas - muted green in dark mode */
-    --grid-line-color: rgba(61, 107, 82, 0.2);
-    --grid-line-subtle: rgba(61, 107, 82, 0.1);
-  }
-}
-
-/* ============================================================================
-   CSS Reset & Base Styles
-   ============================================================================ */
 
 * {
   box-sizing: border-box;
@@ -226,18 +176,12 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-/* ============================================================================
-   Focus Styles
-   ============================================================================ */
 
 :focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
 }
 
-/* ============================================================================
-   Scrollbar Styling
-   ============================================================================ */
 
 ::-webkit-scrollbar {
   width: 8px;
@@ -263,7 +207,7 @@ input[type="number"] {
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) ::-webkit-scrollbar-thumb:hover {
+  :root:not([data-theme]) ::-webkit-scrollbar-thumb:hover {
     background: rgba(58, 140, 101, 0.6);
   }
 }
@@ -298,46 +242,16 @@ input[type="number"] {
   .hover\:bg-green-600:hover { background-color: #2d7352 !important; }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    /* Muted emerald text colors */
-    .text-emerald-400 { color: #5a9d7a !important; }
-    .text-emerald-500 { color: #4a9470 !important; }
-    .text-emerald-600 { color: #3a8c65 !important; }
-    .text-emerald-700 { color: #2d7352 !important; }
-    
-    /* Muted green text colors */
-    .text-green-400 { color: #5a9d7a !important; }
-    .text-green-500 { color: #4a9470 !important; }
-    .text-green-600 { color: #3a8c65 !important; }
-    .text-green-700 { color: #2d7352 !important; }
-    
-    /* Muted emerald backgrounds */
-    .bg-emerald-500 { background-color: #3a8c65 !important; }
-    .bg-emerald-600 { background-color: #2d7352 !important; }
-    .bg-green-500 { background-color: #3a8c65 !important; }
-    .bg-green-600 { background-color: #2d7352 !important; }
-    
-    /* Hover states */
-    .hover\:bg-emerald-600:hover { background-color: #2d7352 !important; }
-    .hover\:bg-green-600:hover { background-color: #2d7352 !important; }
-  }
-}
 
 /* Hide scrollbar utilities */
-.scrollbar-hide::-webkit-scrollbar,
-.hide-scrollbar::-webkit-scrollbar {
+.scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
-.scrollbar-hide,
-.hide-scrollbar {
+.scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 
-/* ============================================================================
-   Selection Style - Excel Green
-   ============================================================================ */
 
 ::selection {
   background-color: rgba(33, 115, 70, 0.2);

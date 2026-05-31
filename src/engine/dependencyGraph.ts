@@ -1,13 +1,3 @@
-/**
- * Dependency Graph Manager
- * 
- * Provides DAG (Directed Acyclic Graph) operations for managing table dependencies.
- * Used for:
- * - Cycle detection when creating new connections
- * - Topological sorting for computation order
- * - Finding ancestors/descendants for dirty propagation
- */
-
 import type { Edge, ProjectNode } from '@/types'
 
 
@@ -22,9 +12,6 @@ export interface DependencyGraph {
 type NodeColor = 'white' | 'gray' | 'black'
 
 
-/**
- * Build a dependency graph from edges
- */
 export function buildDependencyGraph(edges: Record<string, Edge>): DependencyGraph {
   const upstream = new Map<string, Set<string>>()
   const downstream = new Map<string, Set<string>>()
@@ -36,13 +23,11 @@ export function buildDependencyGraph(edges: Record<string, Edge>): DependencyGra
     // So fromNodeId is upstream of toNodeId
     // And toNodeId is downstream of fromNodeId
     
-    // Add to downstream map (fromNodeId's children)
     if (!downstream.has(fromNodeId)) {
       downstream.set(fromNodeId, new Set())
     }
     downstream.get(fromNodeId)!.add(toNodeId)
     
-    // Add to upstream map (toNodeId's parents)
     if (!upstream.has(toNodeId)) {
       upstream.set(toNodeId, new Set())
     }
@@ -50,6 +35,19 @@ export function buildDependencyGraph(edges: Record<string, Edge>): DependencyGra
   }
   
   return { upstream, downstream }
+}
+
+// Single-entry memoization: avoids rebuilding the graph when the same edges
+// reference is passed to multiple helper functions in a single call chain.
+let _memoEdges: Record<string, Edge> | null = null
+let _memoGraph: DependencyGraph | null = null
+
+function getCachedGraph(edges: Record<string, Edge>): DependencyGraph {
+  if (edges !== _memoEdges) {
+    _memoEdges = edges
+    _memoGraph = buildDependencyGraph(edges)
+  }
+  return _memoGraph!
 }
 
 
@@ -70,35 +68,19 @@ export function wouldCreateCycle(
   sourceId: string,
   targetId: string
 ): boolean {
-  // Self-loop is always a cycle
   if (sourceId === targetId) {
     return true
   }
   
-  const graph = buildDependencyGraph(edges)
+  const graph = getCachedGraph(edges)
   
   // A cycle would occur if we can reach sourceId starting from targetId
   // by following downstream edges (i.e., sourceId is already reachable from targetId)
   // Because adding targetId -> sourceId edge would then complete a cycle
   
-  // Wait, the edge goes FROM sourceId TO targetId
-  // So after adding: sourceId -> targetId
-  // A cycle exists if targetId can reach sourceId through existing paths
-  // i.e., if sourceId is downstream of targetId
-  
-  // Actually, let me think again:
-  // Edge: fromNodeId -> toNodeId means "toNodeId depends on fromNodeId"
-  // New edge: sourceId -> targetId means "targetId will depend on sourceId"
-  // 
-  // A cycle would occur if sourceId already depends on targetId (directly or indirectly)
-  // i.e., if we can reach sourceId by following downstream edges from targetId
-  
   return isReachable(graph.downstream, targetId, sourceId)
 }
 
-/**
- * Check if targetId is reachable from sourceId by following edges in the adjacency map.
- */
 function isReachable(
   adjacency: Map<string, Set<string>>,
   sourceId: string,
@@ -142,17 +124,16 @@ export function detectCycles(
   nodes: Record<string, ProjectNode>,
   edges: Record<string, Edge>
 ): string[] {
-  const graph = buildDependencyGraph(edges)
+  const graph = getCachedGraph(edges)
   const colors = new Map<string, NodeColor>()
   const cycleNodes: string[] = []
   
-  // Initialize all nodes as white (unvisited)
   for (const nodeId of Object.keys(nodes)) {
     colors.set(nodeId, 'white')
   }
   
   function dfs(nodeId: string): boolean {
-    colors.set(nodeId, 'gray') // Mark as being processed
+    colors.set(nodeId, 'gray')
     
     const children = graph.downstream.get(nodeId)
     if (children) {
@@ -174,11 +155,10 @@ export function detectCycles(
       }
     }
     
-    colors.set(nodeId, 'black') // Mark as fully processed
+    colors.set(nodeId, 'black')
     return false
   }
   
-  // Run DFS from each unvisited node
   for (const nodeId of Object.keys(nodes)) {
     if (colors.get(nodeId) === 'white') {
       dfs(nodeId)
@@ -190,23 +170,19 @@ export function detectCycles(
 
 
 /**
- * Get nodes in topological order (dependencies before dependents).
- * This determines the order in which tables should be computed.
- * 
  * @returns Array of node IDs in computation order, or null if graph has cycles
  */
 export function getTopologicalOrder(
   nodes: Record<string, ProjectNode>,
   edges: Record<string, Edge>
 ): string[] | null {
-  const graph = buildDependencyGraph(edges)
+  const graph = getCachedGraph(edges)
   const result: string[] = []
   const visited = new Set<string>()
-  const visiting = new Set<string>() // For cycle detection
+  const visiting = new Set<string>()
   
   function visit(nodeId: string): boolean {
     if (visiting.has(nodeId)) {
-      // Cycle detected
       return false
     }
     
@@ -216,7 +192,6 @@ export function getTopologicalOrder(
     
     visiting.add(nodeId)
     
-    // Visit all dependencies (upstream nodes) first
     const upstreamNodes = graph.upstream.get(nodeId)
     if (upstreamNodes) {
       for (const upstreamId of upstreamNodes) {
@@ -233,11 +208,10 @@ export function getTopologicalOrder(
     return true
   }
   
-  // Visit all nodes
   for (const nodeId of Object.keys(nodes)) {
     if (!visited.has(nodeId)) {
       if (!visit(nodeId)) {
-        return null // Cycle detected
+        return null
       }
     }
   }
@@ -245,16 +219,12 @@ export function getTopologicalOrder(
   return result
 }
 
-/**
- * Get computation order for a specific node and its dependencies.
- * Returns nodes in the order they should be computed to materialize the target node.
- */
 export function getComputationOrder(
   targetNodeId: string,
   _nodes: Record<string, ProjectNode>,
   edges: Record<string, Edge>
 ): string[] {
-  const graph = buildDependencyGraph(edges)
+  const graph = getCachedGraph(edges)
   const result: string[] = []
   const visited = new Set<string>()
   
@@ -263,7 +233,6 @@ export function getComputationOrder(
       return
     }
     
-    // Visit dependencies first
     const upstreamNodes = graph.upstream.get(nodeId)
     if (upstreamNodes) {
       for (const upstreamId of upstreamNodes) {
@@ -281,14 +250,13 @@ export function getComputationOrder(
 
 
 /**
- * Get all descendants of a node (nodes that depend on this node, directly or indirectly).
  * Used for dirty propagation - when a node changes, all descendants become dirty.
  */
 export function getAllDescendants(
   nodeId: string,
   edges: Record<string, Edge>
 ): Set<string> {
-  const graph = buildDependencyGraph(edges)
+  const graph = getCachedGraph(edges)
   const descendants = new Set<string>()
   const stack = [nodeId]
   
@@ -317,7 +285,7 @@ export function getAllAncestors(
   nodeId: string,
   edges: Record<string, Edge>
 ): Set<string> {
-  const graph = buildDependencyGraph(edges)
+  const graph = getCachedGraph(edges)
   const ancestors = new Set<string>()
   const stack = [nodeId]
   
@@ -338,31 +306,24 @@ export function getAllAncestors(
   return ancestors
 }
 
-/**
- * Get direct upstream nodes (immediate dependencies).
- */
 export function getDirectUpstream(
   nodeId: string,
   edges: Record<string, Edge>
 ): Set<string> {
-  const graph = buildDependencyGraph(edges)
+  const graph = getCachedGraph(edges)
   return graph.upstream.get(nodeId) ?? new Set()
 }
 
-/**
- * Get direct downstream nodes (immediate dependents).
- */
 export function getDirectDownstream(
   nodeId: string,
   edges: Record<string, Edge>
 ): Set<string> {
-  const graph = buildDependencyGraph(edges)
+  const graph = getCachedGraph(edges)
   return graph.downstream.get(nodeId) ?? new Set()
 }
 
 
 /**
- * Get the depth of a node in the dependency graph.
  * Source tables (no dependencies) have depth 0.
  * Derived tables have depth = max(upstream depths) + 1.
  */
@@ -375,7 +336,7 @@ export function getNodeDepth(
     return cache.get(nodeId)!
   }
   
-  const graph = buildDependencyGraph(edges)
+  const graph = getCachedGraph(edges)
   const upstream = graph.upstream.get(nodeId)
   
   if (!upstream || upstream.size === 0) {
@@ -394,9 +355,6 @@ export function getNodeDepth(
   return depth
 }
 
-/**
- * Check if nodeA is an ancestor of nodeB (nodeB depends on nodeA).
- */
 export function isAncestorOf(
   nodeA: string,
   nodeB: string,
@@ -406,9 +364,6 @@ export function isAncestorOf(
   return ancestors.has(nodeA)
 }
 
-/**
- * Check if nodeA is a descendant of nodeB (nodeA depends on nodeB).
- */
 export function isDescendantOf(
   nodeA: string,
   nodeB: string,
@@ -425,7 +380,7 @@ export function getRootNodes(
   nodes: Record<string, ProjectNode>,
   edges: Record<string, Edge>
 ): string[] {
-  const graph = buildDependencyGraph(edges)
+  const graph = getCachedGraph(edges)
   const roots: string[] = []
   
   for (const nodeId of Object.keys(nodes)) {
@@ -438,14 +393,11 @@ export function getRootNodes(
   return roots
 }
 
-/**
- * Get all leaf nodes (nodes with no downstream dependents).
- */
 export function getLeafNodes(
   nodes: Record<string, ProjectNode>,
   edges: Record<string, Edge>
 ): string[] {
-  const graph = buildDependencyGraph(edges)
+  const graph = getCachedGraph(edges)
   const leaves: string[] = []
   
   for (const nodeId of Object.keys(nodes)) {

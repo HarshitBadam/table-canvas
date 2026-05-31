@@ -1,21 +1,18 @@
-/**
- * Chart View - Full chart editing interface
- */
-
 import { useMemo, useCallback, useState } from 'react'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useProjectStore } from '@/state/projectStore'
 import { ChartRenderer } from './ChartRenderer'
+import { ChartTypeIcon } from './ChartTypeIcon'
 import { useChartData } from './useChartData'
-import type { ChartNode, ChartConfig, AggregationType, TableNode } from '@/types'
+import { useNavigation } from '@/app/NavigationContext'
+import type { ChartNode, ChartConfig, ChartType, AggregationType, TableNode } from '@/types'
 
 interface ChartViewProps {
   chartId: string
-  onNavigateToTable: (tableId: string) => void
 }
 
-type ChartType = 'bar' | 'line' | 'pie' | 'scatter'
-
-export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
+export function ChartView({ chartId }: ChartViewProps) {
+  const { openTable } = useNavigation()
   const chartNode = useProjectStore((state) => state.nodes[chartId]) as ChartNode | undefined
   const updateNode = useProjectStore((state) => state.updateNode)
   const updateChartConfig = useProjectStore((state) => state.updateChartConfig)
@@ -76,9 +73,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="p-6 max-w-5xl mx-auto w-full space-y-4">
-        {/* Chart Card */}
         <div className="bg-white dark:bg-[#252526] rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-          {/* Chart Header */}
           <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-accent-green rounded-lg flex items-center justify-center">
@@ -108,7 +103,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => onNavigateToTable(sourceTableId)}
+                onClick={() => openTable(sourceTableId)}
                 className="px-3 py-1.5 text-sm font-medium text-accent-green bg-accent-green/10 hover:bg-accent-green/20 rounded-md transition-colors"
               >
                 {sourceTable?.name}
@@ -117,11 +112,10 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
             </div>
           </div>
           
-          {/* Chart Area */}
           <div className="p-6">
             {loading ? (
               <div className="h-[420px] flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-gray-200 border-t-accent-green rounded-full animate-spin" />
+                <LoadingSpinner size="lg" className="text-accent-green" />
               </div>
             ) : error ? (
               <div className="h-[420px] flex flex-col items-center justify-center text-center px-8">
@@ -177,9 +171,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
           </div>
         </div>
         
-        {/* Configuration Panel */}
         <div className="bg-white dark:bg-[#252526] rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          {/* Chart Type Row */}
           <div className="flex items-center gap-8 pb-4 mb-4 border-b border-gray-100 dark:border-gray-700">
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider w-14">Type</span>
             <div className="flex gap-2">
@@ -200,9 +192,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
             </div>
           </div>
           
-          {/* Data Fields Row */}
           <div className="flex gap-8">
-            {/* X-Axis */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -233,7 +223,6 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
             
             <div className="w-px bg-gray-200 dark:bg-gray-700" />
             
-            {/* Y-Axis */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -262,7 +251,6 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
             
             {chartType !== 'scatter' && <div className="w-px bg-gray-200 dark:bg-gray-700" />}
             
-            {/* Aggregation */}
             {chartType !== 'scatter' && (
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-3">
@@ -293,38 +281,4 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
       </div>
     </div>
   )
-}
-
-function ChartTypeIcon({ type, className }: { type: ChartType; className?: string }) {
-  switch (type) {
-    case 'bar':
-      return (
-        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-          <path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z" />
-        </svg>
-      )
-    case 'line':
-      return (
-        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 4 4 6-6" />
-        </svg>
-      )
-    case 'pie':
-      return (
-        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-          <path d="M11 2v20c-5.07-.5-9-4.79-9-10s3.93-9.5 9-10zm2.03 0v8.99H22c-.47-4.74-4.24-8.52-8.97-8.99zm0 11.01V22c4.74-.47 8.5-4.25 8.97-8.99h-8.97z" />
-        </svg>
-      )
-    case 'scatter':
-      return (
-        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-          <circle cx="7" cy="14" r="2" />
-          <circle cx="11" cy="10" r="2" />
-          <circle cx="15" cy="16" r="2" />
-          <circle cx="17" cy="8" r="2" />
-        </svg>
-      )
-    default:
-      return null
-  }
 }

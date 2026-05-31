@@ -1,9 +1,3 @@
-/**
- * Project Model Unit Tests
- * 
- * Tests for validation, soft-delete functionality, and static methods.
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Types } from 'mongoose';
 import { Project } from './Project.js';
@@ -13,11 +7,11 @@ import {
   createSampleNode,
   createSampleEdge,
 } from '../test/helpers.js';
+import { setupMongoTestDB } from '../test/setup.js';
+
+setupMongoTestDB();
 
 describe('Project Model', () => {
-  // ============================================================================
-  // Validation Tests
-  // ============================================================================
 
   describe('validation', () => {
     it('should require userId', async () => {
@@ -132,9 +126,6 @@ describe('Project Model', () => {
     });
   });
 
-  // ============================================================================
-  // Soft Delete Tests
-  // ============================================================================
 
   describe('soft delete', () => {
     it('should set deletedAt on softDelete()', async () => {
@@ -172,7 +163,6 @@ describe('Project Model', () => {
     it('should exclude deleted projects from findByUser()', async () => {
       const userId = createMockUserId();
 
-      // Create 3 active and 2 deleted projects
       await createTestProject({ userId, name: 'Active 1' });
       await createTestProject({ userId, name: 'Active 2' });
       await createTestProject({ userId, name: 'Active 3' });
@@ -198,9 +188,6 @@ describe('Project Model', () => {
     });
   });
 
-  // ============================================================================
-  // Static Methods Tests
-  // ============================================================================
 
   describe('findByUser', () => {
     it('should return projects for a specific user', async () => {
@@ -243,14 +230,10 @@ describe('Project Model', () => {
 
       const projects = await Project.findByUser(userId);
 
-      // Should have basic fields
       expect(projects[0]._id).toBeDefined();
       expect(projects[0].name).toBeDefined();
       expect(projects[0].updatedAt).toBeDefined();
       expect(projects[0].createdAt).toBeDefined();
-
-      // Should NOT have full nodes (not selected)
-      // Note: Mongoose select may still have the field but as undefined
     });
 
     it('should return empty array for user with no projects', async () => {
@@ -329,9 +312,6 @@ describe('Project Model', () => {
     });
   });
 
-  // ============================================================================
-  // Instance Methods Tests
-  // ============================================================================
 
   describe('toPublic', () => {
     it('should return public representation', async () => {
@@ -364,9 +344,6 @@ describe('Project Model', () => {
     });
   });
 
-  // ============================================================================
-  // Timestamps Tests
-  // ============================================================================
 
   describe('timestamps', () => {
     it('should set createdAt on creation', async () => {
@@ -385,7 +362,6 @@ describe('Project Model', () => {
       const project = await createTestProject();
       const originalUpdatedAt = project.updatedAt;
 
-      // Wait a bit to ensure time difference
       await new Promise((r) => setTimeout(r, 10));
 
       project.name = 'Updated Name';

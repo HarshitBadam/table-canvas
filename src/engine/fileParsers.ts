@@ -3,9 +3,6 @@ import * as XLSX from 'xlsx'
 import type { TableRow } from '@/state/dataStore'
 import type { CellValue, TableSchema, ColumnSchema } from '@/types'
 
-/**
- * Parse file data based on file type.
- */
 export async function parseFileData(
   fileData: ArrayBuffer,
   fileType: 'csv' | 'xlsx',

@@ -1,8 +1,3 @@
-/**
- * Suggestions Store
- * Manages suggestion state with caching, debouncing, and cancellation
- */
-
 import { create } from 'zustand'
 import type { Suggestion, SuggestionCategory } from '@/types'
 
@@ -14,7 +9,6 @@ export function createContextKey(
   return `${tableVersionHash}:${columnId ?? 'table'}`
 }
 
-// Generate a simple hash from table data for cache invalidation
 export function generateTableVersionHash(
   tableId: string,
   rowCount: number,
@@ -25,11 +19,7 @@ export function generateTableVersionHash(
 }
 
 interface SuggestionsState {
-  // Panel UI state
-  isOpen: boolean
   activeTab: SuggestionCategory | 'all'
-  
-  // Selection context
   selectedTableId: string | null
   selectedColumnId: string | null
   
@@ -43,16 +33,11 @@ interface SuggestionsState {
   // These persist even when source data hasn't changed (e.g., after creating a derived table)
   consumed: Set<string>
   
-  // Loading state
   isLoading: boolean
   error: string | null
   
-  // Current request for cancellation
   currentRequestId: string | null
   
-  // Actions
-  setOpen: (isOpen: boolean) => void
-  toggleOpen: () => void
   setActiveTab: (tab: SuggestionCategory | 'all') => void
   
   setSelection: (tableId: string | null, columnId?: string | null) => void
@@ -65,7 +50,6 @@ interface SuggestionsState {
   undismissSuggestion: (contextKey: string, suggestionId: string) => void
   isDismissed: (contextKey: string, suggestionId: string) => boolean
   
-  // Consumed suggestion actions (for recipes/analysis that create derived tables)
   consumeSuggestion: (suggestionId: string) => void
   unconsumeSuggestion: (suggestionId: string) => void
   isConsumed: (suggestionId: string) => boolean
@@ -78,7 +62,6 @@ interface SuggestionsState {
 }
 
 export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
-  isOpen: false,
   activeTab: 'all',
   selectedTableId: null,
   selectedColumnId: null,
@@ -89,8 +72,6 @@ export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
   error: null,
   currentRequestId: null,
   
-  setOpen: (isOpen) => set({ isOpen }),
-  toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
   setActiveTab: (tab) => set({ activeTab: tab }),
   
   setSelection: (tableId, columnId) => set({
@@ -117,7 +98,6 @@ export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
         return { suggestionsCache: new Map() }
       }
       
-      // Clear entries that contain this tableId
       const newCache = new Map(state.suggestionsCache)
       for (const key of newCache.keys()) {
         if (key.includes(tableId)) {
@@ -183,58 +163,4 @@ export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
   },
 }))
 
-let debounceTimeout: ReturnType<typeof setTimeout> | null = null
-
-export function debouncedSetSelection(
-  tableId: string | null,
-  columnId?: string | null,
-  delay = 100
-): void {
-  if (debounceTimeout) {
-    clearTimeout(debounceTimeout)
-  }
-  
-  debounceTimeout = setTimeout(() => {
-    useSuggestionsStore.getState().setSelection(tableId, columnId)
-    debounceTimeout = null
-  }, delay)
-}
-
-export function useFilteredSuggestions(contextKey: string): Suggestion[] {
-  const suggestions = useSuggestionsStore((state) => 
-    state.suggestionsCache.get(contextKey) ?? []
-  )
-  const dismissed = useSuggestionsStore((state) => 
-    state.dismissed.get(contextKey) ?? new Set()
-  )
-  const consumed = useSuggestionsStore((state) => state.consumed)
-  const activeTab = useSuggestionsStore((state) => state.activeTab)
-  
-  return suggestions.filter((s) => {
-    if (dismissed.has(s.id)) return false
-    if (consumed.has(s.id)) return false
-    if (activeTab !== 'all' && s.category !== activeTab) return false
-    
-    return true
-  })
-}
-
-export function useCategoryCounts(contextKey: string): Record<SuggestionCategory | 'all', number> {
-  const suggestions = useSuggestionsStore((state) => 
-    state.suggestionsCache.get(contextKey) ?? []
-  )
-  const dismissed = useSuggestionsStore((state) => 
-    state.dismissed.get(contextKey) ?? new Set()
-  )
-  const consumed = useSuggestionsStore((state) => state.consumed)
-  
-  const filtered = suggestions.filter((s) => !dismissed.has(s.id) && !consumed.has(s.id))
-  
-  return {
-    all: filtered.length,
-    cleaning: filtered.filter((s) => s.category === 'cleaning').length,
-    analysis: filtered.filter((s) => s.category === 'analysis').length,
-    recipe: filtered.filter((s) => s.category === 'recipe').length,
-  }
-}
 

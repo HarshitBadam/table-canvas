@@ -26,9 +26,6 @@ export class EngineAdapter {
     this.rpc = new WorkerRPC(worker)
   }
 
-  /**
-   * Get singleton instance
-   */
   static getInstance(): EngineAdapter {
     if (!engineInstance) {
       engineInstance = new EngineAdapter()
@@ -36,9 +33,6 @@ export class EngineAdapter {
     return engineInstance
   }
 
-  /**
-   * Initialize the engine
-   */
   async init(): Promise<void> {
     if (this.initialized) return
     
@@ -47,9 +41,6 @@ export class EngineAdapter {
     this.initialized = true
   }
 
-  /**
-   * Load table data into the engine
-   */
   async loadTable(
     tableId: string,
     schema: TableSchema,
@@ -97,10 +88,6 @@ export class EngineAdapter {
     await this.rpc.call('loadTable', request)
   }
 
-  /**
-   * Execute a transform and create a derived table
-   * @param columnIdToName - Optional mapping from column IDs to human-readable names
-   */
   async executeTransform(
     transformDef: TransformDef,
     outputTableId: string,
@@ -115,45 +102,30 @@ export class EngineAdapter {
     })
   }
 
-  /**
-   * Get a slice of table data for display
-   */
   async getSlice(tableId: string, offset: number, limit: number): Promise<TableSlice> {
     await this.ensureInitialized()
     
     return this.rpc.call<TableSlice>('getSlice', { tableId, offset, limit })
   }
 
-  /**
-   * Get aggregation results for charts
-   */
   async getAggregation(tableId: string, aggDef: AggregationDef): Promise<AggregationResult> {
     await this.ensureInitialized()
     
     return this.rpc.call<AggregationResult>('getAggregation', { tableId, aggDef })
   }
 
-  /**
-   * Get profiling results for a table
-   */
   async getProfile(tableId: string, phase: 1 | 2 = 1): Promise<ProfileResult> {
     await this.ensureInitialized()
     
     return this.rpc.call<ProfileResult>('getProfile', { tableId, phase })
   }
 
-  /**
-   * Drop a table from the engine
-   */
   async dropTable(tableId: string): Promise<void> {
     await this.ensureInitialized()
     
     await this.rpc.call('dropTable', tableId)
   }
 
-  /**
-   * Ensure the engine is initialized
-   */
   private async ensureInitialized(): Promise<void> {
     if (!this.initialized) {
       await this.init()

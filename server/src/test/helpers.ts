@@ -1,26 +1,13 @@
-/**
- * Test Helpers
- * 
- * Factory functions and utilities for creating test data.
- */
-
 import { Types } from 'mongoose';
 import { Project, IProjectDocument } from '../models/Project.js';
 import { File, IFileDocument } from '../models/File.js';
 import type { ProjectNode, Edge, SerializedPatches } from '../types/index.js';
 
 
-/**
- * Generate a mock user ID for testing
- * Since we skip auth, we use mock user IDs
- */
 export function createMockUserId(): Types.ObjectId {
   return new Types.ObjectId();
 }
 
-/**
- * Create a mock authenticated request context
- */
 export function createMockAuthContext(userId?: Types.ObjectId) {
   const id = userId || createMockUserId();
   return {
@@ -41,9 +28,6 @@ export interface CreateTestProjectOptions {
   deleted?: boolean;
 }
 
-/**
- * Create a test project in the database
- */
 export async function createTestProject(
   options: CreateTestProjectOptions = {}
 ): Promise<IProjectDocument> {
@@ -69,9 +53,6 @@ export async function createTestProject(
   return project;
 }
 
-/**
- * Create multiple test projects for a user
- */
 export async function createTestProjects(
   userId: Types.ObjectId,
   count: number
@@ -89,9 +70,6 @@ export async function createTestProjects(
   return projects;
 }
 
-/**
- * Create a sample node for testing
- */
 export function createSampleNode(
   id: string,
   kind: 'source_table' | 'derived_table' | 'chart' = 'source_table'
@@ -110,9 +88,6 @@ export function createSampleNode(
   };
 }
 
-/**
- * Create a sample edge for testing
- */
 export function createSampleEdge(
   id: string,
   fromNodeId: string,
@@ -137,9 +112,6 @@ export interface CreateTestFileOptions {
   deleted?: boolean;
 }
 
-/**
- * Create a test file metadata in the database
- */
 export async function createTestFile(
   options: CreateTestFileOptions = {}
 ): Promise<IFileDocument> {
@@ -154,7 +126,7 @@ export async function createTestFile(
   } = options;
 
   const file = new File({
-    gridFsId: new Types.ObjectId(), // Mock GridFS ID
+    gridFsId: new Types.ObjectId(),
     userId,
     projectId,
     filename,
@@ -168,9 +140,6 @@ export async function createTestFile(
   return file;
 }
 
-/**
- * Create multiple test files for a user
- */
 export async function createTestFiles(
   userId: Types.ObjectId,
   count: number,
@@ -192,9 +161,6 @@ export async function createTestFiles(
 }
 
 
-/**
- * Clear all documents from a specific collection
- */
 export async function clearCollection(collectionName: string): Promise<void> {
   const mongoose = await import('mongoose');
   const collection = mongoose.connection.collections[collectionName];
@@ -203,9 +169,6 @@ export async function clearCollection(collectionName: string): Promise<void> {
   }
 }
 
-/**
- * Clear all collections in the database
- */
 export async function clearDatabase(): Promise<void> {
   const mongoose = await import('mongoose');
   const collections = mongoose.connection.collections;
@@ -215,9 +178,6 @@ export async function clearDatabase(): Promise<void> {
   }
 }
 
-/**
- * Get count of documents in a collection
- */
 export async function getCollectionCount(
   collectionName: string
 ): Promise<number> {
@@ -230,9 +190,6 @@ export async function getCollectionCount(
 }
 
 
-/**
- * Assert that a project has expected structure
- */
 export function assertProjectStructure(project: Record<string, unknown>): void {
   if (!project.id) throw new Error('Project missing id');
   if (!project.name) throw new Error('Project missing name');
@@ -243,9 +200,6 @@ export function assertProjectStructure(project: Record<string, unknown>): void {
   if (!project.updatedAt) throw new Error('Project missing updatedAt');
 }
 
-/**
- * Assert that a file has expected structure
- */
 export function assertFileStructure(file: Record<string, unknown>): void {
   if (!file.id) throw new Error('File missing id');
   if (!file.filename) throw new Error('File missing filename');
@@ -255,16 +209,10 @@ export function assertFileStructure(file: Record<string, unknown>): void {
 }
 
 
-/**
- * Wait for a specified number of milliseconds
- */
 export function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Get a date in the past
- */
 export function getPastDate(daysAgo: number): Date {
   const date = new Date();
   date.setDate(date.getDate() - daysAgo);

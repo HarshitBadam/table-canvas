@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useDataStore } from '@/state/dataStore'
-import { generateSuggestions } from '@/suggestions/suggestionEngine'
+import { generateSuggestions } from '@/suggestions/engine'
 import { generateTableVersionHash } from '@/suggestions/suggestionsStore'
 import type { Suggestion } from '@/types'
 import { useTableNodes, useAllProfiles } from './dashboardHelpers'
@@ -45,8 +45,8 @@ export function useTopSuggestions(limit: number = 5): {
         for (const suggestion of tableSuggestions) {
           allSuggestions.push({ ...suggestion, tableName: table.name })
         }
-      } catch {
-        // Suggestion generation failed for this table, skip
+      } catch (error) {
+        console.error('[useTopSuggestions] Suggestion generation failed for table:', table.name, error);
       }
     }
 

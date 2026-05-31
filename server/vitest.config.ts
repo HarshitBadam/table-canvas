@@ -4,7 +4,6 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.ts'],
     exclude: [
       '**/node_modules/**',
@@ -28,14 +27,15 @@ export default defineConfig({
         'src/services/auth.service.ts',
       ],
     },
-    // Increase timeout for database operations
     testTimeout: 30000,
     hookTimeout: 30000,
-    // Run tests sequentially to avoid MongoDB connection issues
+    // Run sequentially with shared module cache to avoid mongoose model conflicts
+    fileParallelism: false,
     pool: 'forks',
     poolOptions: {
       forks: {
         singleFork: true,
+        isolate: false,
       },
     },
   },

@@ -51,12 +51,13 @@ export const CHART_THEME = {
   },
 }
 
+/** Epoch millisecond bounds covering 2000-01-01 to 2100-01-01. */
+export const EPOCH_MS_MIN = 946684800000
+export const EPOCH_MS_MAX = 4102444800000
+
 function isTimestamp(value: unknown): boolean {
   if (typeof value !== 'number') return false
-  // Epoch milliseconds range: 2000-01-01 to 2100-01-01
-  const epochMsMin = 946684800000
-  const epochMsMax = 4102444800000
-  return value > epochMsMin && value < epochMsMax
+  return value > EPOCH_MS_MIN && value < EPOCH_MS_MAX
 }
 
 function formatTimestamp(value: number): string {

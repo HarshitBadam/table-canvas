@@ -74,7 +74,6 @@ const ProjectSchema = new Schema<IProjectDocument, IProjectModel>(
     deletedAt: {
       type: Date,
       default: null,
-      // Index defined below with sparse option
     },
   },
   {
@@ -104,44 +103,29 @@ ProjectSchema.methods.toPublic = function () {
   };
 };
 
-/**
- * Soft delete the project by setting deletedAt timestamp
- */
 ProjectSchema.methods.softDelete = async function (): Promise<IProjectDocument> {
   this.deletedAt = new Date();
   return this.save();
 };
 
-/**
- * Restore a soft-deleted project by clearing deletedAt
- */
 ProjectSchema.methods.restore = async function (): Promise<IProjectDocument> {
   this.deletedAt = null;
   return this.save();
 };
 
-/**
- * Check if project is soft-deleted
- */
 ProjectSchema.methods.isDeleted = function (): boolean {
   return this.deletedAt !== null;
 };
 
-/**
- * Find all active (non-deleted) projects for a user
- */
 ProjectSchema.statics.findByUser = function (userId: string | Types.ObjectId) {
   return this.find({ 
     userId,
-    deletedAt: null,  // Exclude soft-deleted
+    deletedAt: null,
   })
     .select('_id name updatedAt createdAt')
     .sort({ updatedAt: -1 });
 };
 
-/**
- * Find a specific active (non-deleted) project by ID and user
- */
 ProjectSchema.statics.findByIdAndUser = function (
   projectId: string,
   userId: string
@@ -149,22 +133,16 @@ ProjectSchema.statics.findByIdAndUser = function (
   return this.findOne({
     _id: new Types.ObjectId(projectId),
     userId: new Types.ObjectId(userId),
-    deletedAt: null,  // Exclude soft-deleted
+    deletedAt: null,
   });
 };
 
-/**
- * Find all projects including soft-deleted (for admin/recovery)
- */
 ProjectSchema.statics.findWithDeleted = function (
   filter: mongoose.FilterQuery<IProjectDocument> = {}
 ) {
   return this.find(filter).sort({ updatedAt: -1 });
 };
 
-/**
- * Find all projects for a user including soft-deleted
- */
 ProjectSchema.statics.findByUserWithDeleted = function (
   userId: string | Types.ObjectId
 ) {

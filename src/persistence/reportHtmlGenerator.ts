@@ -1,21 +1,12 @@
 import type { Report } from '@/report/types'
+import type { JSONContent } from '@tiptap/core'
 
-interface TipTapNode {
-  type: string
-  content?: TipTapNode[]
-  text?: string
-  marks?: Array<{ type: string }>
-  attrs?: Record<string, unknown>
-}
-
-interface TipTapContent {
-  content?: TipTapNode[]
-}
-
-function nodeToHtml(node: TipTapNode): string {
+function nodeToHtml(node: JSONContent): string {
   if (!node) return ''
 
-  switch (node.type) {
+  const nodeType = node.type ?? ''
+
+  switch (nodeType) {
     case 'paragraph': {
       const pContent = node.content?.map((n) => nodeToHtml(n)).join('') || ''
       return `<p>${pContent}</p>\n`
@@ -83,7 +74,7 @@ function nodeToHtml(node: TipTapNode): string {
 
     case 'tableBlock':
     case 'chartBlock':
-      return `<div class="block-placeholder">[${node.type}]</div>\n`
+      return `<div class="block-placeholder">[${nodeType}]</div>\n`
 
     default:
       if (node.content) {
@@ -93,7 +84,7 @@ function nodeToHtml(node: TipTapNode): string {
   }
 }
 
-function tiptapToHtml(content: TipTapContent): string {
+function tiptapToHtml(content: JSONContent): string {
   if (!content || !content.content) return ''
 
   let html = ''

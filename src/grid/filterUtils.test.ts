@@ -1,14 +1,3 @@
-/**
- * Unit tests for Grid Filter Utilities
- * 
- * Tests the core filtering logic including:
- * - Condition evaluation for all operators
- * - Type-specific comparisons (string, number, date, boolean)
- * - Multi-select (enum) filtering
- * - Filter application to rows
- * - Edge cases (null, empty, special characters)
- */
-
 import { describe, it, expect } from 'vitest'
 import {
   evaluateCondition,
@@ -25,11 +14,8 @@ import {
   createEmptyFilterConfig,
   quickDateOptions,
 } from './filterUtils'
-import type { ColumnSchema } from '@/types'
+import type { ColumnSchema, CellValue } from '@/types'
 
-// ============================================================================
-// Test Fixtures
-// ============================================================================
 
 interface TestRow {
   __rowId: string
@@ -40,12 +26,8 @@ function createRow(id: string, data: Record<string, string | number | boolean | 
   return { __rowId: id, ...data }
 }
 
-// Identity display value function (no patches)
-const identityDisplayValue = (_rowId: string, _colId: string, base: unknown) => base
+const identityDisplayValue = (_rowId: string, _colId: string, base: CellValue): CellValue => base
 
-// ============================================================================
-// evaluateCondition - String Operations
-// ============================================================================
 
 describe('evaluateCondition - String Operations', () => {
   it('evaluates equals (case-insensitive)', () => {
@@ -61,7 +43,7 @@ describe('evaluateCondition - String Operations', () => {
 
   it('evaluates contains', () => {
     expect(evaluateCondition('Hello World', { columnId: 'col', operator: 'contains', value: 'World' }, 'string')).toBe(true)
-    expect(evaluateCondition('Hello World', { columnId: 'col', operator: 'contains', value: 'world' }, 'string')).toBe(true) // case-insensitive
+    expect(evaluateCondition('Hello World', { columnId: 'col', operator: 'contains', value: 'world' }, 'string')).toBe(true)
     expect(evaluateCondition('Hello World', { columnId: 'col', operator: 'contains', value: 'foo' }, 'string')).toBe(false)
   })
 
@@ -83,9 +65,6 @@ describe('evaluateCondition - String Operations', () => {
   })
 })
 
-// ============================================================================
-// evaluateCondition - Number Operations
-// ============================================================================
 
 describe('evaluateCondition - Number Operations', () => {
   it('evaluates equals for numbers', () => {
@@ -140,9 +119,6 @@ describe('evaluateCondition - Number Operations', () => {
   })
 })
 
-// ============================================================================
-// evaluateCondition - Boolean Operations
-// ============================================================================
 
 describe('evaluateCondition - Boolean Operations', () => {
   it('evaluates boolean true values', () => {
@@ -164,9 +140,6 @@ describe('evaluateCondition - Boolean Operations', () => {
   })
 })
 
-// ============================================================================
-// evaluateCondition - Date Operations
-// ============================================================================
 
 describe('evaluateCondition - Date Operations', () => {
   it('evaluates date equals', () => {
@@ -202,14 +175,11 @@ describe('evaluateCondition - Date Operations', () => {
   })
 })
 
-// ============================================================================
-// evaluateCondition - Null/Empty Checks
-// ============================================================================
 
 describe('evaluateCondition - Null/Empty Checks', () => {
   it('evaluates is_null', () => {
     expect(evaluateCondition(null, { columnId: 'col', operator: 'is_null', value: '' }, 'string')).toBe(true)
-    expect(evaluateCondition(undefined, { columnId: 'col', operator: 'is_null', value: '' }, 'string')).toBe(true)
+    expect(evaluateCondition(null, { columnId: 'col', operator: 'is_null', value: '' }, 'string')).toBe(true)
     expect(evaluateCondition('', { columnId: 'col', operator: 'is_null', value: '' }, 'string')).toBe(true)
     expect(evaluateCondition('value', { columnId: 'col', operator: 'is_null', value: '' }, 'string')).toBe(false)
   })
@@ -226,9 +196,6 @@ describe('evaluateCondition - Null/Empty Checks', () => {
   })
 })
 
-// ============================================================================
-// evaluateCondition - Multi-Select (Enum) Operations
-// ============================================================================
 
 describe('evaluateCondition - Multi-Select (Enum)', () => {
   it('evaluates single value match', () => {
@@ -248,9 +215,6 @@ describe('evaluateCondition - Multi-Select (Enum)', () => {
   })
 })
 
-// ============================================================================
-// applyFilters - Full Row Filtering
-// ============================================================================
 
 describe('applyFilters', () => {
   const columns: ColumnSchema[] = [
@@ -328,9 +292,6 @@ describe('applyFilters', () => {
   })
 })
 
-// ============================================================================
-// Type Detection and Configuration
-// ============================================================================
 
 describe('isEnumColumn', () => {
   it('returns true for string column with few unique values', () => {
@@ -405,9 +366,6 @@ describe('getOperatorsForType', () => {
   })
 })
 
-// ============================================================================
-// Operator Labels
-// ============================================================================
 
 describe('getOperatorLabel', () => {
   it('returns context-aware labels for dates', () => {
@@ -430,9 +388,6 @@ describe('getOperatorLabel', () => {
   })
 })
 
-// ============================================================================
-// Quick Date Options
-// ============================================================================
 
 describe('quickDateOptions', () => {
   it('has all expected presets', () => {
@@ -450,7 +405,7 @@ describe('quickDateOptions', () => {
   it('today returns current date for both start and end', () => {
     const today = quickDateOptions.find(o => o.id === 'today')!
     const range = today.getRange()
-    expect(range.start).toBe(range.end) // Same day
+    expect(range.start).toBe(range.end)
     expect(range.start).toMatch(/^\d{4}-\d{2}-\d{2}$/) // YYYY-MM-DD format
   })
 
@@ -464,9 +419,6 @@ describe('quickDateOptions', () => {
   })
 })
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
 
 describe('getUniqueValues', () => {
   const rows: TestRow[] = [
@@ -577,9 +529,6 @@ describe('createEmptyFilterConfig', () => {
   })
 })
 
-// ============================================================================
-// Edge Cases
-// ============================================================================
 
 describe('Edge Cases', () => {
   it('handles special characters in string values', () => {

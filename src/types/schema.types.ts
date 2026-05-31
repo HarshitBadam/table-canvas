@@ -1,5 +1,4 @@
 
-/** Supported data types for columns */
 export type ColumnType = 
   | 'string' 
   | 'number' 
@@ -8,7 +7,9 @@ export type ColumnType =
   | 'datetime' 
   | 'unknown'
 
-/** Semantic hints for enhanced column understanding */
+/** User-selectable column types (excludes auto-detected 'datetime' and 'unknown') */
+export type UserColumnType = Extract<ColumnType, 'string' | 'number' | 'boolean' | 'date'>
+
 export type SemanticHint = 
   | 'currency' 
   | 'percentage' 
@@ -21,7 +22,6 @@ export type SemanticHint =
   | 'category'
 
 
-/** Schema definition for a single column */
 export interface ColumnSchema {
   id: string
   name: string
@@ -30,7 +30,6 @@ export interface ColumnSchema {
   semanticHints?: SemanticHint[]
   /** Formula expression for computed columns, e.g., "[unit_price] * [quantity]" */
   formula?: string
-  /** Flag for virtual/computed columns */
   isComputed?: boolean
   /** 
    * The actual column name used in DuckDB queries.
@@ -41,7 +40,6 @@ export interface ColumnSchema {
   duckDbName?: string
 }
 
-/** Schema definition for a table */
 export interface TableSchema {
   columns: ColumnSchema[]
   rowCount?: number

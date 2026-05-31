@@ -2,7 +2,7 @@
  * API Client with automatic token refresh and error handling
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 
 export interface ApiResponse<T = unknown> {
@@ -54,7 +54,8 @@ async function refreshToken(): Promise<boolean> {
     });
 
     return response.ok;
-  } catch {
+  } catch (error) {
+    console.error('[client] Failed to refresh token:', error);
     return false;
   }
 }
@@ -89,7 +90,6 @@ async function request<T>(
     ...(fetchOptions.headers as Record<string, string>),
   };
 
-  // Add Content-Type for JSON bodies
   if (fetchOptions.body && typeof fetchOptions.body === 'string') {
     headers['Content-Type'] = 'application/json';
   }
@@ -97,20 +97,17 @@ async function request<T>(
   const config: RequestInit = {
     ...fetchOptions,
     headers,
-    credentials: 'include', // Include cookies
+    credentials: 'include',
   };
 
   let response = await fetch(url, config);
 
-  // Handle 401 - try to refresh token
   if (response.status === 401 && !skipAuth) {
     const refreshed = await handleTokenRefresh();
     
     if (refreshed) {
-      // Retry the original request
       response = await fetch(url, config);
     } else {
-      // Refresh failed, trigger auth error handler
       if (onAuthError) {
         onAuthError();
       }
@@ -118,12 +115,12 @@ async function request<T>(
     }
   }
 
-  // Handle non-OK responses
   if (!response.ok) {
     let errorData: ApiResponse;
     try {
       errorData = await response.json();
-    } catch {
+    } catch (error) {
+      console.error('[client] Failed to parse error response body as JSON:', error);
       throw new ApiError(
         `Request failed with status ${response.status}`,
         response.status
@@ -137,7 +134,6 @@ async function request<T>(
     );
   }
 
-  // Parse response
   const data: ApiResponse<T> = await response.json();
 
   if (!data.success) {
@@ -176,7 +172,6 @@ export const api = {
   delete: <T>(endpoint: string, options?: RequestOptions): Promise<T> =>
     request<T>(endpoint, { ...options, method: 'DELETE' }),
 
-  // Special method for file uploads
   upload: async <T>(
     endpoint: string,
     file: File,
@@ -214,7 +209,6 @@ export const api = {
     return data.data as T;
   },
 
-  // Special method for file downloads
   download: async (endpoint: string): Promise<Blob> => {
     const url = `${API_BASE_URL}${endpoint}`;
     const response = await fetch(url, {
@@ -230,4 +224,3 @@ export const api = {
   },
 };
 
-export default api;

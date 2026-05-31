@@ -8,19 +8,10 @@ export const createSelectionSlice: StateCreator<
   SelectionSliceState
 > = (set) => ({
   selectedNodeId: null,
-  selectedEdgeId: null,
 
   selectNode: (id) => {
     set((state) => {
       state.selectedNodeId = id
-      state.selectedEdgeId = null
-    })
-  },
-
-  selectEdge: (id) => {
-    set((state) => {
-      state.selectedEdgeId = id
-      state.selectedNodeId = null
     })
   },
 })

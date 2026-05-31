@@ -3,14 +3,13 @@ import type { TransformDef, AggregationType, ViewFilterConfig } from './transfor
 import type { Position } from './common.types'
 
 
+export type ChartType = 'bar' | 'line' | 'pie' | 'scatter'
+
 /** Types of nodes in the project graph */
 export type NodeKind = 'source_table' | 'derived_table' | 'chart' | 'dashboard'
 
-/** View modes for table nodes on canvas */
 export type NodeViewMode = 'collapsed' | 'data'
 
-
-/** UI state for a node */
 export interface NodeUI {
   position: Position
   collapsed?: boolean
@@ -23,7 +22,6 @@ export interface NodeUI {
 }
 
 
-/** Base interface shared by all node types */
 interface BaseNode {
   id: string
   kind: NodeKind
@@ -34,11 +32,8 @@ interface BaseNode {
 }
 
 
-/** Cache state for computed nodes */
 export interface CacheInfo {
-  /** Indicates data needs recomputation */
   isDirty?: boolean
-  /** Timestamp of last successful computation */
   lastComputedAt?: string
   /** Hash of the transform definition (for derived tables) */
   lastPlanHash?: string
@@ -50,29 +45,23 @@ export interface CacheInfo {
    * For derived tables: hash of lastPlanHash + lastUpstreamHash
    */
   currentVersionHash?: string
-  /** Row count from last computation */
   lastRowCount?: number
   /** Warnings (e.g., "many-to-many join detected") */
   warnings?: string[]
-  /** Error from last computation attempt */
   error?: string
-  /** Is computation currently in progress? */
   isComputing?: boolean
 }
 
 
-/** Plan for source table (imported file) */
 export interface SourceTablePlan {
   /** Reference to stored file in IndexedDB */
   fileRef: string
   fileName: string
   fileType: 'csv' | 'xlsx'
-  /** Sheet name for xlsx files */
   sheetName?: string
   inferredSchemaVersion: number
 }
 
-/** Source table node (imported from file) */
 export interface SourceTableNode extends BaseNode {
   kind: 'source_table'
   schema?: TableSchema
@@ -82,13 +71,11 @@ export interface SourceTableNode extends BaseNode {
 }
 
 
-/** Plan for derived table (transform result) */
 export interface DerivedTablePlan {
   transformDef: TransformDef
   upstreamNodeIds: string[]
 }
 
-/** Derived table node (result of a transform) */
 export interface DerivedTableNode extends BaseNode {
   kind: 'derived_table'
   schema?: TableSchema
@@ -98,58 +85,25 @@ export interface DerivedTableNode extends BaseNode {
 }
 
 
-/** Chart configuration */
 export interface ChartConfig {
-  /** Column id for x-axis */
   xAxis?: string
-  /** Column id for y-axis */
   yAxis?: string
-  /** Column ids for series */
   series?: string[]
   aggregation?: AggregationType
-  /** Column id for grouping */
   groupBy?: string
 }
 
-/** Plan for chart node */
 export interface ChartPlan {
-  chartType: 'bar' | 'line' | 'pie' | 'scatter'
+  chartType: ChartType
   sourceTableId: string
   config: ChartConfig
 }
 
-/** Chart node */
 export interface ChartNode extends BaseNode {
   kind: 'chart'
   plan: ChartPlan
 }
 
 
-/** Single card in a dashboard layout */
-export interface DashboardCard {
-  id: string
-  /** Reference to chart or KPI node */
-  nodeId: string
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-/** Dashboard layout configuration */
-export interface DashboardLayout {
-  cards: DashboardCard[]
-}
-
-/** Dashboard node */
-export interface DashboardNode extends BaseNode {
-  kind: 'dashboard'
-  layout: DashboardLayout
-}
-
-
-/** Union of table node types */
 export type TableNode = SourceTableNode | DerivedTableNode
-
-/** Union of all project node types */
-export type ProjectNode = TableNode | ChartNode | DashboardNode
+export type ProjectNode = TableNode | ChartNode

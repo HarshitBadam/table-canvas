@@ -1,11 +1,5 @@
-/**
- * Formula Tokenizer
- * Lexical analysis of formula strings into tokens
- */
-
 import type { Token } from './types'
 
-// Built-in functions that should be recognized
 const FUNCTIONS = new Set([
   // Math
   'SUM', 'AVG', 'MIN', 'MAX', 'COUNT', 'ROUND', 'ABS', 'FLOOR', 'CEIL', 'POWER', 'SQRT', 'MOD',
@@ -41,37 +35,31 @@ export class FormulaTokenizer {
 
       const char = this.input[this.position]
 
-      // Column reference: [column_name]
       if (char === '[') {
         this.readColumnReference()
         continue
       }
 
-      // String literal: "text" or 'text'
       if (char === '"' || char === "'") {
         this.readString(char)
         continue
       }
 
-      // Number
       if (this.isDigit(char) || (char === '.' && this.isDigit(this.peek(1)))) {
         this.readNumber()
         continue
       }
 
-      // Negative number (minus followed by digit)
       if (char === '-' && this.isDigit(this.peek(1)) && this.shouldBeNegativeNumber()) {
         this.readNumber()
         continue
       }
 
-      // Multi-character operators
       if (this.isComparisonOperator()) {
         this.readComparisonOperator()
         continue
       }
 
-      // Single character operators
       if (OPERATORS.has(char)) {
         this.tokens.push({
           type: 'OPERATOR',
@@ -83,7 +71,6 @@ export class FormulaTokenizer {
         continue
       }
 
-      // Parentheses
       if (char === '(') {
         this.tokens.push({
           type: 'LPAREN',
@@ -106,7 +93,6 @@ export class FormulaTokenizer {
         continue
       }
 
-      // Comma
       if (char === ',') {
         this.tokens.push({
           type: 'COMMA',
@@ -118,17 +104,14 @@ export class FormulaTokenizer {
         continue
       }
 
-      // Identifier (function name, boolean, or logical operator)
       if (this.isAlpha(char)) {
         this.readIdentifier()
         continue
       }
 
-      // Unknown character - skip it
       this.position++
     }
 
-    // Add EOF token
     this.tokens.push({
       type: 'EOF',
       value: '',
@@ -175,7 +158,6 @@ export class FormulaTokenizer {
     const char = this.input[this.position]
     const next = this.peek(1)
     
-    // Two-character operators
     if ((char === '>' || char === '<' || char === '!' || char === '=') && next === '=') {
       return true
     }
@@ -183,7 +165,6 @@ export class FormulaTokenizer {
       return true
     }
     
-    // Single character comparison operators
     return char === '>' || char === '<' || char === '='
   }
 
@@ -194,7 +175,6 @@ export class FormulaTokenizer {
 
     let value: string
 
-    // Two-character operators
     if ((char === '>' && next === '=') || 
         (char === '<' && next === '=') || 
         (char === '!' && next === '=') || 
@@ -217,7 +197,7 @@ export class FormulaTokenizer {
 
   private readColumnReference(): void {
     const start = this.position
-    this.position++ // Skip opening [
+    this.position++
 
     let columnName = ''
     while (this.position < this.input.length && this.input[this.position] !== ']') {
@@ -226,7 +206,7 @@ export class FormulaTokenizer {
     }
 
     if (this.position < this.input.length) {
-      this.position++ // Skip closing ]
+      this.position++
     }
 
     this.tokens.push({
@@ -239,13 +219,12 @@ export class FormulaTokenizer {
 
   private readString(quote: string): void {
     const start = this.position
-    this.position++ // Skip opening quote
+    this.position++
 
     let value = ''
     while (this.position < this.input.length) {
       const char = this.input[this.position]
       
-      // Handle escape sequences
       if (char === '\\' && this.peek(1) === quote) {
         value += quote
         this.position += 2
@@ -253,7 +232,7 @@ export class FormulaTokenizer {
       }
 
       if (char === quote) {
-        this.position++ // Skip closing quote
+        this.position++
         break
       }
 
@@ -273,19 +252,16 @@ export class FormulaTokenizer {
     const start = this.position
     let numStr = ''
 
-    // Handle negative sign
     if (this.input[this.position] === '-') {
       numStr += '-'
       this.position++
     }
 
-    // Integer part
     while (this.position < this.input.length && this.isDigit(this.input[this.position])) {
       numStr += this.input[this.position]
       this.position++
     }
 
-    // Decimal part
     if (this.position < this.input.length && this.input[this.position] === '.') {
       numStr += '.'
       this.position++
@@ -329,7 +305,6 @@ export class FormulaTokenizer {
 
     const upper = identifier.toUpperCase()
 
-    // Check if it's a boolean
     if (upper === 'TRUE' || upper === 'FALSE') {
       this.tokens.push({
         type: 'BOOLEAN',
@@ -340,7 +315,6 @@ export class FormulaTokenizer {
       return
     }
 
-    // Check if it's a logical operator
     if (LOGICAL_OPERATORS.has(upper)) {
       this.tokens.push({
         type: 'LOGICAL',
@@ -351,7 +325,6 @@ export class FormulaTokenizer {
       return
     }
 
-    // Check if it's a function
     if (FUNCTIONS.has(upper)) {
       this.tokens.push({
         type: 'FUNCTION',
@@ -372,17 +345,8 @@ export class FormulaTokenizer {
   }
 }
 
-/**
- * Tokenize a formula string
- */
 export function tokenize(formula: string): Token[] {
   const tokenizer = new FormulaTokenizer(formula)
   return tokenizer.tokenize()
 }
 
-/**
- * Get list of supported functions
- */
-export function getSupportedFunctions(): string[] {
-  return Array.from(FUNCTIONS).sort()
-}

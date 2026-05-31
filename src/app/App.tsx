@@ -1,7 +1,8 @@
-import { useState, useCallback, lazy, Suspense } from 'react'
+import { useState, useCallback, lazy, Suspense, useMemo } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { AppHeader } from './AppHeader'
+import { NavigationProvider } from './NavigationContext'
 import { useProjectExport } from './useProjectExport'
 import { CanvasView } from '@/canvas/CanvasView'
 import { GridView } from '@/grid/GridView'
@@ -14,7 +15,7 @@ import { LoginPage } from '@/auth/LoginPage'
 import { EarlyAccessPage } from '@/auth/EarlyAccessPage'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
-import { ErrorBoundary } from '@/design/components'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 const ReportView = lazy(() => import('@/report/ReportView').then(m => ({ default: m.ReportView })))
 
@@ -118,65 +119,63 @@ function MainApp() {
     setViewMode('chart')
   }, [selectNode])
 
-  const handleNavigateToTable = useCallback((tableId: string) => {
-    selectNode(tableId)
-    setViewMode('grid')
-  }, [selectNode])
+  const navigationValue = useMemo(() => ({
+    openTable: handleOpenTable,
+    openChart: handleOpenChart,
+    openCanvas: handleBackToCanvas,
+    openDashboard: handleOpenDashboard,
+    openReport: handleOpenReport,
+  }), [handleOpenTable, handleOpenChart, handleBackToCanvas, handleOpenDashboard, handleOpenReport])
 
   return (
-    <div className="flex h-full bg-canvas">
-      <Sidebar
-        onOpenTable={handleOpenTable}
-        onOpenChart={handleOpenChart}
-        onOpenCanvas={handleBackToCanvas}
-        onOpenDashboard={handleOpenDashboard}
-        onOpenReport={handleOpenReport}
-      />
+    <NavigationProvider value={navigationValue}>
+      <div className="flex h-full bg-canvas">
+        <Sidebar />
 
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <AppHeader
-          viewMode={viewMode}
-          selectedNode={selectedNode}
-          exportState={exportState}
-          onBackToCanvas={handleBackToCanvas}
-          onOpenDashboard={handleOpenDashboard}
-          onNavigateToTable={handleNavigateToTable}
-        />
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <AppHeader
+            viewMode={viewMode}
+            selectedNode={selectedNode}
+            exportState={exportState}
+            onBackToCanvas={handleBackToCanvas}
+            onOpenDashboard={handleOpenDashboard}
+          />
 
-        <div className="flex-1 overflow-hidden">
-          {viewMode === 'canvas' && (
-            <ErrorBoundary name="CanvasView">
-              <CanvasView onNodeDoubleClick={handleNodeDoubleClick} />
-            </ErrorBoundary>
-          )}
-          {viewMode === 'grid' && selectedNodeId && (
-            <ErrorBoundary name="GridView">
-              <GridView tableId={selectedNodeId} />
-            </ErrorBoundary>
-          )}
-          {viewMode === 'chart' && selectedNodeId && (
-            <ErrorBoundary name="ChartView">
-              <ChartView chartId={selectedNodeId} onNavigateToTable={handleNavigateToTable} />
-            </ErrorBoundary>
-          )}
-          {viewMode === 'dashboard' && (
-            <ErrorBoundary name="Dashboard">
-              <Dashboard onOpenTable={handleOpenTable} onOpenChart={handleOpenChart} />
-            </ErrorBoundary>
-          )}
-          {viewMode === 'report' && reportId && (
-            <ErrorBoundary name="ReportView">
-              <Suspense fallback={
-                <div className="flex items-center justify-center h-full">
-                  <LoadingSpinner />
-                </div>
-              }>
-                <ReportView reportId={reportId} onOpenTable={handleOpenTable} />
-              </Suspense>
-            </ErrorBoundary>
-          )}
-        </div>
-      </main>
-    </div>
+          <div className="flex-1 overflow-hidden">
+            {viewMode === 'canvas' && (
+              <ErrorBoundary name="CanvasView">
+                <CanvasView onNodeDoubleClick={handleNodeDoubleClick} />
+              </ErrorBoundary>
+            )}
+            {viewMode === 'grid' && selectedNodeId && (
+              <ErrorBoundary name="GridView">
+                <GridView tableId={selectedNodeId} />
+              </ErrorBoundary>
+            )}
+            {viewMode === 'chart' && selectedNodeId && (
+              <ErrorBoundary name="ChartView">
+                <ChartView chartId={selectedNodeId} />
+              </ErrorBoundary>
+            )}
+            {viewMode === 'dashboard' && (
+              <ErrorBoundary name="Dashboard">
+                <Dashboard />
+              </ErrorBoundary>
+            )}
+            {viewMode === 'report' && reportId && (
+              <ErrorBoundary name="ReportView">
+                <Suspense fallback={
+                  <div className="flex items-center justify-center h-full">
+                    <LoadingSpinner />
+                  </div>
+                }>
+                  <ReportView reportId={reportId} />
+                </Suspense>
+              </ErrorBoundary>
+            )}
+          </div>
+        </main>
+      </div>
+    </NavigationProvider>
   )
 }

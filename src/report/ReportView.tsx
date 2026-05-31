@@ -9,16 +9,14 @@ import './PrintStyles.css';
 
 interface ReportViewProps {
   reportId: string;
-  onOpenTable?: (tableId: string) => void;
 }
 
-export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
+export function ReportView({ reportId }: ReportViewProps) {
   const report = useReportStore((state) => state.reports[reportId]);
   const updateReport = useReportStore((state) => state.updateReport);
   const editorRef = useRef<TipTapEditorHandle>(null);
   const hasMigrated = useRef(false);
 
-  // Migrate report if needed
   useEffect(() => {
     if (report && needsMigration(report) && !hasMigrated.current) {
       hasMigrated.current = true;
@@ -29,13 +27,10 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
     }
   }, [report, reportId, updateReport]);
 
-  // Handle content changes - just save content, name is managed separately via toolbar
   const handleContentChange = useCallback((content: JSONContent) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    updateReport(reportId, { tiptapContent: content as unknown as any });
+    updateReport(reportId, { tiptapContent: content });
   }, [reportId, updateReport]);
 
-  // Focus editor on mount
   useEffect(() => {
     const timer = setTimeout(() => {
       editorRef.current?.focus();
@@ -43,7 +38,6 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
     return () => clearTimeout(timer);
   }, [reportId]);
 
-  // Toolbar action handlers
   const handleHighlight = useCallback(() => {
     editorRef.current?.toggleHighlight();
   }, []);
@@ -68,7 +62,6 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
     );
   }
 
-  // Get content - if no tiptapContent, create default with title as H1
   const content: JSONContent = report.tiptapContent || {
     type: 'doc',
     content: [
@@ -85,14 +78,12 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
 
   return (
     <div className="h-full flex flex-col bg-surface report-view">
-      {/* Report Toolbar */}
       <ReportToolbar
         activeReportId={reportId}
         onHighlight={handleHighlight}
         onInsertTable={handleInsertTable}
       />
       
-      {/* Editor */}
       <div className="flex-1 overflow-auto">
         <div className="max-w-3xl mx-auto px-6 py-12 print:px-0 print:py-8 print:max-w-none">
           <TipTapEditor
@@ -100,7 +91,6 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
             content={content}
             onChange={handleContentChange}
             reportId={reportId}
-            onOpenTable={onOpenTable}
             placeholder="Type '/' for commands..."
           />
         </div>
@@ -109,4 +99,3 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
   );
 }
 
-export default ReportView;

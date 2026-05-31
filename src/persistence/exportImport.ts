@@ -1,7 +1,7 @@
 import type { ProjectNode, Edge, Patches } from '@/types'
 import type { Report } from '@/report/types'
 import { getDB, type SerializedPatches } from './dbCore'
-import { saveProject, loadProject } from './projectStorage'
+import { loadProject } from './projectStorage'
 import { saveFile, loadFileRecord } from './fileStorage'
 import { loadAllReports } from './reportStorage'
 
@@ -134,7 +134,8 @@ export async function parseImportFile(
 
   try {
     data = JSON.parse(text)
-  } catch {
+  } catch (error) {
+    console.error('[exportImport] Failed to parse import file as JSON:', error)
     throw new Error('Invalid file: Unable to parse JSON')
   }
 
@@ -243,62 +244,3 @@ export async function parseImportFile(
   }
 }
 
-/**
- * @deprecated Use parseImportFile() + importProjectWithSync() for server compatibility
- */
-export async function importProjectFile(
-  file: File,
-  options?: {
-    importReports?: boolean
-  }
-): Promise<string> {
-  const parsed = await parseImportFile(file, options)
-
-  const newProjectId = `local_${Date.now()}`
-
-  await saveProject(
-    newProjectId,
-    parsed.name,
-    parsed.nodes,
-    parsed.edges,
-    parsed.patches
-  )
-
-  console.log(`[Import] Project saved locally as ${newProjectId}`)
-
-  return newProjectId
-}
-
-export async function importLegacyProjectFile(file: File): Promise<string> {
-  const text = await file.text()
-  const data = JSON.parse(text)
-
-  if (!data.version || !data.project) {
-    throw new Error('Invalid project file format')
-  }
-
-  const newId = `project_${Date.now()}`
-  const project = data.project
-
-  const patches: Record<string, Patches> = {}
-  if (project.patches) {
-    for (const [tableId, serialized] of Object.entries(project.patches as Record<string, SerializedPatches>)) {
-      patches[tableId] = {
-        cellPatches: serialized.cellPatches as Record<string, Record<string, import('@/types').CellValue>>,
-        deletedRows: new Set(serialized.deletedRows),
-        insertedRows: serialized.insertedRows as import('@/types').InsertedRow[],
-        highlightedCells: new Set(serialized.highlightedCells || []),
-      }
-    }
-  }
-
-  await saveProject(
-    newId,
-    project.name,
-    project.nodes,
-    project.edges,
-    patches
-  )
-
-  return newId
-}

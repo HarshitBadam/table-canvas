@@ -1,20 +1,12 @@
-/**
- * What To Do Next Section Component
- * 
- * Shows prioritized suggestions with clear, actionable CTAs.
- * Limited to 3 suggestions for focus.
- */
-
 import type { Suggestion } from '@/types'
+import { useNavigation } from '@/app/NavigationContext'
 
 interface QuickActionsSectionProps {
   suggestions: Suggestion[]
   onApply: (suggestion: Suggestion) => void
-  onOpenTable: (tableId: string) => void
   isLoading: boolean
 }
 
-// Get human-readable action label
 function getActionLabel(suggestion: Suggestion): string {
   const action = suggestion.action
   
@@ -31,7 +23,6 @@ function getActionLabel(suggestion: Suggestion): string {
   return 'Apply'
 }
 
-// Get icon for suggestion type
 function getSuggestionIcon(suggestion: Suggestion) {
   const category = suggestion.category
   
@@ -50,7 +41,6 @@ function getSuggestionIcon(suggestion: Suggestion) {
     )
   }
   
-  // Recipe
   return (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -58,7 +48,6 @@ function getSuggestionIcon(suggestion: Suggestion) {
   )
 }
 
-// Get category color
 function getCategoryColor(category: Suggestion['category']): string {
   switch (category) {
     case 'analysis':
@@ -75,13 +64,11 @@ function getCategoryColor(category: Suggestion['category']): string {
 export function QuickActionsSection({ 
   suggestions, 
   onApply, 
-  onOpenTable,
   isLoading 
 }: QuickActionsSectionProps) {
-  // Limit to 3 suggestions
+  const { openTable } = useNavigation()
   const topSuggestions = suggestions.slice(0, 3)
 
-  // Loading state
   if (isLoading) {
     return (
       <div>
@@ -108,7 +95,6 @@ export function QuickActionsSection({
     )
   }
 
-  // Empty state
   if (topSuggestions.length === 0) {
     return (
       <div>
@@ -127,13 +113,11 @@ export function QuickActionsSection({
 
   return (
     <div>
-      {/* Section Header */}
       <div className="mb-4">
         <h2 className="text-base font-semibold text-text-primary">Suggested Actions</h2>
         <p className="text-sm text-text-tertiary">Recommendations based on your data</p>
       </div>
 
-      {/* Suggestions Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {topSuggestions.map((suggestion) => (
           <div
@@ -141,18 +125,16 @@ export function QuickActionsSection({
             className="bg-surface rounded-xl border border-border p-5 hover:shadow-md transition-shadow"
           >
             <div className="flex items-start gap-3 mb-4">
-              {/* Icon */}
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getCategoryColor(suggestion.category)}`}>
                 {getSuggestionIcon(suggestion)}
               </div>
 
-              {/* Title */}
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-medium text-text-primary leading-tight">
                   {suggestion.title}
                 </h4>
                 <button
-                  onClick={() => onOpenTable(suggestion.context.tableId)}
+                  onClick={() => openTable(suggestion.context.tableId)}
                   className="text-xs text-text-tertiary hover:text-accent-green transition-colors"
                 >
                   View table
@@ -164,7 +146,6 @@ export function QuickActionsSection({
               {suggestion.description}
             </p>
 
-            {/* Action Button */}
             <button
               onClick={() => onApply(suggestion)}
               className="w-full px-4 py-2.5 text-sm font-medium bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"

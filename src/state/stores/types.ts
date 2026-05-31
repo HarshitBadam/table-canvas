@@ -9,6 +9,7 @@ import type {
   ChartConfig,
   Patches,
   CellValue,
+  UserColumnType,
 } from '@/types'
 
 export interface HistoryEntry {
@@ -49,9 +50,9 @@ export interface NodesSliceState {
     position?: Position
   }) => string
   updateTableSchema: (tableId: string, schema: TableSchema) => void
-  addColumn: (tableId: string, columnName: string, columnType?: 'string' | 'number' | 'boolean' | 'date') => void
-  insertColumnAt: (tableId: string, columnName: string, columnType: 'string' | 'number' | 'boolean' | 'date', index: number, formula?: string) => void
-  addFormulaColumn: (tableId: string, columnName: string, formula: string, columnType: 'string' | 'number' | 'boolean' | 'date', index?: number) => void
+  addColumn: (tableId: string, columnName: string, columnType?: UserColumnType) => void
+  insertColumnAt: (tableId: string, columnName: string, columnType: UserColumnType, index: number, formula?: string) => void
+  addFormulaColumn: (tableId: string, columnName: string, formula: string, columnType: UserColumnType, index?: number) => void
   renameColumn: (tableId: string, columnId: string, newName: string) => void
   updateChartConfig: (chartId: string, updates: Partial<ChartConfig>) => void
   updateChartName: (chartId: string, name: string) => void
@@ -91,10 +92,8 @@ export interface PatchesSliceState {
 
 export interface SelectionSliceState {
   selectedNodeId: string | null
-  selectedEdgeId: string | null
   
   selectNode: (id: string | null) => void
-  selectEdge: (id: string | null) => void
 }
 
 export interface HistorySliceState {

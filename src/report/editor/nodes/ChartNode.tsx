@@ -3,22 +3,22 @@ import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/r
 import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
 import { useDataStore } from '@/state/dataStore';
 import { useProjectStore } from '@/state/projectStore';
+import { useNavigation } from '@/app/NavigationContext';
 import { ChartRenderer } from '@/charts/ChartRenderer';
 import { TableSelector } from './ChartNodeTablePicker';
 import { ChartConfigPanel } from './ChartNodeConfigPanel';
-import type { EnhancedChartConfig } from '../../types';
-import type { TableNode as TableNodeType, ColumnSchema } from '@/types';
+import type { EnhancedChartConfig } from '@/report/types';
+import type { ChartType, TableNode as TableNodeType, ColumnSchema } from '@/types';
 
 
 interface ChartNodeAttrs {
   sourceTableId: string;
-  chartType: 'bar' | 'line' | 'pie' | 'scatter';
+  chartType: ChartType;
   config: EnhancedChartConfig;
 }
 
 interface ChartNodeOptions {
   reportId?: string;
-  onOpenTable?: (tableId: string) => void;
 }
 
 
@@ -26,11 +26,10 @@ const ChartNodeView = memo(function ChartNodeView({
   node, 
   updateAttributes,
   selected,
-  extension,
   deleteNode,
 }: NodeViewProps) {
   const attrs = node.attrs as ChartNodeAttrs;
-  const options = extension.options as ChartNodeOptions;
+  const { openTable } = useNavigation();
   
   const tableDataEntry = useDataStore((state) => state.tableData[attrs.sourceTableId]);
   const tableData = tableDataEntry?.rows || [];
@@ -94,7 +93,7 @@ const ChartNodeView = memo(function ChartNodeView({
     });
   }, [attrs.config, updateAttributes]);
 
-  const handleChartTypeChange = useCallback((chartType: 'bar' | 'line' | 'pie' | 'scatter') => {
+  const handleChartTypeChange = useCallback((chartType: ChartType) => {
     updateAttributes({ chartType });
   }, [updateAttributes]);
 
@@ -141,9 +140,9 @@ const ChartNodeView = memo(function ChartNodeView({
           <div className="block-empty-state-description">
             {tableNode ? `No data in "${tableNode.name}"` : 'Table not found'}
           </div>
-          {tableNode && options.onOpenTable && (
+          {tableNode && (
             <button
-              onClick={() => options.onOpenTable?.(attrs.sourceTableId)}
+              onClick={() => openTable(attrs.sourceTableId)}
               className="text-sm text-accent-green hover:underline mt-2"
             >
               Open table
@@ -304,7 +303,6 @@ export const ChartNode = Node.create<ChartNodeOptions>({
   addOptions() {
     return {
       reportId: undefined,
-      onOpenTable: undefined,
     };
   },
 
@@ -362,5 +360,3 @@ export const ChartNode = Node.create<ChartNodeOptions>({
     };
   },
 });
-
-export default ChartNode;

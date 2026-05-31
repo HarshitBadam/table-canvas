@@ -1,22 +1,9 @@
-/**
- * Unit tests for Materialization Service
- * Tests the orchestration of derived table computation including:
- * - Cache validation and version hashing
- * - Dependency ordering
- * - Status tracking
- * - Error propagation
- * 
- * Note: These tests mock external dependencies (DuckDB engine, stores, IndexedDB)
- */
+// Note: These tests mock external dependencies (DuckDB engine, stores, IndexedDB)
 
-import { describe, it, expect, beforeEach, vi, afterEach, type Mock } from 'vitest'
-import type { SourceTableNode, DerivedTableNode, TableSchema, CellValue } from '@/types'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import type { SourceTableNode, DerivedTableNode, TableSchema } from '@/types'
 
-// ============================================================================
-// Mock Setup
-// ============================================================================
 
-// Mock the project store
 const mockProjectStore = {
   projectId: 'test-project',
   nodes: {} as Record<string, SourceTableNode | DerivedTableNode>,
@@ -29,14 +16,12 @@ const mockProjectStore = {
   getState: vi.fn(() => mockProjectStore),
 }
 
-// Mock the data store
 const mockDataStore = {
   tableData: {} as Record<string, { rows: unknown[]; isLoading?: boolean }>,
   setTableData: vi.fn(),
   getState: vi.fn(() => mockDataStore),
 }
 
-// Mock the engine adapter
 const mockEngine = {
   init: vi.fn().mockResolvedValue(undefined),
   loadTable: vi.fn().mockResolvedValue(undefined),
@@ -51,7 +36,6 @@ const mockEngine = {
   }),
 }
 
-// Mock loadFile from persistence
 const mockLoadFile = vi.fn().mockResolvedValue(null)
 
 // Setup mocks before importing the module
@@ -75,7 +59,6 @@ vi.mock('@/persistence/db', () => ({
   loadFile: (...args: unknown[]) => mockLoadFile(...args),
 }))
 
-// Mock Papa parse
 vi.mock('papaparse', () => ({
   default: {
     parse: vi.fn((text: string, options: { header: boolean; skipEmptyLines: boolean; complete: (results: { data: Record<string, string>[]; meta: { fields: string[] } }) => void }) => {
@@ -94,7 +77,6 @@ vi.mock('papaparse', () => ({
   },
 }))
 
-// Mock XLSX
 vi.mock('xlsx', () => ({
   read: vi.fn(() => ({
     SheetNames: ['Sheet1'],
@@ -114,9 +96,6 @@ import {
   getTableData,
 } from './materializationService'
 
-// ============================================================================
-// Test Fixtures
-// ============================================================================
 
 function createSourceTableNode(id: string, name: string, options?: {
   fileRef?: string
@@ -192,20 +171,15 @@ function createEdge(from: string, to: string) {
   }
 }
 
-// ============================================================================
-// Reset Mocks
-// ============================================================================
 
 beforeEach(() => {
   vi.clearAllMocks()
   
-  // Reset store state
   mockProjectStore.nodes = {}
   mockProjectStore.edges = {}
   mockProjectStore.patches = {}
   mockDataStore.tableData = {}
   
-  // Reset mock implementations
   mockProjectStore.getTableNode.mockImplementation((id: string) => mockProjectStore.nodes[id])
   mockLoadFile.mockResolvedValue(null)
   
@@ -223,9 +197,6 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-// ============================================================================
-// needsMaterialization Tests
-// ============================================================================
 
 describe('needsMaterialization', () => {
   it('returns true when table is dirty', () => {
@@ -273,9 +244,6 @@ describe('needsMaterialization', () => {
   })
 })
 
-// ============================================================================
-// getMaterializationStatus Tests
-// ============================================================================
 
 describe('getMaterializationStatus', () => {
   it('returns correct status for dirty table', () => {
@@ -334,9 +302,6 @@ describe('getMaterializationStatus', () => {
   })
 })
 
-// ============================================================================
-// ensureTableMaterialized - Source Tables
-// ============================================================================
 
 describe('ensureTableMaterialized - Source Tables', () => {
   it('returns error for non-existent table', async () => {
@@ -351,7 +316,7 @@ describe('ensureTableMaterialized - Source Tables', () => {
       cacheInfo: { isDirty: true, currentVersionHash: undefined },
     })
     mockProjectStore.nodes = { table_1: table }
-    mockLoadFile.mockResolvedValue(null) // File not found
+    mockLoadFile.mockResolvedValue(null)
 
     const result = await ensureTableMaterialized('table_1')
 
@@ -373,7 +338,7 @@ describe('ensureTableMaterialized - Source Tables', () => {
     // Mock engine to succeed
     mockEngine.getSlice.mockRejectedValue(new Error('Table not found'))
 
-    const result = await ensureTableMaterialized('table_1')
+    await ensureTableMaterialized('table_1')
 
     expect(mockEngine.init).toHaveBeenCalled()
     expect(mockEngine.loadTable).toHaveBeenCalled()
@@ -404,9 +369,6 @@ describe('ensureTableMaterialized - Source Tables', () => {
   })
 })
 
-// ============================================================================
-// ensureTableMaterialized - Derived Tables
-// ============================================================================
 
 describe('ensureTableMaterialized - Derived Tables', () => {
   it('materializes upstream tables first', async () => {
@@ -495,9 +457,6 @@ describe('ensureTableMaterialized - Derived Tables', () => {
   })
 })
 
-// ============================================================================
-// forceMaterialize Tests
-// ============================================================================
 
 describe('forceMaterialize', () => {
   it('marks table and descendants dirty before materializing', async () => {
@@ -517,9 +476,6 @@ describe('forceMaterialize', () => {
   })
 })
 
-// ============================================================================
-// getTableData Tests
-// ============================================================================
 
 describe('getTableData', () => {
   it('returns error for non-existent table', async () => {
@@ -572,9 +528,6 @@ describe('getTableData', () => {
   })
 })
 
-// ============================================================================
-// Deduplication Tests
-// ============================================================================
 
 describe('Concurrent Materialization Deduplication', () => {
   it('deduplicates concurrent requests for same table', async () => {
@@ -604,9 +557,6 @@ describe('Concurrent Materialization Deduplication', () => {
   })
 })
 
-// ============================================================================
-// Error Handling Tests
-// ============================================================================
 
 describe('Error Handling', () => {
   it('captures engine errors and updates cache info', async () => {
@@ -669,9 +619,6 @@ describe('Error Handling', () => {
   })
 })
 
-// ============================================================================
-// Diamond Dependency Pattern Tests
-// ============================================================================
 
 describe('Diamond Dependency Pattern', () => {
   it('handles diamond dependencies correctly', async () => {

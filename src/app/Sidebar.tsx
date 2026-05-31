@@ -4,17 +4,11 @@ import { useApp } from '@/state/AppContext'
 import { ImportButton } from '@/components/ImportButton'
 import { NewTableModal } from '@/canvas/modals/NewTableModal'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { useNavigation } from './NavigationContext'
 import type { ProjectNode, TableNode, ChartNode } from '@/types'
 
-interface SidebarProps {
-  onOpenTable: (tableId: string) => void
-  onOpenChart: (chartId: string) => void
-  onOpenCanvas: () => void
-  onOpenDashboard: () => void
-  onOpenReport: () => void
-}
-
-export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboard, onOpenReport }: SidebarProps) {
+export function Sidebar() {
+  const { openTable, openChart, openCanvas, openDashboard, openReport } = useNavigation()
   const nodes = useProjectStore((state) => state.nodes)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
   const { deleteNodeWithSync } = useApp()
@@ -31,28 +25,23 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
     (node): node is ChartNode => node.kind === 'chart'
   )
 
-  // Handle new table creation - opens modal for schema configuration
   const handleNewTable = useCallback(() => {
     setNewTableModalOpen(true)
   }, [])
 
-  // Handle table click - navigate directly to table view
   const handleTableClick = useCallback((nodeId: string) => {
-    onOpenTable(nodeId)
-  }, [onOpenTable])
+    openTable(nodeId)
+  }, [openTable])
 
-  // Handle chart click - navigate directly to chart view
   const handleChartClick = useCallback((chartId: string) => {
-    onOpenChart(chartId)
-  }, [onOpenChart])
+    openChart(chartId)
+  }, [openChart])
 
-  // Handle delete table
   const handleDeleteTable = useCallback((nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setDeleteConfirmId(nodeId)
   }, [])
 
-  // Confirm delete
   const confirmDelete = useCallback(async () => {
     if (deleteConfirmId) {
       await deleteNodeWithSync(deleteConfirmId)
@@ -60,15 +49,13 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
     }
   }, [deleteConfirmId, deleteNodeWithSync])
 
-  // Cancel delete
   const cancelDelete = useCallback(() => {
     setDeleteConfirmId(null)
   }, [])
 
   return (
-    <aside className="w-64 border-r border-border bg-surface flex flex-col">
-      {/* Logo / Title */}
-      <div className="h-14 border-b border-border flex items-center px-4">
+      <aside className="w-64 border-r border-border bg-surface flex flex-col">
+        <div className="h-14 border-b border-border flex items-center px-4">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded bg-[#217346] dark:bg-[#4a7d60] flex items-center justify-center">
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -79,8 +66,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="p-4 space-y-2 border-b border-border">
+        <div className="p-4 space-y-2 border-b border-border">
         <ImportButton />
         <button
           onClick={handleNewTable}
@@ -94,8 +80,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
         </button>
       </div>
 
-      {/* Tables List */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide p-4">
+        <div className="flex-1 overflow-y-auto scrollbar-hide p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">
             Tables
@@ -130,8 +115,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
                   <div className="flex items-center gap-2.5">
                     <TableIcon kind={node.kind} />
                     <span className="truncate flex-1 font-medium">{node.name}</span>
-                    {/* Delete button - visible on hover */}
-                    <button
+          <button
                       onClick={(e) => handleDeleteTable(node.id, e)}
                       className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-text-tertiary hover:text-red-500 transition-all"
                       title="Delete table"
@@ -152,7 +136,6 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
           </ul>
         )}
 
-        {/* Charts Section */}
         {chartNodes.length > 0 && (
           <>
             <div className="flex items-center justify-between mb-2 mt-6">
@@ -192,11 +175,10 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
 
       </div>
 
-      {/* Canvas Section */}
-      <div className="px-4 py-3 border-t border-border">
-        <button
-          type="button"
-          onClick={onOpenCanvas}
+        <div className="px-4 py-3 border-t border-border">
+          <button
+            type="button"
+            onClick={openCanvas}
           className="btn btn-ghost w-full gap-2.5 justify-start text-sm"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -206,11 +188,10 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
         </button>
       </div>
       
-      {/* Dashboard Section */}
-      <div className="px-4 py-3 border-t border-border">
-        <button
-          type="button"
-          onClick={onOpenDashboard}
+        <div className="px-4 py-3 border-t border-border">
+          <button
+            type="button"
+            onClick={openDashboard}
           className="btn btn-ghost w-full gap-2.5 justify-start text-sm"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -220,11 +201,10 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
         </button>
       </div>
       
-      {/* Report Section */}
-      <div className="px-4 py-3 border-t border-border">
-        <button
-          type="button"
-          onClick={onOpenReport}
+        <div className="px-4 py-3 border-t border-border">
+          <button
+            type="button"
+            onClick={openReport}
           className="btn btn-ghost w-full gap-2.5 justify-start text-sm"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -234,20 +214,17 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
         </button>
       </div>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-border bg-surface-secondary/50">
-        <ThemeToggle />
-      </div>
+        <div className="p-4 border-t border-border bg-surface-secondary/50">
+          <ThemeToggle />
+        </div>
 
-      {/* New Table Modal */}
-      <NewTableModal
+        <NewTableModal
         isOpen={newTableModalOpen}
         onClose={() => setNewTableModalOpen(false)}
       />
 
-      {/* Delete Table Confirmation Modal */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        {deleteConfirmId && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-surface border border-border rounded-lg shadow-lg p-5 max-w-sm mx-4">
             <div className="flex items-start gap-3 mb-3">
               <div className="w-8 h-8 rounded bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">

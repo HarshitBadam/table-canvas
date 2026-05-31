@@ -1,8 +1,3 @@
-/**
- * Loading Screen Component
- * Shows a clean loading state with phase indicator during app initialization
- */
-
 import type { AppPhase } from '@/state/AppContext'
 
 interface LoadingScreenProps {
@@ -24,7 +19,6 @@ export function LoadingScreen({ phase, message }: LoadingScreenProps) {
   return (
     <div className="flex h-screen items-center justify-center bg-canvas">
       <div className="text-center w-full max-w-sm px-4">
-        {/* Logo */}
         <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-accent-green/10 flex items-center justify-center">
           <svg
             className="w-8 h-8 text-accent-green"
@@ -41,12 +35,10 @@ export function LoadingScreen({ phase, message }: LoadingScreenProps) {
           </svg>
         </div>
 
-        {/* Title */}
         <h1 className="text-xl font-semibold text-text-primary mb-2">
           Table Canvas
         </h1>
 
-        {/* Progress Bar */}
         <div className="w-full h-1 bg-border rounded-full overflow-hidden mb-4">
           <div 
             className="h-full bg-accent-green transition-all duration-500 ease-out"
@@ -54,12 +46,10 @@ export function LoadingScreen({ phase, message }: LoadingScreenProps) {
           />
         </div>
 
-        {/* Status Message */}
         <p className="text-sm text-text-secondary animate-pulse">
           {message}
         </p>
 
-        {/* Phase Dots */}
         <div className="flex justify-center gap-2 mt-6">
           {PHASE_ORDER.map((p, i) => (
             <div

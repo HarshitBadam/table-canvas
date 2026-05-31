@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useRef } from 'react'
-import { CellValue, ColumnSchema, FilterCondition } from '@/types'
+import { CellValue, ColumnSchema, FilterCondition, ViewFilterConfig } from '@/types'
 import {
-  GridFilterConfig,
   FilterColumnType,
   getOperatorsForType,
   createFilterCondition,
@@ -23,8 +22,8 @@ interface FilterPanelProps {
   isOpen: boolean
   onClose: () => void
   columns: ColumnSchema[]
-  filters: GridFilterConfig
-  onFiltersChange: (filters: GridFilterConfig) => void
+  filters: ViewFilterConfig
+  onFiltersChange: (filters: ViewFilterConfig) => void
   rows: Array<{ __rowId: string; [key: string]: CellValue }>
   getDisplayValue: (rowId: string, colId: string, base: CellValue) => CellValue
   matchingRowCount: number

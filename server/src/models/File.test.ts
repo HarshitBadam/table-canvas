@@ -1,9 +1,3 @@
-/**
- * File Model Unit Tests
- * 
- * Tests for validation, soft-delete functionality, and static methods.
- */
-
 import { describe, it, expect } from 'vitest';
 import { Types } from 'mongoose';
 import { File } from './File.js';
@@ -13,11 +7,11 @@ import {
   createTestProject,
   createMockUserId,
 } from '../test/helpers.js';
+import { setupMongoTestDB } from '../test/setup.js';
+
+setupMongoTestDB();
 
 describe('File Model', () => {
-  // ============================================================================
-  // Validation Tests
-  // ============================================================================
 
   describe('validation', () => {
     it('should require gridFsId', async () => {
@@ -129,9 +123,6 @@ describe('File Model', () => {
     });
   });
 
-  // ============================================================================
-  // Soft Delete Tests
-  // ============================================================================
 
   describe('soft delete', () => {
     it('should set deletedAt on softDelete()', async () => {
@@ -169,7 +160,6 @@ describe('File Model', () => {
     it('should exclude deleted files from findByUser()', async () => {
       const userId = createMockUserId();
 
-      // Create 3 active and 2 deleted files
       await createTestFile({ userId, filename: 'active1.csv' });
       await createTestFile({ userId, filename: 'active2.csv' });
       await createTestFile({ userId, filename: 'active3.csv' });
@@ -195,9 +185,6 @@ describe('File Model', () => {
     });
   });
 
-  // ============================================================================
-  // Static Methods Tests
-  // ============================================================================
 
   describe('findByUser', () => {
     it('should return files for a specific user', async () => {
@@ -225,7 +212,6 @@ describe('File Model', () => {
 
       const files = await File.findByUser(userId);
 
-      // Most recent first
       expect(files[0].filename).toBe('third.csv');
       expect(files[2].filename).toBe('first.csv');
     });
@@ -327,9 +313,6 @@ describe('File Model', () => {
     });
   });
 
-  // ============================================================================
-  // Instance Methods Tests
-  // ============================================================================
 
   describe('toPublic', () => {
     it('should return public representation', async () => {
@@ -360,9 +343,9 @@ describe('File Model', () => {
 
       const publicData = file.toPublic();
 
-      expect((publicData as Record<string, unknown>).userId).toBeUndefined();
-      expect((publicData as Record<string, unknown>).gridFsId).toBeUndefined();
-      expect((publicData as Record<string, unknown>).deletedAt).toBeUndefined();
+      expect((publicData as unknown as Record<string, unknown>).userId).toBeUndefined();
+      expect((publicData as unknown as Record<string, unknown>).gridFsId).toBeUndefined();
+      expect((publicData as unknown as Record<string, unknown>).deletedAt).toBeUndefined();
     });
 
     it('should handle missing projectId', async () => {
@@ -374,9 +357,6 @@ describe('File Model', () => {
     });
   });
 
-  // ============================================================================
-  // Timestamps Tests
-  // ============================================================================
 
   describe('timestamps', () => {
     it('should set createdAt on creation', async () => {

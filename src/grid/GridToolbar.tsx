@@ -1,56 +1,43 @@
-import type { GridFilterConfig } from './filterUtils'
+import type { ViewFilterConfig } from '@/types'
 import { hasActiveFilters, countActiveFilters } from './filterUtils'
 import { formatNumber } from '@/lib/utils'
+import { useGridContext } from './GridContext'
 
 interface GridToolbarProps {
   totalRows: number
   unfilteredTotalRows: number
   columnCount: number
-  filters: GridFilterConfig
-  isEditable: boolean
   isDirty: boolean
   isMaterializing: boolean
   isComputing: boolean
   showFilterPanel: boolean
   showSuggestions: boolean
-  highlightedCells: Set<string> | undefined
-  tableId: string
-  theme: string
   rowInsertionDescription: string
   columnInsertionDescription: string
-  onAddRow: () => void
   onAddColumn: () => void
-  onToggleFilters: () => void
   onToggleSuggestions: () => void
   onOpenChartBuilder: () => void
   onClearHighlights: (tableId: string) => void
-  onToggleTheme: () => void
 }
 
 export function GridToolbar({
   totalRows,
   unfilteredTotalRows,
   columnCount,
-  filters,
-  isEditable,
   isDirty,
   isMaterializing,
   isComputing,
   showFilterPanel,
   showSuggestions,
-  highlightedCells,
-  tableId,
-  theme,
   rowInsertionDescription,
   columnInsertionDescription,
-  onAddRow,
   onAddColumn,
-  onToggleFilters,
   onToggleSuggestions,
   onOpenChartBuilder,
   onClearHighlights,
-  onToggleTheme,
 }: GridToolbarProps) {
+  const { filters: contextFilters, isEditable, highlightedCells, tableId, handleAddRow, handleToggleFilters } = useGridContext()
+  const filters = contextFilters as ViewFilterConfig
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-surface">
       <div className="text-sm text-text-secondary">
@@ -79,7 +66,7 @@ export function GridToolbar({
       {isEditable && (
         <>
           <button 
-            onClick={onAddRow}
+            onClick={handleAddRow}
             className="btn btn-primary text-xs gap-1.5"
             title={`Insert row ${rowInsertionDescription}`}
           >
@@ -106,7 +93,7 @@ export function GridToolbar({
       )}
       
       <button 
-        onClick={onToggleFilters}
+        onClick={handleToggleFilters}
         className={`btn text-xs ${showFilterPanel || hasActiveFilters(filters) ? 'btn-primary' : 'btn-ghost'}`}
       >
         <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -154,23 +141,6 @@ export function GridToolbar({
         Suggestions
       </button>
       
-      <div className="ml-auto flex items-center gap-2">
-        <button
-          onClick={onToggleTheme}
-          className="btn btn-ghost text-xs p-2"
-          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-        >
-          {theme === 'dark' ? (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
-          )}
-        </button>
-      </div>
     </div>
   )
 }

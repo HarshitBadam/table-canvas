@@ -1,7 +1,3 @@
-/**
- * Loading Spinner Component
- */
-
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg'
   className?: string
@@ -37,27 +33,4 @@ export function LoadingSpinner({ size = 'md', className = '' }: LoadingSpinnerPr
   )
 }
 
-/**
- * Full page loading state
- */
-export function LoadingPage({ message = 'Loading...' }: { message?: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full">
-      <LoadingSpinner size="lg" className="text-accent-green mb-4" />
-      <p className="text-sm text-text-secondary">{message}</p>
-    </div>
-  )
-}
-
-/**
- * Inline loading state
- */
-export function LoadingInline({ message = 'Loading...' }: { message?: string }) {
-  return (
-    <div className="flex items-center gap-2 text-text-secondary">
-      <LoadingSpinner size="sm" />
-      <span className="text-sm">{message}</span>
-    </div>
-  )
-}
 

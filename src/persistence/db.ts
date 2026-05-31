@@ -26,7 +26,5 @@ export { saveReport, loadReport, loadAllReports, listReports, deleteReport, save
 export {
   exportProjectFile,
   parseImportFile,
-  importProjectFile,
-  importLegacyProjectFile,
 } from './exportImport'
 export type { ParsedImportData } from './exportImport'

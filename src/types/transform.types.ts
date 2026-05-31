@@ -1,5 +1,4 @@
 
-/** Types of transformations that can be applied */
 export type TransformType = 
   | 'join' 
   | 'filter' 
@@ -8,7 +7,6 @@ export type TransformType =
   | 'group_summarize'
   | 'union'
 
-/** Edge connecting two nodes with a transform */
 export interface Edge {
   id: string
   fromNodeId: string
@@ -17,7 +15,6 @@ export interface Edge {
 }
 
 
-/** Union type of all transform definitions */
 export type TransformDef = 
   | JoinTransformDef 
   | FilterTransformDef 
@@ -26,18 +23,14 @@ export type TransformDef =
   | GroupSummarizeDef
   | UnionTransformDef
 
-/** Types of SQL joins */
 export type JoinType = 'left' | 'inner' | 'right' | 'full'
 
-/** Join transform definition */
 export interface JoinTransformDef {
   type: 'join'
   leftTableId: string
   rightTableId: string
   joinType: JoinType
-  /** Column id for left table join key */
   leftKey: string
-  /** Column id for right table join key */
   rightKey: string
   /** Column IDs to include from left table (if omitted, include all) */
   leftColumns?: string[]
@@ -45,9 +38,7 @@ export interface JoinTransformDef {
   rightColumns?: string[]
   /** Column naming strategy for disambiguation */
   columnPrefix?: 'table_name' | 'left_right' | 'none'
-  /** Human-readable left table name for column prefixes */
   leftTableName?: string
-  /** Human-readable right table name for column prefixes */
   rightTableName?: string
   /** @deprecated Legacy option - use leftColumns instead */
   keepLeftColumns?: string[]
@@ -56,7 +47,6 @@ export interface JoinTransformDef {
 }
 
 
-/** Filter comparison operators */
 export type FilterOperator = 
   | 'equals' 
   | 'not_equals' 
@@ -72,7 +62,6 @@ export type FilterOperator =
   | 'is_null' 
   | 'is_not_null'
 
-/** Single filter condition */
 export interface FilterCondition {
   columnId: string
   operator: FilterOperator
@@ -81,7 +70,6 @@ export interface FilterCondition {
   value2?: string | number
 }
 
-/** Filter transform definition */
 export interface FilterTransformDef {
   type: 'filter'
   sourceTableId: string
@@ -90,7 +78,6 @@ export interface FilterTransformDef {
 }
 
 
-/** Column selection for select transform */
 export interface SelectColumn {
   sourceColumnId: string
   newName?: string
@@ -105,27 +92,22 @@ export interface SelectTransformDef {
 }
 
 
-/** Calculated column transform definition */
 export interface CalculatedColumnDef {
   type: 'calculated_column'
   sourceTableId: string
   newColumnName: string
-  /** Expression string to be parsed */
   expression: string
 }
 
 
-/** Aggregation function types */
 export type AggregationType = 'sum' | 'avg' | 'min' | 'max' | 'count' | 'count_distinct'
 
-/** Single aggregation definition */
 export interface Aggregation {
   columnId: string
   operation: AggregationType
   alias: string
 }
 
-/** Group and summarize transform definition */
 export interface GroupSummarizeDef {
   type: 'group_summarize'
   sourceTableId: string
@@ -134,7 +116,6 @@ export interface GroupSummarizeDef {
 }
 
 
-/** Union transform definition */
 export interface UnionTransformDef {
   type: 'union'
   sourceTableIds: string[]

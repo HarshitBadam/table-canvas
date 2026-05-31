@@ -1,15 +1,10 @@
 import type { CellValue, PatchOp } from './common.types'
 import type { TransformDef } from './transform.types'
-import type { ChartConfig } from './node.types'
+import type { ChartConfig, ChartType } from './node.types'
 
 
-/** Categories of suggestions */
 export type SuggestionCategory = 'cleaning' | 'analysis' | 'recipe'
-
-/** Scope of suggestion applicability */
 export type SuggestionScope = 'table' | 'column'
-
-/** Confidence level for suggestions */
 export type SuggestionConfidence = 'high' | 'medium' | 'low'
 
 
@@ -20,7 +15,6 @@ export type PreviewData =
   | { kind: 'aggregateSample'; columns: string[]; rows: CellValue[][] }
   | { kind: 'recipeOutputs'; outputs: Array<{ type: 'table' | 'chart'; name: string }> }
 
-/** Preview state for a suggestion */
 export interface SuggestionPreview {
   status: 'not_loaded' | 'loading' | 'ready' | 'error'
   data?: PreviewData
@@ -28,7 +22,6 @@ export interface SuggestionPreview {
 }
 
 
-/** Types of cleaning operations that can be applied */
 export type CleaningOperation =
   | { type: 'trim' }
   | { type: 'lowercase' }
@@ -45,7 +38,6 @@ export type CleaningOperation =
   | { type: 'highlight_outliers'; lowerBound: number; upperBound: number }
 
 
-/** Context for a suggestion */
 export interface SuggestionContext {
   tableId: string
   columnId?: string
@@ -54,16 +46,14 @@ export interface SuggestionContext {
   cleaningOperation?: CleaningOperation
 }
 
-/** Impact description for a suggestion */
 export interface SuggestionImpact {
   kind: 'patch' | 'derivedTable' | 'chart' | 'recipe'
   summary: string
 }
 
 
-/** Chart definition for creating charts from suggestions */
 export interface ChartDef {
-  chartType: 'bar' | 'line' | 'pie' | 'scatter' | 'histogram'
+  chartType: ChartType | 'histogram'
   sourceTableId: string
   title?: string
   config: ChartConfig
@@ -99,7 +89,6 @@ export type SuggestionAction =
     }
 
 
-/** Complete suggestion object */
 export interface Suggestion {
   id: string
   category: SuggestionCategory
@@ -114,9 +103,3 @@ export interface Suggestion {
   action: SuggestionAction
 }
 
-
-/** @deprecated Legacy action types for migration */
-export type LegacySuggestionAction = 
-  | { type: 'create_derived_table'; transform: TransformDef }
-  | { type: 'create_chart'; chartConfig: ChartConfig; sourceTableId: string }
-  | { type: 'apply_cleaning'; columnId: string; operation: string }

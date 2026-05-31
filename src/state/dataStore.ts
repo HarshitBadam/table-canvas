@@ -1,13 +1,11 @@
 import { create } from 'zustand'
 import { CellValue } from '@/types'
 
-// Row data with stable row ID
 export interface TableRow {
   __rowId: string
   [columnId: string]: CellValue
 }
 
-// Table data including rows and metadata
 export interface TableData {
   tableId: string
   rows: TableRow[]
@@ -17,16 +15,13 @@ export interface TableData {
 }
 
 interface DataStoreState {
-  // Table data cache
   tableData: Record<string, TableData>
   
-  // Actions
   setTableData: (tableId: string, rows: TableRow[]) => void
   setLoading: (tableId: string, isLoading: boolean) => void
   setError: (tableId: string, error: string) => void
   clearTableData: (tableId: string) => void
   
-  // Get slice of data for virtual scrolling
   getSlice: (tableId: string, start: number, end: number) => TableRow[]
 }
 

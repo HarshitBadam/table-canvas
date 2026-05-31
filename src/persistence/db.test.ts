@@ -5,7 +5,7 @@
  * Uses fake-indexeddb for browser-like IndexedDB simulation
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import 'fake-indexeddb/auto'
 import { IDBFactory } from 'fake-indexeddb'
 
@@ -21,22 +21,17 @@ if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
   }
 }
 
-// Reset IndexedDB between tests
 beforeEach(() => {
-  // @ts-expect-error - fake-indexeddb global assignment
-  globalThis.indexedDB = new IDBFactory()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).indexedDB = new IDBFactory()
 })
 
 // Dynamic imports to ensure fresh module state
 async function getDB() {
-  // Clear module cache and re-import
   vi.resetModules()
   return await import('./db')
 }
 
-// ============================================================================
-// Test Fixtures
-// ============================================================================
 
 function createMockSourceTableNode(id: string, name: string) {
   return {
@@ -52,8 +47,8 @@ function createMockSourceTableNode(id: string, name: string) {
     },
     schema: {
       columns: [
-        { id: 'col_1', name: 'ID', type: 'string', nullable: false },
-        { id: 'col_2', name: 'Value', type: 'number', nullable: true },
+        { id: 'col_1', name: 'ID', type: 'string' as const, nullable: false },
+        { id: 'col_2', name: 'Value', type: 'number' as const, nullable: true },
       ],
       rowCount: 10,
     },
@@ -70,10 +65,10 @@ function createMockDerivedTableNode(id: string, name: string, upstreamIds: strin
     ui: { position: { x: 100, y: 100 } },
     plan: {
       transformDef: {
-        type: 'filter',
+        type: 'filter' as const,
         sourceTableId: upstreamIds[0] || '',
         conditions: [],
-        logic: 'and',
+        logic: 'and' as const,
       },
       upstreamNodeIds: upstreamIds,
     },
@@ -87,7 +82,7 @@ function createMockEdge(from: string, to: string) {
     id: `edge_${from}_${to}`,
     fromNodeId: from,
     toNodeId: to,
-    transformType: 'filter',
+    transformType: 'filter' as const,
   }
 }
 
@@ -105,20 +100,18 @@ function createMockPatches() {
 }
 
 function createMockReport(id: string, name: string) {
+  const now = new Date().toISOString()
   return {
     id,
     name,
     blocks: [
-      { id: 'block_1', type: 'text' as const, content: 'Hello World' },
+      { id: 'block_1', type: 'text' as const, content: 'Hello World', createdAt: now, updatedAt: now },
     ],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
   }
 }
 
-// ============================================================================
-// Project Operations
-// ============================================================================
 
 describe('Project Operations', () => {
   it('saves and loads a project', async () => {
@@ -137,10 +130,8 @@ describe('Project Operations', () => {
       table_a: createMockPatches(),
     }
 
-    // Save
     await db.saveProject(projectId, projectName, nodes, edges, patches)
 
-    // Load
     const loaded = await db.loadProject(projectId)
 
     expect(loaded).not.toBeNull()
@@ -194,7 +185,6 @@ describe('Project Operations', () => {
     const projects = await db.listProjects()
 
     expect(projects).toHaveLength(3)
-    // Should be sorted by most recent first
     expect(projects[0].name).toBe('Third Project')
     expect(projects[2].name).toBe('First Project')
   })
@@ -204,14 +194,11 @@ describe('Project Operations', () => {
     
     await db.saveProject('to-delete', 'Delete Me', {}, {}, {})
     
-    // Verify it exists
     let loaded = await db.loadProject('to-delete')
     expect(loaded).not.toBeNull()
 
-    // Delete
     await db.deleteProject('to-delete')
 
-    // Verify it's gone
     loaded = await db.loadProject('to-delete')
     expect(loaded).toBeNull()
   })
@@ -221,23 +208,17 @@ describe('Project Operations', () => {
     
     const projectId = 'update-test'
     
-    // Create initial project
     await db.saveProject(projectId, 'Initial Name', {}, {}, {})
     
-    // Update it
     const newNodes = { table_1: createMockSourceTableNode('table_1', 'New Table') }
     await db.saveProject(projectId, 'Updated Name', newNodes, {}, {})
 
-    // Load and verify
     const loaded = await db.loadProject(projectId)
     expect(loaded?.name).toBe('Updated Name')
     expect(Object.keys(loaded?.nodes || {})).toHaveLength(1)
   })
 })
 
-// ============================================================================
-// File Operations
-// ============================================================================
 
 describe('File Operations', () => {
   it('saves and loads a file', async () => {
@@ -250,16 +231,13 @@ describe('File Operations', () => {
     const encoder = new TextEncoder()
     const fileData = encoder.encode(content).buffer
 
-    // Save
     await db.saveFile(fileId, fileName, fileType, fileData)
 
-    // Load
     const loaded = await db.loadFile(fileId)
 
     expect(loaded).not.toBeNull()
     expect(loaded?.byteLength).toBe(fileData.byteLength)
     
-    // Verify content
     const decoder = new TextDecoder()
     const loadedContent = decoder.decode(loaded!)
     expect(loadedContent).toBe(content)
@@ -281,14 +259,11 @@ describe('File Operations', () => {
 
     await db.saveFile(fileId, 'test.txt', 'text/plain', fileData)
     
-    // Verify exists
     let loaded = await db.loadFile(fileId)
     expect(loaded).not.toBeNull()
 
-    // Delete
     await db.deleteFile(fileId)
 
-    // Verify gone
     loaded = await db.loadFile(fileId)
     expect(loaded).toBeNull()
   })
@@ -313,9 +288,6 @@ describe('File Operations', () => {
   })
 })
 
-// ============================================================================
-// Cache Operations
-// ============================================================================
 
 describe('Cache Operations', () => {
   it('saves and loads cache data', async () => {
@@ -329,10 +301,8 @@ describe('Cache Operations', () => {
       rowCount: 100,
     }
 
-    // Save
     await db.saveCache(tableId, 'profile', profileData)
 
-    // Load
     const loaded = await db.loadCache(tableId, 'profile')
 
     expect(loaded).toEqual(profileData)
@@ -366,26 +336,18 @@ describe('Cache Operations', () => {
   it('clears cache for a specific table', async () => {
     const db = await getDB()
     
-    // Create cache for multiple tables
     await db.saveCache('table_1', 'profile', { data: 1 })
     await db.saveCache('table_1', 'slice', { data: 2 })
     await db.saveCache('table_2', 'profile', { data: 3 })
 
-    // Clear table_1 cache
     await db.clearTableCache('table_1')
 
-    // Verify table_1 cache is gone
     expect(await db.loadCache('table_1', 'profile')).toBeNull()
     expect(await db.loadCache('table_1', 'slice')).toBeNull()
-    
-    // Verify table_2 cache remains
     expect(await db.loadCache('table_2', 'profile')).toEqual({ data: 3 })
   })
 })
 
-// ============================================================================
-// Report Operations
-// ============================================================================
 
 describe('Report Operations', () => {
   it('saves and loads a report', async () => {
@@ -464,36 +426,28 @@ describe('Report Operations', () => {
   })
 })
 
-// ============================================================================
-// Export/Import Operations
-// ============================================================================
 
 describe('Export/Import Operations', () => {
   it('exports project with embedded files', async () => {
     const db = await getDB()
     
-    // Create project with file reference
     const projectId = 'export-test'
     const nodes = {
       table_1: createMockSourceTableNode('table_1', 'Data Table'),
     }
     
-    // Save the referenced file
     const fileContent = 'id,name\n1,Alice\n2,Bob'
     const encoder = new TextEncoder()
     await db.saveFile('file_table_1', 'data.csv', 'text/csv', encoder.encode(fileContent).buffer)
     
-    // Save project
     await db.saveProject(projectId, 'Export Test', nodes, {}, {})
 
-    // Export
     const exportBlob = await db.exportProjectFile(projectId)
 
     expect(exportBlob).toBeInstanceOf(Blob)
     expect(exportBlob.type).toBe('application/json')
     expect(exportBlob.size).toBeGreaterThan(0)
 
-    // Parse export to verify structure
     const exportText = await exportBlob.text()
     const exportData = JSON.parse(exportText)
 
@@ -501,7 +455,7 @@ describe('Export/Import Operations', () => {
     expect(exportData.formatType).toBe('tablecanvas-full')
     expect(exportData.project.name).toBe('Export Test')
     expect(exportData.files['file_table_1']).toBeDefined()
-    expect(exportData.files['file_table_1'].data).toBeDefined() // base64 encoded
+    expect(exportData.files['file_table_1'].data).toBeDefined()
   })
 
   it('throws error when exporting non-existent project', async () => {
@@ -546,20 +500,17 @@ describe('Export/Import Operations', () => {
       },
     }
 
-    // Create mock file
     const mockFile = new File(
       [JSON.stringify(exportData)],
       'project.tablecanvas.json',
       { type: 'application/json' }
     )
 
-    // Parse import
     const parsed = await db.parseImportFile(mockFile)
 
     expect(parsed.name).toBe('Imported Project')
     expect(parsed.filesRestored).toBe(1)
     
-    // Verify file ref was remapped to new ID
     const tableNode = parsed.nodes.table_1 as { plan: { fileRef: string } }
     expect(tableNode.plan.fileRef).not.toBe('old_file_id')
     expect(tableNode.plan.fileRef).toMatch(/^file_/)
@@ -600,7 +551,6 @@ describe('Export/Import Operations', () => {
 
     const parsed = await db.parseImportFile(mockFile)
 
-    // Should succeed but report 0 files restored
     expect(parsed.filesRestored).toBe(0)
     // Original fileRef should be preserved (no mapping available)
     const tableNode = parsed.nodes.table_1 as { plan: { fileRef: string } }
@@ -730,16 +680,12 @@ describe('Export/Import Operations', () => {
 
     const parsed = await db.parseImportFile(mockFile)
 
-    // Patches should have Sets, not arrays
     expect(parsed.patches.table_1.deletedRows).toBeInstanceOf(Set)
     expect(parsed.patches.table_1.deletedRows.has('row_a')).toBe(true)
     expect(parsed.patches.table_1.highlightedCells).toBeInstanceOf(Set)
   })
 })
 
-// ============================================================================
-// Edge Cases
-// ============================================================================
 
 describe('Edge Cases', () => {
   it('handles empty project', async () => {
@@ -756,7 +702,6 @@ describe('Edge Cases', () => {
   it('handles large file data', async () => {
     const db = await getDB()
     
-    // Create 1MB of data
     const largeData = new Uint8Array(1024 * 1024)
     for (let i = 0; i < largeData.length; i++) {
       largeData[i] = i % 256
@@ -783,14 +728,12 @@ describe('Edge Cases', () => {
     
     const projectId = 'concurrent'
     
-    // Fire off multiple saves concurrently
     await Promise.all([
       db.saveProject(projectId, 'Version 1', {}, {}, {}),
       db.saveProject(projectId, 'Version 2', {}, {}, {}),
       db.saveProject(projectId, 'Version 3', {}, {}, {}),
     ])
 
-    // Should have one project (last write wins)
     const loaded = await db.loadProject(projectId)
     expect(loaded).not.toBeNull()
   })

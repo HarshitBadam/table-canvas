@@ -1,9 +1,3 @@
-/**
- * Suggestion Rule Registry
- * 
- * Central registry for all suggestion rules.
- */
-
 import type { 
   Suggestion, 
   SuggestionCategory,
@@ -43,7 +37,6 @@ export interface MetadataBundle {
   columnProfile?: ColumnProfile;
 }
 
-// Rule interface for suggestion generation
 export interface SuggestionRule {
   id: string;
   category: SuggestionCategory;
@@ -60,10 +53,6 @@ export function registerRule(rule: SuggestionRule): void {
   suggestionRules.push(rule);
 }
 
-export function getRules(): SuggestionRule[] {
-  return suggestionRules;
-}
-
 export function getTableRules(): SuggestionRule[] {
   return suggestionRules.filter(r => r.scope === 'table');
 }
@@ -75,10 +64,7 @@ export function getColumnRules(): SuggestionRule[] {
 
 import { generateTableVersionHash } from '../suggestionsStore';
 
-/**
- * Generate a deterministic suggestion ID based on rule and context
- * This ensures the same suggestion always has the same ID across regenerations
- */
+/** Deterministic ID ensures the same suggestion keeps the same ID across regenerations. */
 export function createSuggestionId(ruleId: string, tableId: string, columnId?: string, extra?: string): string {
   const parts = [ruleId, tableId];
   if (columnId) parts.push(columnId);

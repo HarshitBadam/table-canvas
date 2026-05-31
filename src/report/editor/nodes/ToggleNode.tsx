@@ -1,9 +1,3 @@
-/**
- * ToggleNode - TipTap Custom Node for Collapsible Sections
- * 
- * Creates toggle/collapsible blocks like Notion.
- */
-
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, NodeViewProps } from '@tiptap/react';
 import { useState, useCallback, memo } from 'react';
@@ -51,7 +45,6 @@ const ToggleNodeView = memo(function ToggleNodeView({
   return (
     <NodeViewWrapper className="toggle-block">
       <div className={`tiptap-block-wrapper ${selected ? 'is-selected' : ''}`}>
-        {/* Toggle Header */}
         <div className="toggle-header" onClick={toggleExpand}>
           <span className={`toggle-arrow ${attrs.isExpanded ? 'is-expanded' : ''}`}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
@@ -84,7 +77,6 @@ const ToggleNodeView = memo(function ToggleNodeView({
           )}
         </div>
 
-        {/* Toggle Content */}
         <div className={`toggle-content ${attrs.isExpanded ? '' : 'is-collapsed'}`}>
           <NodeViewContent className="toggle-content-inner no-placeholder" />
         </div>
@@ -135,4 +127,3 @@ export const ToggleNode = Node.create({
   },
 });
 
-export default ToggleNode;
