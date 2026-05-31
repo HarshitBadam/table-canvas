@@ -1,8 +1,3 @@
-/**
- * RPC layer for Worker communication
- * Provides a Promise-based interface for sending messages to the worker
- */
-
 import type { WorkerRequest, WorkerResponse } from '../types'
 
 type PendingRequest = {
@@ -20,22 +15,18 @@ export class WorkerRPC {
   constructor(worker: Worker) {
     this.worker = worker
     
-    // Create ready promise
     this.readyPromise = new Promise((resolve) => {
       this.readyResolve = resolve
     })
 
-    // Listen for messages from worker
     this.worker.onmessage = (event: MessageEvent<WorkerResponse | { type: 'ready' }>) => {
       const data = event.data
       
-      // Handle ready message
       if ('type' in data && data.type === 'ready') {
         this.readyResolve()
         return
       }
 
-      // Handle response
       const response = data as WorkerResponse
       const pending = this.pendingRequests.get(response.id)
       
@@ -50,10 +41,8 @@ export class WorkerRPC {
       }
     }
 
-    // Handle worker errors
     this.worker.onerror = (error) => {
       console.error('Worker error:', error)
-      // Reject all pending requests
       for (const [id, pending] of this.pendingRequests) {
         pending.reject(new Error(`Worker error: ${error.message}`))
         this.pendingRequests.delete(id)
@@ -61,18 +50,11 @@ export class WorkerRPC {
     }
   }
 
-  /**
-   * Wait for the worker to be ready
-   */
   async waitForReady(): Promise<void> {
     return this.readyPromise
   }
 
-  /**
-   * Send a request to the worker and wait for response
-   */
   async call<T>(type: WorkerRequest['type'], payload: unknown): Promise<T> {
-    // Wait for worker to be ready
     await this.readyPromise
 
     const id = `req_${++this.requestId}`
@@ -88,13 +70,9 @@ export class WorkerRPC {
     })
   }
 
-  /**
-   * Terminate the worker
-   */
   terminate(): void {
     this.worker.terminate()
     
-    // Reject all pending requests
     for (const [id, pending] of this.pendingRequests) {
       pending.reject(new Error('Worker terminated'))
       this.pendingRequests.delete(id)

@@ -1,13 +1,16 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { applySuggestion, setToastHandler, type ToastNotification } from '@/suggestions/commands'
+import { Toast } from '@/suggestions/Toast'
 import type { Suggestion } from '@/types'
+import { formatNumber } from '@/lib/utils'
+import { useNavigation } from '@/app/NavigationContext'
 
 import { LineageMiniMap } from './components/LineageMiniMap'
 import { TableStatsSection } from './components/TableStatsSection'
 import { QuickActionsSection } from './components/QuickActionsSection'
+import { CompletenessBar } from './components/ColumnStatComponents'
 
-// Import dashboard hooks
 import {
   useProjectHealthMetrics,
   useDataQualityMetrics,
@@ -15,13 +18,8 @@ import {
   useLineageData,
 } from './useDashboardData'
 
-interface DashboardProps {
-  onOpenTable?: (tableId: string) => void
-  onOpenChart?: (chartId: string) => void
-}
-
-export function Dashboard({ onOpenTable, onOpenChart }: DashboardProps) {
-  const selectNode = useProjectStore((state) => state.selectNode)
+export function Dashboard() {
+  const { openTable, openChart } = useNavigation()
   const nodes = useProjectStore((state) => state.nodes)
   
   const healthMetrics = useProjectHealthMetrics()
@@ -43,39 +41,21 @@ export function Dashboard({ onOpenTable, onOpenChart }: DashboardProps) {
     if (!node) return
     
     if (node.kind === 'chart') {
-      if (onOpenChart) {
-        onOpenChart(nodeId)
-      } else {
-        selectNode(nodeId)
-      }
+      openChart(nodeId)
     } else {
-      if (onOpenTable) {
-        onOpenTable(nodeId)
-      } else {
-        selectNode(nodeId)
-      }
+      openTable(nodeId)
     }
-  }, [nodes, onOpenTable, onOpenChart, selectNode])
-
-  const handleOpenTable = useCallback((tableId: string) => {
-    if (onOpenTable) {
-      onOpenTable(tableId)
-    } else {
-      selectNode(tableId)
-    }
-  }, [onOpenTable, selectNode])
+  }, [nodes, openTable, openChart])
 
   const handleApplySuggestion = useCallback(async (suggestion: Suggestion) => {
     await applySuggestion(suggestion)
   }, [])
 
-  // Check if we have any data at all
   const hasData = tableMetrics.length > 0
   const { totalTables, totalRows, totalColumns, overallCompleteness } = healthMetrics
 
   return (
     <div className="h-full flex flex-col bg-canvas">
-      {/* Header - Compact single line */}
       <header className="flex items-center justify-between px-5 py-2.5 border-b border-border bg-surface print:hidden">
         <div className="flex items-center gap-4">
           <h1 className="text-sm font-semibold text-text-primary">Project Overview</h1>
@@ -88,19 +68,17 @@ export function Dashboard({ onOpenTable, onOpenChart }: DashboardProps) {
               <span className="text-text-tertiary">·</span>
               <Stat value={totalColumns} label="Cols" />
               <span className="text-text-tertiary">·</span>
-              <CompletenessIndicator completeness={overallCompleteness} />
+              <CompletenessBar value={overallCompleteness} barWidth="w-12" barHeight="h-1" />
             </div>
           )}
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="flex-1 overflow-auto p-6">
         {!hasData ? (
-          <EmptyState />
+          <DashboardEmptyState />
         ) : (
           <div className="max-w-5xl mx-auto space-y-8 dashboard-container">
-            {/* Data Flow - Hero Section (full width) */}
             <section className="lineage-section">
               <LineageMiniMap
                 nodes={lineageData.nodes}
@@ -109,20 +87,16 @@ export function Dashboard({ onOpenTable, onOpenChart }: DashboardProps) {
               />
             </section>
 
-            {/* Your Data - Table Cards (full width) */}
             <section>
               <TableStatsSection
                 tableMetrics={tableMetrics}
-                onOpenTable={handleOpenTable}
               />
             </section>
 
-            {/* Suggested Actions (full width) */}
             <section className="quick-actions-section">
               <QuickActionsSection
                 suggestions={suggestions}
                 onApply={handleApplySuggestion}
-                onOpenTable={handleOpenTable}
                 isLoading={suggestionsLoading}
               />
             </section>
@@ -130,7 +104,6 @@ export function Dashboard({ onOpenTable, onOpenChart }: DashboardProps) {
         )}
       </div>
 
-      {/* Toast Notification */}
       {toast && (
         <Toast notification={toast} onDismiss={() => setToast(null)} />
       )}
@@ -146,42 +119,8 @@ function Stat({ value, label }: { value: string | number; label: string }) {
   )
 }
 
-function CompletenessIndicator({ completeness }: { completeness: number }) {
-  const isGood = completeness >= 95
-  const isWarning = completeness >= 80 && completeness < 95
-  
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="w-12 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-        <div 
-          className={`h-full rounded-full ${
-            isGood ? 'bg-green-500' : isWarning ? 'bg-amber-500' : 'bg-red-500'
-          }`}
-          style={{ width: `${completeness}%` }}
-        />
-      </div>
-      <span className={`font-medium ${
-        isGood ? 'text-green-600 dark:text-green-400' : 
-        isWarning ? 'text-amber-600 dark:text-amber-400' : 
-        'text-red-600 dark:text-red-400'
-      }`}>
-        {completeness}%
-      </span>
-    </div>
-  )
-}
 
-function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`
-  }
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`
-  }
-  return num.toLocaleString()
-}
-
-function EmptyState() {
+function DashboardEmptyState() {
   return (
     <div className="h-full flex items-center justify-center">
       <div className="text-center max-w-md">
@@ -209,35 +148,3 @@ function EmptyState() {
   )
 }
 
-function Toast({ 
-  notification, 
-  onDismiss 
-}: { 
-  notification: ToastNotification
-  onDismiss: () => void 
-}) {
-  const bgColor = notification.type === 'success' ? 'bg-green-600' :
-                  notification.type === 'error' ? 'bg-red-600' : 'bg-blue-600'
-
-  return (
-    <div className={`fixed bottom-4 right-4 ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg z-[100] flex items-center gap-3 animate-slide-up`}>
-      <span className="text-sm">{notification.message}</span>
-      {notification.action && (
-        <button
-          onClick={() => {
-            notification.action?.onClick()
-            onDismiss()
-          }}
-          className="text-sm font-medium underline hover:no-underline"
-        >
-          {notification.action.label}
-        </button>
-      )}
-      <button onClick={onDismiss} className="ml-2 opacity-70 hover:opacity-100">
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-  )
-}

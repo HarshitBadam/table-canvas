@@ -1,9 +1,3 @@
-/**
- * Recipe Rules
- * 
- * Suggestion rules for data recipes and advanced transformations.
- */
-
 import { registerRule, createSuggestionId, getVersionHash } from '../registry';
 import { isAnalyzableNumeric } from '../classification';
 import { 
@@ -21,7 +15,6 @@ registerRule({
     const opportunities = detectAggregationOpportunities(meta.schema, meta.profile?.columns);
     if (opportunities.length === 0) return false;
     
-    // Check if a similar derived table already exists
     const best = opportunities[0];
     const groupCol = best.groupColumns[0].column;
     

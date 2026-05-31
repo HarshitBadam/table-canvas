@@ -3,6 +3,8 @@ import { useProjectStore } from '@/state/projectStore'
 import { useReportStore } from '@/report/reportStore'
 import { useApp, useAppAuth } from '@/state/AppContext'
 import { exportReportToPDF } from '@/report/pdfExport'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { useNavigation } from './NavigationContext'
 import type { ChartNode, ProjectNode } from '@/types'
 import type { ViewMode } from './App'
 import type { ProjectExportState } from './useProjectExport'
@@ -13,7 +15,6 @@ interface AppHeaderProps {
   exportState: ProjectExportState
   onBackToCanvas: () => void
   onOpenDashboard: () => void
-  onNavigateToTable: (tableId: string) => void
 }
 
 export function AppHeader({
@@ -22,7 +23,6 @@ export function AppHeader({
   exportState,
   onBackToCanvas,
   onOpenDashboard,
-  onNavigateToTable,
 }: AppHeaderProps) {
   const { user, logout } = useAppAuth()
   const { isSaving } = useApp()
@@ -64,7 +64,6 @@ export function AppHeader({
         <ChartHeaderContent
           selectedNode={selectedNode}
           onBackToCanvas={onBackToCanvas}
-          onNavigateToTable={onNavigateToTable}
         />
       )}
       {viewMode === 'dashboard' && (
@@ -109,7 +108,7 @@ export function AppHeader({
             >
               {(isExporting || isImporting) ? (
                 <>
-                  <SpinnerIcon />
+                  <LoadingSpinner size="sm" />
                   <span className="truncate max-w-32">
                     {isExporting ? (exportProgress || 'Exporting...') : 'Importing...'}
                   </span>
@@ -148,7 +147,7 @@ export function AppHeader({
 
       {isSaving && (
         <div className="flex items-center gap-1.5 text-text-tertiary">
-          <SpinnerIcon className="w-3 h-3" />
+          <LoadingSpinner size="sm" className="w-3 h-3" />
           <span className="text-xs">Saving...</span>
         </div>
       )}
@@ -201,12 +200,11 @@ function GridHeaderContent({ selectedNode, onBackToCanvas }: { selectedNode: Pro
 function ChartHeaderContent({
   selectedNode,
   onBackToCanvas,
-  onNavigateToTable,
 }: {
   selectedNode: ProjectNode
   onBackToCanvas: () => void
-  onNavigateToTable: (tableId: string) => void
 }) {
+  const { openTable } = useNavigation()
   const chartNode = selectedNode as ChartNode
   const sourceTableName = chartNode.plan.sourceTableId
     ? useProjectStore.getState().nodes[chartNode.plan.sourceTableId]?.name || 'Unknown'
@@ -220,7 +218,7 @@ function ChartHeaderContent({
       <span className="badge badge-purple">Chart</span>
       {chartNode.plan.sourceTableId && (
         <button
-          onClick={() => onNavigateToTable(chartNode.plan.sourceTableId)}
+          onClick={() => openTable(chartNode.plan.sourceTableId)}
           className="text-xs text-accent-green hover:underline ml-2"
         >
           Source: {sourceTableName}
@@ -239,15 +237,6 @@ function SimpleHeaderContent({ label, onBackToCanvas }: { label: string; onBackT
       <span className="text-sm font-medium">{label}</span>
       <div className="flex-1" />
     </>
-  )
-}
-
-function SpinnerIcon({ className = "w-4 h-4" }: { className?: string }) {
-  return (
-    <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-    </svg>
   )
 }
 

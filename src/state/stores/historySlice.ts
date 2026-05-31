@@ -26,9 +26,8 @@ export const createHistorySlice: StateCreator<
       }
 
       state.history.past.push(snapshot)
-      state.history.future = [] // Clear redo stack on new action
+      state.history.future = []
 
-      // Limit history size
       if (state.history.past.length > MAX_UNDO_HISTORY) {
         state.history.past.shift()
       }
@@ -55,7 +54,6 @@ export const createHistorySlice: StateCreator<
       state.nodes = previous.nodes
       state.edges = previous.edges
 
-      // Restore patches with Set conversion
       state.patches = {}
       Object.entries(previous.patches).forEach(([tableId, patches]) => {
         state.patches[tableId] = {
@@ -88,7 +86,6 @@ export const createHistorySlice: StateCreator<
       state.nodes = next.nodes
       state.edges = next.edges
 
-      // Restore patches with Set conversion
       state.patches = {}
       Object.entries(next.patches).forEach(([tableId, patches]) => {
         state.patches[tableId] = {

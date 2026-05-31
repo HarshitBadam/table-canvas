@@ -1,10 +1,3 @@
-/**
- * ReportToolbar Component
- * 
- * Clean, structured toolbar for reports - matching Grid view style.
- * Shows report info, metadata, and actions.
- */
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useReportStore } from './reportStore';
 import type { Report } from './types';
@@ -116,9 +109,7 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
 
   return (
     <div className="report-toolbar-v2">
-      {/* Left Section - Report Info */}
       <div className="report-toolbar-v2-left">
-        {/* New Report Button */}
         <button
           className="report-toolbar-v2-add"
           onClick={handleCreateReport}
@@ -129,9 +120,7 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
           </svg>
         </button>
 
-        {/* Report Selector */}
         <div className="report-toolbar-v2-selector" ref={listRef}>
-          {/* Current Report Name */}
           {isEditing ? (
             <input
               ref={inputRef}
@@ -156,7 +145,6 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
             </button>
           )}
 
-          {/* Report List Dropdown */}
           {showReportList && (
             <div className="report-toolbar-v2-list">
               {reportsList.map((report) => (
@@ -194,12 +182,10 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
           )}
         </div>
 
-        {/* Document Badge */}
         <span className="report-toolbar-v2-badge">
           Document
         </span>
 
-        {/* Info Text */}
         {activeReport && (
           <span className="report-toolbar-v2-info">
             {wordCount > 0 ? `${wordCount.toLocaleString()} words` : 'Empty'} · Updated {formatDate(activeReport.updatedAt)}
@@ -207,7 +193,6 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
         )}
       </div>
 
-      {/* Right Section - Actions */}
       <div className="report-toolbar-v2-right">
         {onHighlight && (
           <button
@@ -240,4 +225,3 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
   );
 }
 
-export default ReportToolbar;

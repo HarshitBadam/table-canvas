@@ -10,6 +10,7 @@ import type {
 import { generateId } from '@/lib/utils'
 import { getAllDescendants } from '@/engine/dependencyGraph'
 import { createInitialPatches } from './patchesSlice'
+import { createColumnOps } from './nodesColumnOps'
 
 export const createNodesSlice: StateCreator<
   ProjectStoreState,
@@ -39,10 +40,8 @@ export const createNodesSlice: StateCreator<
     state.saveSnapshot(`Delete node ${state.nodes[id]?.name || id}`)
 
     set((state) => {
-      // Delete the node
       delete state.nodes[id]
 
-      // Delete related edges
       Object.keys(state.edges).forEach((edgeId) => {
         const edge = state.edges[edgeId]
         if (edge.fromNodeId === id || edge.toNodeId === id) {
@@ -50,10 +49,8 @@ export const createNodesSlice: StateCreator<
         }
       })
 
-      // Delete patches if source table
       delete state.patches[id]
 
-      // Clear selection if this was selected
       if (state.selectedNodeId === id) {
         state.selectedNodeId = null
       }
@@ -85,7 +82,6 @@ export const createNodesSlice: StateCreator<
     const id = generateId()
     const now = new Date().toISOString()
 
-    // Find a good position for the new table
     const existingNodes = Object.values(state.nodes)
     const maxX = existingNodes.reduce((max, n) => Math.max(max, n.ui.position.x), 0)
 
@@ -127,7 +123,6 @@ export const createNodesSlice: StateCreator<
     const id = generateId()
     const now = new Date().toISOString()
 
-    // Calculate position if not provided
     const existingNodes = Object.values(state.nodes)
     const defaultPosition = {
       x: existingNodes.length > 0
@@ -172,7 +167,6 @@ export const createNodesSlice: StateCreator<
     const id = generateId()
     const now = new Date().toISOString()
 
-    // Calculate position based on upstream nodes
     const upstreamPositions = upstreamNodeIds
       .map(uid => state.nodes[uid]?.ui.position)
       .filter(Boolean) as Position[]
@@ -204,7 +198,6 @@ export const createNodesSlice: StateCreator<
     set((state) => {
       state.nodes[id] = newTable
 
-      // Create edges from upstream nodes
       upstreamNodeIds.forEach((fromId) => {
         const edgeId = generateId()
         state.edges[edgeId] = {
@@ -230,164 +223,19 @@ export const createNodesSlice: StateCreator<
       }
     })
 
-    // Mark all downstream nodes as dirty
     get().markNodeAndDescendantsDirty(tableId)
   },
 
-  addColumn: (tableId, columnName, columnType = 'string') => {
-    set((state) => {
-      const node = state.nodes[tableId]
-      if (node && node.kind === 'source_table') {
-        const tableNode = node as SourceTableNode
-        if (!tableNode.schema) {
-          tableNode.schema = { columns: [], rowCount: 0 }
-        }
-
-        // Generate a unique column ID
-        const colIndex = tableNode.schema.columns.length
-        const columnId = `col_${colIndex}_${columnName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
-
-        // Add the new column
-        tableNode.schema.columns.push({
-          id: columnId,
-          name: columnName,
-          type: columnType,
-          nullable: true,
-        })
-
-        tableNode.updatedAt = new Date().toISOString()
-
-        // Initialize cell values for existing inserted rows
-        const patches = state.patches[tableId]
-        if (patches?.insertedRows) {
-          patches.insertedRows.forEach(row => {
-            if (row.values[columnId] === undefined) {
-              row.values[columnId] = ''
-            }
-          })
-        }
-      }
-    })
-
-    // Mark all downstream nodes as dirty
-    get().markNodeAndDescendantsDirty(tableId)
-  },
-
-  insertColumnAt: (tableId, columnName, columnType, index, formula) => {
-    set((state) => {
-      const node = state.nodes[tableId]
-      if (node && node.kind === 'source_table') {
-        const tableNode = node as SourceTableNode
-        if (!tableNode.schema) {
-          tableNode.schema = { columns: [], rowCount: 0 }
-        }
-
-        // Generate a unique column ID
-        const totalCols = tableNode.schema.columns.length
-        const columnId = `col_${totalCols}_${columnName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`
-
-        // Insert the new column at the specified index
-        const newColumn = {
-          id: columnId,
-          name: columnName,
-          type: columnType,
-          nullable: true,
-          formula: formula || undefined,
-          isComputed: !!formula,
-        }
-
-        // Clamp index to valid range
-        const insertIndex = Math.max(0, Math.min(index, tableNode.schema.columns.length))
-        tableNode.schema.columns.splice(insertIndex, 0, newColumn)
-
-        tableNode.updatedAt = new Date().toISOString()
-
-        // Initialize cell values for existing inserted rows (only if not a formula column)
-        if (!formula) {
-          const patches = state.patches[tableId]
-          if (patches?.insertedRows) {
-            patches.insertedRows.forEach(row => {
-              if (row.values[columnId] === undefined) {
-                row.values[columnId] = ''
-              }
-            })
-          }
-        }
-      }
-    })
-
-    // Mark all downstream nodes as dirty
-    get().markNodeAndDescendantsDirty(tableId)
-  },
-
-  addFormulaColumn: (tableId, columnName, formula, columnType, index) => {
-    set((state) => {
-      const node = state.nodes[tableId]
-      if (node && node.kind === 'source_table') {
-        const tableNode = node as SourceTableNode
-        if (!tableNode.schema) {
-          tableNode.schema = { columns: [], rowCount: 0 }
-        }
-
-        // Generate a unique column ID
-        const totalCols = tableNode.schema.columns.length
-        const columnId = `formula_${totalCols}_${columnName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`
-
-        // Create the formula column
-        const newColumn = {
-          id: columnId,
-          name: columnName,
-          type: columnType,
-          nullable: true,
-          formula: formula,
-          isComputed: true,
-        }
-
-        // Insert at specified index or at end
-        if (index !== undefined) {
-          const insertIndex = Math.max(0, Math.min(index, tableNode.schema.columns.length))
-          tableNode.schema.columns.splice(insertIndex, 0, newColumn)
-        } else {
-          tableNode.schema.columns.push(newColumn)
-        }
-
-        tableNode.updatedAt = new Date().toISOString()
-      }
-    })
-
-    // Mark all downstream nodes as dirty
-    get().markNodeAndDescendantsDirty(tableId)
-  },
-
-  renameColumn: (tableId, columnId, newName) => {
-    set((state) => {
-      const node = state.nodes[tableId]
-      if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-        const tableNode = node as SourceTableNode
-        if (tableNode.schema) {
-          const column = tableNode.schema.columns.find(c => c.id === columnId)
-          if (column) {
-            column.name = newName
-            tableNode.updatedAt = new Date().toISOString()
-          }
-        }
-      }
-    })
-
-    // Mark all downstream nodes as dirty (column renames affect derived tables)
-    get().markNodeAndDescendantsDirty(tableId)
-  },
+  ...createColumnOps(set, get),
 
   setTableFilters: (tableId, filters) => {
     set((state) => {
       const node = state.nodes[tableId]
       if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
         const tableNode = node as TableNode
-        // Store filters on the node - null or empty conditions means no filters
         if (filters && filters.conditions.length > 0) {
           tableNode.viewFilters = filters
         } else {
-          // Clear filters if empty
           tableNode.viewFilters = undefined
         }
         tableNode.updatedAt = new Date().toISOString()
@@ -436,7 +284,7 @@ export const createNodesSlice: StateCreator<
           tableNode.cacheInfo = {}
         }
         tableNode.cacheInfo.isDirty = true
-        tableNode.cacheInfo.error = undefined // Clear previous error
+        tableNode.cacheInfo.error = undefined
         tableNode.updatedAt = new Date().toISOString()
       }
     })
@@ -445,10 +293,8 @@ export const createNodesSlice: StateCreator<
   markNodeAndDescendantsDirty: (nodeId) => {
     const state = get()
 
-    // Mark the node itself as dirty
     state.markNodeDirty(nodeId)
 
-    // Get all descendants and mark them dirty too
     const descendants = getAllDescendants(nodeId, state.edges)
 
     set((draft) => {
@@ -460,7 +306,7 @@ export const createNodesSlice: StateCreator<
             tableNode.cacheInfo = {}
           }
           tableNode.cacheInfo.isDirty = true
-          tableNode.cacheInfo.error = undefined // Clear previous error
+          tableNode.cacheInfo.error = undefined
           tableNode.updatedAt = new Date().toISOString()
         }
       }

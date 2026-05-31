@@ -1,11 +1,9 @@
-/**
- * Recipe Wizard Component
- * Modal wizard for configuring and executing recipe suggestions
- */
-
 import { useState, useMemo } from 'react'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
+import { RECIPE_CONFIGS } from './recipeConfigs'
+import type { RecipeField } from './recipeConfigs'
 import type { Suggestion, ColumnSchema, TransformDef } from '@/types'
 
 interface RecipeWizardProps {
@@ -15,207 +13,15 @@ interface RecipeWizardProps {
   onExecute: (transform: TransformDef, tableName: string) => Promise<void>
 }
 
-interface RecipeConfig {
-  id: string
-  title: string
-  description: string
-  fields: RecipeField[]
-  outputs: string[]
-  buildTransform: (bindings: Record<string, string>, tableId: string, columns?: ColumnSchema[]) => TransformDef
-  getTableName: (tableName: string, bindings: Record<string, string>, columns?: ColumnSchema[]) => string
-}
-
-interface RecipeField {
-  id: string
-  label: string
-  type: 'column' | 'select'
-  columnType?: 'string' | 'number' | 'date' | 'datetime'
-  required: boolean
-  hint?: string
-  options?: { value: string; label: string }[]
-}
-
-// Recipe configurations
-const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
-  trend_summary: {
-    id: 'trend_summary',
-    title: 'Trend Analysis',
-    description: 'Analyze how values change over time with aggregated summaries.',
-    fields: [
-      { id: 'dateColumnId', label: 'Date Column', type: 'column', columnType: 'date', required: true, hint: 'The time dimension for grouping' },
-      { id: 'valueColumnId', label: 'Value Column', type: 'column', columnType: 'number', required: true, hint: 'The metric to analyze' },
-      { id: 'period', label: 'Group By', type: 'select', required: true, options: [
-        { value: 'day', label: 'Day' },
-        { value: 'week', label: 'Week' },
-        { value: 'month', label: 'Month' },
-        { value: 'quarter', label: 'Quarter' },
-        { value: 'year', label: 'Year' },
-      ]},
-    ],
-    outputs: ['Summary table with period totals', 'Line chart showing trend'],
-    buildTransform: (bindings, tableId, columns) => {
-      const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
-      const valueName = valueCol?.name || 'Value'
-      // Use column ID (what DuckDB uses internally) for derived tables
-      const dateColRef = bindings.dateColumnId
-      const valueColRef = bindings.valueColumnId
-      return {
-        type: 'group_summarize',
-        sourceTableId: tableId,
-        groupByColumns: [dateColRef],
-        aggregations: [
-          { columnId: valueColRef, operation: 'sum', alias: `Total ${valueName}` },
-          { columnId: valueColRef, operation: 'avg', alias: `Avg ${valueName}` },
-          { columnId: valueColRef, operation: 'count', alias: 'Record Count' },
-        ],
-      }
-    },
-    getTableName: (_tableName, bindings, columns) => {
-      const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
-      const valueName = valueCol?.name || 'Values'
-      return `${valueName} Trend`
-    },
-  },
-  contribution: {
-    id: 'contribution',
-    title: 'Category Contribution',
-    description: 'Analyze how each category contributes to the total (Pareto analysis).',
-    fields: [
-      { id: 'categoryColumnId', label: 'Category Column', type: 'column', columnType: 'string', required: true, hint: 'The dimension to group by' },
-      { id: 'valueColumnId', label: 'Value Column', type: 'column', columnType: 'number', required: true, hint: 'The metric to sum' },
-    ],
-    outputs: ['Summary table ranked by contribution', 'Bar chart showing breakdown', 'Cumulative percentage'],
-    buildTransform: (bindings, tableId, columns) => {
-      const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
-      const valueName = valueCol?.name || 'Value'
-      // Use column ID (what DuckDB uses internally) for derived tables
-      const categoryColRef = bindings.categoryColumnId
-      const valueColRef = bindings.valueColumnId
-      return {
-        type: 'group_summarize',
-        sourceTableId: tableId,
-        groupByColumns: [categoryColRef],
-        aggregations: [
-          { columnId: valueColRef, operation: 'sum', alias: `Total ${valueName}` },
-          { columnId: valueColRef, operation: 'count', alias: 'Record Count' },
-        ],
-      }
-    },
-    getTableName: (_tableName, bindings, columns) => {
-      const categoryCol = columns?.find(c => c.id === bindings.categoryColumnId)
-      const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
-      const categoryName = categoryCol?.name || 'Category'
-      const valueName = valueCol?.name || 'Value'
-      return `${valueName} by ${categoryName}`
-    },
-  },
-  variance_analysis: {
-    id: 'variance_analysis',
-    title: 'Variance Analysis',
-    description: 'Compare actual vs planned/budgeted values with variance calculations.',
-    fields: [
-      { id: 'actualColumnId', label: 'Actual Column', type: 'column', columnType: 'number', required: true, hint: 'The actual/real values' },
-      { id: 'budgetColumnId', label: 'Budget/Plan Column', type: 'column', columnType: 'number', required: true, hint: 'The target/expected values' },
-      { id: 'groupByColumnId', label: 'Group By (optional)', type: 'column', columnType: 'string', required: false, hint: 'Optional dimension for grouping' },
-    ],
-    outputs: ['Variance table (absolute & percentage)', 'Variance chart'],
-    buildTransform: (bindings, tableId, columns) => {
-      const actualCol = columns?.find(c => c.id === bindings.actualColumnId)
-      const budgetCol = columns?.find(c => c.id === bindings.budgetColumnId)
-      const actualName = actualCol?.name || 'Actual'
-      const budgetName = budgetCol?.name || 'Budget'
-      // Use column ID (what DuckDB uses internally) for derived tables
-      const actualColRef = bindings.actualColumnId
-      const budgetColRef = bindings.budgetColumnId
-      return {
-        type: 'calculated_column',
-        sourceTableId: tableId,
-        newColumnName: `${actualName} vs ${budgetName} Variance`,
-        expression: `("${actualColRef}" - "${budgetColRef}")`,
-      }
-    },
-    getTableName: (_tableName, bindings, columns) => {
-      const actualCol = columns?.find(c => c.id === bindings.actualColumnId)
-      const budgetCol = columns?.find(c => c.id === bindings.budgetColumnId)
-      const actualName = actualCol?.name || 'Actual'
-      const budgetName = budgetCol?.name || 'Budget'
-      return `${actualName} vs ${budgetName} Variance`
-    },
-  },
-  reconciliation: {
-    id: 'reconciliation',
-    title: 'Reconciliation',
-    description: 'Match records between two datasets and identify discrepancies.',
-    fields: [
-      { id: 'leftTableId', label: 'Left Table', type: 'select', required: true },
-      { id: 'rightTableId', label: 'Right Table', type: 'select', required: true },
-      { id: 'leftKeyColumn', label: 'Left Key Column', type: 'column', required: true, hint: 'The matching key from left table' },
-      { id: 'rightKeyColumn', label: 'Right Key Column', type: 'column', required: true, hint: 'The matching key from right table' },
-    ],
-    outputs: ['Matched records', 'Unmatched from left', 'Unmatched from right'],
-    buildTransform: (bindings) => ({
-      type: 'join',
-      leftTableId: bindings.leftTableId,
-      rightTableId: bindings.rightTableId,
-      joinType: 'full',
-      leftKey: bindings.leftKeyColumn,
-      rightKey: bindings.rightKeyColumn,
-    }),
-    getTableName: () => 'Reconciliation Results',
-  },
-  period_over_period: {
-    id: 'period_over_period',
-    title: 'Period-over-Period Analysis',
-    description: 'Calculate changes between time periods to track growth and trends.',
-    fields: [
-      { id: 'dateColumnId', label: 'Date Column', type: 'column', columnType: 'date', required: true, hint: 'The time dimension for comparison' },
-      { id: 'valueColumnId', label: 'Value Column', type: 'column', columnType: 'number', required: true, hint: 'The metric to compare across periods' },
-      { id: 'period', label: 'Period', type: 'select', required: true, options: [
-        { value: 'day', label: 'Day' },
-        { value: 'week', label: 'Week' },
-        { value: 'month', label: 'Month' },
-        { value: 'quarter', label: 'Quarter' },
-        { value: 'year', label: 'Year' },
-      ]},
-    ],
-    outputs: ['Table with period comparisons', 'Growth rate calculations'],
-    buildTransform: (bindings, tableId, columns) => {
-      const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
-      const valueName = valueCol?.name || 'Value'
-      // Use column ID (what DuckDB uses internally) for derived tables
-      const dateColRef = bindings.dateColumnId
-      const valueColRef = bindings.valueColumnId
-      return {
-        type: 'group_summarize',
-        sourceTableId: tableId,
-        groupByColumns: [dateColRef],
-        aggregations: [
-          { columnId: valueColRef, operation: 'sum', alias: `Total ${valueName}` },
-          { columnId: valueColRef, operation: 'avg', alias: `Avg ${valueName}` },
-          { columnId: valueColRef, operation: 'count', alias: 'Record Count' },
-        ],
-      }
-    },
-    getTableName: (_tableName, bindings, columns) => {
-      const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
-      const valueName = valueCol?.name || 'Value'
-      const period = bindings.period || 'period'
-      return `${valueName} by ${period.charAt(0).toUpperCase() + period.slice(1)}`
-    },
-  },
-}
-
 export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeWizardProps) {
   const nodes = useProjectStore((state) => state.nodes)
   const currentTableId = suggestion?.context.tableId
   const currentNode = currentTableId ? nodes[currentTableId] : null
   const schema = currentNode && ('schema' in currentNode) ? currentNode.schema : null
   
-  // Get recipe config
   const recipeId = suggestion?.action.kind === 'launchRecipe' ? suggestion.action.recipeId : null
   const recipeConfig = recipeId ? RECIPE_CONFIGS[recipeId] : null
   
-  // Initialize bindings from suggestion
   const initialBindings = suggestion?.action.kind === 'launchRecipe' 
     ? (suggestion.action.initialBindings as Record<string, string> | undefined) ?? {}
     : {}
@@ -223,17 +29,14 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
   const [bindings, setBindings] = useState<Record<string, string>>(initialBindings)
   const [isExecuting, setIsExecuting] = useState(false)
   
-  // Reset bindings when suggestion changes
   useMemo(() => {
     if (suggestion?.action.kind === 'launchRecipe') {
       setBindings((suggestion.action.initialBindings as Record<string, string> | undefined) ?? {})
     }
   }, [suggestion])
   
-  // Get columns for column selectors
   const columns = schema?.columns ?? []
   
-  // Filter columns by type
   const getColumnsForField = (field: RecipeField): ColumnSchema[] => {
     if (field.type !== 'column') return []
     if (!field.columnType) return columns
@@ -244,14 +47,12 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
     return columns.filter(c => c.type === field.columnType)
   }
   
-  // Get other tables for reconciliation
   const otherTables = useMemo(() => {
     return Object.values(nodes)
       .filter(n => (n.kind === 'source_table' || n.kind === 'derived_table') && n.id !== currentTableId)
       .map(n => ({ value: n.id, label: n.name }))
   }, [nodes, currentTableId])
   
-  // Validation
   const isValid = useMemo(() => {
     if (!recipeConfig) return false
     return recipeConfig.fields
@@ -259,12 +60,10 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
       .every(f => bindings[f.id])
   }, [recipeConfig, bindings])
   
-  // Handle field change
   const handleFieldChange = (fieldId: string, value: string) => {
     setBindings(prev => ({ ...prev, [fieldId]: value }))
   }
   
-  // Handle execute
   const handleExecute = async () => {
     if (!recipeConfig || !currentTableId || !isValid || !currentNode) return
     
@@ -283,7 +82,6 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
   
   if (!recipeConfig) return null
   
-  // Generate preview of what will be created
   const previewTableName = currentNode ? recipeConfig.getTableName(currentNode.name, bindings, columns) : ''
   
   return (
@@ -291,7 +89,6 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fade-in z-50" />
         <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-surface rounded-2xl shadow-2xl border border-border animate-scale-in z-50 overflow-hidden">
-          {/* Header */}
           <div className="px-6 pt-5 pb-4">
             <div className="flex items-center justify-between">
               <Dialog.Title className="text-lg font-semibold text-text-primary">
@@ -311,7 +108,6 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
             </Dialog.Description>
           </div>
           
-          {/* Content */}
           <div className="px-6 pb-4 space-y-4">
             {recipeConfig.fields.map((field) => (
               <div key={field.id}>
@@ -392,7 +188,6 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
             ))}
           </div>
           
-          {/* Footer with preview and action */}
           <div className="px-6 py-4 bg-surface-secondary/50 border-t border-border">
             {isValid && previewTableName && (
               <p className="text-xs text-text-tertiary mb-3">
@@ -417,10 +212,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
               >
                 {isExecuting ? (
                   <>
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
+                    <LoadingSpinner size="sm" />
                     Creating...
                   </>
                 ) : (

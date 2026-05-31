@@ -1,10 +1,7 @@
-/**
- * Dashboard shared types, helper functions, and utility hooks.
- */
-
 import { useMemo, useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
-import { useProfilingStore, loadProfileForTable } from '@/profiling/profiler'
+import { useProfilingStore, loadProfileForTable } from '@/profiling'
+import { formatNumber, getTableNodes } from '@/lib/utils'
 import type {
   TableNode,
   ChartNode,
@@ -84,7 +81,6 @@ export interface LineageEdge {
   to: string
 }
 
-/** Stale threshold in days */
 const STALE_THRESHOLD_DAYS = 7
 
 export function formatRelativeTime(dateString: string | null | undefined): string {
@@ -146,17 +142,9 @@ export function computeTypeBreakdown(schema: TableSchema | undefined): ColumnTyp
   return breakdown
 }
 
+/** @deprecated Use `formatNumber(value, { compact: true })` from `@/lib/utils` instead. */
 export function formatStatValue(value: number): string {
-  if (Math.abs(value) >= 1000000) {
-    return `${(value / 1000000).toFixed(1)}M`
-  }
-  if (Math.abs(value) >= 1000) {
-    return `${(value / 1000).toFixed(1)}K`
-  }
-  if (Number.isInteger(value)) {
-    return value.toString()
-  }
-  return value.toFixed(2)
+  return formatNumber(value, { compact: true })
 }
 
 export function computeTableCompleteness(profile: ProfileResult | undefined, rowCount: number): number {
@@ -251,114 +239,10 @@ export function extractIssuesFromProfile(
   return issues
 }
 
-export function extractInsightsFromProfile(
-  tableId: string,
-  tableName: string,
-  profile: ProfileResult | undefined,
-  schema: TableSchema | undefined,
-  rowCount: number
-): Insight[] {
-  const insights: Insight[] = []
-  if (!profile?.columns || !schema) return insights
-
-  for (const colProfile of profile.columns) {
-    const schemaCol = schema.columns.find(c => c.id === colProfile.columnId)
-    const columnName = schemaCol?.name || colProfile.columnId
-
-    if (colProfile.missingPercent > 30) {
-      insights.push({
-        id: `missing-${tableId}-${colProfile.columnId}`,
-        type: 'high_missing',
-        title: `High Missing Values`,
-        description: `"${columnName}" in "${tableName}" is ${Math.round(colProfile.missingPercent)}% empty`,
-        tableId,
-        tableName,
-        columnId: colProfile.columnId,
-        columnName,
-        severity: 'warning',
-        data: { missingPercent: colProfile.missingPercent, missingCount: colProfile.missingCount },
-      })
-    }
-
-    if (colProfile.isKeyCandidate) {
-      insights.push({
-        id: `key-${tableId}-${colProfile.columnId}`,
-        type: 'key_candidate',
-        title: `Potential Key Column`,
-        description: `"${columnName}" appears to be a unique identifier`,
-        tableId,
-        tableName,
-        columnId: colProfile.columnId,
-        columnName,
-        severity: 'info',
-        data: { distinctCount: colProfile.distinctCount },
-      })
-    }
-
-    if (schemaCol?.type === 'date' && colProfile.min !== undefined && colProfile.max !== undefined) {
-      insights.push({
-        id: `daterange-${tableId}-${colProfile.columnId}`,
-        type: 'date_range',
-        title: `Date Range Detected`,
-        description: `"${columnName}" spans from ${colProfile.min} to ${colProfile.max}`,
-        tableId,
-        tableName,
-        columnId: colProfile.columnId,
-        columnName,
-        severity: 'info',
-        data: { min: colProfile.min, max: colProfile.max },
-      })
-    }
-
-    if (colProfile.topValues && colProfile.topValues.length > 0 && colProfile.topValues.length <= 10) {
-      const total = colProfile.topValues.reduce((sum, tv) => sum + tv.count, 0)
-      if (total > 0 && colProfile.distinctCount <= 10) {
-        const topThree = colProfile.topValues.slice(0, 3)
-        const distribution = topThree
-          .map(tv => `${tv.value} (${Math.round((tv.count / total) * 100)}%)`)
-          .join(', ')
-
-        insights.push({
-          id: `category-${tableId}-${colProfile.columnId}`,
-          type: 'category_distribution',
-          title: `Category Distribution`,
-          description: `"${columnName}" has ${colProfile.distinctCount} values: ${distribution}`,
-          tableId,
-          tableName,
-          columnId: colProfile.columnId,
-          columnName,
-          severity: 'info',
-          data: { topValues: colProfile.topValues, distinctCount: colProfile.distinctCount },
-        })
-      }
-    }
-  }
-
-  const completeness = computeTableCompleteness(profile, rowCount)
-  if (completeness >= 95) {
-    insights.push({
-      id: `completeness-${tableId}`,
-      type: 'completeness_warning',
-      title: `Excellent Data Quality`,
-      description: `"${tableName}" has ${completeness}% complete data`,
-      tableId,
-      tableName,
-      severity: 'success',
-      data: { completeness },
-    })
-  }
-
-  return insights
-}
-
 export function useTableNodes(): TableNode[] {
   const nodes = useProjectStore((state) => state.nodes)
 
-  return useMemo(() => {
-    return Object.values(nodes).filter(
-      (n): n is TableNode => n.kind === 'source_table' || n.kind === 'derived_table'
-    )
-  }, [nodes])
+  return useMemo(() => getTableNodes(nodes), [nodes])
 }
 
 export function useChartNodes(): ChartNode[] {

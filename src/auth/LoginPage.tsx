@@ -1,4 +1,5 @@
 import { useState, FormEvent, useCallback } from 'react';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useApp } from '@/state/AppContext';
 import { ApiError } from '@/api/client';
@@ -14,7 +15,6 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get the redirect destination
   const from = (location.state as { from?: Location })?.from?.pathname || '/';
 
   const clearError = useCallback(() => setError(null), []);
@@ -51,7 +51,6 @@ export function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-canvas p-4">
       <div className="w-full max-w-md">
-        {/* Logo/Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-accent-green/10 flex items-center justify-center">
             <svg
@@ -72,17 +71,14 @@ export function LoginPage() {
           <p className="text-sm text-text-secondary mt-1">Welcome back!</p>
         </div>
 
-        {/* Form Card */}
         <div className="bg-surface border border-border rounded-xl p-6 shadow-lg">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Error Message */}
             {error && (
               <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
                 {error}
               </div>
             )}
 
-            {/* Email Field */}
             <div>
               <label
                 htmlFor="email"
@@ -102,7 +98,6 @@ export function LoginPage() {
               />
             </div>
 
-            {/* Password Field */}
             <div>
               <label
                 htmlFor="password"
@@ -122,7 +117,6 @@ export function LoginPage() {
               />
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isSubmitting}
@@ -130,25 +124,7 @@ export function LoginPage() {
             >
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
-                  <svg
-                    className="w-4 h-4 animate-spin"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
+                  <LoadingSpinner size="sm" />
                   Signing in...
                 </span>
               ) : (
@@ -157,7 +133,6 @@ export function LoginPage() {
             </button>
           </form>
 
-          {/* Early Access Link */}
           <div className="mt-6 pt-6 border-t border-border text-center">
             <p className="text-sm text-text-secondary">
               Don't have an account?{' '}
@@ -171,7 +146,6 @@ export function LoginPage() {
           </div>
         </div>
 
-        {/* Footer */}
         <p className="mt-6 text-center text-xs text-text-tertiary">
           By continuing, you agree to our Terms of Service and Privacy Policy
         </p>

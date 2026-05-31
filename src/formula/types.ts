@@ -1,7 +1,4 @@
-/**
- * Formula Types
- * Type definitions for the formula parser and evaluator
- */
+import type { SuggestionConfidence, UserColumnType } from '@/types'
 
 
 export type TokenType =
@@ -117,7 +114,7 @@ export interface FormulaResult {
   success: boolean
   value?: FormulaValue
   error?: FormulaError
-  inferredType?: 'string' | 'number' | 'boolean' | 'date'
+  inferredType?: UserColumnType
 }
 
 
@@ -138,15 +135,7 @@ export interface FunctionDefinition {
 export interface FormulaSuggestion {
   formula: string
   description: string
-  confidence: 'high' | 'medium' | 'low'
+  confidence: SuggestionConfidence
   basedOn: string[] // Column names used
 }
 
-export interface AutocompleteItem {
-  type: 'column' | 'function'
-  label: string
-  value: string
-  description?: string
-  category?: FunctionCategory
-  columnType?: string
-}

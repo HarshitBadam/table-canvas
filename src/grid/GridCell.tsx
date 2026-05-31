@@ -1,67 +1,95 @@
 import { useRef, useEffect, useMemo } from 'react'
-import type { ColumnSchema, CellValue } from '@/types'
+import type { ColumnSchema } from '@/types'
 import { formatNumber } from '@/lib/utils'
+import { useGridContext } from './GridContext'
+import type { GridRow } from './types'
 
 interface GridCellProps {
-  value: CellValue
   column: ColumnSchema
-  width: number
+  row: GridRow
   rowIndex: number
-  isEditing: boolean
-  isSelected: boolean
-  isColumnSelected: boolean
-  isRowSelected: boolean
-  isEditable: boolean
-  isHighlighted?: boolean
-  editValue: string
-  editError: string | null
-  autofillPreviewValue?: CellValue
-  isInAutofillRange?: boolean
-  isInCellRange?: boolean
-  isSelectionTopEdge?: boolean
-  isSelectionBottomEdge?: boolean
-  isSelectionLeftEdge?: boolean
-  isSelectionRightEdge?: boolean
-  showFillHandle?: boolean
-  onEditChange: (value: string) => void
-  onMouseDown: (e: React.MouseEvent) => void
-  onDoubleClick: () => void
-  onContextMenu: (e: React.MouseEvent) => void
-  onBlur: () => void
-  onFillHandleMouseDown?: () => void
-  onMouseEnter?: () => void
 }
 
 export function GridCell({
-  value,
   column,
-  width,
-  rowIndex: _rowIndex,
-  isEditing,
-  isSelected,
-  isColumnSelected,
-  isRowSelected,
-  isEditable,
-  isHighlighted,
-  editValue,
-  editError,
-  autofillPreviewValue,
-  isInAutofillRange,
-  isInCellRange,
-  isSelectionTopEdge,
-  isSelectionBottomEdge,
-  isSelectionLeftEdge,
-  isSelectionRightEdge,
-  showFillHandle,
-  onEditChange,
-  onMouseDown,
-  onDoubleClick,
-  onContextMenu,
-  onBlur,
-  onFillHandleMouseDown,
-  onMouseEnter,
+  row,
+  rowIndex,
 }: GridCellProps) {
+  const {
+    isEditable,
+    getDisplayValue,
+    getColumnWidth,
+    selectedCell,
+    selection,
+    cellRangeSelection,
+    editingCell,
+    editValue,
+    editError,
+    setEditValue,
+    commitEdit,
+    handleCellMouseDown,
+    handleCellMouseEnter,
+    handleCellDoubleClick,
+    handleContextMenu,
+    autofillDragging,
+    autofillEndRow,
+    autofillPreview,
+    autofillColumnId,
+    handleAutofillStart,
+    handleAutofillMove,
+    highlightedCells,
+    isDraggingSelectionRef,
+    columns,
+  } = useGridContext()
+
   const inputRef = useRef<HTMLInputElement>(null)
+  const width = getColumnWidth(column.id)
+  const value = getDisplayValue(row.__rowId, column.id, row[column.id], row)
+
+  const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.columnId === column.id
+  const isCellSelected = selectedCell?.rowIndex === rowIndex && selectedCell?.columnId === column.id
+  const isColumnHighlighted = selection?.type === 'column' && selection.columnId === column.id
+  const isRowSelected = selection?.type === 'row' && selection.rowIndex === rowIndex
+  const isCellInRowSelected = selection?.type === 'cell' && selection.rowIndex === rowIndex
+
+  const colIndex = columns.findIndex(c => c.id === column.id)
+  const isInCellRange = cellRangeSelection !== null &&
+    rowIndex >= cellRangeSelection.startRow &&
+    rowIndex <= cellRangeSelection.endRow &&
+    colIndex >= cellRangeSelection.startColIndex &&
+    colIndex <= cellRangeSelection.endColIndex
+
+  const isSelectionTopEdge = isInCellRange && rowIndex === cellRangeSelection!.startRow
+  const isSelectionBottomEdge = isInCellRange && rowIndex === cellRangeSelection!.endRow
+  const isSelectionLeftEdge = isInCellRange && colIndex === cellRangeSelection!.startColIndex
+  const isSelectionRightEdge = isInCellRange && colIndex === cellRangeSelection!.endColIndex
+
+  const autofillPreviewValue = autofillPreview.find(
+    p => p.rowIndex === rowIndex && autofillColumnId.current === column.id
+  )?.value
+
+  const colIdxForAutofill = columns.findIndex(c => c.id === column.id)
+  const sourceEndRow = cellRangeSelection && colIdxForAutofill >= cellRangeSelection.startColIndex && colIdxForAutofill <= cellRangeSelection.endColIndex
+    ? cellRangeSelection.endRow
+    : (selection?.type === 'cell' && selection.columnId === column.id ? selection.rowIndex : null)
+
+  const isInAutofillRange = autofillDragging &&
+    sourceEndRow !== null &&
+    autofillEndRow !== null &&
+    autofillColumnId.current === column.id &&
+    rowIndex > sourceEndRow &&
+    rowIndex <= autofillEndRow
+
+  const isLastCellOfRange = cellRangeSelection !== null &&
+    rowIndex === cellRangeSelection.endRow &&
+    colIndex === cellRangeSelection.endColIndex
+  const showFillHandle = isEditable && !isEditing && (
+    (isCellSelected && !cellRangeSelection) ||
+    isLastCellOfRange
+  )
+
+  const isCellHighlighted = highlightedCells?.has(`${row.__rowId}:${column.id}`) ?? false
+  const isSelected = isCellSelected || isInCellRange
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -95,26 +123,30 @@ export function GridCell({
   }, [autofillPreviewValue, column.type])
 
   const isFormulaColumn = column.isComputed
+  const currentEditError = isEditing ? editError : null
 
   return (
     <div
-      onMouseDown={onMouseDown}
-      onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu}
-      onMouseEnter={onMouseEnter}
+      onMouseDown={(e) => handleCellMouseDown(rowIndex, column.id, e)}
+      onDoubleClick={() => handleCellDoubleClick(rowIndex, column.id, value)}
+      onContextMenu={(e) => handleContextMenu(e, 'cell', rowIndex, column.id)}
+      onMouseEnter={() => {
+        if (autofillDragging) handleAutofillMove(rowIndex)
+        if (isDraggingSelectionRef.current) handleCellMouseEnter(rowIndex, column.id)
+      }}
       className={`
         relative flex items-center px-2 text-sm overflow-hidden box-border
         ${isEditable && !isFormulaColumn ? 'cursor-cell' : 'cursor-default'}
-        ${isHighlighted && !isSelected && !isInCellRange ? 'bg-emerald-100 dark:bg-emerald-900/50 outline outline-2 outline-emerald-500' : ''}
-        ${isSelected && !isInCellRange && !editError ? 'bg-accent-green/20 dark:bg-accent-green/30 outline outline-2 outline-accent-green' : ''}
+        ${isCellHighlighted && !isSelected ? 'bg-emerald-100 dark:bg-emerald-900/50 outline outline-2 outline-emerald-500' : ''}
+        ${isSelected && !isInCellRange && !currentEditError ? 'bg-accent-green/20 dark:bg-accent-green/30 outline outline-2 outline-accent-green' : ''}
         ${isInCellRange ? 'bg-accent-green/20 dark:bg-accent-green/30' : ''}
-        ${editError ? 'outline outline-2 outline-red-500 bg-red-50 dark:bg-red-900/30' : ''}
+        ${currentEditError ? 'outline outline-2 outline-red-500 bg-red-50 dark:bg-red-900/30' : ''}
         ${isInAutofillRange ? 'bg-accent-green/10 dark:bg-accent-green/20' : ''}
-        ${(isColumnSelected || isRowSelected) && !isSelected && !isInAutofillRange && !isInCellRange && !isHighlighted ? 'bg-accent-green/5 dark:bg-accent-green/10' : ''}
+        ${(isColumnHighlighted || isRowSelected || isCellInRowSelected) && !isSelected && !isInAutofillRange && !isInCellRange && !isCellHighlighted ? 'bg-accent-green/5 dark:bg-accent-green/10' : ''}
         ${column.type === 'number' ? 'justify-end font-mono' : ''}
-        ${isFormulaColumn && !isSelected && !isInCellRange && !isHighlighted ? 'bg-purple-50/30 dark:bg-purple-900/10' : ''}
-        ${isEditable && !isEditing && !isSelected && !isInCellRange && !isFormulaColumn && !isHighlighted ? 'hover:bg-gray-50 dark:hover:bg-gray-800/50' : ''}
-        ${!isInCellRange && !isSelected && !isHighlighted ? 'border-r border-border-subtle' : ''}
+        ${isFormulaColumn && !isSelected && !isInCellRange && !isCellHighlighted ? 'bg-purple-50/30 dark:bg-purple-900/10' : ''}
+        ${isEditable && !isEditing && !isSelected && !isInCellRange && !isFormulaColumn && !isCellHighlighted ? 'hover:bg-gray-50 dark:hover:bg-gray-800/50' : ''}
+        ${!isInCellRange && !isSelected && !isCellHighlighted ? 'border-r border-border-subtle' : ''}
         ${isSelectionTopEdge ? 'border-t-2 border-t-accent-green' : ''}
         ${isSelectionBottomEdge ? 'border-b-2 border-b-accent-green' : ''}
         ${isSelectionLeftEdge ? 'border-l-2 border-l-accent-green' : ''}
@@ -129,15 +161,15 @@ export function GridCell({
             ref={inputRef}
             type="text"
             value={editValue}
-            onChange={(e) => onEditChange(e.target.value)}
-            onBlur={onBlur}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={commitEdit}
             className={`w-full h-full px-2 border-none outline-none text-sm bg-transparent ${
               column.type === 'number' ? 'text-right font-mono' : ''
-            } ${editError ? 'text-red-700 dark:text-red-300' : 'text-text-primary'}`}
+            } ${currentEditError ? 'text-red-700 dark:text-red-300' : 'text-text-primary'}`}
           />
-          {editError && (
+          {currentEditError && (
             <div className="absolute left-0 top-full mt-1 z-20 px-2 py-1 bg-red-500 text-white text-xs rounded shadow-lg whitespace-nowrap">
-              {editError}
+              {currentEditError}
             </div>
           )}
         </div>
@@ -158,7 +190,7 @@ export function GridCell({
               onMouseDown={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                onFillHandleMouseDown?.()
+                handleAutofillStart(rowIndex, column.id)
               }}
               className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 cursor-crosshair z-10 hover:bg-green-600"
               style={{ transform: 'translate(50%, 50%)' }}

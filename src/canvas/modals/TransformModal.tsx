@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
-import { JoinType, ColumnSchema, CellValue } from '@/types'
+import { JoinType } from '@/types'
 import { ensureTableMaterialized } from '@/engine/materializationService'
+import { analyzeMatch, findBestKeys } from '@/canvas/joinUtils'
 
 interface TransformModalProps {
   isOpen: boolean
@@ -112,44 +113,6 @@ function ColumnSelect({
 }
 
 
-function analyzeMatch(
-  leftData: Record<string, CellValue>[],
-  rightData: Record<string, CellValue>[],
-  leftKey: string,
-  rightKey: string
-) {
-  if (!leftKey || !rightKey || !leftData.length || !rightData.length) {
-    return { rows: 0, rate: 0 }
-  }
-  const leftVals = leftData.map(r => r[leftKey]).filter(v => v != null)
-  const rightSet = new Set(rightData.map(r => r[rightKey]).filter(v => v != null).map(String))
-  const matches = leftVals.filter(v => rightSet.has(String(v))).length
-  return {
-    rows: matches || leftData.length,
-    rate: leftVals.length ? Math.round((matches / leftVals.length) * 100) : 0
-  }
-}
-
-function findBestKeys(
-  leftCols: ColumnSchema[],
-  rightCols: ColumnSchema[],
-  leftData: Record<string, CellValue>[],
-  rightData: Record<string, CellValue>[]
-) {
-  let best: { left: string; right: string; score: number } | null = null
-  for (const lc of leftCols) {
-    for (const rc of rightCols) {
-      const ln = lc.name.toLowerCase().replace(/[^a-z0-9]/g, '')
-      const rn = rc.name.toLowerCase().replace(/[^a-z0-9]/g, '')
-      const nameScore = ln === rn ? 100 : ln.includes(rn) || rn.includes(ln) ? 50 : 0
-      const { rate } = analyzeMatch(leftData, rightData, lc.id, rc.id)
-      const score = nameScore * 0.3 + rate * 0.7
-      if (!best || score > best.score) best = { left: lc.id, right: rc.id, score }
-    }
-  }
-  return best && best.score > 15 ? best : null
-}
-
 
 export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: TransformModalProps) {
   const nodes = useProjectStore(s => s.nodes)
@@ -253,7 +216,6 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       <Dialog.Portal>
         <Dialog.Overlay className="join-overlay" />
         <Dialog.Content className="join-modal">
-          {/* Header */}
           <div className="join-header">
             <div className="join-header-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -272,9 +234,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
             </Dialog.Close>
           </div>
 
-          {/* Body */}
           <div className="join-body">
-            {/* Join Type */}
             <section className="join-section">
               <h3>Join Type</h3>
               <div className="join-types">
@@ -292,7 +252,6 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               </div>
             </section>
 
-            {/* Match Keys */}
             <section className="join-section">
               <h3>Match Columns</h3>
               <div className="join-keys">
@@ -325,7 +284,6 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               </div>
             </section>
 
-            {/* Columns */}
             <section className="join-section">
               <div className="join-section-header">
                 <h3>Output Columns</h3>
@@ -364,7 +322,6 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               </div>
             </section>
 
-            {/* Output Name */}
             <section className="join-section">
               <h3>Output Table Name</h3>
               <input
@@ -377,7 +334,6 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
             </section>
           </div>
 
-          {/* Footer */}
           <div className="join-footer">
             <Dialog.Close className="join-btn-cancel">Cancel</Dialog.Close>
             <button 

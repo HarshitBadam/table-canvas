@@ -1,8 +1,3 @@
-/**
- * Formula Parser
- * Builds AST from tokens and validates syntax
- */
-
 import { Token, TokenType, ASTNode, FormulaError } from './types'
 import { tokenize } from './tokenizer'
 
@@ -35,7 +30,6 @@ export class FormulaParser {
 
       const ast = this.parseExpression()
 
-      // Ensure we've consumed all tokens
       if (!this.isAtEnd()) {
         const token = this.peek()
         return {
@@ -77,7 +71,7 @@ export class FormulaParser {
 
     // Check type AND value before consuming to avoid eating wrong tokens
     while (this.check('LOGICAL') && this.peek().value === 'OR') {
-      this.advance() // Now consume the OR token
+      this.advance()
       const right = this.parseLogicalAnd()
       left = {
         type: 'BinaryExpression',
@@ -91,13 +85,12 @@ export class FormulaParser {
     return left
   }
 
-  // Logical AND
   private parseLogicalAnd(): ASTNode {
     let left = this.parseComparison()
 
     // Check type AND value before consuming to avoid eating wrong tokens
     while (this.check('LOGICAL') && this.peek().value === 'AND') {
-      this.advance() // Now consume the AND token
+      this.advance()
       const right = this.parseComparison()
       left = {
         type: 'BinaryExpression',
@@ -111,7 +104,6 @@ export class FormulaParser {
     return left
   }
 
-  // Comparison operators
   private parseComparison(): ASTNode {
     let left = this.parseAddition()
 
@@ -130,7 +122,6 @@ export class FormulaParser {
     return left
   }
 
-  // Addition and subtraction
   private parseAddition(): ASTNode {
     let left = this.parseMultiplication()
 
@@ -150,7 +141,6 @@ export class FormulaParser {
     return left
   }
 
-  // Multiplication, division, modulo
   private parseMultiplication(): ASTNode {
     let left = this.parsePower()
 
@@ -177,7 +167,7 @@ export class FormulaParser {
 
     if (this.check('OPERATOR') && this.peek().value === '^') {
       this.advance()
-      const right = this.parsePower() // Right associative
+      const right = this.parsePower()
       return {
         type: 'BinaryExpression',
         operator: '^',
@@ -190,7 +180,6 @@ export class FormulaParser {
     return left
   }
 
-  // Unary operators (NOT, negative)
   private parseUnary(): ASTNode {
     if (this.match('LOGICAL') && this.previous().value === 'NOT') {
       const argument = this.parseUnary()
@@ -369,29 +358,11 @@ class ParseError extends Error {
   }
 }
 
-/**
- * Parse a formula string into an AST
- */
 export function parseFormula(formula: string): ParseResult {
   const parser = new FormulaParser(formula)
   return parser.parse()
 }
 
-/**
- * Validate a formula without full parsing
- * Returns list of errors if any
- */
-export function validateFormula(formula: string): FormulaError[] {
-  const result = parseFormula(formula)
-  if (result.success) {
-    return []
-  }
-  return result.error ? [result.error] : []
-}
-
-/**
- * Extract column references from a formula
- */
 export function extractColumnReferences(formula: string): string[] {
   const result = parseFormula(formula)
   if (!result.success || !result.ast) {
@@ -424,5 +395,5 @@ export function extractColumnReferences(formula: string): string[] {
   }
 
   traverse(result.ast)
-  return [...new Set(columns)] // Remove duplicates
+  return [...new Set(columns)]
 }

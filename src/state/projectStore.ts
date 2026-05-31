@@ -20,7 +20,4 @@ export const useProjectStore = create<ProjectStoreState>()(
   }))
 )
 
-export const useCanUndo = () => useProjectStore((state) => state.history.past.length > 0)
-export const useCanRedo = () => useProjectStore((state) => state.history.future.length > 0)
-
 export type { ProjectStoreState } from './stores/types'

@@ -16,14 +16,10 @@ import {
   evaluateFormulaForRows,
   inferFormulaType, 
   validateFormulaWithColumns,
-  FormulaEvaluator
 } from './evaluator'
-import { parseFormula, extractColumnReferences } from './parser'
+import { extractColumnReferences } from './parser'
 import type { EvaluationContext } from './types'
 
-// ============================================================================
-// Test Fixtures
-// ============================================================================
 
 function createContext(
   row: Record<string, unknown>,
@@ -41,9 +37,6 @@ function createContext(
   }
 }
 
-// ============================================================================
-// Basic Arithmetic - Happy Path
-// ============================================================================
 
 describe('evaluateFormula - Arithmetic', () => {
   it('evaluates simple addition', () => {
@@ -132,9 +125,6 @@ describe('evaluateFormula - Arithmetic', () => {
   })
 })
 
-// ============================================================================
-// Column References
-// ============================================================================
 
 describe('evaluateFormula - Column References', () => {
   it('resolves column reference by name', () => {
@@ -225,9 +215,6 @@ describe('evaluateFormula - Column References', () => {
   })
 })
 
-// ============================================================================
-// String Operations
-// ============================================================================
 
 describe('evaluateFormula - Strings', () => {
   it('returns string literal', () => {
@@ -275,9 +262,6 @@ describe('evaluateFormula - Strings', () => {
   })
 })
 
-// ============================================================================
-// Comparison Operators
-// ============================================================================
 
 describe('evaluateFormula - Comparisons', () => {
   it('evaluates equality with =', () => {
@@ -341,9 +325,6 @@ describe('evaluateFormula - Comparisons', () => {
   })
 })
 
-// ============================================================================
-// Logical Operators
-// ============================================================================
 
 describe('evaluateFormula - Logical Operators', () => {
   it('evaluates AND operator', () => {
@@ -378,9 +359,6 @@ describe('evaluateFormula - Logical Operators', () => {
   })
 })
 
-// ============================================================================
-// Conditional Expressions (IF)
-// ============================================================================
 
 describe('evaluateFormula - IF Function', () => {
   it('evaluates IF with true condition', () => {
@@ -450,9 +428,6 @@ describe('evaluateFormula - IF Function', () => {
   })
 })
 
-// ============================================================================
-// Built-in Math Functions
-// ============================================================================
 
 describe('evaluateFormula - Math Functions', () => {
   it('evaluates SUM function', () => {
@@ -542,9 +517,6 @@ describe('evaluateFormula - Math Functions', () => {
   })
 })
 
-// ============================================================================
-// Built-in Text Functions
-// ============================================================================
 
 describe('evaluateFormula - Text Functions', () => {
   it('evaluates UPPER function', () => {
@@ -597,9 +569,6 @@ describe('evaluateFormula - Text Functions', () => {
   })
 })
 
-// ============================================================================
-// Built-in Logic Functions
-// ============================================================================
 
 describe('evaluateFormula - Logic Functions', () => {
   // Note: AND and OR in this parser are binary operators (e.g., TRUE AND FALSE)
@@ -657,9 +626,6 @@ describe('evaluateFormula - Logic Functions', () => {
   })
 })
 
-// ============================================================================
-// Built-in Date Functions
-// ============================================================================
 
 describe('evaluateFormula - Date Functions', () => {
   it('evaluates YEAR function', () => {
@@ -702,9 +668,6 @@ describe('evaluateFormula - Date Functions', () => {
   })
 })
 
-// ============================================================================
-// Edge Cases & Error Handling
-// ============================================================================
 
 describe('evaluateFormula - Edge Cases', () => {
   it('handles division by zero gracefully', () => {
@@ -767,9 +730,6 @@ describe('evaluateFormula - Edge Cases', () => {
   })
 })
 
-// ============================================================================
-// Batch Evaluation
-// ============================================================================
 
 describe('evaluateFormulaForRows', () => {
   it('evaluates formula for multiple rows', () => {
@@ -820,9 +780,6 @@ describe('evaluateFormulaForRows', () => {
   })
 })
 
-// ============================================================================
-// Type Inference
-// ============================================================================
 
 describe('inferFormulaType', () => {
   const columns = [
@@ -870,9 +827,6 @@ describe('inferFormulaType', () => {
   })
 })
 
-// ============================================================================
-// Validation
-// ============================================================================
 
 describe('validateFormulaWithColumns', () => {
   const columns = [
@@ -902,9 +856,6 @@ describe('validateFormulaWithColumns', () => {
   })
 })
 
-// ============================================================================
-// Parser - extractColumnReferences
-// ============================================================================
 
 describe('extractColumnReferences', () => {
   it('extracts single column reference', () => {

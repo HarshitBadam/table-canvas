@@ -23,7 +23,6 @@ const COLUMN_TYPES: { value: ColumnType; label: string; icon: string }[] = [
   { value: 'date', label: 'Date', icon: '◷' },
 ]
 
-// Custom dropdown component
 function TypeDropdown({ 
   value, 
   onChange 
@@ -165,7 +164,6 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
         <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-xl shadow-2xl w-full max-w-md z-50 overflow-hidden border border-border-elevation">
-          {/* Header */}
           <div className="px-5 pt-5 pb-4 border-b border-border-subtle">
             <Dialog.Title className="text-base font-semibold text-text-primary">
               Create New Table
@@ -175,9 +173,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
             </Dialog.Description>
           </div>
 
-          {/* Content */}
           <div className="px-5 py-4 space-y-5">
-            {/* Table Name */}
             <div>
               <label className="block text-xs font-medium text-text-tertiary uppercase tracking-wide mb-2">
                 Table Name
@@ -191,7 +187,6 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
               />
             </div>
 
-            {/* Row Count */}
             <div>
               <label className="block text-xs font-medium text-text-tertiary uppercase tracking-wide mb-2">
                 Rows
@@ -211,7 +206,6 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
               </div>
             </div>
 
-            {/* Columns */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <label className="text-xs font-medium text-text-tertiary uppercase tracking-wide">
@@ -228,7 +222,6 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                 </button>
               </div>
               
-              {/* Column rows */}
               <div className="space-y-2 max-h-52 overflow-y-auto">
                 {columns.map((col, index) => (
                   <div 
@@ -265,7 +258,6 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
             </div>
           </div>
 
-          {/* Footer */}
           <div className="px-5 py-4 border-t border-border-subtle flex items-center justify-between bg-surface-secondary/50">
             <span className="text-xs text-text-secondary">
               {rowCount} rows × {columns.length} columns

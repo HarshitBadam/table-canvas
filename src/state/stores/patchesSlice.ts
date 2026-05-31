@@ -2,9 +2,6 @@ import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, PatchesSliceState } from './types'
 import type { Patches } from '@/types'
 
-/**
- * Create initial empty patches object
- */
 export const createInitialPatches = (): Patches => ({
   cellPatches: {},
   deletedRows: new Set(),
@@ -32,7 +29,6 @@ export const createPatchesSlice: StateCreator<
       }
       patches.cellPatches[columnId][rowId] = value
 
-      // Mark the node as updated
       const node = state.nodes[tableId]
       if (node) {
         node.updatedAt = new Date().toISOString()
@@ -51,14 +47,12 @@ export const createPatchesSlice: StateCreator<
 
       state.patches[tableId].deletedRows.add(rowId)
 
-      // Update node
       const node = state.nodes[tableId]
       if (node) {
         node.updatedAt = new Date().toISOString()
       }
     })
 
-    // Mark all downstream nodes as dirty
     get().markNodeAndDescendantsDirty(tableId)
   },
 
@@ -74,14 +68,12 @@ export const createPatchesSlice: StateCreator<
         insertedAt: index,
       })
 
-      // Update node
       const node = state.nodes[tableId]
       if (node) {
         node.updatedAt = new Date().toISOString()
       }
     })
 
-    // Mark all downstream nodes as dirty
     get().markNodeAndDescendantsDirty(tableId)
   },
 

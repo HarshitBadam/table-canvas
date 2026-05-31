@@ -22,7 +22,6 @@ export interface ZipExportOptions {
 }
 
 /**
- * Build an XLSX workbook from all table nodes in the project.
  * Returns null if there are no tables.
  */
 async function buildExcelWorkbook(

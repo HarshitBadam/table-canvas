@@ -1,11 +1,3 @@
-/**
- * Files API Integration Tests
- * 
- * Tests for file upload, download, and management operations.
- * Note: GridFS operations require a full MongoDB connection,
- * so some tests verify behavior at the route/controller level.
- */
-
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import express, { Express, Request, Response, NextFunction } from 'express';
@@ -15,10 +7,10 @@ import {
   createTestFile,
   createMockUserId,
 } from '../test/helpers.js';
+import { setupMongoTestDB } from '../test/setup.js';
 
-// ============================================================================
-// Mock File Service
-// ============================================================================
+setupMongoTestDB();
+
 
 // We mock the file service since GridFS requires a real connection
 vi.mock('../services/file.service.js', () => ({
@@ -31,9 +23,6 @@ vi.mock('../services/file.service.js', () => ({
 
 import * as fileService from '../services/file.service.js';
 
-// ============================================================================
-// Test App Setup
-// ============================================================================
 
 interface MockUser {
   userId: string;
@@ -44,14 +33,11 @@ function createFileTestApp(mockUser: MockUser): Express {
   const app = express();
   app.use(express.json());
 
-  // Mock auth middleware
   app.use((req: Request, _res: Response, next: NextFunction) => {
     (req as any).user = mockUser;
     next();
   });
 
-  // Import routes dynamically to use mocked service
-  // For simplicity, we'll define test routes inline
   const router = express.Router();
 
   router.get('/', async (req: Request, res: Response) => {
@@ -112,9 +98,6 @@ describe('Files API', () => {
     app = createFileTestApp(mockUser);
   });
 
-  // ============================================================================
-  // GET /api/files - List Files
-  // ============================================================================
 
   describe('GET /api/files', () => {
     it('should return list of user files', async () => {
@@ -166,9 +149,6 @@ describe('Files API', () => {
     });
   });
 
-  // ============================================================================
-  // GET /api/files/:id - Download File
-  // ============================================================================
 
   describe('GET /api/files/:id', () => {
     it('should return file data for valid ID', async () => {
@@ -217,9 +197,6 @@ describe('Files API', () => {
     });
   });
 
-  // ============================================================================
-  // DELETE /api/files/:id - Delete File
-  // ============================================================================
 
   describe('DELETE /api/files/:id', () => {
     it('should delete file for authorized user', async () => {
@@ -261,9 +238,6 @@ describe('Files API', () => {
     });
   });
 
-  // ============================================================================
-  // File Model Integration Tests (uses in-memory DB)
-  // ============================================================================
 
   describe('File Model Integration', () => {
     it('should create and retrieve file metadata', async () => {
@@ -303,14 +277,12 @@ describe('Files API', () => {
 
       await file.softDelete();
 
-      // Should not appear in regular queries
       const found = await File.findByIdAndUser(
         file._id.toString(),
         userId.toString()
       );
       expect(found).toBeNull();
 
-      // Should appear in findWithDeleted
       const all = await File.findWithDeleted({ _id: file._id });
       expect(all).toHaveLength(1);
       expect(all[0].deletedAt).not.toBeNull();
@@ -350,9 +322,6 @@ describe('Files API', () => {
   });
 });
 
-// ============================================================================
-// Upload Tests (Multer integration)
-// ============================================================================
 
 describe('File Upload', () => {
   it('should accept CSV files', () => {

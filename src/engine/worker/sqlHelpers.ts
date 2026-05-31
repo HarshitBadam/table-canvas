@@ -1,4 +1,4 @@
-import type { CellValue } from '@/types'
+import type { CellValue, ColumnType } from '@/types'
 
 export function sanitizeTableName(tableId: string): string {
   return tableId.replace(/[^a-zA-Z0-9_]/g, '_')
@@ -14,7 +14,7 @@ export function mapTypeToDuckDB(type: string): string {
   }
 }
 
-export function mapDuckDBTypeToApp(duckType: string): 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'unknown' {
+export function mapDuckDBTypeToApp(duckType: string): ColumnType {
   const lower = duckType.toLowerCase()
   if (lower.includes('int') || lower.includes('float') || lower.includes('double') || lower.includes('decimal')) {
     return 'number'

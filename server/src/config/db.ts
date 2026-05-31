@@ -19,7 +19,6 @@ export async function connectDatabase(): Promise<void> {
     isConnected = true;
     console.log('[DB] Successfully connected to MongoDB');
 
-    // Handle connection events
     mongoose.connection.on('error', (err) => {
       console.error('[DB] MongoDB connection error:', err);
     });

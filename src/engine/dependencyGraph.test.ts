@@ -17,9 +17,6 @@ import {
 } from './dependencyGraph'
 import type { Edge, ProjectNode, SourceTableNode, DerivedTableNode } from '@/types'
 
-// ============================================================================
-// Test Fixtures
-// ============================================================================
 
 function createSourceTable(id: string, name: string): SourceTableNode {
   return {
@@ -67,9 +64,6 @@ function createEdge(from: string, to: string, index: number = 0): Edge {
   }
 }
 
-// ============================================================================
-// buildDependencyGraph Tests
-// ============================================================================
 
 describe('buildDependencyGraph', () => {
   it('should build empty graph for empty edges', () => {
@@ -113,9 +107,6 @@ describe('buildDependencyGraph', () => {
   })
 })
 
-// ============================================================================
-// Cycle Detection Tests
-// ============================================================================
 
 describe('wouldCreateCycle', () => {
   it('should detect self-loop as cycle', () => {
@@ -196,9 +187,6 @@ describe('detectCycles', () => {
   })
 })
 
-// ============================================================================
-// Topological Sort Tests
-// ============================================================================
 
 describe('getTopologicalOrder', () => {
   it('should return nodes in dependency order', () => {
@@ -294,9 +282,6 @@ describe('getComputationOrder', () => {
   })
 })
 
-// ============================================================================
-// Ancestor/Descendant Tests
-// ============================================================================
 
 describe('getAllDescendants', () => {
   it('should find all descendants', () => {
@@ -402,9 +387,6 @@ describe('getDirectUpstream and getDirectDownstream', () => {
   })
 })
 
-// ============================================================================
-// Utility Function Tests
-// ============================================================================
 
 describe('getNodeDepth', () => {
   it('should return 0 for root nodes', () => {

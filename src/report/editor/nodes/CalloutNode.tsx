@@ -1,9 +1,3 @@
-/**
- * CalloutNode - TipTap Custom Node for Callouts/Highlights
- * 
- * Creates callout blocks with different variants (info, success, warning, error, note).
- */
-
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, NodeViewProps } from '@tiptap/react';
 import { useState, useCallback, memo } from 'react';
@@ -94,7 +88,6 @@ const CalloutNodeView = memo(function CalloutNodeView({
         className={`callout-block callout-${attrs.variant} ${selected ? 'is-selected' : ''}`}
         style={{ position: 'relative' }}
       >
-        {/* Icon */}
         <span 
           className="callout-icon cursor-pointer"
           onClick={() => setShowVariantPicker(!showVariantPicker)}
@@ -103,12 +96,10 @@ const CalloutNodeView = memo(function CalloutNodeView({
           <IconComponent />
         </span>
 
-        {/* Content */}
         <div className="callout-content no-placeholder">
           <NodeViewContent className="no-placeholder" />
         </div>
 
-        {/* Variant Picker */}
         {showVariantPicker && selected && (
           <div 
             className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 p-1"
@@ -177,4 +168,3 @@ export const CalloutNode = Node.create({
   },
 });
 
-export default CalloutNode;

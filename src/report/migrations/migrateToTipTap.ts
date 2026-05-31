@@ -1,20 +1,10 @@
-/**
- * Migration utility for converting old block format to TipTap JSON
- */
-
 import type { Report, ReportBlock, TipTapContent, TipTapNode } from '../types';
 
-/**
- * Check if a report uses the old block format
- */
 export function needsMigration(report: Report): boolean {
   return !report.tiptapContent && report.blocks && report.blocks.length > 0;
 }
 
-/**
- * Convert old block format to TipTap JSON content
- */
-export function migrateBlocksToTipTap(blocks: ReportBlock[]): TipTapContent {
+function migrateBlocksToTipTap(blocks: ReportBlock[]): TipTapContent {
   const content: TipTapNode[] = [];
 
   for (const block of blocks) {
@@ -24,7 +14,6 @@ export function migrateBlocksToTipTap(blocks: ReportBlock[]): TipTapContent {
     }
   }
 
-  // Ensure at least one paragraph
   if (content.length === 0) {
     content.push({ type: 'paragraph' });
   }
@@ -35,9 +24,6 @@ export function migrateBlocksToTipTap(blocks: ReportBlock[]): TipTapContent {
   };
 }
 
-/**
- * Convert a single block to TipTap node
- */
 function convertBlockToNode(block: ReportBlock): TipTapNode | null {
   switch (block.type) {
     case 'text':
@@ -102,15 +88,11 @@ function convertBlockToNode(block: ReportBlock): TipTapNode | null {
   }
 }
 
-/**
- * Convert markdown-like text content to TipTap nodes
- */
 function convertTextBlock(content: string): TipTapNode {
   if (!content || content.trim() === '') {
     return { type: 'paragraph' };
   }
 
-  // Split by double newlines for paragraphs
   const paragraphs = content.split(/\n\n+/);
   
   if (paragraphs.length === 1) {
@@ -120,17 +102,12 @@ function convertTextBlock(content: string): TipTapNode {
     };
   }
 
-  // Multiple paragraphs - return just the first one
-  // (In a real implementation, you might want to return multiple nodes)
   return {
     type: 'paragraph',
     content: parseInlineContent(paragraphs[0]),
   };
 }
 
-/**
- * Parse inline content (bold, italic, code, links)
- */
 function parseInlineContent(text: string): TipTapNode[] {
   const nodes: TipTapNode[] = [];
   let remaining = text;
@@ -195,7 +172,6 @@ function parseInlineContent(text: string): TipTapNode[] {
       continue;
     }
 
-    // Fallback - take one character
     nodes.push({
       type: 'text',
       text: remaining[0],
@@ -206,9 +182,6 @@ function parseInlineContent(text: string): TipTapNode[] {
   return nodes.length > 0 ? nodes : [{ type: 'text', text: '' }];
 }
 
-/**
- * Migrate a report in place
- */
 export function migrateReport(report: Report): Report {
   if (!needsMigration(report)) {
     return report;

@@ -1,26 +1,14 @@
-/**
- * Chart Builder - Professional chart creation dialog
- */
-
 import { useState, useMemo, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
-import type { AggregationType, TableNode, ProjectNode } from '@/types'
-import { generateId } from '@/lib/utils'
-
-type ChartType = 'bar' | 'line' | 'pie' | 'scatter'
+import type { AggregationType, ChartType, TableNode, ProjectNode } from '@/types'
+import { isLikelyIdColumn, computeChartPosition, buildChartNodeSpec } from './chartBuilderUtils'
 
 interface ChartBuilderProps {
   isOpen: boolean
   onClose: () => void
   sourceTableId?: string
   preselectedColumn?: string
-}
-
-function isLikelyIdColumn(name: string): boolean {
-  const lower = name.toLowerCase()
-  return lower === 'id' || lower.endsWith('_id') || lower.endsWith('id') || 
-         lower.startsWith('id_') || lower === 'uuid' || lower === 'guid'
 }
 
 export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn }: ChartBuilderProps) {
@@ -86,24 +74,11 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
     if (!tableId || !xAxis) return
 
     saveSnapshot('Create chart')
-    const chartId = generateId()
-    const now = new Date().toISOString()
-    const sourceNode = nodes[tableId]
-    const position = sourceNode 
-      ? { x: sourceNode.ui.position.x + 350, y: sourceNode.ui.position.y + 100 }
-      : { x: 400, y: 200 }
+    const position = computeChartPosition(nodes[tableId])
+    const node = buildChartNodeSpec({ chartName, chartType, tableId, position, xAxis, yAxis, aggregation })
 
-    addNode({
-      id: chartId,
-      kind: 'chart',
-      name: chartName,
-      ui: { position },
-      plan: { chartType, sourceTableId: tableId, config: { xAxis, yAxis: yAxis || undefined, aggregation } },
-      createdAt: now,
-      updatedAt: now,
-    })
-
-    useProjectStore.getState().addEdge({ fromNodeId: tableId, toNodeId: chartId, transformType: 'select' })
+    addNode(node)
+    useProjectStore.getState().addEdge({ fromNodeId: tableId, toNodeId: node.id, transformType: 'select' })
     onClose()
   }
 
@@ -127,7 +102,6 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
             boxShadow: '0 24px 48px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05)',
           }}
         >
-          {/* Header */}
           <div 
             className="px-5 py-4 bg-accent-green"
           >
@@ -165,12 +139,8 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
             </div>
           </div>
           
-          {/* Content Container */}
           <div className="bg-white dark:bg-[#1f1f1f]">
-
-          {/* Content */}
           <div className="p-5 space-y-5">
-            {/* Chart Type */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
                 Chart Type
@@ -210,10 +180,8 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
               </div>
             </div>
 
-            {/* Data Configuration */}
             {selectedTable && (
               <div className="space-y-4">
-                {/* Category / X-Axis */}
                 <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -244,7 +212,6 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                   </div>
                 </div>
 
-                {/* Values / Y-Axis */}
                 <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -275,7 +242,6 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                   </div>
                 </div>
 
-                {/* Aggregation */}
                 {chartType !== 'scatter' && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
@@ -310,7 +276,6 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
             )}
           </div>
 
-          {/* Footer */}
           <div 
             className="px-5 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1a1a1a]"
           >
@@ -344,7 +309,6 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
   )
 }
 
-// Icons
 function BarIcon() {
   return (
     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">

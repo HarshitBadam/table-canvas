@@ -6,7 +6,6 @@ export async function saveCache(
   data: unknown
 ): Promise<void> {
   const db = await getDB()
-
   await db.put('cache', {
     tableId,
     type,
@@ -28,11 +27,9 @@ export async function clearTableCache(tableId: string): Promise<void> {
   const db = await getDB()
   const tx = db.transaction('cache', 'readwrite')
   const index = tx.store.index('by-table')
-
   const keysToDelete = await index.getAllKeys(tableId)
   for (const key of keysToDelete) {
     await tx.store.delete(key)
   }
-
   await tx.done
 }

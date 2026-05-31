@@ -1,32 +1,23 @@
-/**
- * Unit tests for Suggestion Engine
- * Tests cleaning detection logic including:
- * - Mixed case detection
- * - Placeholder detection
- * - Full suggestion generation
- */
-
 import { describe, it, expect } from 'vitest'
-import { 
-  __testing, 
-  generateSuggestions,
-  SuggestionEngineContext 
-} from './suggestionEngine'
-import type { ColumnSchema, ColumnProfile, TableSchema } from '@/types'
-
-const {
+import { generateSuggestions } from './engine'
+import type { SuggestionEngineContext } from './engine'
+import {
   hasMixedCase,
   findPlaceholders,
   getMixedCaseVariants,
   looksLikeIdColumn,
   hasSequentialPattern,
   hasLeadingTrailingWhitespace,
-  PLACEHOLDER_VALUES,
-} = __testing
+} from './engine/detection'
+import { PLACEHOLDER_VALUES } from './cleaningConstants'
+import {
+  classifyColumn,
+  isUniqueIdentifier,
+  classifyNumericColumn,
+  classifyStringColumn,
+} from './engine/classification'
+import type { ColumnSchema, ColumnProfile, TableSchema } from '@/types'
 
-// ============================================================================
-// Helper Function Tests
-// ============================================================================
 
 describe('hasLeadingTrailingWhitespace', () => {
   it('detects leading whitespace', () => {
@@ -307,9 +298,6 @@ describe('PLACEHOLDER_VALUES', () => {
   })
 })
 
-// ============================================================================
-// Integration Tests - Full Suggestion Generation
-// ============================================================================
 
 describe('generateSuggestions - Cleaning', () => {
   const createContext = (
@@ -520,16 +508,6 @@ describe('generateSuggestions - Cleaning', () => {
   })
 })
 
-// ============================================================================
-// Column Classification Tests
-// ============================================================================
-
-const {
-  classifyColumn,
-  isUniqueIdentifier,
-  classifyNumericColumn,
-  classifyStringColumn,
-} = __testing
 
 describe('classifyColumn', () => {
   it('classifies sequential numeric ID as unique_identifier', () => {
