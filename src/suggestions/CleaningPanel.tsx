@@ -1,24 +1,9 @@
-/**
- * CleaningPanel - Batch cleaning suggestions panel
- * Displays and applies data cleaning suggestions for source tables
- */
-
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
-import { useSuggestionsStore } from './suggestionsStore'
 import { computeSuggestionEffect } from './computeEffects'
-import { isPlaceholder } from './cleaningConstants'
-import { loadProfileForTable, useProfilingStore } from '@/profiling/profiler'
-import type { Suggestion, CellValue } from '@/types'
-
-// Types
-interface CellChange {
-  rowId: string
-  columnId: string
-  oldValue: CellValue
-  newValue: CellValue
-}
+import { useCleaningApply } from './useCleaningApply'
+import type { Suggestion } from '@/types'
 
 interface CleaningPanelProps {
   suggestions: Suggestion[]
@@ -28,26 +13,16 @@ interface CleaningPanelProps {
 }
 
 export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, onCountChange }: CleaningPanelProps) {
-  // Store hooks
-  const saveSnapshot = useProjectStore((state) => state.saveSnapshot)
-  const markNodeDirty = useProjectStore((state) => state.markNodeDirty)
-  const setHighlights = useProjectStore((state) => state.setHighlights)
   const node = useProjectStore((state) => state.getTableNode(tableId))
   const patches = useProjectStore((state) => state.patches[tableId])
   const tableData = useDataStore((state) => state.tableData[tableId])
-  const setTableData = useDataStore((state) => state.setTableData)
-  const clearSuggestionsCache = useSuggestionsStore((state) => state.clearCache)
-  
-  // Local state
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [isApplying, setIsApplying] = useState(false)
 
-  // Get existing highlights
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
   const existingHighlights = useMemo(() => {
     return patches?.highlightedCells || new Set<string>()
   }, [patches?.highlightedCells])
 
-  // Compute effects for each suggestion
   const suggestionsWithEffects = useMemo(() => {
     if (!tableData?.rows) return []
 
@@ -66,7 +41,6 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         return patchedRow
       })
     
-    // Add inserted rows
     if (patches?.insertedRows) {
       for (const inserted of patches.insertedRows) {
         const insertedRow: TableRow = { __rowId: inserted.rowId, ...inserted.values }
@@ -74,7 +48,6 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       }
     }
 
-    // Deduplicate suggestions by ID
     const seen = new Set<string>()
     const deduplicatedSuggestions = suggestions.filter(s => {
       if (seen.has(s.id)) return false
@@ -100,7 +73,6 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         return { suggestion, ...effect }
       })
       .filter(s => {
-        // Filter out highlight suggestions that are already applied
         if (s.operationType === 'review' && s.highlights.length > 0) {
           const allAlreadyHighlighted = s.highlights.every(h => existingHighlights.has(h))
           if (allAlreadyHighlighted) return false
@@ -111,12 +83,10 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
     return result
   }, [suggestions, tableData?.rows, patches?.cellPatches, patches?.deletedRows, patches?.insertedRows, existingHighlights])
 
-  // Report count to parent
   useEffect(() => {
     onCountChange?.(suggestionsWithEffects.length)
   }, [suggestionsWithEffects.length, onCountChange])
 
-  // Selection handlers
   const toggleSelection = useCallback((id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
@@ -137,176 +107,19 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
     setSelectedIds(new Set())
   }, [])
 
-  // Compute selected suggestions
   const selectedSuggestions = useMemo(() => {
     return suggestionsWithEffects.filter(s => selectedIds.has(s.suggestion.id))
   }, [suggestionsWithEffects, selectedIds])
 
   const selectedCount = selectedSuggestions.length
 
-  // Apply handler
-  const handleApply = useCallback(async () => {
-    const currentSelectedSuggestions = suggestionsWithEffects.filter(s => selectedIds.has(s.suggestion.id))
-    const currentSelectedCount = currentSelectedSuggestions.length
-
-    if (currentSelectedCount === 0 || !tableData?.rows) {
-      return
-    }
-
-    setIsApplying(true)
-
-    try {
-      const changesMap = new Map<string, CellChange>()
-      const allHighlights: string[] = []
-      
-      // Build merged rows for scanning
-      const mergedRows = tableData.rows
-        .filter(row => !patches?.deletedRows?.has(row.__rowId))
-        .map(row => {
-          const patchedRow = { ...row }
-          if (patches?.cellPatches) {
-            for (const [columnId, columnPatches] of Object.entries(patches.cellPatches)) {
-              if (columnPatches[row.__rowId] !== undefined) {
-                patchedRow[columnId] = columnPatches[row.__rowId]
-              }
-            }
-          }
-          return patchedRow
-        })
-      
-      // Add inserted rows
-      if (patches?.insertedRows) {
-        for (const inserted of patches.insertedRows) {
-          const insertedRow: TableRow = { __rowId: inserted.rowId, ...inserted.values }
-          mergedRows.push(insertedRow)
-        }
-      }
-      
-      // Separate nullify_placeholders from other operations
-      // We process nullify_placeholders LAST so it takes precedence over normalize_case
-      const placeholderSuggestions = currentSelectedSuggestions.filter(
-        s => s.suggestion.context.cleaningOperation?.type === 'nullify_placeholders'
-      )
-      const otherSuggestions = currentSelectedSuggestions.filter(
-        s => s.suggestion.context.cleaningOperation?.type !== 'nullify_placeholders'
-      )
-      
-      // Process other operations FIRST (like normalize_case, trim, etc.)
-      for (const item of otherSuggestions) {
-        for (const change of item.changes) {
-          const key = `${change.rowId}:${change.columnId}`
-          changesMap.set(key, change)
-        }
-        allHighlights.push(...item.highlights)
-      }
-      
-      // Process nullify_placeholders LAST - this ensures placeholders become null
-      // even if normalize_case tried to change "NULL" to "null" (string)
-      for (const item of placeholderSuggestions) {
-        const columnId = item.suggestion.context.columnId
-        if (columnId) {
-          for (const row of mergedRows) {
-            const value = row[columnId]
-            if (value === null || value === undefined) continue
-            
-            if (isPlaceholder(value)) {
-              const key = `${row.__rowId}:${columnId}`
-              changesMap.set(key, {
-                rowId: row.__rowId,
-                columnId,
-                oldValue: value,
-                newValue: null,
-              })
-            }
-          }
-        }
-        allHighlights.push(...item.highlights)
-      }
-      
-      const allChanges = Array.from(changesMap.values())
-
-      // Apply data changes
-      if (allChanges.length > 0) {
-        saveSnapshot('Apply cleaning operations')
-        
-        // Apply changes to rows
-        const updatedRows = mergedRows.map(row => {
-          const rowChanges = allChanges.filter(c => c.rowId === row.__rowId)
-          if (rowChanges.length === 0) return row
-          
-          const updatedRow = { ...row }
-          for (const change of rowChanges) {
-            updatedRow[change.columnId] = change.newValue === null ? null : change.newValue
-          }
-          return updatedRow
-        })
-        
-        // Set profile to loading to prevent stale suggestions
-        useProfilingStore.getState().clearAndStartLoading(tableId)
-        clearSuggestionsCache(tableId)
-        
-        // Update base data
-        setTableData(tableId, updatedRows)
-        
-        // Update patches - add changes to patches for consistency
-        useProjectStore.setState((state) => {
-          if (!state.patches[tableId]) {
-            state.patches[tableId] = {
-              cellPatches: {},
-              deletedRows: new Set(),
-              insertedRows: [],
-              highlightedCells: new Set(),
-            }
-          }
-          
-          const patches = state.patches[tableId]
-          if (!patches.cellPatches) {
-            patches.cellPatches = {}
-          }
-          
-          for (const change of allChanges) {
-            if (!patches.cellPatches[change.columnId]) {
-              patches.cellPatches[change.columnId] = {}
-            }
-            patches.cellPatches[change.columnId][change.rowId] = change.newValue
-          }
-          
-          const node = state.nodes[tableId]
-          if (node) {
-            node.updatedAt = new Date().toISOString()
-          }
-        })
-        
-        markNodeDirty(tableId)
-        await loadProfileForTable(tableId, true)
-      }
-
-      // Apply highlights
-      if (allHighlights.length > 0) {
-        setHighlights(tableId, allHighlights)
-      }
-
-      setSelectedIds(new Set())
-    } catch (error) {
-      console.error('[CleaningPanel] handleApply ERROR:', error)
-      throw error
-    } finally {
-      setIsApplying(false)
-    }
-  }, [
+  const { isApplying, handleApply } = useCleaningApply({
     suggestionsWithEffects,
     selectedIds,
-    tableData?.rows,
     tableId,
-    patches,
-    saveSnapshot,
-    setTableData,
-    markNodeDirty,
-    setHighlights,
-    clearSuggestionsCache,
-  ])
+    setSelectedIds,
+  })
 
-  // Early returns
   if (node?.kind !== 'source_table') {
     return (
       <div className="p-4 text-center">
@@ -339,7 +152,6 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="p-3 border-b border-border flex items-center justify-between">
         <span className="text-sm font-medium text-text-primary">
           {suggestionsWithEffects.length} issue{suggestionsWithEffects.length !== 1 ? 's' : ''}
@@ -361,7 +173,6 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         </div>
       </div>
 
-      {/* Suggestions list */}
       <div className="flex-1 overflow-y-auto">
         {suggestionsWithEffects.map(({ suggestion, changes, highlights, operationType }) => {
           const isSelected = selectedIds.has(suggestion.id)
@@ -407,7 +218,6 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         })}
       </div>
 
-      {/* Apply button */}
       <div className="p-3 border-t border-border">
         <button
           onClick={handleApply}
@@ -421,7 +231,6 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
   )
 }
 
-// Icons
 function FixIcon() {
   return (
     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

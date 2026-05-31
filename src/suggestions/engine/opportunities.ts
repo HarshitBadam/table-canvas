@@ -1,9 +1,3 @@
-/**
- * Data Opportunity Detection
- * 
- * Functions for detecting analysis opportunities in data.
- */
-
 import type { TableSchema, ColumnSchema, ColumnProfile } from '@/types';
 import { isAnalyzableNumeric, isGroupableCategory } from './classification';
 
@@ -14,9 +8,6 @@ export interface AggregationOpportunity {
   groupColumns: Array<{ column: ColumnSchema; profile?: ColumnProfile }>;
 }
 
-/**
- * Detect aggregation opportunities: numeric + category columns
- */
 export function detectAggregationOpportunities(
   schema: TableSchema,
   profiles?: ColumnProfile[]
@@ -57,9 +48,6 @@ export interface TimeSeriesOpportunity {
   suggestedPeriod: 'day' | 'week' | 'month' | 'quarter' | 'year';
 }
 
-/**
- * Detect time series analysis opportunities: date + numeric columns
- */
 export function detectTimeSeriesOpportunities(
   schema: TableSchema,
   profiles?: ColumnProfile[],
@@ -103,9 +91,6 @@ export interface ComparisonOpportunity {
   similarity: number;
 }
 
-/**
- * Detect comparison opportunities: two or more numeric columns
- */
 export function detectComparisonOpportunities(
   schema: TableSchema,
   profiles?: ColumnProfile[]

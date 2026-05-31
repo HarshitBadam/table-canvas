@@ -1,8 +1,11 @@
 import { memo, useCallback, useState, useRef, useEffect } from 'react'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { Handle, Position, NodeProps } from 'reactflow'
 import { TableSchema, CacheInfo, NodeUI, NodeViewMode, CellValue, ViewFilterConfig } from '@/types'
 import { formatNumber } from '@/lib/utils'
 import { MiniTableView } from './MiniTableView'
+import { NODE_WIDTH } from '../canvasConstants'
+import { ColumnTypeBadge } from '@/components/ColumnTypeBadge'
 
 interface TableNodeData {
   id: string
@@ -23,27 +26,7 @@ interface TableNodeData {
 }
 
 
-// Type badge colors - refined, muted tones (no green)
-function getTypeBadgeStyle(type: string): { bg: string; text: string } {
-  const t = type.toLowerCase()
-  if (t === 'number' || t === 'integer' || t === 'float' || t === 'double') {
-    return { bg: 'bg-blue-50 dark:bg-blue-500/15', text: 'text-blue-600 dark:text-blue-400' }
-  }
-  if (t === 'string' || t === 'varchar' || t === 'text') {
-    return { bg: 'bg-cyan-50 dark:bg-cyan-500/15', text: 'text-cyan-600 dark:text-cyan-400' }
-  }
-  if (t === 'boolean' || t === 'bool') {
-    return { bg: 'bg-amber-50 dark:bg-amber-500/15', text: 'text-amber-600 dark:text-amber-400' }
-  }
-  if (t === 'date' || t === 'datetime' || t === 'timestamp') {
-    return { bg: 'bg-purple-50 dark:bg-purple-500/15', text: 'text-purple-600 dark:text-purple-400' }
-  }
-  return { bg: 'bg-gray-100 dark:bg-gray-500/15', text: 'text-gray-500 dark:text-gray-400' }
-}
-
-// Helper to get current view mode from UI state
 function getViewMode(ui: NodeUI | undefined): NodeViewMode {
-  // If viewMode is explicitly set, use it
   if (ui?.viewMode) {
     // Handle legacy 'stats' mode - map to 'collapsed'
     if ((ui.viewMode as string) === 'stats') return 'collapsed'
@@ -54,7 +37,6 @@ function getViewMode(ui: NodeUI | undefined): NodeViewMode {
   return 'collapsed'
 }
 
-// View mode labels and icons (only schema and data now)
 const VIEW_MODE_CONFIG: Record<NodeViewMode, { label: string; icon: JSX.Element }> = {
   collapsed: {
     label: 'Schema',
@@ -74,7 +56,6 @@ const VIEW_MODE_CONFIG: Record<NodeViewMode, { label: string; icon: JSX.Element 
   },
 }
 
-// View mode dropdown component
 function ViewModeDropdown({ 
   currentMode, 
   onSelect,
@@ -87,7 +68,6 @@ function ViewModeDropdown({
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     if (!isOpen) return
     const handleClickOutside = (e: MouseEvent) => {
@@ -184,24 +164,18 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
     }
   }, [data])
 
-  // Fixed width for consistent edge connections
-  const NODE_WIDTH = 340
-
   return (
     <div
       className="rounded-2xl bg-surface transition-all duration-200 ease-out"
       style={{
         width: NODE_WIDTH,
-        // Strong shadow for depth - cards float above canvas
         boxShadow: selected
           ? `0 0 0 2px ${isSource ? '#217346' : 'rgb(139 92 246)'}, 0 12px 40px -8px rgba(0,0,0,0.25), 0 4px 16px -4px rgba(0,0,0,0.15)`
           : '0 4px 16px -4px rgba(0,0,0,0.15), 0 12px 32px -8px rgba(0,0,0,0.12), 0 0 0 1px var(--color-border-elevation)',
       }}
     >
-      {/* Header - clean, minimal */}
       <div className="px-4 py-3.5 bg-surface-secondary/80 rounded-t-2xl">
         <div className="flex items-center gap-3">
-          {/* Icon - muted green for source (app theme), violet for derived */}
           <div className={`
             w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0
             ${isSource 
@@ -231,7 +205,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             </p>
           </div>
           
-          {/* View mode dropdown */}
           <ViewModeDropdown 
             currentMode={viewMode} 
             onSelect={handleSetViewMode}
@@ -240,20 +213,15 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
         </div>
       </div>
 
-      {/* Body - iOS list style */}
       <div>
-        {/* Collapsed: Column list */}
         {viewMode === 'collapsed' && schema && schema.columns.length > 0 && (
           <div className="px-4 py-3">
             <div className="space-y-2">
               {schema.columns.slice(0, 4).map((col) => {
-                const typeStyle = getTypeBadgeStyle(col.type)
                 return (
                   <div key={col.id} className="flex items-center justify-between gap-3">
                     <span className="text-[13px] text-text-primary truncate">{col.name}</span>
-                    <span className={`text-[10px] font-medium uppercase px-1.5 py-0.5 rounded ${typeStyle.bg} ${typeStyle.text}`}>
-                      {col.type}
-                    </span>
+                    <ColumnTypeBadge type={col.type} />
                   </div>
                 )
               })}
@@ -266,7 +234,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
           </div>
         )}
 
-        {/* Data: Mini table view with actual data */}
         {viewMode === 'data' && schema && schema.columns.length > 0 && (
           <MiniTableView
             tableId={data.id}
@@ -277,9 +244,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
           />
         )}
 
-        {/* Status indicators - iOS alert style */}
         
-        {/* Error indicator */}
         {data.cacheInfo?.error && (
           <div className="px-4 py-2.5 text-[12px] font-medium text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 flex items-center gap-2">
             <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -291,17 +256,13 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
           </div>
         )}
         
-        {/* Computing indicator */}
         {data.cacheInfo?.isComputing && !data.cacheInfo?.error && (
           <div className="px-4 py-2.5 text-[12px] font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 flex items-center gap-2">
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <LoadingSpinner size="sm" />
             Computing...
           </div>
         )}
         
-        {/* Dirty indicator */}
         {data.cacheInfo?.isDirty && !data.cacheInfo?.error && !data.cacheInfo?.isComputing && (
           <div className="px-4 py-2.5 text-[12px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -314,7 +275,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
 
       {/* Connection handles - larger hit areas for easier connections */}
       
-      {/* LEFT handle - visible dot with extended hit area */}
       <Handle
         type="target"
         position={Position.Left}
@@ -328,7 +288,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
         className="table-handle table-handle-left !opacity-0"
       />
       
-      {/* RIGHT handle - visible dot with extended hit area */}
       <Handle
         type="source"
         position={Position.Right}
@@ -342,7 +301,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
         className="table-handle table-handle-right !opacity-0"
       />
       
-      {/* TOP handle - visible dot with extended hit area */}
       <Handle
         type="target"
         position={Position.Top}
@@ -356,7 +314,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
         className="table-handle table-handle-top !opacity-0"
       />
       
-      {/* BOTTOM handle - visible dot with extended hit area */}
       <Handle
         type="source"
         position={Position.Bottom}

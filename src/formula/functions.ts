@@ -8,5 +8,4 @@ export {
   registerFunction,
   executeFunction,
   getFunctionsByCategory,
-  getAllFunctions,
 } from './registry'

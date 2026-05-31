@@ -1,8 +1,3 @@
-/**
- * Formula Evaluator
- * Executes formulas against row data
- */
-
 import {
   ASTNode,
   FormulaValue,
@@ -10,6 +5,7 @@ import {
   FormulaResult,
   FormulaError,
 } from './types'
+import type { UserColumnType } from '@/types'
 import { parseFormula, extractColumnReferences } from './parser'
 import { builtInFunctions, executeFunction } from './functions'
 
@@ -73,7 +69,6 @@ export class FormulaEvaluator {
     const left = this.evaluate(leftNode)
     const right = this.evaluate(rightNode)
 
-    // Handle null values in arithmetic
     if (operator === '+' || operator === '-' || operator === '*' || operator === '/' || operator === '%' || operator === '^') {
       if (left === null || right === null) {
         return null
@@ -81,7 +76,6 @@ export class FormulaEvaluator {
     }
 
     switch (operator) {
-      // Arithmetic
       case '+':
         if (typeof left === 'string' || typeof right === 'string') {
           return String(left ?? '') + String(right ?? '')
@@ -106,7 +100,6 @@ export class FormulaEvaluator {
       case '^':
         return Math.pow(left as number, right as number)
 
-      // Comparison
       case '=':
       case '==':
         return left === right
@@ -127,7 +120,6 @@ export class FormulaEvaluator {
       case '<=':
         return (left as number) <= (right as number)
 
-      // Logical
       case 'AND':
         return Boolean(left) && Boolean(right)
       
@@ -185,9 +177,6 @@ export class FormulaEvaluator {
   }
 }
 
-/**
- * Evaluate a formula string against row data
- */
 export function evaluateFormula(
   formula: string,
   context: EvaluationContext
@@ -205,7 +194,7 @@ export function evaluateFormula(
     const evaluator = new FormulaEvaluator(context)
     const value = evaluator.evaluate(parseResult.ast)
 
-    let inferredType: 'string' | 'number' | 'boolean' | 'date' | undefined
+    let inferredType: UserColumnType | undefined
     if (typeof value === 'number') {
       inferredType = 'number'
     } else if (typeof value === 'boolean') {
@@ -231,9 +220,6 @@ export function evaluateFormula(
   }
 }
 
-/**
- * Evaluate a formula for multiple rows (batch evaluation)
- */
 export function evaluateFormulaForRows(
   formula: string,
   rows: Array<Record<string, FormulaValue>>,
@@ -242,7 +228,6 @@ export function evaluateFormulaForRows(
   const parseResult = parseFormula(formula)
   
   if (!parseResult.success || !parseResult.ast) {
-    // Return same error for all rows
     return rows.map(() => ({
       success: false,
       error: parseResult.error,
@@ -255,7 +240,7 @@ export function evaluateFormulaForRows(
       const evaluator = new FormulaEvaluator(context)
       const value = evaluator.evaluate(parseResult.ast!)
 
-      let inferredType: 'string' | 'number' | 'boolean' | 'date' | undefined
+      let inferredType: UserColumnType | undefined
       if (typeof value === 'number') {
         inferredType = 'number'
       } else if (typeof value === 'boolean') {
@@ -282,9 +267,6 @@ export function evaluateFormulaForRows(
   })
 }
 
-/**
- * Infer the result type of a formula without evaluating it
- */
 export function inferFormulaType(
   formula: string,
   columns: Array<{ id: string; name: string; type: string }>
@@ -326,7 +308,6 @@ function inferNodeType(
       if (['=', '==', '<>', '!=', '>', '<', '>=', '<='].includes(op)) {
         return 'boolean'
       }
-      // Logical operators return boolean
       if (['AND', 'OR'].includes(op)) {
         return 'boolean'
       }
@@ -338,7 +319,6 @@ function inferNodeType(
           return 'string'
         }
       }
-      // Other arithmetic returns number
       return 'number'
     }
 
@@ -348,19 +328,15 @@ function inferNodeType(
 
     case 'FunctionCall': {
       const funcName = node.name.toUpperCase()
-      // Math functions return number
       if (['SUM', 'AVG', 'MIN', 'MAX', 'COUNT', 'ROUND', 'ABS', 'FLOOR', 'CEIL', 'POWER', 'SQRT', 'MOD', 'LEN'].includes(funcName)) {
         return 'number'
       }
-      // Text functions return string
       if (['CONCAT', 'UPPER', 'LOWER', 'TRIM', 'LEFT', 'RIGHT', 'MID', 'SUBSTITUTE', 'REPLACE', 'TEXT'].includes(funcName)) {
         return 'string'
       }
-      // Logic functions return boolean
       if (['AND', 'OR', 'NOT', 'ISNULL'].includes(funcName)) {
         return 'boolean'
       }
-      // Date functions
       if (['NOW', 'TODAY', 'DATE'].includes(funcName)) {
         return 'date'
       }
@@ -379,9 +355,6 @@ function inferNodeType(
   }
 }
 
-/**
- * Check if a formula is valid for given columns
- */
 export function validateFormulaWithColumns(
   formula: string,
   columns: Array<{ id: string; name: string; type: string }>
@@ -396,7 +369,6 @@ export function validateFormulaWithColumns(
     return errors
   }
 
-  // Check that all referenced columns exist
   const columnRefs = extractColumnReferences(formula)
   for (const ref of columnRefs) {
     const column = columns.find(

@@ -1,38 +1,24 @@
-/**
- * Column Classification System
- * 
- * Classifies columns for intelligent suggestion generation.
- * Determines what types of analysis/charts make sense for each column.
- */
-
 import type { ColumnSchema, ColumnProfile, ColumnClassification } from '@/types';
 import { hasSequentialPattern } from './detection';
 
 
-/**
- * Classify a column for intelligent suggestion generation.
- */
 export function classifyColumn(
   col: ColumnSchema, 
   profile: ColumnProfile | undefined,
   rowCount: number
 ): ColumnClassification {
-  // 1. Check for unique identifiers first (most important to filter out)
   if (isUniqueIdentifier(col, profile, rowCount)) {
     return 'unique_identifier';
   }
   
-  // 2. Temporal columns
   if (col.type === 'date' || col.type === 'datetime') {
     return 'temporal';
   }
   
-  // 3. Numeric columns
   if (col.type === 'number') {
     return classifyNumericColumn(col, profile, rowCount);
   }
   
-  // 4. String columns
   if (col.type === 'string') {
     return classifyStringColumn(col, profile, rowCount);
   }
@@ -49,7 +35,6 @@ export function isUniqueIdentifier(
   profile: ColumnProfile | undefined,
   rowCount: number
 ): boolean {
-  // Name-based detection patterns
   const name = col.name.toLowerCase();
   const idPatterns = [
     /^id$/,           // exactly "id"
@@ -70,18 +55,14 @@ export function isUniqueIdentifier(
   // Also check if name ends with "id" and is short (e.g., "userid", "productid")
   const endsWithId = name.endsWith('id') && name.length <= 15 && name.length > 2;
   
-  // Semantic hint check
   if (col.semanticHints?.includes('id')) return true;
   
-  // Profile-based detection
   if (profile) {
     // Key candidate from profiler (>95% unique, <1% null)
     if (profile.isKeyCandidate) return true;
     
-    // Uniqueness ratio > 95% with additional checks
     const uniquenessRatio = profile.distinctCount / Math.max(rowCount, 1);
     if (uniquenessRatio > 0.95) {
-      // If numeric, check for sequential pattern
       if (col.type === 'number' && profile.stdDev !== undefined && profile.min !== undefined && profile.max !== undefined) {
         const range = profile.max - profile.min;
         if (range > 0) {
@@ -100,10 +81,8 @@ export function isUniqueIdentifier(
         }
       }
       
-      // String with high uniqueness AND ID-like name
       if ((hasIdName || endsWithId) && col.type === 'string') return true;
       
-      // Check for sequential string pattern (PROD001, PROD002...)
       if (col.type === 'string' && profile.topValues && profile.topValues.length >= 3) {
         if (hasSequentialPattern(profile.topValues.map(v => String(v.value)))) {
           return true;
@@ -112,7 +91,6 @@ export function isUniqueIdentifier(
     }
   }
   
-  // Strong name-based signals without profile
   if (hasIdName && name.length <= 12) return true;
   if (endsWithId) return true;
   
@@ -120,9 +98,6 @@ export function isUniqueIdentifier(
 }
 
 
-/**
- * Classify a numeric column as continuous or discrete
- */
 export function classifyNumericColumn(
   _col: ColumnSchema,
   profile: ColumnProfile | undefined,
@@ -145,7 +120,6 @@ export function classifyNumericColumn(
   // Integer values with small range might be discrete
   if (profile.min !== undefined && profile.max !== undefined) {
     const range = profile.max - profile.min;
-    // If range is small and all values are likely integers
     if (range <= 20 && profile.distinctCount <= range + 1) {
       return 'discrete_numeric';
     }
@@ -155,9 +129,6 @@ export function classifyNumericColumn(
 }
 
 
-/**
- * Classify a string column by cardinality
- */
 export function classifyStringColumn(
   col: ColumnSchema,
   profile: ColumnProfile | undefined,
@@ -167,7 +138,6 @@ export function classifyStringColumn(
   
   const distinctRatio = profile.distinctCount / Math.max(rowCount, 1);
   
-  // Check for semantic hints that indicate category
   if (col.semanticHints?.includes('category')) {
     return profile.distinctCount <= 20 ? 'low_cardinality_cat' : 'high_cardinality_cat';
   }
@@ -194,11 +164,9 @@ export function isAnalyzableNumeric(col: ColumnSchema, profile?: ColumnProfile):
   if (col.type !== 'number') return false;
   if (!profile) return true; // Assume analyzable without profile
   
-  // Skip if it looks like an ID
   if (profile.isKeyCandidate) return false;
   if (col.semanticHints?.includes('id')) return false;
   
-  // Must have some variance
   if (profile.stdDev !== undefined && profile.stdDev === 0) return false;
   
   return true;
@@ -211,25 +179,13 @@ export function isGroupableCategory(col: ColumnSchema, profile?: ColumnProfile):
   if (col.type !== 'string') return false;
   if (!profile) return true; // Assume groupable without profile
   
-  // Skip if it looks like an ID
   if (profile.isKeyCandidate) return false;
   if (col.semanticHints?.includes('id')) return false;
   
   // Must have reasonable cardinality (not too high)
   const distinctCount = profile.distinctCount ?? 0;
-  if (distinctCount > 100) return false; // Too many categories
-  if (distinctCount < 2) return false; // Not enough categories
+  if (distinctCount > 100) return false;
+  if (distinctCount < 2) return false;
   
   return true;
-}
-
-/**
- * Check if column looks like a category based on name
- */
-export function looksLikeCategoryByName(columnName: string): boolean {
-  const name = columnName.toLowerCase();
-  return name.includes('category') || name.includes('type') || name.includes('status') ||
-         name.includes('group') || name.includes('class') || name.includes('segment') ||
-         name.includes('region') || name.includes('country') || name.includes('state') ||
-         name.includes('department') || name.includes('product') || name.includes('brand');
 }

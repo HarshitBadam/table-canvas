@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { Handle, Position, NodeProps } from 'reactflow'
 import { ChartNode as ChartNodeType, TableNode } from '@/types'
 import { MiniChart } from '@/charts/ChartRenderer'
@@ -33,7 +34,6 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
   const columns = sourceTable?.schema?.columns
   const { data: chartData, loading, error } = useChartData(sourceTableId, config, sourceVersionHash, columns)
 
-  // Chart type colors for subtle accents
   const typeColors: Record<string, string> = {
     bar: '#217346',
     line: '#2563eb',
@@ -54,7 +54,6 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
         }
       `}
     >
-      {/* Header - Clean, no top stripe */}
       <div className="px-3 py-2 border-b border-border-subtle bg-surface-secondary/50">
         <div className="flex items-center gap-2">
           <div 
@@ -81,9 +80,7 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
         </div>
       </div>
 
-      {/* Chart Area with grid background */}
       <div className="relative px-2 py-2 bg-surface">
-        {/* Subtle grid pattern */}
         <div 
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -94,11 +91,8 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
         />
         
         {loading ? (
-          <div className="relative h-[110px] flex items-center justify-center">
-            <div 
-              className="w-4 h-4 border-2 border-border rounded-full animate-spin"
-              style={{ borderTopColor: accentColor }}
-            />
+          <div className="relative h-[110px] flex items-center justify-center" style={{ color: accentColor }}>
+            <LoadingSpinner size="sm" />
           </div>
         ) : error ? (
           <div className="relative h-[110px] flex flex-col items-center justify-center px-3 text-center">
@@ -132,7 +126,6 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
         )}
       </div>
 
-      {/* Footer */}
       <div className="px-3 py-1.5 bg-surface-secondary/80 border-t border-border-subtle">
         <div className="flex items-center justify-between text-[9px] text-text-secondary">
           {chartType === 'pie' ? (
@@ -150,7 +143,6 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
         </div>
       </div>
 
-      {/* Connection Handles */}
       <Handle
         type="target"
         position={Position.Left}

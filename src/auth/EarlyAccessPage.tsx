@@ -1,15 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 
-/**
- * Early Access Page - Shown when users try to register
- */
 export function EarlyAccessPage() {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-canvas p-4">
       <div className="w-full max-w-md">
-        {/* Logo/Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-accent-green/10 flex items-center justify-center">
             <svg
@@ -30,10 +26,8 @@ export function EarlyAccessPage() {
           <p className="text-sm text-text-secondary mt-1">Early Access Program</p>
         </div>
 
-        {/* Message Card */}
         <div className="bg-surface border border-border rounded-xl p-6 shadow-lg">
           <div className="text-center">
-            {/* Info Icon */}
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-accent-blue/10 flex items-center justify-center">
               <svg
                 className="w-6 h-6 text-accent-blue"
@@ -96,7 +90,6 @@ export function EarlyAccessPage() {
           </div>
         </div>
 
-        {/* Footer */}
         <p className="mt-6 text-center text-xs text-text-tertiary">
           Already have an account? Go back to the login page to sign in.
         </p>

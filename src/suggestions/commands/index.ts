@@ -1,23 +1,15 @@
-export type { SuggestionCommand, CommandResult, ToastType, ToastNotification } from './types'
-export { setToastHandler, showToast } from './types'
+export type { ToastNotification } from './types'
+export { setToastHandler } from './types'
 
-export { CreateDerivedTableCommand } from './tableCommands'
-export { ApplyPatchCommand } from './tableCommands'
-
-export { CreateChartCommand } from './chartCommand'
-
-export { HighlightCellsCommand } from './utilityCommands'
-export { LaunchRecipeCommand } from './utilityCommands'
 export { setRecipeWizardCallback, executeRecipeTransform } from './utilityCommands'
 
 import type { Suggestion } from '@/types'
 import type { SuggestionCommand, CommandResult } from './types'
-import { CreateDerivedTableCommand } from './tableCommands'
+import { CreateDerivedTableCommand, ApplyPatchCommand } from './tableCommands'
 import { CreateChartCommand } from './chartCommand'
-import { ApplyPatchCommand } from './tableCommands'
 import { HighlightCellsCommand, LaunchRecipeCommand } from './utilityCommands'
 
-export function createCommand(suggestion: Suggestion): SuggestionCommand | null {
+function createCommand(suggestion: Suggestion): SuggestionCommand | null {
   const action = suggestion.action
 
   switch (action.kind) {

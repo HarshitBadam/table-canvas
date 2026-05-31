@@ -1,9 +1,3 @@
-/**
- * Suggestion Engine Core
- * 
- * Main generation functions for producing suggestions.
- */
-
 import type { Suggestion, TransformDef } from '@/types';
 import { 
   SuggestionEngineContext, 
@@ -22,9 +16,6 @@ interface ScoredSuggestion {
 }
 
 
-/**
- * Generate all suggestions for a table
- */
 export function generateSuggestions(context: SuggestionEngineContext): Suggestion[] {
   const scored: ScoredSuggestion[] = [];
   
@@ -33,7 +24,6 @@ export function generateSuggestions(context: SuggestionEngineContext): Suggestio
     profile: context.profile,
   };
   
-  // Process table-scoped rules
   const tableRules = getTableRules();
   
   for (const rule of tableRules) {
@@ -44,12 +34,11 @@ export function generateSuggestions(context: SuggestionEngineContext): Suggestio
         const score = rule.score(context, meta);
         scored.push({ suggestion, score });
       }
-    } catch {
-      // Rule evaluation failed, skip
+    } catch (error) {
+      console.error('[SuggestionEngine] Table rule evaluation failed:', error);
     }
   }
   
-  // Process column-scoped rules for each column
   const columnRules = getColumnRules();
   
   for (const column of context.schema.columns) {
@@ -66,13 +55,12 @@ export function generateSuggestions(context: SuggestionEngineContext): Suggestio
           const score = rule.score(context, columnMeta);
           scored.push({ suggestion, score });
         }
-      } catch {
-        // Rule evaluation failed, skip
+      } catch (error) {
+        console.error('[SuggestionEngine] Column rule evaluation failed:', error);
       }
     }
   }
   
-  // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
   
   // Apply limits: 10 cleaning, 3 analysis, 2 recipes, max 15 total
@@ -93,9 +81,6 @@ export function generateSuggestions(context: SuggestionEngineContext): Suggestio
   return result;
 }
 
-/**
- * Get contextual suggestions for a selected column
- */
 export function getColumnSuggestions(context: SuggestionEngineContext): Suggestion[] {
   if (!context.selectedColumnId) return [];
   
@@ -111,7 +96,6 @@ export function getColumnSuggestions(context: SuggestionEngineContext): Suggesti
     columnProfile: context.profile?.columns.find(p => p.columnId === column.id),
   };
   
-  // Only process column-scoped rules for the selected column
   for (const rule of getColumnRules()) {
     if (rule.when(context, meta)) {
       const suggestion = rule.build(context, meta);
@@ -130,7 +114,6 @@ export function getColumnSuggestions(context: SuggestionEngineContext): Suggesti
     if (rule.when(context, tableMeta)) {
       const suggestion = rule.build(context, tableMeta);
       
-      // Check if this suggestion involves the selected column
       const action = suggestion.action;
       let involvesColumn = false;
       
@@ -156,7 +139,6 @@ export function getColumnSuggestions(context: SuggestionEngineContext): Suggesti
     }
   }
   
-  // Sort by score and apply limits
   scored.sort((a, b) => b.score - a.score);
   
   const result: Suggestion[] = [];

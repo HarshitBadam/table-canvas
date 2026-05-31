@@ -1,53 +1,26 @@
-export interface ContextMenuState {
-  x: number
-  y: number
-  type: 'cell' | 'row' | 'column' | 'header' | 'index' | 'corner'
-  rowIndex?: number
-  columnId?: string
-}
+export type { ContextMenuState } from './types'
+import { useGridContext } from './GridContext'
 
-interface GridContextMenuProps {
-  contextMenu: ContextMenuState | null
-  filteredRows: { __rowId: string }[]
-  cellRangeSelection: {
-    startRow: number
-    endRow: number
-    startColIndex: number
-    endColIndex: number
-  } | null
-  highlightedCells: Set<string> | undefined
-  onInsertRowAbove: () => void
-  onInsertRowBelow: () => void
-  onDeleteRow: () => void
-  onInsertColumnLeft: () => void
-  onInsertColumnRight: () => void
-  onInsertRowAtBeginning: () => void
-  onInsertColumnAtBeginning: () => void
-  onToggleHighlight: () => void
-  onToggleCellHighlight: (tableId: string, rowId: string, columnId: string) => void
-  onCreateChart: (columnId: string) => void
-  onClose: () => void
-  tableId: string
-}
+export function GridContextMenu() {
+  const {
+    contextMenu,
+    filteredRows,
+    cellRangeSelection,
+    highlightedCells,
+    onInsertRowAbove,
+    onInsertRowBelow,
+    onDeleteRow,
+    onInsertColumnLeft,
+    onInsertColumnRight,
+    onInsertRowAtBeginning,
+    onInsertColumnAtBeginning,
+    toggleHighlightForSelection,
+    onToggleCellHighlight,
+    onCreateChart,
+    closeContextMenu,
+    tableId,
+  } = useGridContext()
 
-export function GridContextMenu({
-  contextMenu,
-  filteredRows,
-  cellRangeSelection,
-  highlightedCells,
-  onInsertRowAbove,
-  onInsertRowBelow,
-  onDeleteRow,
-  onInsertColumnLeft,
-  onInsertColumnRight,
-  onInsertRowAtBeginning,
-  onInsertColumnAtBeginning,
-  onToggleHighlight,
-  onToggleCellHighlight,
-  onCreateChart,
-  onClose,
-  tableId,
-}: GridContextMenuProps) {
   if (!contextMenu) return null
 
   return (
@@ -56,7 +29,6 @@ export function GridContextMenu({
       style={{ left: contextMenu.x, top: contextMenu.y }}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Row operations */}
       {(contextMenu.type === 'cell' || contextMenu.type === 'row') && (
         <>
           <button
@@ -90,7 +62,6 @@ export function GridContextMenu({
         </>
       )}
       
-      {/* Highlight cell option - only for cells */}
       {contextMenu.type === 'cell' && contextMenu.rowIndex !== undefined && contextMenu.columnId && (
         <>
           <div className="border-t border-border my-1" />
@@ -102,11 +73,11 @@ export function GridContextMenu({
               <button
                 onClick={() => {
                   if (cellRangeSelection) {
-                    onToggleHighlight()
+                    toggleHighlightForSelection()
                   } else if (row) {
                     onToggleCellHighlight(tableId, row.__rowId, contextMenu.columnId!)
                   }
-                  onClose()
+                  closeContextMenu()
                 }}
                 className={`w-full px-3 py-2 text-sm text-left flex items-center gap-2 ${
                   isCurrentlyHighlighted 
@@ -131,7 +102,6 @@ export function GridContextMenu({
         </>
       )}
       
-      {/* Column operations from header context menu */}
       {contextMenu.type === 'header' && (
         <>
           <button
@@ -146,7 +116,6 @@ export function GridContextMenu({
         </>
       )}
       
-      {/* Corner context menu */}
       {contextMenu.type === 'corner' && (
         <>
           <button
@@ -170,7 +139,6 @@ export function GridContextMenu({
         </>
       )}
       
-      {/* Index column context menu */}
       {contextMenu.type === 'index' && (
         <>
           <button
@@ -185,7 +153,6 @@ export function GridContextMenu({
         </>
       )}
       
-      {/* Column operations */}
       {(contextMenu.type === 'cell' || contextMenu.type === 'column') && contextMenu.columnId && (
         <>
           {contextMenu.type === 'cell' && <div className="border-t border-border my-1" />}
@@ -211,7 +178,7 @@ export function GridContextMenu({
           <button
             onClick={() => {
               onCreateChart(contextMenu.columnId!)
-              onClose()
+              closeContextMenu()
             }}
             className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
           >

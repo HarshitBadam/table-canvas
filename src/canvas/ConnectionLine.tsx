@@ -1,15 +1,5 @@
 import { ConnectionLineComponentProps, getSmoothStepPath } from 'reactflow'
 
-/**
- * Custom connection line component that provides clear visual feedback
- * when dragging a new connection from a node handle.
- * 
- * Features:
- * - Animated dashed line
- * - Glowing effect for visibility
- * - Pulsing target indicator
- * - Smooth step path for clean routing
- */
 export function CustomConnectionLine({
   fromX,
   fromY,
@@ -32,7 +22,6 @@ export function CustomConnectionLine({
 
   return (
     <g className="react-flow__connection">
-      {/* Outer glow layer - large blur for ambient effect */}
       <path
         d={path}
         fill="none"
@@ -42,7 +31,6 @@ export function CustomConnectionLine({
         filter="url(#connectionGlow)"
       />
       
-      {/* Middle glow layer */}
       <path
         d={path}
         fill="none"
@@ -52,7 +40,6 @@ export function CustomConnectionLine({
         className="animate-pulse"
       />
       
-      {/* Main connection line - animated dash */}
       <path
         d={path}
         fill="none"
@@ -63,7 +50,6 @@ export function CustomConnectionLine({
         className="connection-line-animated"
       />
       
-      {/* Source indicator - small dot at start */}
       <circle
         cx={fromX}
         cy={fromY}
@@ -73,7 +59,6 @@ export function CustomConnectionLine({
         strokeWidth={2}
       />
       
-      {/* Target indicator - pulsing ring at cursor */}
       <circle
         cx={toX}
         cy={toY}
@@ -84,7 +69,6 @@ export function CustomConnectionLine({
         className="connection-target-ring"
       />
       
-      {/* Target indicator - inner filled circle */}
       <circle
         cx={toX}
         cy={toY}
@@ -95,7 +79,6 @@ export function CustomConnectionLine({
         className="animate-pulse"
       />
       
-      {/* SVG Filter for glow effect */}
       <defs>
         <filter id="connectionGlow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />

@@ -1,5 +1,5 @@
 import { useMemo, memo } from 'react'
-import type { ChartConfig, CellValue } from '@/types'
+import type { ChartConfig, ChartType, CellValue } from '@/types'
 import { useTheme } from '@/components/ThemeToggle'
 import { DEFAULT_COLORS, CHART_THEME, detectTimestamps } from './chartShared'
 import type { ChartTypeProps } from './chartShared'
@@ -9,7 +9,7 @@ import { PieChartRenderer } from './PieChartRenderer'
 import { ScatterChartRenderer } from './ScatterChartRenderer'
 
 interface ChartRendererProps {
-  type: 'bar' | 'line' | 'pie' | 'scatter'
+  type: ChartType
   config: ChartConfig
   data: Record<string, CellValue>[]
   height?: number
@@ -159,7 +159,7 @@ export function MiniChart({
   compact = true,
   columnNames = {},
 }: {
-  type: 'bar' | 'line' | 'pie' | 'scatter'
+  type: ChartType
   config: ChartConfig
   data: Record<string, CellValue>[]
   height?: number

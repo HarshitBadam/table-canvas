@@ -4,9 +4,6 @@
  * Custom utilities, animations, and helper classes.
  */
 
-/* ============================================================================
-   Custom Utility Classes
-   ============================================================================ */
 
 @layer utilities {
   .text-balance {
@@ -17,18 +14,8 @@
     scrollbar-width: thin;
   }
 
-  .scrollbar-none {
-    scrollbar-width: none;
-  }
-
-  .scrollbar-none::-webkit-scrollbar {
-    display: none;
-  }
 }
 
-/* ============================================================================
-   Animations - Keyframes
-   ============================================================================ */
 
 @keyframes fade-in {
   from { opacity: 0; }
@@ -105,9 +92,6 @@
   }
 }
 
-/* ============================================================================
-   Animation Classes
-   ============================================================================ */
 
 .animate-fade-in {
   animation: fade-in 150ms ease-out;
@@ -137,9 +121,6 @@
   animation: expand-down 200ms ease-out;
 }
 
-/* ============================================================================
-   Connection Line Animations
-   ============================================================================ */
 
 @keyframes connection-dash {
   0% {
@@ -172,9 +153,6 @@
   animation: target-ring-pulse 1s ease-in-out infinite;
 }
 
-/* ============================================================================
-   Canvas Grid Background
-   ============================================================================ */
 
 .canvas-grid {
   background-color: #f8faf9;

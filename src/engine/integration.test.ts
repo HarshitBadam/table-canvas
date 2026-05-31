@@ -9,9 +9,6 @@ import { useProjectStore } from '@/state/projectStore'
 import { getComputationOrder } from './dependencyGraph'
 import type { TableSchema, SourceTableNode, DerivedTableNode } from '@/types'
 
-// ============================================================================
-// Test Fixtures
-// ============================================================================
 
 const sampleSchema: TableSchema = {
   columns: [
@@ -21,9 +18,6 @@ const sampleSchema: TableSchema = {
   rowCount: 100,
 }
 
-// ============================================================================
-// Store Setup Helpers
-// ============================================================================
 
 function resetStore() {
   useProjectStore.setState({
@@ -33,14 +27,10 @@ function resetStore() {
     edges: {},
     patches: {},
     selectedNodeId: null,
-    selectedEdgeId: null,
     history: { past: [], future: [] },
   })
 }
 
-// ============================================================================
-// Dirty Propagation Tests
-// ============================================================================
 
 describe('Dirty Propagation', () => {
   beforeEach(() => {
@@ -272,9 +262,6 @@ describe('Dirty Propagation', () => {
   })
 })
 
-// ============================================================================
-// Cycle Prevention Tests
-// ============================================================================
 
 describe('Cycle Prevention', () => {
   beforeEach(() => {
@@ -284,7 +271,6 @@ describe('Cycle Prevention', () => {
   it('should detect cycle through wouldCreateCycle in store', () => {
     const store = useProjectStore.getState()
 
-    // Create A -> B
     const tableAId = store.addSourceTable({
       name: 'Table A',
       fileRef: 'file_a',
@@ -304,7 +290,6 @@ describe('Cycle Prevention', () => {
       upstreamNodeIds: [tableAId],
     })
 
-    // Get fresh state
     const state = useProjectStore.getState()
 
     // Note: We need to use the generated IDs, not display names
@@ -318,7 +303,6 @@ describe('Cycle Prevention', () => {
   it('should allow valid non-cyclic connections', () => {
     const store = useProjectStore.getState()
 
-    // Create A -> B
     const tableAId = store.addSourceTable({
       name: 'Table A',
       fileRef: 'file_a',
@@ -338,7 +322,6 @@ describe('Cycle Prevention', () => {
       upstreamNodeIds: [tableAId],
     })
 
-    // Create a new source table C
     const tableCId = store.addSourceTable({
       name: 'Table C',
       fileRef: 'file_c',
@@ -354,9 +337,6 @@ describe('Cycle Prevention', () => {
   })
 })
 
-// ============================================================================
-// Computation Order Tests
-// ============================================================================
 
 describe('Computation Order', () => {
   beforeEach(() => {
@@ -452,9 +432,6 @@ describe('Computation Order', () => {
   })
 })
 
-// ============================================================================
-// Schema Change Propagation Tests
-// ============================================================================
 
 describe('Schema Change Propagation', () => {
   beforeEach(() => {
@@ -483,10 +460,8 @@ describe('Schema Change Propagation', () => {
       upstreamNodeIds: [tableAId],
     })
 
-    // Clear dirty
     store.updateCacheInfo(tableBId, { isDirty: false })
 
-    // Add column to A
     store.addColumn(tableAId, 'NewColumn', 'string')
 
     const state = useProjectStore.getState()
@@ -515,10 +490,8 @@ describe('Schema Change Propagation', () => {
       upstreamNodeIds: [tableAId],
     })
 
-    // Clear dirty
     store.updateCacheInfo(tableBId, { isDirty: false })
 
-    // Rename column in A
     store.renameColumn(tableAId, 'col1', 'RenamedID')
 
     const state = useProjectStore.getState()
@@ -526,9 +499,6 @@ describe('Schema Change Propagation', () => {
   })
 })
 
-// ============================================================================
-// Row Operation Propagation Tests
-// ============================================================================
 
 describe('Row Operation Propagation', () => {
   beforeEach(() => {
@@ -557,10 +527,8 @@ describe('Row Operation Propagation', () => {
       upstreamNodeIds: [tableAId],
     })
 
-    // Clear dirty
     store.updateCacheInfo(tableBId, { isDirty: false })
 
-    // Insert row in A
     store.insertRow(tableAId, 'new_row_id', { col1: 'test', col2: 42 }, 0)
 
     const state = useProjectStore.getState()
@@ -589,10 +557,8 @@ describe('Row Operation Propagation', () => {
       upstreamNodeIds: [tableAId],
     })
 
-    // Clear dirty
     store.updateCacheInfo(tableBId, { isDirty: false })
 
-    // Delete row in A
     store.deleteRow(tableAId, 'row_1')
 
     const state = useProjectStore.getState()
@@ -600,9 +566,6 @@ describe('Row Operation Propagation', () => {
   })
 })
 
-// ============================================================================
-// Cache Info Management Tests
-// ============================================================================
 
 describe('Cache Info Management', () => {
   beforeEach(() => {
@@ -620,7 +583,6 @@ describe('Cache Info Management', () => {
       schema: sampleSchema,
     })
 
-    // Update cache info
     const timestamp = new Date().toISOString()
     store.updateCacheInfo(tableAId, {
       isDirty: false,
@@ -649,7 +611,6 @@ describe('Cache Info Management', () => {
       schema: sampleSchema,
     })
 
-    // Set an error
     store.updateCacheInfo(tableAId, { error: 'Test error' })
 
     let state = useProjectStore.getState()

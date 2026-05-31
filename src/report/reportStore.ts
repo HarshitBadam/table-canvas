@@ -1,10 +1,3 @@
-/**
- * Report Store
- * 
- * Zustand store for managing reports and their blocks.
- * Uses immer for immutable state updates.
- */
-
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { current } from 'immer';
@@ -18,7 +11,6 @@ import type {
   Report, 
   ReportBlock, 
   ReportStoreState,
-  NewBlock,
 } from './types';
 
 
@@ -206,7 +198,6 @@ export const useReportStore = create<ReportStoreState>()(
             const now = new Date().toISOString();
             const existingBlock = report.blocks[blockIndex];
             
-            // Create new block with transformed type while preserving id and timestamps
             report.blocks[blockIndex] = {
               id: existingBlock.id,
               type: newType,
@@ -235,96 +226,9 @@ export const useReportStore = create<ReportStoreState>()(
 );
 
 
-/**
- * Hook to get the currently selected report
- */
-export const useSelectedReport = () => {
-  return useReportStore((state) => {
-    const { selectedReportId, reports } = state;
-    return selectedReportId ? reports[selectedReportId] : null;
-  });
-};
-
-/**
- * Hook to get all reports as an array
- * Note: This returns a new array on each store update.
- * For better performance, use useReportStore((state) => state.reports) directly
- * and memoize in your component with useMemo.
- */
-export const useReportsList = () => {
-  return useReportStore((state) => state.reports);
-};
-
-/**
- * Hook to check if there are any reports
- */
-export const useHasReports = () => {
-  return useReportStore((state) => Object.keys(state.reports).length > 0);
-};
-
-
-export function createTextBlock(content: string = ''): NewBlock {
-  return {
-    type: 'text',
-    content,
-  };
-}
-
-export function createHeadingBlock(level: 1 | 2 | 3, content: string = ''): NewBlock {
-  return {
-    type: 'heading',
-    level,
-    content,
-  };
-}
-
-export function createChartBlock(
-  sourceTableId: string,
-  chartType: 'bar' | 'line' | 'pie' | 'scatter',
-  config: Partial<import('./types').EnhancedChartConfig> = {}
-): NewBlock {
-  return {
-    type: 'chart',
-    sourceTableId,
-    chartType,
-    config: {
-      showLegend: true,
-      legendPosition: 'bottom',
-      showGrid: true,
-      ...config,
-    },
-  };
-}
-
-export function createTableSnippetBlock(
-  sourceTableId: string,
-  selectedColumns: string[] = [],
-  rowLimit: number = 10
-): NewBlock {
-  return {
-    type: 'table_snippet',
-    sourceTableId,
-    selectedColumns,
-    rowSelectionMode: 'first_n',
-    rowLimit,
-    showRowNumbers: true,
-  };
-}
-
-export function createDividerBlock(): NewBlock {
-  return {
-    type: 'divider',
-  };
-}
-
-
-/**
- * Initialize the report store with data from IndexedDB
- */
 export async function initializeReportStore(): Promise<void> {
   try {
     const reports = await loadAllReports();
-    // Only update if we actually got reports (or an empty object)
     if (reports && typeof reports === 'object') {
       useReportStore.setState((state) => ({
         ...state,
