@@ -1,153 +1,119 @@
 # Table Canvas
 
-### Abstract
+A local-first visual data workbench. Import CSV or Excel files, then build transformation
+pipelines by wiring tables together on a canvas instead of editing formulas across cells.
+SQL runs entirely in the browser via DuckDB-WASM, so data never has to leave the machine.
 
-Table Canvas is a local-first **visual data workbench** that experiments with a node-based approach to ETL (Extract, Transform, Load). Built on a modular React architecture and powered by **DuckDB-WASM**, it explores how visual graphs can improve the auditability of data transformation pipelines compared to traditional tabular interfaces.
+Everything persists locally in IndexedDB. There's also an optional Express + MongoDB backend
+that adds login and cross-device sync, but the app runs fully without it.
 
-### Technical Scope
+> Built solo. Core technical pieces: DuckDB-WASM for in-browser SQL, a reactive DAG compute
+> engine, and a ReactFlow canvas. No server required.
 
-This repository houses the source code for the initial public release. The system encompasses:
+## The idea
 
-* **Core Engine:** A client-side SQL execution layer (DuckDB-WASM) capable of processing 100k+ row datasets entirely in the browser.
-* **State Management:** A custom Directed Acyclic Graph (DAG) implementation using **Zustand** and **Immer** to ensure reactive data propagation.
-* **Frontend Architecture:** A modular React 18 application featuring virtualized grids for high-performance rendering.
+Spreadsheets hide their logic inside cells, which makes pipelines hard to trace and re-run.
+Table Canvas keeps the data (tables) separate from the logic (transforms). You connect nodes
+on a canvas, pick a transform, and the result becomes a new derived table. The graph itself is
+the documentation. You can see exactly where every table came from.
 
----
+## How it works
 
-## The Motivation
+1. Import a file (or create a table). It's parsed, typed, stored in IndexedDB, and loaded into DuckDB.
+2. The project is a directed acyclic graph (DAG): nodes are tables/charts, edges are transforms.
+3. Connecting two nodes opens a transform modal (filter, join, group, etc.) and creates a derived table.
+4. DuckDB-WASM (running in a Web Worker) executes the SQL and materializes results.
+5. When upstream data changes, downstream tables are marked dirty and recomputed on demand.
+6. View data in the grid, build charts, see a project overview on the dashboard, or write reports.
 
-Spreadsheets are the industry standard for data entry and ad-hoc analysis. However, as data transformation complexity grows, tabular interfaces present specific architectural challenges:
-
-* **Auditability:** In traditional spreadsheets, logic is hidden inside cells. Tracing dependencies often requires manual inspection of formulas.
-* **Linearity:** Complex joins and filtering logic can become difficult to visualize in a grid format.
-* **Reproducibility:** Re-running the same analysis on new datasets often requires manual adjustments to cell ranges.
-
-## The Approach
-
-Table Canvas proposes a **visual graph paradigm** for data operations. By decoupling the data (tables) from the logic (nodes), users can architect transformation pipelines that self-document their lineage.
-
-* **Visual Lineage:** Drag connections between nodes to filter, join, and aggregate data. The pipeline *is* the documentation.
-* **Local-First Execution:** Leveraging WebAssembly (DuckDB-WASM) to execute SQL queries client-side, ensuring data privacy and zero-latency feedback.
-* **Reactive Propagation:** When upstream data changes, the DAG automatically determines which downstream nodes require re-calculation.
-
-## Tech Stack
+## Tech stack
 
 | Layer | Technology | Purpose |
 | --- | --- | --- |
-| **Core** | React 18 + TypeScript | Component architecture and type safety |
-| **Engine** | DuckDB-WASM | In-browser SQL execution |
-| **State** | Zustand + Immer | DAG state management and immutability |
-| **Canvas** | ReactFlow | Node-based interactive graph |
-| **Persistence** | IndexedDB | Local storage for offline capability |
-| **Visualization** | Recharts | Reactive data charting |
-| **Backend** | Express + MongoDB | Optional server sync and auth |
+| UI | React 18 + TypeScript | Component architecture and type safety |
+| Engine | DuckDB-WASM | In-browser SQL execution (in a Web Worker) |
+| State | Zustand + Immer | DAG state and immutable updates |
+| Canvas | ReactFlow + Dagre | Node graph and auto-layout |
+| Charts | Recharts | Bar / line / pie / scatter |
+| Reports | TipTap | Notion-style rich-text editor |
+| Persistence | IndexedDB (`idb`) | Local storage, offline-capable |
+| Parsing/Export | PapaParse, xlsx, JSZip | CSV/Excel import and project export |
+| Backend (optional) | Express + MongoDB | Auth and cross-device sync |
 
-## Architecture Overview
+## Quick start
 
-The application follows a **Headless UI** pattern where the calculation engine is decoupled from the visualization layer.
-
-1. **Ingestion:** Files (CSV/Excel) are parsed and loaded into a transient DuckDB instance in memory.
-2. **DAG Processing:** The visual graph is converted into a topological sort order to determine execution dependency.
-3. **Execution:** SQL queries are generated dynamically based on node connections and executed against the WASM instance.
-4. **Rendering:** Results are streamed back to the UI via web workers to prevent main-thread blocking.
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js 18+
-- npm 9+
-- Docker and Docker Compose (optional, for full-stack setup)
-
-### Local Development (Frontend Only) — Recommended
-
-> **Easiest way to get started!** No Docker, no database, no configuration needed.
+Frontend only. No Docker, no database, no config.
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 ```
 
-The application runs at `http://localhost:5173`. This mode uses IndexedDB for local persistence. No login required - you'll be automatically signed in as "Local User".
+Open `http://localhost:5173`. With no backend running, the app drops into **local mode**:
+you're signed in automatically as "Local User" and everything is stored in IndexedDB.
 
-### Full Stack with Docker
+For the full stack (auth + sync) with Docker:
 
 ```bash
-# Start all services (MongoDB, backend, frontend)
-npm run docker:up
-
-# Seed sample data
-npm run docker:seed
-
-# View logs
-npm run docker:logs
-
-# Stop services
-npm run docker:down
+npm run docker:up      # MongoDB + backend + frontend
+npm run docker:seed    # optional sample data
+npm run docker:down    # stop
 ```
 
-Services:
-- Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:3001`
-- MongoDB: `localhost:27017`
+See [docs/setup.md](docs/setup.md) for environment variables and the manual backend setup.
 
-See [docs/setup.md](docs/setup.md) for detailed configuration options.
-
-## Project Structure
+## Project structure
 
 ```
-├── src/                    # Frontend application
-│   ├── canvas/             # ReactFlow-based visual canvas
-│   ├── engine/             # DuckDB-WASM integration + DAG
-│   ├── formula/            # Custom formula parser/evaluator
-│   ├── grid/               # Spreadsheet grid component
-│   ├── suggestions/        # Rule-based analysis suggestions
-│   ├── persistence/        # IndexedDB + export services
-│   ├── state/              # Zustand stores
-│   └── ...
-├── server/                 # Express backend
-│   └── src/
-│       ├── routes/         # API endpoints
-│       ├── models/         # MongoDB schemas
-│       └── services/       # Business logic
-├── e2e/                    # Playwright E2E tests
-└── data/                   # Sample datasets
+src/
+├── api/            # HTTP client for the optional backend (auth, projects, files)
+├── auth/           # Login and early-access pages
+├── canvas/         # ReactFlow canvas: nodes, transform modal, auto-layout
+├── charts/         # Chart builder + renderers (bar/line/pie/scatter)
+├── components/     # Shared UI (import button, theme toggle, error boundary)
+├── dashboard/      # Project overview: lineage map, data-quality stats, suggestions
+├── engine/         # DuckDB-WASM adapter, DAG, materialization, Web Worker
+├── formula/        # Spreadsheet formula parser + evaluator
+├── grid/           # Virtualized spreadsheet grid
+├── layout/         # App shell: routing, sidebar, header, view switching
+├── lib/            # Utilities, including column profiling
+├── persistence/    # IndexedDB, ZIP export, server sync
+├── report/         # TipTap report editor + export
+├── state/          # Zustand stores + AppContext orchestration
+├── styles/         # Global CSS and vendor overrides
+├── suggestions/    # Analysis / cleaning suggestion engine
+├── test/           # Vitest setup and shared test utilities
+└── types/          # Shared TypeScript types
+server/             # Optional Express + MongoDB backend
+e2e/                # Playwright end-to-end tests
+data/               # Sample datasets
+scripts/            # Docker helper scripts
 ```
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Setup Guide](docs/setup.md) | Installation, configuration, environment variables |
-| [Architecture](docs/architecture.md) | System design, DAG implementation, state management |
-| [API Reference](docs/api.md) | REST endpoint documentation |
-| [Features](docs/features.md) | Canvas, suggestions, formulas, export formats |
-| [Testing](docs/testing.md) | Test strategy, coverage, running tests |
 
 ## Scripts
 
 ```bash
-# Development
-npm run dev              # Start Vite dev server
-npm run build            # Production build
-npm run preview          # Preview production build
+npm run dev            # Vite dev server
+npm run build          # Production build (tsc + vite)
+npm run preview        # Preview the production build
+npm run lint           # ESLint
 
-# Testing
-npm run test             # Run unit tests (watch mode)
-npm run test:run         # Run unit tests once
-npm run test:coverage    # Generate coverage report
-npm run test:e2e         # Run Playwright E2E tests
+npm run test           # Unit tests (watch)
+npm run test:run       # Unit tests once
+npm run test:coverage  # Coverage report
+npm run test:e2e       # Playwright E2E
 
-# Docker
-npm run docker:up        # Start all services
-npm run docker:down      # Stop services
-npm run docker:seed      # Seed database
-
-# Linting
-npm run lint             # ESLint check
+npm run docker:up      # Full stack (Docker)
+npm run docker:down    # Stop the stack
+npm run docker:seed    # Seed sample data
 ```
+
+## Docs
+
+| Document | What's in it |
+|----------|--------------|
+| [Setup](docs/setup.md) | Run modes, environment variables, troubleshooting |
+| [Architecture](docs/architecture.md) | DAG, engine, state, materialization, persistence |
+| [Features](docs/features.md) | Canvas, grid, formulas, transforms, charts, dashboard, reports |
+| [API](docs/api.md) | REST endpoints for the optional backend |
+| [Testing](docs/testing.md) | How to run tests, where they live, CI |

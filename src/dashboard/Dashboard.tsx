@@ -4,7 +4,7 @@ import { applySuggestion, setToastHandler, type ToastNotification } from '@/sugg
 import { Toast } from '@/suggestions/Toast'
 import type { Suggestion } from '@/types'
 import { formatNumber } from '@/lib/utils'
-import { useNavigation } from '@/app/NavigationContext'
+import { useNavigation } from '@/layout/NavigationContext'
 
 import { LineageMiniMap } from './components/LineageMiniMap'
 import { TableStatsSection } from './components/TableStatsSection'

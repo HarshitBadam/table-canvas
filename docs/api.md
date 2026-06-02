@@ -1,8 +1,11 @@
 # API Reference
 
+REST API for the **optional** backend. The app runs fully in local mode without it; these
+endpoints only matter when you're running the server for auth and cross-device sync.
+
 Base URL: `http://localhost:3001/api`
 
-All endpoints return JSON with the structure:
+All endpoints except the health check return JSON with the structure:
 ```typescript
 interface ApiResponse<T> {
   success: boolean
@@ -226,7 +229,7 @@ Get project by ID.
 
 ### PUT /projects/:id
 
-Full update of project.
+Update project. Only provided fields are updated; omitted fields retain their current values.
 
 **Request:**
 ```json
@@ -248,6 +251,10 @@ Full update of project.
 }
 ```
 
+**Errors:**
+- `400` - Invalid project ID format
+- `404` - Project not found
+
 ### PATCH /projects/:id
 
 Partial update of project. Only provided fields are updated.
@@ -261,6 +268,20 @@ Partial update of project. Only provided fields are updated.
 
 **Allowed fields:** `name`, `nodes`, `edges`, `patches`
 
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "project": { ... }
+  }
+}
+```
+
+**Errors:**
+- `400` - Invalid project ID format
+- `404` - Project not found
+
 ### DELETE /projects/:id
 
 Soft delete a project.
@@ -272,6 +293,10 @@ Soft delete a project.
   "message": "Project deleted successfully"
 }
 ```
+
+**Errors:**
+- `400` - Invalid project ID format
+- `404` - Project not found
 
 ### POST /projects/:id/restore
 
@@ -287,6 +312,10 @@ Restore a soft-deleted project.
   "message": "Project restored successfully"
 }
 ```
+
+**Errors:**
+- `400` - Invalid project ID format
+- `404` - Deleted project not found
 
 ---
 
@@ -309,7 +338,7 @@ List user's uploaded files.
         "filename": "data.csv",
         "size": 1024,
         "contentType": "text/csv",
-        "uploadedAt": "..."
+        "uploadDate": "..."
       }
     ]
   }
@@ -344,7 +373,8 @@ Upload a file (CSV or Excel).
 ```
 
 **Errors:**
-- `400` - No file uploaded or invalid type
+- `400` - No file uploaded
+- `500` - Disallowed file type (rejected by the upload filter)
 
 ### GET /files/:id
 
@@ -354,6 +384,9 @@ Download a file.
 - `Content-Type`: File MIME type
 - `Content-Length`: File size
 - `Content-Disposition`: `attachment; filename="..."`
+
+**Errors:**
+- `404` - File not found
 
 ### GET /files/:id/metadata
 
@@ -374,6 +407,9 @@ Get file metadata without downloading.
 }
 ```
 
+**Errors:**
+- `404` - File not found
+
 ### DELETE /files/:id
 
 Delete a file.
@@ -385,6 +421,9 @@ Delete a file.
   "message": "File deleted successfully"
 }
 ```
+
+**Errors:**
+- `404` - File not found
 
 ---
 
@@ -412,7 +451,7 @@ All errors follow this format:
 {
   "success": false,
   "error": "Error message",
-  "details": ["Validation error 1", "Validation error 2"]
+  "errors": ["Validation error 1", "Validation error 2"]
 }
 ```
 
@@ -437,4 +476,4 @@ Currently no rate limiting is implemented. For production, configure at the reve
 
 ## CORS
 
-The API allows requests from the configured `FRONTEND_URL` with credentials (cookies). Methods allowed: `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`.
+The API allows requests from the configured `FRONTEND_URL` with credentials (cookies). Methods allowed: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`.
