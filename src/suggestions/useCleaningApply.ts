@@ -3,7 +3,7 @@ import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
 import { useSuggestionsStore } from './suggestionsStore'
 import { isPlaceholder } from './cleaningConstants'
-import { loadProfileForTable, useProfilingStore } from '@/profiling'
+import { loadProfileForTable, useProfilingStore } from '@/lib/profiling'
 import type { CellValue } from '@/types'
 
 interface CellChange {

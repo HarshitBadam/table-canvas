@@ -14,7 +14,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 
 import { useProjectStore } from '@/state/projectStore'
-import { useProfilingStore, loadProfileForTable } from '@/profiling'
+import { useProfilingStore, loadProfileForTable } from '@/lib/profiling'
 import type { ProjectNode, Edge as ProjectEdge } from '@/types'
 import { useCanvasKeyboard } from './useCanvasKeyboard'
 import { useCanvasViewMode } from './useCanvasViewMode'

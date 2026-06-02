@@ -1,5 +1,5 @@
 import type { Suggestion } from '@/types'
-import { useNavigation } from '@/app/NavigationContext'
+import { useNavigation } from '@/layout/NavigationContext'
 
 interface QuickActionsSectionProps {
   suggestions: Suggestion[]

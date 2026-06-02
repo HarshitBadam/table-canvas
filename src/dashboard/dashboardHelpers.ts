@@ -1,6 +1,6 @@
 import { useMemo, useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
-import { useProfilingStore, loadProfileForTable } from '@/profiling'
+import { useProfilingStore, loadProfileForTable } from '@/lib/profiling'
 import { formatNumber, getTableNodes } from '@/lib/utils'
 import type {
   TableNode,
