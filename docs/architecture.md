@@ -1,339 +1,227 @@
 # Architecture
 
-## System Overview
-
-Table Canvas follows a hybrid architecture where computation happens client-side (DuckDB-WASM) while optional server-side persistence provides authentication and cross-device sync.
+Computation happens client-side in DuckDB-WASM. The optional server only handles auth and
+persistence. If the server isn't reachable, the app runs entirely in the browser (local mode).
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        Browser                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │   React UI  │  │   Zustand   │  │     IndexedDB       │  │
-│  │  (Canvas,   │◄─┤   Stores    │◄─┤  (Projects, Files)  │  │
-│  │   Grid)     │  │             │  │                     │  │
-│  └──────┬──────┘  └──────┬──────┘  └─────────────────────┘  │
-│         │                │                                  │
-│         │         ┌──────▼──────┐                           │
-│         │         │  Web Worker │                           │
-│         └────────►│  DuckDB-WASM│                           │
-│                   └─────────────┘                           │
+│                          Browser                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐    │
+│  │   React UI  │  │   Zustand   │  │      IndexedDB      │    │
+│  │ (Canvas,    │◄─┤   Stores    │◄─┤  (Projects, Files,  │    │
+│  │  Grid, etc.)│  │             │  │   Cache, Reports)   │    │
+│  └──────┬──────┘  └──────┬──────┘  └─────────────────────┘    │
+│         │                │                                    │
+│         │         ┌──────▼───────┐                            │
+│         └────────►│  Web Worker  │                            │
+│                   │  DuckDB-WASM │                            │
+│                   └──────────────┘                            │
 └─────────────────────────────────────────────────────────────┘
                             │
-                       ( Sync)
+                       (optional sync)
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                        Server                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │   Express   │◄─┤  Services   │◄─┤      MongoDB        │  │
-│  │   Routes    │  │  (Auth,     │  │  (Users, Projects)  │  │
-│  │             │  │   Files)    │  │                     │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+│                          Server                               │
+│   Express routes ─► services ─► MongoDB (users, projects)     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Dependency Graph (DAG)
+## The DAG
 
-The core data model is a directed acyclic graph where nodes are tables and edges represent data dependencies.
+A project is a directed acyclic graph. Nodes are tables and charts; edges are transforms that
+turn upstream tables into downstream ones.
 
-### Node Types
+### Node types
 
-| Type | Description | Properties |
-|------|-------------|------------|
-| `source_table` | Imported CSV/Excel | `fileRef`, `schema`, `patches` |
-| `derived_table` | Computed from transforms | `transformDef`, `upstreamNodeIds` |
-| `chart` | Visualization | `sourceTableId`, `chartType`, `config` |
+| Kind | Description |
+|------|-------------|
+| `source_table` | Imported CSV/Excel or a manually created table. Holds a file reference, schema, and patches (cell edits). |
+| `derived_table` | Computed from a transform applied to one or more upstream tables. Read-only. |
+| `chart` | A visualization bound to a source table. |
 
-### Edge Properties
+See `src/types/node.types.ts` and `src/types/transform.types.ts` for the exact shapes.
+
+### Edges
 
 ```typescript
 interface Edge {
   id: string
-  fromNodeId: string      // Upstream (data source)
-  toNodeId: string        // Downstream (dependent)
-  transformType: string   // 'filter' | 'join' | 'group' | ...
+  fromNodeId: string      // upstream (data source)
+  toNodeId: string        // downstream (dependent)
+  transformType: TransformType
 }
 ```
 
-### Cycle Detection
+### Cycle detection
 
-Before creating edges, the system checks for cycles using DFS with three-color marking:
+Before an edge is created, the graph is checked for cycles with a reachability test
+(`src/engine/dependencyGraph.ts`). A self-loop, or a target that can already reach the source,
+is rejected and the connection is blocked.
+
+### Computation order
+
+`getComputationOrder` does a topological sort so upstream tables are materialized before the
+tables that depend on them.
+
+## State management
+
+Zustand stores, with Immer for immutable updates. The main ones:
+
+- **`projectStore`**: the graph itself, composed from slices in `src/state/stores/`:
+  `nodesSlice`, `edgesSlice`, `patchesSlice` (cell edits / row ops), `historySlice` (undo/redo),
+  `selectionSlice`, plus `nodesColumnOps` for column-level operations.
+- **`dataStore`**: in-memory row data for loaded tables.
+- **`profilingStore`** (`src/lib/profiling/`): per-column profiles (see below).
+- **`suggestionsStore`**: analysis/cleaning suggestions.
+- **`reportStore`**: report documents.
+
+`AppContext` (`src/state/AppContext.tsx`) ties it together: it boots the engine, checks auth,
+loads or creates a project, materializes tables, and auto-saves (debounced ~1.5s) when the graph
+changes.
+
+### Dirty propagation
+
+Editing a source cell updates its patches and marks the node plus every downstream descendant
+dirty (`cacheInfo.isDirty = true`). Dirty tables are recomputed the next time they're needed.
+
+## Computation engine
+
+### Web Worker
+
+DuckDB-WASM runs in a dedicated worker (`src/engine/worker/`) so SQL execution never blocks the
+UI thread. The main thread talks to it over a small RPC layer (`worker/rpc.ts`).
+
+```
+Main thread                Worker thread
+    │  ── loadTable ──►          │
+    │  ◄─ ready ──────           │
+    │  ── transform ──►          │
+    │  ◄─ result ─────           │
+```
+
+### Materialization
+
+`ensureTableMaterialized` (`src/engine/materializationService.ts`) orchestrates computation:
+
+1. Dedupe: an `inProgressMaterializations` map prevents duplicate concurrent requests.
+2. Resolve the computation order (topological sort).
+3. Materialize each node in order; the queue chains promises so execution stays sequential.
+4. Update cache info.
+
+### Cache invalidation
+
+Version hashes decide whether cached data is stale:
 
 ```typescript
-// src/engine/dependencyGraph.ts
-function wouldCreateCycle(edges, sourceId, targetId): boolean {
-  // Self-loop check
-  if (sourceId === targetId) return true
-  
-  // Build adjacency graph
-  const graph = buildDependencyGraph(edges)
-  
-  // Check if targetId can reach sourceId
-  return isReachable(graph.downstream, targetId, sourceId)
-}
-```
-
-### Topological Sort
-
-Computation order is determined by topological sort, ensuring upstream tables are materialized before downstream consumers:
-
-```typescript
-function getComputationOrder(targetNodeId, nodes, edges): string[] {
-  // Returns nodes in dependency order
-  // [upstream1, upstream2, ..., targetNode]
-}
-```
-
-## State Management
-
-### Store Architecture
-
-State is managed by Zustand with Immer for immutable updates. The store is composed from domain slices:
-
-```
-projectStore
-├── nodesSlice      # Table/chart node CRUD
-├── edgesSlice      # Connection management
-├── patchesSlice    # Cell edits, row insertions/deletions
-├── historySlice    # Undo/redo stack
-└── selectionSlice  # UI selection state
-```
-
-### Dirty Propagation
-
-When a source table is edited, all downstream derived tables are marked dirty:
-
-```typescript
-// On cell edit
-setCellValue(tableId, rowId, colId, value) {
-  // 1. Update patches
-  // 2. Mark node and descendants dirty
-  markNodeAndDescendantsDirty(tableId)
-}
-```
-
-The `markNodeAndDescendantsDirty` function traverses the downstream graph and sets `cacheInfo.isDirty = true` on all affected nodes.
-
-## Computation Engine
-
-### Web Worker Architecture
-
-DuckDB-WASM runs in a dedicated Web Worker to avoid blocking the UI thread:
-
-```
-Main Thread                    Worker Thread
-     │                              │
-     │  ──── loadTable ────►        │
-     │  ◄─── ready ────────         │
-     │                              │
-     │  ──── executeTransform ──►   │
-     │  ◄─── result ────────────    │
-     │                              │
-```
-
-Communication uses a simple RPC protocol:
-
-```typescript
-// src/engine/worker/rpc.ts
-class WorkerRPC {
-  call<T>(method: string, params: unknown): Promise<T>
-  waitForReady(): Promise<void>
-}
-```
-
-### Materialization Service
-
-The materialization service orchestrates computation:
-
-```typescript
-async function ensureTableMaterialized(tableId): Promise<MaterializationResult> {
-  // 1. Check if already in progress (dedup)
-  // 2. Get computation order
-  // 3. Materialize each node in order
-  // 4. Update cache info
-}
-```
-
-**Race condition handling:**
-- `inProgressMaterializations` Map prevents duplicate concurrent requests
-- `materializationQueue` Promise chain ensures sequential execution
-
-### Cache Invalidation
-
-Version hashes track whether cached data is stale:
-
-```typescript
-// Source table hash
+// source table
 hash = simpleHash(`source:${tableId}:${fileRef}:${patchVersion}`)
 
-// Derived table hash  
+// derived table
 hash = simpleHash(`derived:${tableId}:${transformDefJson}:${upstreamHashes}`)
 ```
 
-## Data Flow
+If a hash matches the cached one, the cached result is reused; otherwise it recomputes.
 
-### Import Flow
+## Profiling
 
-```
-User selects file
-       │
-       ▼
-Parse CSV/Excel (PapaParse/xlsx)
-       │
-       ▼
-Infer schema (column types)
-       │
-       ▼
-Save file to IndexedDB
-       │
-       ▼
-Create source_table node
-       │
-       ▼
-Load into DuckDB
-```
+When a table is opened, the profiler (`src/lib/profiling/`) computes per-column statistics in
+two phases: phase 1 is fast (counts, null rate, basic types) and phase 2 fills in the heavier
+stats asynchronously. Profiles also get semantic hints (e.g. "looks like an email/date column").
+These feed the grid's column stats, the dashboard, and the suggestion engine.
 
-### Transform Flow
+## Transforms
 
-```
-User connects nodes on canvas
-       │
-       ▼
-Check for cycles
-       │
-       ▼
-Open transform modal
-       │
-       ▼
-User configures transform
-       │
-       ▼
-Create derived_table node + edge
-       │
-       ▼
-Execute SQL in DuckDB
-       │
-       ▼
-Store result + update schema
-```
+Six transform types (`TransformType` in `src/types/transform.types.ts`). Each has its own
+definition shape:
 
-### Export Flow
-
-```
-User exports project
-       │
-       ▼
-Collect all nodes, edges, patches
-       │
-       ▼
-Load file blobs from IndexedDB
-       │
-       ▼
-Base64 encode files
-       │
-       ▼
-Bundle as ZIP:
-├── project.tablecanvas.json
-├── data.xlsx (all tables as sheets)
-└── reports/*.html
-```
-
-## Transform Definitions
-
-Each transform type has a specific definition structure:
-
-### Filter
+### filter
 ```typescript
-{
-  type: 'filter',
-  sourceTableId: string,
-  conditions: FilterCondition[],
-  logic: 'and' | 'or'
-}
+{ type: 'filter', sourceTableId, conditions: FilterCondition[], logic: 'and' | 'or' }
 ```
+Operators: equals, not_equals, contains, not_contains, starts_with, ends_with, greater_than,
+less_than, greater_equal, less_equal, between, is_null, is_not_null.
 
-### Group/Summarize
+### group_summarize
 ```typescript
 {
   type: 'group_summarize',
-  sourceTableId: string,
+  sourceTableId,
   groupByColumns: string[],
-  aggregations: [{
-    columnId: string,
-    operation: 'sum' | 'avg' | 'min' | 'max' | 'count',
-    alias: string
-  }]
+  aggregations: [{ columnId, operation: 'sum'|'avg'|'min'|'max'|'count'|'count_distinct', alias }]
 }
 ```
 
-### Join
+### join
 ```typescript
-{
-  type: 'join',
-  leftTableId: string,
-  rightTableId: string,
-  joinType: 'inner' | 'left' | 'right' | 'full',
-  leftKey: string,
-  rightKey: string
-}
+{ type: 'join', leftTableId, rightTableId, joinType: 'inner'|'left'|'right'|'full', leftKey, rightKey,
+  leftColumns?, rightColumns?, columnPrefix? }
 ```
 
-### Pivot
+### select
+Column projection and renaming.
 ```typescript
-{
-  type: 'pivot',
-  sourceTableId: string,
-  rowColumns: string[],
-  pivotColumn: string,
-  valueColumn: string,
-  aggregation: 'sum' | 'avg' | 'count'
-}
+{ type: 'select', sourceTableId, columns: [{ sourceColumnId, newName?, include }] }
 ```
 
-## Persistence Layer
+### calculated_column
+Adds a column from a formula expression.
+```typescript
+{ type: 'calculated_column', sourceTableId, newColumnName, expression }
+```
 
-### IndexedDB Schema
+### union
+Stacks rows from multiple tables.
+```typescript
+{ type: 'union', sourceTableIds: string[] }
+```
+
+## Persistence
+
+### IndexedDB
 
 ```typescript
 interface TableCanvasDB {
   projects: {
     key: string
-    value: StoredProject
+    value: { id, name, nodes, edges, patches, createdAt, updatedAt }
     indexes: { 'by-updated': string }
   }
   files: {
     key: string
-    value: { id, name, type, data: ArrayBuffer }
+    value: { id, name, type, data: ArrayBuffer, createdAt }
   }
   cache: {
-    key: [string, string]  // [tableId, type]
-    value: { tableId, type, data, computedAt }
+    key: [string, string]   // [tableId, type]
+    value: { tableId, type: 'profile'|'slice'|'aggregation', data, computedAt }
+    indexes: { 'by-table': string }
   }
   reports: {
     key: string
     value: Report
+    indexes: { 'by-updated': string }
   }
 }
 ```
 
-### Server Sync
+### Server sync
 
-When the backend is available, projects sync bidirectionally:
+When the backend is available, `syncService` saves local changes through the API to MongoDB and
+loads them back on startup. There's no conflict resolution — the last write wins. When the
+backend is unreachable, all of this is skipped and the app stays purely local.
 
-1. **Save:** Local changes → API → MongoDB
-2. **Load:** MongoDB → API → Local store
+## Export
 
-The sync service handles conflicts by timestamp comparison.
-
-## Error Boundaries
-
-React error boundaries wrap major feature areas:
+Exporting a project bundles everything into a self-contained ZIP:
 
 ```
-App
-├── FeatureErrorBoundary (Canvas)
-├── FeatureErrorBoundary (Grid)
-├── FeatureErrorBoundary (Charts)
-└── FeatureErrorBoundary (Reports)
+project.tablecanvas.json   # full state, with base64-encoded source files
+data.xlsx                  # every table as a sheet
+reports/*.html             # reports as HTML
 ```
 
-Each boundary catches render errors and displays a recovery UI without crashing the entire application.
+All tables are included as individual sheets in `data.xlsx` inside the ZIP.
+
+## Error boundaries
+
+Each major view (Canvas, Grid, Charts, Dashboard, Reports) is wrapped in an `ErrorBoundary`,
+so a render error in one area shows a recovery UI instead of taking down the whole app.

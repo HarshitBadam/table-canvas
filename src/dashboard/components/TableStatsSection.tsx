@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useProfilingStore } from '@/profiling'
+import { useProfilingStore } from '@/lib/profiling'
 import type { TableQualityMetrics } from '../useDashboardData'
 import type { TableSchema } from '@/types'
 import { useProjectStore } from '@/state/projectStore'
-import { useNavigation } from '@/app/NavigationContext'
+import { useNavigation } from '@/layout/NavigationContext'
 import { ColumnList } from './ColumnList'
 
 interface TableStatsSectionProps {

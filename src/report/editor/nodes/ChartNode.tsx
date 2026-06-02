@@ -3,7 +3,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/r
 import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
 import { useDataStore } from '@/state/dataStore';
 import { useProjectStore } from '@/state/projectStore';
-import { useNavigation } from '@/app/NavigationContext';
+import { useNavigation } from '@/layout/NavigationContext';
 import { ChartRenderer } from '@/charts/ChartRenderer';
 import { TableSelector } from './ChartNodeTablePicker';
 import { ChartConfigPanel } from './ChartNodeConfigPanel';

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useProjectStore } from '@/state/projectStore'
-import { useProfile } from '@/profiling'
+import { useProfile } from '@/lib/profiling'
 import { generateSuggestions, getColumnSuggestions } from './engine'
 import {
   useSuggestionsStore,

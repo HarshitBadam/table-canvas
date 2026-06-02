@@ -4,7 +4,7 @@ import { useProjectStore } from '@/state/projectStore'
 import { ChartRenderer } from './ChartRenderer'
 import { ChartTypeIcon } from './ChartTypeIcon'
 import { useChartData } from './useChartData'
-import { useNavigation } from '@/app/NavigationContext'
+import { useNavigation } from '@/layout/NavigationContext'
 import type { ChartNode, ChartConfig, ChartType, AggregationType, TableNode } from '@/types'
 
 interface ChartViewProps {
