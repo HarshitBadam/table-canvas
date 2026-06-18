@@ -3,12 +3,15 @@ import request from 'supertest';
 import { Types } from 'mongoose';
 import { createTestApp, createDefaultMockUser, createSecondMockUser, MockUser } from '../test/testApp.js';
 import { Project } from '../models/Project.js';
+import { User } from '../models/User.js';
 import {
   createTestProject,
+  createTestProjects,
   createSampleNode,
   createSampleEdge,
 } from '../test/helpers.js';
 import { setupMongoTestDB } from '../test/setup.js';
+import { LIMITS } from '../config/limits.js';
 
 setupMongoTestDB();
 
@@ -432,6 +435,75 @@ describe('Projects API', () => {
     });
   });
 
+
+  describe('project count enforcement', () => {
+    it('should reject when user has reached the google-tier project limit', async () => {
+      const userId = new Types.ObjectId(mockUser.userId);
+
+      await User.create({
+        _id: userId,
+        email: mockUser.email,
+        name: 'Test User',
+        tier: 'google',
+        passwordHash: 'hash',
+      });
+
+      const limit = LIMITS.google.maxProjects;
+      await createTestProjects(userId, limit);
+
+      const response = await request(app)
+        .post('/api/projects')
+        .send({ name: 'One Too Many' })
+        .expect(403);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('limit');
+    });
+
+    it('should allow project creation when below the limit', async () => {
+      const userId = new Types.ObjectId(mockUser.userId);
+
+      await User.create({
+        _id: userId,
+        email: mockUser.email,
+        name: 'Test User',
+        tier: 'google',
+        passwordHash: 'hash',
+      });
+
+      await createTestProjects(userId, LIMITS.google.maxProjects - 1);
+
+      const response = await request(app)
+        .post('/api/projects')
+        .send({ name: 'Under Limit' })
+        .expect(201);
+
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should not count soft-deleted projects toward the limit', async () => {
+      const userId = new Types.ObjectId(mockUser.userId);
+
+      await User.create({
+        _id: userId,
+        email: mockUser.email,
+        name: 'Test User',
+        tier: 'google',
+        passwordHash: 'hash',
+      });
+
+      const limit = LIMITS.google.maxProjects;
+      await createTestProjects(userId, limit - 1);
+      await createTestProject({ userId, name: 'Deleted', deleted: true });
+
+      const response = await request(app)
+        .post('/api/projects')
+        .send({ name: 'After Deleted' })
+        .expect(201);
+
+      expect(response.body.success).toBe(true);
+    });
+  });
 
   describe('edge cases', () => {
     it('should handle very long project names at limit', async () => {

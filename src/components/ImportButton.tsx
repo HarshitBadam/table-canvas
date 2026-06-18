@@ -1,9 +1,13 @@
 import { useRef, useState } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { UpgradePrompt } from '@/components/UpgradePrompt'
 import * as Dialog from '@radix-ui/react-dialog'
 import * as XLSX from 'xlsx'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
+import { useAppAuth } from '@/state/AppContext'
+import { checkFileSize, checkRowCount, checkTableCount, type LimitExceeded } from '@/shared/enforce'
+import type { Tier } from '@/shared/limits'
 import {
   SheetInfo,
   parseCSVFile,
@@ -12,10 +16,17 @@ import {
   loadTableIntoEngine,
 } from '@/persistence/importParsers'
 
+function getTableCount(nodes: Record<string, { kind: string }>): number {
+  return Object.values(nodes).filter(
+    (n) => n.kind === 'source_table' || n.kind === 'derived_table',
+  ).length
+}
+
 export function ImportButton() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const addSourceTable = useProjectStore((state) => state.addSourceTable)
   const setTableData = useDataStore((state) => state.setTableData)
+  const { user } = useAppAuth()
 
   const [isImporting, setIsImporting] = useState(false)
   const [sheetModalOpen, setSheetModalOpen] = useState(false)
@@ -24,11 +35,28 @@ export function ImportButton() {
   const [excelBuffer, setExcelBuffer] = useState<ArrayBuffer | null>(null)
   const [fileName, setFileName] = useState('')
 
+  const [upgradeViolation, setUpgradeViolation] = useState<LimitExceeded | null>(null)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+
+  const tier: Tier = user?.tier ?? 'guest'
+
+  const showViolation = (v: LimitExceeded) => {
+    setUpgradeViolation(v)
+    setUpgradeOpen(true)
+  }
+
   const handleClick = () => fileInputRef.current?.click()
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    const sizeCheck = checkFileSize(file.size, tier)
+    if (!sizeCheck.ok) {
+      showViolation(sizeCheck)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
 
     setIsImporting(true)
     setFileName(file.name)
@@ -37,7 +65,21 @@ export function ImportButton() {
       const extension = file.name.split('.').pop()?.toLowerCase()
 
       if (extension === 'csv') {
+        const nodes = useProjectStore.getState().nodes
+        const tableCheck = checkTableCount(getTableCount(nodes), tier)
+        if (!tableCheck.ok) {
+          showViolation(tableCheck)
+          return
+        }
+
         const { schema, rows, fileRef } = await parseCSVFile(file)
+
+        const rowCheck = checkRowCount(schema.rowCount ?? rows.length, tier)
+        if (!rowCheck.ok) {
+          showViolation(rowCheck)
+          return
+        }
+
         const tableId = addSourceTable({
           name: file.name.replace(/\.[^/.]+$/, ''),
           fileRef,
@@ -50,7 +92,21 @@ export function ImportButton() {
       } else if (extension === 'xlsx' || extension === 'xls') {
         const result = await parseExcelFile(file)
         if (result.kind === 'single') {
+          const nodes = useProjectStore.getState().nodes
+          const tableCheck = checkTableCount(getTableCount(nodes), tier)
+          if (!tableCheck.ok) {
+            showViolation(tableCheck)
+            return
+          }
+
           const { schema, rows } = result.tableData
+
+          const rowCheck = checkRowCount(schema.rowCount ?? rows.length, tier)
+          if (!rowCheck.ok) {
+            showViolation(rowCheck)
+            return
+          }
+
           const tableId = addSourceTable({
             name: file.name.replace(/\.[^/.]+$/, ''),
             fileRef: result.fileRef,
@@ -82,10 +138,27 @@ export function ImportButton() {
   const handleImportSelectedSheets = async () => {
     if (!workbook) return
 
-    for (const sheet of sheets.filter((s) => s.selected)) {
+    const selectedSheets = sheets.filter((s) => s.selected)
+    const nodes = useProjectStore.getState().nodes
+    const currentTableCount = getTableCount(nodes)
+
+    const tableCheck = checkTableCount(currentTableCount + selectedSheets.length - 1, tier)
+    if (!tableCheck.ok) {
+      showViolation(tableCheck)
+      return
+    }
+
+    for (const sheet of selectedSheets) {
       const { tableData, fileRef } = await importSheetAndPersist(
         workbook, sheet.name, fileName, excelBuffer || undefined
       )
+
+      const rowCheck = checkRowCount(tableData.schema.rowCount ?? tableData.rows.length, tier)
+      if (!rowCheck.ok) {
+        showViolation(rowCheck)
+        return
+      }
+
       const tableId = addSourceTable({
         name: sheet.name,
         fileRef,
@@ -214,6 +287,12 @@ export function ImportButton() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+
+      <UpgradePrompt
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        violation={upgradeViolation}
+      />
     </>
   )
 }

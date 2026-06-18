@@ -209,9 +209,9 @@ describe('needsMaterialization', () => {
     expect(needsMaterialization('table_1')).toBe(true)
   })
 
-  it('returns true when data is missing from store', () => {
+  it('returns true when version hash is missing (no prior materialization)', () => {
     const table = createSourceTableNode('table_1', 'Test', {
-      cacheInfo: { isDirty: false },
+      cacheInfo: { isDirty: false, currentVersionHash: undefined },
     })
     mockProjectStore.nodes = { table_1: table }
     mockDataStore.tableData = {} // No data

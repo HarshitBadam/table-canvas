@@ -10,6 +10,28 @@ that adds login and cross-device sync, but the app runs fully without it.
 > Built solo. Core technical pieces: DuckDB-WASM for in-browser SQL, a reactive DAG compute
 > engine, and a ReactFlow canvas. No server required.
 
+## Quick start
+
+Frontend only. No Docker, no database, no config.
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`. With no backend running, the app drops into **local mode**:
+you're signed in automatically as "Local User" and everything is stored in IndexedDB.
+
+For the full stack (auth + sync) with Docker:
+
+```bash
+npm run docker:up      # MongoDB + backend + frontend
+npm run docker:seed    # optional sample data
+npm run docker:down    # stop
+```
+
+See [docs/setup.md](docs/setup.md) for environment variables and the manual backend setup.
+
 ## The idea
 
 Spreadsheets hide their logic inside cells, which makes pipelines hard to trace and re-run.
@@ -39,28 +61,6 @@ the documentation. You can see exactly where every table came from.
 | Persistence | IndexedDB (`idb`) | Local storage, offline-capable |
 | Parsing/Export | PapaParse, xlsx, JSZip | CSV/Excel import and project export |
 | Backend (optional) | Express + MongoDB | Auth and cross-device sync |
-
-## Quick start
-
-Frontend only. No Docker, no database, no config.
-
-```bash
-npm install
-npm run dev
-```
-
-Open `http://localhost:5173`. With no backend running, the app drops into **local mode**:
-you're signed in automatically as "Local User" and everything is stored in IndexedDB.
-
-For the full stack (auth + sync) with Docker:
-
-```bash
-npm run docker:up      # MongoDB + backend + frontend
-npm run docker:seed    # optional sample data
-npm run docker:down    # stop
-```
-
-See [docs/setup.md](docs/setup.md) for environment variables and the manual backend setup.
 
 ## Project structure
 

@@ -16,6 +16,8 @@ import { EarlyAccessPage } from '@/auth/EarlyAccessPage'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { UpgradePrompt } from '@/components/UpgradePrompt'
+import { StorageWarningBanner } from '@/persistence/StorageWarningBanner'
 
 const ReportView = lazy(() => import('@/report/ReportView').then(m => ({ default: m.ReportView })))
 
@@ -68,6 +70,7 @@ export default function App() {
 }
 
 function MainApp() {
+  const { projectLimitViolation, setProjectLimitViolation } = useApp()
   const [viewMode, setViewMode] = useState<ViewMode>('canvas')
 
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
@@ -129,6 +132,7 @@ function MainApp() {
 
   return (
     <NavigationProvider value={navigationValue}>
+      <StorageWarningBanner />
       <div className="flex h-full bg-canvas">
         <Sidebar />
 
@@ -176,6 +180,12 @@ function MainApp() {
           </div>
         </main>
       </div>
+
+      <UpgradePrompt
+        open={!!projectLimitViolation}
+        onOpenChange={(open) => { if (!open) setProjectLimitViolation(null) }}
+        violation={projectLimitViolation}
+      />
     </NavigationProvider>
   )
 }

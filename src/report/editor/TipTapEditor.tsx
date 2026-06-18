@@ -166,9 +166,22 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
       }).run(),
     }), [editor]);
 
-    // Sync editor content when reportId changes (for switching between reports)
+    const isInternalUpdate = useRef(false);
+
+    useEffect(() => {
+      if (!editor) return;
+      const handler = () => { isInternalUpdate.current = true; };
+      editor.on('update', handler);
+      return () => { editor.off('update', handler); };
+    }, [editor]);
+
     useEffect(() => {
       if (!editor || !content) return;
+
+      if (isInternalUpdate.current) {
+        isInternalUpdate.current = false;
+        return;
+      }
       
       const currentJson = JSON.stringify(editor.getJSON());
       const newJson = JSON.stringify(content);
@@ -176,7 +189,7 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
       if (currentJson !== newJson) {
         editor.commands.setContent(content);
       }
-    }, [editor, reportId]); // Use reportId as trigger, not content (to avoid loops)
+    }, [editor, reportId, content]);
 
     const handleContainerClick = useCallback((e: React.MouseEvent) => {
       if (e.target === e.currentTarget && editor) {

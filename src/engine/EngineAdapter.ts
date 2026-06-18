@@ -11,6 +11,7 @@ import type {
   AggregationResult,
   ProfileResult,
   TransformResult,
+  FilteredSliceRequest,
 } from './types'
 import type { TransformDef, CellValue, TableSchema, Patches } from '@/types'
 import EngineWorker from './worker/engine.worker?worker'
@@ -106,6 +107,31 @@ export class EngineAdapter {
     await this.ensureInitialized()
     
     return this.rpc.call<TableSlice>('getSlice', { tableId, offset, limit })
+  }
+
+  async getFilteredSlice(request: FilteredSliceRequest): Promise<TableSlice> {
+    await this.ensureInitialized()
+    return this.rpc.call<TableSlice>('getFilteredSlice', request)
+  }
+
+  async getDistinctValues(tableId: string, column: string, limit?: number): Promise<CellValue[]> {
+    await this.ensureInitialized()
+    return this.rpc.call<CellValue[]>('getDistinctValues', { tableId, column, limit })
+  }
+
+  async updateCell(tableId: string, rowIndex: number, column: string, value: CellValue, columnType?: string): Promise<void> {
+    await this.ensureInitialized()
+    await this.rpc.call('updateCell', { tableId, rowIndex, column, value, columnType })
+  }
+
+  async insertRow(tableId: string, values: Record<string, CellValue>, columns: string[], types: string[]): Promise<void> {
+    await this.ensureInitialized()
+    await this.rpc.call('insertRow', { tableId, values, columns, types })
+  }
+
+  async deleteRow(tableId: string, rowIndex: number): Promise<void> {
+    await this.ensureInitialized()
+    await this.rpc.call('deleteRow', { tableId, rowIndex })
   }
 
   async getAggregation(tableId: string, aggDef: AggregationDef): Promise<AggregationResult> {

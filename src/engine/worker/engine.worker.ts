@@ -11,7 +11,7 @@ import type {
   AggregationDef,
 } from '../types'
 import type { TransformDef } from '@/types'
-import { loadTable, getSlice, getAggregation, getProfile, dropTable } from './tableOperations'
+import { loadTable, getSlice, getFilteredSlice, updateCell, insertRow, deleteRow, getDistinctValues, getAggregation, getProfile, dropTable } from './tableOperations'
 import { executeTransform } from './transforms'
 
 let db: duckdb.AsyncDuckDB | null = null
@@ -20,9 +20,26 @@ let conn: duckdb.AsyncDuckDBConnection | null = null
 async function initDuckDB(): Promise<void> {
   if (db) return
 
-  const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles()
+  // Serve WASM + worker assets from the app's own origin so first load works
+  // offline and is compatible with COEP. Assets are placed under /duckdb/ by the
+  // Vite duckdbLocalBundlePlugin (dev server middleware + build-time emit).
+  const LOCAL_BUNDLES: duckdb.DuckDBBundles = {
+    mvp: {
+      mainModule: '/duckdb/duckdb-mvp.wasm',
+      mainWorker: '/duckdb/duckdb-browser-mvp.worker.js',
+    },
+    eh: {
+      mainModule: '/duckdb/duckdb-eh.wasm',
+      mainWorker: '/duckdb/duckdb-browser-eh.worker.js',
+    },
+    coi: {
+      mainModule: '/duckdb/duckdb-coi.wasm',
+      mainWorker: '/duckdb/duckdb-browser-coi.worker.js',
+      pthreadWorker: '/duckdb/duckdb-browser-coi.pthread.worker.js',
+    },
+  }
 
-  const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES)
+  const bundle = await duckdb.selectBundle(LOCAL_BUNDLES)
 
   const worker_url = URL.createObjectURL(
     new Blob([`importScripts("${bundle.mainWorker!}");`], { type: 'text/javascript' })
@@ -67,6 +84,46 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       case 'getSlice': {
         const { tableId, offset, limit } = payload as { tableId: string; offset: number; limit: number }
         result = await getSlice(requireConn(), tableId, offset, limit)
+        break
+      }
+
+      case 'getFilteredSlice': {
+        const { tableId, filters, sorts, search, offset, limit } = payload as {
+          tableId: string; filters?: import('../types').FilterConditionDef[];
+          sorts?: import('../types').SortDef[]; search?: string; offset: number; limit: number
+        }
+        result = await getFilteredSlice(requireConn(), tableId, filters, sorts, search, offset, limit)
+        break
+      }
+
+      case 'getDistinctValues': {
+        const { tableId, column, limit } = payload as { tableId: string; column: string; limit?: number }
+        result = await getDistinctValues(requireConn(), tableId, column, limit)
+        break
+      }
+
+      case 'updateCell': {
+        const { tableId, rowIndex, column, value, columnType } = payload as {
+          tableId: string; rowIndex: number; column: string; value: import('@/types').CellValue; columnType?: string
+        }
+        await updateCell(requireConn(), tableId, rowIndex, column, value, columnType)
+        result = { success: true }
+        break
+      }
+
+      case 'insertRow': {
+        const { tableId, values, columns, types } = payload as {
+          tableId: string; values: Record<string, import('@/types').CellValue>; columns: string[]; types: string[]
+        }
+        await insertRow(requireConn(), tableId, values, columns, types)
+        result = { success: true }
+        break
+      }
+
+      case 'deleteRow': {
+        const { tableId, rowIndex } = payload as { tableId: string; rowIndex: number }
+        await deleteRow(requireConn(), tableId, rowIndex)
+        result = { success: true }
         break
       }
 

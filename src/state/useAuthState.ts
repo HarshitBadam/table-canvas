@@ -3,6 +3,7 @@ import {
   checkAuth,
   logout as apiLogout,
   login as apiLogin,
+  loginWithGoogle as apiLoginWithGoogle,
   LoginCredentials,
   User,
 } from '@/api/auth.api'
@@ -23,6 +24,13 @@ export function useAuthState() {
 
   const performLogin = useCallback(async (credentials: LoginCredentials) => {
     const { user } = await apiLogin(credentials)
+    setUser(user)
+    setIsAuthenticated(true)
+    return user
+  }, [])
+
+  const performGoogleLogin = useCallback(async (credential: string) => {
+    const { user } = await apiLoginWithGoogle(credential)
     setUser(user)
     setIsAuthenticated(true)
     return user
@@ -75,6 +83,7 @@ export function useAuthState() {
           id: 'local-user',
           email: 'local@tablecanvas.app',
           name: 'Local User',
+          tier: 'guest',
           createdAt: new Date(),
         }
       } else {
@@ -95,6 +104,7 @@ export function useAuthState() {
     setUser,
     setIsAuthenticated,
     performLogin,
+    performGoogleLogin,
     performLogout,
     performCheckAuth,
   }

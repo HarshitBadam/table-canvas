@@ -85,9 +85,6 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
 
     if (
       existsInEngine &&
-      existingData &&
-      existingData.rows?.length > 0 &&
-      !existingData.isLoading &&
       node.cacheInfo?.currentVersionHash === currentVersionHash &&
       !node.cacheInfo?.isDirty
     ) {
@@ -95,7 +92,7 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
       return {
         status: 'cached',
         tableId,
-        rowCount: existingData.rows.length,
+        rowCount: node.cacheInfo?.lastRowCount ?? 0,
       }
     }
 
@@ -111,7 +108,9 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
           __rowId: row.__rowId || `row_${idx}`,
         }))
 
-        dataStore.setTableData(tableId, rows)
+        // No longer hydrate full rows into the data store — the grid
+        // reads windowed slices from DuckDB. Store an empty marker.
+        dataStore.setTableData(tableId, [])
       } else {
         projectStore.updateCacheInfo(tableId, {
           isComputing: false,
@@ -128,7 +127,7 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
       // Manually created table with no file backing
       rows = existingData?.rows ?? []
       if (!existingData?.rows) {
-        dataStore.setTableData(tableId, rows)
+        dataStore.setTableData(tableId, [])
       }
     }
 
@@ -277,12 +276,10 @@ async function materializeTableInternal(tableId: string): Promise<Materializatio
 
 export function needsMaterialization(tableId: string): boolean {
   const projectStore = useProjectStore.getState()
-  const dataStore = useDataStore.getState()
   const node = projectStore.getTableNode(tableId)
 
   if (!node) return false
   if (node.cacheInfo?.isDirty) return true
-  if (!dataStore.tableData[tableId]) return true
   if (!node.cacheInfo?.currentVersionHash) return true
 
   return false

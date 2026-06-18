@@ -1,8 +1,8 @@
 import { getEngine } from './EngineAdapter'
 import { useProjectStore } from '@/state/projectStore'
-import { useDataStore, TableRow } from '@/state/dataStore'
+import { useDataStore } from '@/state/dataStore'
 import { simpleHash, computeDerivedVersionHash, tableExistsInEngine } from './cacheUtils'
-import type { DerivedTableNode, CellValue, TableSchema } from '@/types'
+import type { DerivedTableNode } from '@/types'
 import type { MaterializationResult } from './materializationService'
 
 /**
@@ -104,31 +104,10 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
       projectStore.updateTableSchema(tableId, schemaWithIds)
     }
 
-    try {
-      const fullData = await engine.getSlice(tableId, 0, Math.max(result.rowCount, 10000))
-      const updatedSchema = projectStore.getTableNode(tableId)?.schema
-      const rows: TableRow[] = fullData.rows.map((row, idx) => {
-        const transformedRow = updatedSchema
-          ? remapRowKeysToSchemaIds(row, updatedSchema)
-          : { ...row } as TableRow
-        transformedRow.__rowId = `derived_row_${idx}`
-        return transformedRow
-      })
-      dataStore.setTableData(tableId, rows)
-    } catch (error) {
-      console.error('[derivedTableComputation] Failed to fetch full data slice, falling back to preview:', error);
-      if (result.preview && result.preview.length > 0) {
-        const updatedSchema = projectStore.getTableNode(tableId)?.schema
-        const rows: TableRow[] = result.preview.map((row, idx) => {
-          const transformedRow = updatedSchema
-            ? remapRowKeysToSchemaIds(row, updatedSchema)
-            : { ...row } as TableRow
-          transformedRow.__rowId = `derived_row_${idx}`
-          return transformedRow
-        })
-        dataStore.setTableData(tableId, rows)
-      }
-    }
+    // No longer hydrate full result into dataStore — the grid reads
+    // windowed slices directly from DuckDB via useWindowedRows.
+    // Set a minimal marker so downstream code knows the table is ready.
+    dataStore.setTableData(tableId, [])
 
     projectStore.updateCacheInfo(tableId, {
       isDirty: false,
@@ -165,15 +144,3 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
   }
 }
 
-/**
- * Remap DuckDB row keys (column names) to our internal schema column IDs.
- */
-function remapRowKeysToSchemaIds(row: Record<string, CellValue>, schema: TableSchema): TableRow {
-  const transformedRow: TableRow = { __rowId: '' }
-  for (const col of schema.columns) {
-    const duckDbKey = col.name
-    const schemaId = col.id
-    transformedRow[schemaId] = row[duckDbKey] ?? row[col.id] ?? null
-  }
-  return transformedRow
-}

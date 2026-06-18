@@ -2,8 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
+import { useAppAuth } from '@/state/AppContext'
 import { generateId } from '@/lib/utils'
 import { ColumnType, ColumnSchema, TableSchema, CellValue } from '@/types'
+import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
+import type { Tier } from '@/shared/limits'
+import { UpgradePrompt } from '@/components/UpgradePrompt'
 
 interface NewTableModalProps {
   isOpen: boolean
@@ -85,7 +89,9 @@ function TypeDropdown({
 
 export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   const addSourceTable = useProjectStore((state) => state.addSourceTable)
+  const nodes = useProjectStore((state) => state.nodes)
   const setTableData = useDataStore((state) => state.setTableData)
+  const { user } = useAppAuth()
   
   const [tableName, setTableName] = useState('New Table')
   const [rowCount, setRowCount] = useState(5)
@@ -93,6 +99,8 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
     { id: generateId(), name: 'Name', type: 'string' },
     { id: generateId(), name: 'Value', type: 'number' },
   ])
+  const [upgradeViolation, setUpgradeViolation] = useState<LimitExceeded | null>(null)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   const addColumn = () => {
     setColumns([
@@ -112,6 +120,17 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   }
 
   const handleCreate = () => {
+    const tier: Tier = user?.tier ?? 'guest'
+    const currentTableCount = Object.values(nodes).filter(
+      (n) => n.kind === 'source_table' || n.kind === 'derived_table',
+    ).length
+    const tableCheck = checkTableCount(currentTableCount, tier)
+    if (!tableCheck.ok) {
+      setUpgradeViolation(tableCheck)
+      setUpgradeOpen(true)
+      return
+    }
+
     const schemaColumns: ColumnSchema[] = columns.map((col, index) => ({
       id: `col_${index}_${col.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
       name: col.name,
@@ -279,6 +298,12 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
           </div>
         </Dialog.Content>
       </Dialog.Portal>
+
+      <UpgradePrompt
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        violation={upgradeViolation}
+      />
     </Dialog.Root>
   )
 }

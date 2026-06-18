@@ -11,6 +11,11 @@ export type WorkerRequestType =
   | 'loadTable'
   | 'executeTransform'
   | 'getSlice'
+  | 'getFilteredSlice'
+  | 'getDistinctValues'
+  | 'updateCell'
+  | 'insertRow'
+  | 'deleteRow'
   | 'getAggregation'
   | 'getProfile'
   | 'dropTable'
@@ -79,5 +84,53 @@ export interface LoadTableRequest {
     types: string[]
     rows: CellValue[][]
   }
+}
+
+export interface FilteredSliceRequest {
+  tableId: string
+  filters?: FilterConditionDef[]
+  sorts?: SortDef[]
+  search?: string
+  offset: number
+  limit: number
+}
+
+export interface FilterConditionDef {
+  column: string
+  operator: string
+  value?: CellValue
+  value2?: CellValue
+  columnType?: string
+}
+
+export interface SortDef {
+  column: string
+  direction: 'asc' | 'desc'
+}
+
+export interface UpdateCellRequest {
+  tableId: string
+  rowIndex: number
+  column: string
+  value: CellValue
+  columnType?: string
+}
+
+export interface InsertRowRequest {
+  tableId: string
+  values: Record<string, CellValue>
+  columns: string[]
+  types: string[]
+}
+
+export interface DeleteRowRequest {
+  tableId: string
+  rowIndex: number
+}
+
+export interface DistinctValuesRequest {
+  tableId: string
+  column: string
+  limit?: number
 }
 

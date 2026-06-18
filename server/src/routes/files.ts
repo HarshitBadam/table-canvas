@@ -13,21 +13,26 @@ import {
   asyncHandler,
   ValidationError,
   NotFoundError,
+  AppError,
 } from '../middleware/errorHandler.js';
+import { User } from '../models/User.js';
+import { File } from '../models/File.js';
+import { checkFileSize, checkStorageQuota } from '../config/enforce.js';
+import type { Tier } from '../config/limits.js';
 
 const router = Router();
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fileSize: 50 * 1024 * 1024, // 50MB hard ceiling; tier limits are tighter
   },
   fileFilter: (_req, file, cb) => {
     const allowedMimes = [
       'text/csv',
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/octet-stream', // Sometimes CSV files come as this
+      'application/octet-stream',
     ];
     
     const allowedExtensions = ['.csv', '.xlsx', '.xls'];
@@ -70,6 +75,25 @@ router.post(
 
     if (!file) {
       throw new ValidationError(['No file uploaded']);
+    }
+
+    const userDoc = await User.findById(userId);
+    const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
+
+    const sizeCheck = checkFileSize(file.size, tier);
+    if (!sizeCheck.ok) {
+      throw new AppError(sizeCheck.reason, 413);
+    }
+
+    const userFiles = await File.find({
+      userId: userDoc!._id,
+      deletedAt: null,
+    }).select('size');
+    const currentUsedBytes = userFiles.reduce((sum, f) => sum + (f.size || 0), 0);
+
+    const quotaCheck = checkStorageQuota(currentUsedBytes, file.size, tier);
+    if (!quotaCheck.ok) {
+      throw new AppError(quotaCheck.reason, 413);
     }
 
     let contentType = file.mimetype;

@@ -23,6 +23,8 @@ import { ProjectSummary } from '@/api/projects.api';
 import type { SourceTableNode, ProjectNode } from '@/types';
 import { initializeReportStore } from '@/report/reportStore';
 import { useAuthState } from './useAuthState';
+import { checkProjectCount, type LimitExceeded } from '@/shared/enforce';
+import type { Tier } from '@/shared/limits';
 
 export type AppPhase =
   | 'idle'
@@ -48,11 +50,14 @@ interface AppState {
 
 interface AppContextValue extends AppState {
   login: (credentials: LoginCredentials) => Promise<void>;
+  googleLogin: (credential: string) => Promise<void>;
   logout: () => Promise<void>;
   createNewProject: (name?: string) => Promise<void>;
   loadProject: (projectId: string) => Promise<void>;
   refreshProjects: () => Promise<void>;
   deleteNodeWithSync: (nodeId: string) => Promise<void>;
+  projectLimitViolation: LimitExceeded | null;
+  setProjectLimitViolation: (v: LimitExceeded | null) => void;
   isReady: boolean;
   isLoading: boolean;
 }
@@ -105,6 +110,7 @@ async function loadOrCreateProject() {
 
 export function AppProvider({ children }: AppProviderProps) {
   const auth = useAuthState();
+  const [projectLimitViolation, setProjectLimitViolation] = useState<LimitExceeded | null>(null);
 
   const [state, setState] = useState<AppState>({
     phase: 'idle',
@@ -222,9 +228,7 @@ export function AppProvider({ children }: AppProviderProps) {
     };
   }, [nodes, edges, patches, projectName, state.phase, state.isAuthenticated, state.projectId]);
 
-  const login = useCallback(async (credentials: LoginCredentials) => {
-    await auth.performLogin(credentials);
-
+  const postLoginSetup = useCallback(async () => {
     setPhase('loading_project');
     const { project, projectList } = await loadOrCreateProject();
 
@@ -246,7 +250,17 @@ export function AppProvider({ children }: AppProviderProps) {
     }
 
     setPhase('ready');
-  }, [setPhase, auth.performLogin]);
+  }, [setPhase]);
+
+  const login = useCallback(async (credentials: LoginCredentials) => {
+    await auth.performLogin(credentials);
+    await postLoginSetup();
+  }, [auth.performLogin, postLoginSetup]);
+
+  const googleLogin = useCallback(async (credential: string) => {
+    await auth.performGoogleLogin(credential);
+    await postLoginSetup();
+  }, [auth.performGoogleLogin, postLoginSetup]);
 
   const logout = useCallback(async () => {
     await auth.performLogout();
@@ -268,6 +282,13 @@ export function AppProvider({ children }: AppProviderProps) {
   }, [auth.performLogout]);
 
   const createNewProject = useCallback(async (name?: string) => {
+    const tier: Tier = auth.user?.tier ?? 'guest';
+    const projCheck = checkProjectCount(state.projects.length, tier);
+    if (!projCheck.ok) {
+      setProjectLimitViolation(projCheck);
+      return;
+    }
+
     const project = await createProjectWithSync(name || 'Untitled Project');
 
     useProjectStore.setState({
@@ -287,7 +308,7 @@ export function AppProvider({ children }: AppProviderProps) {
         ...prev.projects,
       ],
     }));
-  }, []);
+  }, [auth.user?.tier, state.projects.length]);
 
   const loadProject = useCallback(async (projectId: string) => {
     try {
@@ -359,11 +380,14 @@ export function AppProvider({ children }: AppProviderProps) {
     isReady: state.phase === 'ready',
     isLoading: state.phase !== 'ready' && state.phase !== 'error',
     login,
+    googleLogin,
     logout,
     createNewProject,
     loadProject,
     refreshProjects,
     deleteNodeWithSync,
+    projectLimitViolation,
+    setProjectLimitViolation,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -378,6 +402,6 @@ export function useApp(): AppContextValue {
 }
 
 export function useAppAuth() {
-  const { user, isAuthenticated, login, logout } = useApp();
-  return { user, isAuthenticated, login, logout };
+  const { user, isAuthenticated, login, googleLogin, logout } = useApp();
+  return { user, isAuthenticated, login, googleLogin, logout };
 }

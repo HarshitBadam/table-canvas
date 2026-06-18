@@ -20,6 +20,8 @@ export interface IUserDocument extends Omit<IUser, '_id'>, Document {
     id: string;
     email: string;
     name: string;
+    tier: 'guest' | 'google';
+    avatarUrl?: string;
     createdAt: Date;
   };
 }
@@ -45,7 +47,12 @@ const UserSchema = new Schema<IUserDocument, IUserModel>(
     },
     passwordHash: {
       type: String,
-      required: [true, 'Password is required'],
+      required: [
+        function (this: IUserDocument) {
+          return !this.googleId;
+        },
+        'Password is required for non-Google accounts',
+      ],
     },
     name: {
       type: String,
@@ -53,6 +60,19 @@ const UserSchema = new Schema<IUserDocument, IUserModel>(
       trim: true,
       minlength: [1, 'Name cannot be empty'],
       maxlength: [100, 'Name cannot exceed 100 characters'],
+    },
+    googleId: {
+      type: String,
+      sparse: true,
+      unique: true,
+    },
+    avatarUrl: {
+      type: String,
+    },
+    tier: {
+      type: String,
+      enum: ['guest', 'google'],
+      default: 'google',
     },
     refreshTokens: {
       type: [RefreshTokenSchema],
@@ -66,15 +86,21 @@ const UserSchema = new Schema<IUserDocument, IUserModel>(
 );
 
 // Note: email index is already created by `unique: true` in schema definition
+// googleId index is created by `unique: true` + `sparse: true` in schema definition
 UserSchema.index({ 'refreshTokens.token': 1 });
 
 UserSchema.methods.toPublic = function () {
-  return {
+  const pub: ReturnType<IUserDocument['toPublic']> = {
     id: this._id.toString(),
     email: this.email,
     name: this.name,
+    tier: this.tier || 'google',
     createdAt: this.createdAt,
   };
+  if (this.avatarUrl) {
+    pub.avatarUrl = this.avatarUrl;
+  }
+  return pub;
 };
 
 UserSchema.statics.findByEmail = function (email: string) {
