@@ -1,19 +1,28 @@
-import { useState, FormEvent, useCallback } from 'react';
+import { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useApp } from '@/state/AppContext';
 import { ApiError } from '@/api/client';
 
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const GIS_SCRIPT_URL = 'https://accounts.google.com/gsi/client';
+
+interface GoogleCredentialResponse {
+  credential: string;
+  select_by: string;
+}
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  const { login } = useApp();
+  const [gisReady, setGisReady] = useState(false);
+
+  const { login, googleLogin } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
+  const googleBtnRef = useRef<HTMLDivElement>(null);
 
   const from = (location.state as { from?: Location })?.from?.pathname || '/';
 
@@ -32,6 +41,69 @@ export function LoginPage() {
       setError('An unexpected error occurred');
     }
   }, []);
+
+  const handleGoogleCredential = useCallback(
+    async (response: GoogleCredentialResponse) => {
+      clearError();
+      setIsSubmitting(true);
+      try {
+        await googleLogin(response.credential);
+        navigate(from, { replace: true });
+      } catch (err) {
+        handleError(err);
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [googleLogin, navigate, from, clearError, handleError],
+  );
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+
+    const existing = document.querySelector(`script[src="${GIS_SCRIPT_URL}"]`);
+    if (existing) {
+      if ((window as unknown as Record<string, unknown>).google) {
+        setGisReady(true);
+      }
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = GIS_SCRIPT_URL;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setGisReady(true);
+    script.onerror = () => {
+      /* GIS script failed to load — degrade gracefully */
+    };
+    document.head.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    if (!gisReady || !GOOGLE_CLIENT_ID || !googleBtnRef.current) return;
+    const g = (window as unknown as Record<string, unknown>).google as {
+      accounts: {
+        id: {
+          initialize: (config: Record<string, unknown>) => void;
+          renderButton: (parent: HTMLElement, config: Record<string, unknown>) => void;
+        };
+      };
+    } | undefined;
+    if (!g) return;
+
+    g.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: handleGoogleCredential,
+    });
+    g.accounts.id.renderButton(googleBtnRef.current, {
+      type: 'standard',
+      theme: 'outline',
+      size: 'large',
+      width: googleBtnRef.current.offsetWidth,
+      text: 'signin_with',
+    });
+  }, [gisReady, handleGoogleCredential]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -72,13 +144,27 @@ export function LoginPage() {
         </div>
 
         <div className="bg-surface border border-border rounded-xl p-6 shadow-lg">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
-                {error}
-              </div>
-            )}
+          {error && (
+            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+              {error}
+            </div>
+          )}
 
+          {GOOGLE_CLIENT_ID && gisReady && (
+            <>
+              <div ref={googleBtnRef} className="w-full" />
+              <div className="relative my-5">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-surface px-2 text-text-tertiary">or</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label
                 htmlFor="email"

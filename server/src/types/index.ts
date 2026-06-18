@@ -26,8 +26,11 @@ export interface IRefreshToken {
 export interface IUser {
   _id: Types.ObjectId;
   email: string;
-  passwordHash: string;
+  passwordHash?: string;
   name: string;
+  googleId?: string;
+  avatarUrl?: string;
+  tier: 'guest' | 'google';
   refreshTokens: IRefreshToken[];
   createdAt: Date;
   updatedAt: Date;
@@ -37,6 +40,8 @@ export interface IUserPublic {
   id: string;
   email: string;
   name: string;
+  tier: 'guest' | 'google';
+  avatarUrl?: string;
   createdAt: Date;
 }
 

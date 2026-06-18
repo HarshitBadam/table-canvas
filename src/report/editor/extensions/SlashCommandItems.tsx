@@ -1,8 +1,6 @@
 import type { SuggestionOptions } from '@tiptap/suggestion';
 import type { Editor } from '@tiptap/react';
 import type { Range } from '@tiptap/core';
-import { useProjectStore } from '@/state/projectStore';
-import type { TableNode as TableNodeType } from '@/types';
 import {
   TextIcon,
   H1Icon,
@@ -34,9 +32,6 @@ export interface SlashCommandsOptions {
 }
 
 export function getCommands(_options: SlashCommandsOptions): SlashCommandItem[] {
-  const tables = Object.values(useProjectStore.getState().nodes)
-    .filter(n => 'type' in n && n.type === 'table') as TableNodeType[];
-
   return [
     {
       title: 'Text',
@@ -156,7 +151,7 @@ export function getCommands(_options: SlashCommandsOptions): SlashCommandItem[] 
         editor.chain().focus().deleteRange(range).insertContent({
           type: 'chartBlock',
           attrs: {
-            sourceTableId: tables[0]?.id || '',
+            sourceTableId: '',
             chartType: 'bar',
             config: { showLegend: true, showGrid: true },
           },
@@ -172,7 +167,7 @@ export function getCommands(_options: SlashCommandsOptions): SlashCommandItem[] 
         editor.chain().focus().deleteRange(range).insertContent({
           type: 'embeddedTable',
           attrs: {
-            sourceTableId: tables[0]?.id || '',
+            sourceTableId: '',
             selectedColumns: [],
             rowSelectionMode: 'first_n',
             rowLimit: 10,

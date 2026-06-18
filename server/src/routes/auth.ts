@@ -13,6 +13,7 @@ import {
   getRefreshTokenFromCookie,
   getRefreshTokenExpiryDate,
 } from '../services/auth.service.js';
+import { verifyGoogleToken } from '../services/google.service.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
   asyncHandler,
@@ -89,7 +90,7 @@ router.post(
     }
 
     const user = await User.findByEmail(email);
-    if (!user) {
+    if (!user || !user.passwordHash) {
       throw new AuthenticationError('Invalid email or password');
     }
 
@@ -216,6 +217,76 @@ router.post(
         user: user.toPublic(),
       },
       message: 'Token refreshed successfully',
+    };
+
+    res.json(response);
+  })
+);
+
+router.post(
+  '/google',
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const { credential } = req.body;
+
+    if (!credential) {
+      throw new ValidationError(['Google credential token is required']);
+    }
+
+    let googleInfo;
+    try {
+      googleInfo = await verifyGoogleToken(credential);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Google token verification failed';
+      throw new AuthenticationError(message);
+    }
+
+    // 1. Try to find by googleId
+    let user = await User.findOne({ googleId: googleInfo.googleId });
+
+    if (!user) {
+      // 2. Try to find by email and link the Google account
+      user = await User.findByEmail(googleInfo.email);
+      if (user) {
+        user.googleId = googleInfo.googleId;
+        if (!user.avatarUrl && googleInfo.avatarUrl) {
+          user.avatarUrl = googleInfo.avatarUrl;
+        }
+        if (!user.tier) {
+          user.tier = 'google';
+        }
+      } else {
+        // 3. Create a brand-new Google user
+        user = new User({
+          email: googleInfo.email.toLowerCase().trim(),
+          name: googleInfo.name,
+          googleId: googleInfo.googleId,
+          avatarUrl: googleInfo.avatarUrl,
+          tier: 'google',
+        });
+      }
+    } else {
+      if (googleInfo.avatarUrl) {
+        user.avatarUrl = googleInfo.avatarUrl;
+      }
+    }
+
+    const accessToken = generateAccessToken(user._id.toString(), user.email);
+    const refreshToken = generateRefreshToken(user._id.toString(), user.email);
+
+    user.refreshTokens.push({
+      token: refreshToken,
+      expiresAt: getRefreshTokenExpiryDate(),
+    });
+    await user.save();
+
+    setAuthCookies(res, accessToken, refreshToken);
+
+    const response: ApiResponse<LoginResponse> = {
+      success: true,
+      data: {
+        user: user.toPublic(),
+        message: 'Google login successful',
+      },
     };
 
     res.json(response);

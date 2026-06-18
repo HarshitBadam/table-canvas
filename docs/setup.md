@@ -74,9 +74,23 @@ JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
 FRONTEND_URL=http://localhost:5173   # must match the frontend origin for CORS
+
+# Optional — enables Google Sign-In (get from Google Cloud Console → Credentials)
+GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
+```
+
+**Frontend**: also add the same Google client ID in the project-root `.env`:
+
+```env
+VITE_API_URL=http://localhost:3001/api
+VITE_GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
 ```
 
 Generate secrets with `openssl rand -base64 32`.
+
+Google Sign-In is optional. If `GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` are absent, the
+server boots normally (Google login attempts return a clear error) and the client hides the
+Google button.
 
 ## Build
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import { Readable } from 'stream';
 import mongoose from 'mongoose';
 import { Types, mongo } from 'mongoose';
@@ -36,6 +36,18 @@ describe('FileService', () => {
 
     Object.defineProperty(mongoose.connection, 'db', {
       get: () => mockDb,
+      configurable: true,
+    });
+  });
+
+  // These tests redefine `mongoose.connection.db` as a getter-only accessor.
+  // Restore it to an assignable data property afterwards so later suites that
+  // share this fork (via setupMongoTestDB) can reconnect the default
+  // connection — mongoose's internal `_setClient` assigns to `connection.db`.
+  afterAll(() => {
+    Object.defineProperty(mongoose.connection, 'db', {
+      value: undefined,
+      writable: true,
       configurable: true,
     });
   });
