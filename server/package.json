@@ -9,7 +9,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint src/",
-    "seed": "tsx scripts/seed.ts",
+    "seed": "node --import tsx/esm scripts/seed.ts 2>/dev/null || node dist/scripts/seed.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
