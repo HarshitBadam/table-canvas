@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { User } from '../models/User.js';
+import { User, IUserDocument } from '../models/User.js';
 import { AuthenticatedRequest, ApiResponse, LoginResponse, RegisterResponse } from '../types/index.js';
 import {
   hashPassword,
@@ -241,7 +241,7 @@ router.post(
     }
 
     // 1. Try to find by googleId
-    let user = await User.findOne({ googleId: googleInfo.googleId });
+    let user: IUserDocument | null = await User.findOne({ googleId: googleInfo.googleId });
 
     if (!user) {
       // 2. Try to find by email and link the Google account
