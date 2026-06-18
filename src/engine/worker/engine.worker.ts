@@ -41,16 +41,11 @@ async function initDuckDB(): Promise<void> {
 
   const bundle = await duckdb.selectBundle(LOCAL_BUNDLES)
 
-  const worker_url = URL.createObjectURL(
-    new Blob([`importScripts("${bundle.mainWorker!}");`], { type: 'text/javascript' })
-  )
-
-  const worker = new Worker(worker_url)
+  const worker = new Worker(bundle.mainWorker!)
   const logger = new duckdb.ConsoleLogger()
   db = new duckdb.AsyncDuckDB(logger, worker)
 
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker)
-  URL.revokeObjectURL(worker_url)
 
   conn = await db.connect()
 }
