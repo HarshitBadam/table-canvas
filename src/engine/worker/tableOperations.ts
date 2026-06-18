@@ -5,6 +5,8 @@ import type {
   AggregationDef,
   AggregationResult,
   ProfileResult,
+  FilterConditionDef,
+  SortDef,
 } from '../types'
 import type { CellValue, ColumnProfile } from '@/types'
 import {
@@ -311,4 +313,203 @@ export async function getProfile(
 export async function dropTable(conn: duckdb.AsyncDuckDBConnection, tableId: string): Promise<void> {
   const tableName = sanitizeTableName(tableId)
   await conn.query(`DROP TABLE IF EXISTS "${tableName}"`)
+}
+
+export async function getFilteredSlice(
+  conn: duckdb.AsyncDuckDBConnection,
+  tableId: string,
+  filters: FilterConditionDef[] | undefined,
+  sorts: SortDef[] | undefined,
+  search: string | undefined,
+  offset: number,
+  limit: number
+): Promise<TableSlice> {
+  const tableName = sanitizeTableName(tableId)
+
+  const whereClauses: string[] = []
+
+  if (filters && filters.length > 0) {
+    for (const f of filters) {
+      const clause = buildFilterClause(f)
+      if (clause) whereClauses.push(clause)
+    }
+  }
+
+  if (search && search.trim()) {
+    const schemaResult = await conn.query(`DESCRIBE "${tableName}"`)
+    const schemaCols = schemaResult.toArray()
+    const searchTerm = escapeLiteral(search.trim().toLowerCase())
+    const searchClauses = schemaCols.map((col: { column_name: string }) =>
+      `LOWER(CAST("${col.column_name}" AS VARCHAR)) LIKE '%' || ${searchTerm} || '%'`
+    )
+    if (searchClauses.length > 0) {
+      whereClauses.push(`(${searchClauses.join(' OR ')})`)
+    }
+  }
+
+  const whereStr = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : ''
+
+  let orderStr = ''
+  if (sorts && sorts.length > 0) {
+    const orderClauses = sorts.map(s => `"${s.column}" ${s.direction === 'desc' ? 'DESC' : 'ASC'}`)
+    orderStr = `ORDER BY ${orderClauses.join(', ')}`
+  }
+
+  const countSql = `SELECT COUNT(*) as cnt FROM "${tableName}" ${whereStr}`
+  const countResult = await conn.query(countSql)
+  const totalRows = Number(countResult.toArray()[0]?.cnt ?? 0)
+
+  const dataSql = `SELECT * FROM "${tableName}" ${whereStr} ${orderStr} LIMIT ${limit} OFFSET ${offset}`
+  const result = await conn.query(dataSql)
+  const rows = result.toArray().map(row => {
+    const obj: Record<string, CellValue> = {}
+    for (const key of Object.keys(row)) {
+      obj[key] = row[key] as CellValue
+    }
+    return obj
+  })
+
+  return { tableId, offset, limit, rows, totalRows }
+}
+
+export async function updateCell(
+  conn: duckdb.AsyncDuckDBConnection,
+  tableId: string,
+  rowIndex: number,
+  column: string,
+  value: CellValue,
+  columnType?: string
+): Promise<void> {
+  const tableName = sanitizeTableName(tableId)
+  const formattedValue = columnType
+    ? formatValueWithType(value, columnType)
+    : formatValue(value)
+
+  await conn.query(
+    `UPDATE "${tableName}" SET "${column}" = ${formattedValue} WHERE rowid = (
+      SELECT rowid FROM "${tableName}" LIMIT 1 OFFSET ${rowIndex}
+    )`
+  )
+}
+
+export async function insertRow(
+  conn: duckdb.AsyncDuckDBConnection,
+  tableId: string,
+  values: Record<string, CellValue>,
+  columns: string[],
+  types: string[]
+): Promise<void> {
+  const tableName = sanitizeTableName(tableId)
+  const colNames = columns.map(c => `"${c}"`).join(', ')
+  const vals = columns.map((col, i) => formatValueWithType(values[col] ?? null, types[i])).join(', ')
+  await conn.query(`INSERT INTO "${tableName}" (${colNames}) VALUES (${vals})`)
+}
+
+export async function deleteRow(
+  conn: duckdb.AsyncDuckDBConnection,
+  tableId: string,
+  rowIndex: number
+): Promise<void> {
+  const tableName = sanitizeTableName(tableId)
+  await conn.query(
+    `DELETE FROM "${tableName}" WHERE rowid = (
+      SELECT rowid FROM "${tableName}" LIMIT 1 OFFSET ${rowIndex}
+    )`
+  )
+}
+
+export async function getDistinctValues(
+  conn: duckdb.AsyncDuckDBConnection,
+  tableId: string,
+  column: string,
+  limit: number = 100
+): Promise<CellValue[]> {
+  const tableName = sanitizeTableName(tableId)
+  const result = await conn.query(
+    `SELECT DISTINCT "${column}" AS val FROM "${tableName}" WHERE "${column}" IS NOT NULL ORDER BY "${column}" LIMIT ${limit}`
+  )
+  return result.toArray().map(row => (row as { val: CellValue }).val)
+}
+
+function buildFilterClause(f: FilterConditionDef): string | null {
+  const col = `"${f.column}"`
+
+  switch (f.operator) {
+    case 'is_null':
+      return `${col} IS NULL OR CAST(${col} AS VARCHAR) = ''`
+    case 'is_not_null':
+      return `${col} IS NOT NULL AND CAST(${col} AS VARCHAR) != ''`
+    case 'equals':
+      if (f.columnType === 'boolean') {
+        const boolVal = String(f.value).toLowerCase()
+        const isTrue = ['true', '1', 'yes'].includes(boolVal)
+        return `${col} = ${isTrue ? 'TRUE' : 'FALSE'}`
+      }
+      if (f.columnType === 'number') {
+        return `${col} = ${Number(f.value)}`
+      }
+      if (f.columnType === 'date' || f.columnType === 'datetime') {
+        return `CAST(${col} AS DATE) = CAST(${escapeLiteral(String(f.value))} AS DATE)`
+      }
+      return `LOWER(CAST(${col} AS VARCHAR)) = ${escapeLiteral(String(f.value ?? '').toLowerCase())}`
+    case 'not_equals':
+      if (f.columnType === 'number') {
+        return `${col} != ${Number(f.value)}`
+      }
+      return `LOWER(CAST(${col} AS VARCHAR)) != ${escapeLiteral(String(f.value ?? '').toLowerCase())}`
+    case 'contains': {
+      const filterStr = String(f.value ?? '')
+      if (filterStr.includes('|||')) {
+        const vals = filterStr.split('|||').filter(Boolean)
+        const conditions = vals.map(v => `LOWER(CAST(${col} AS VARCHAR)) = ${escapeLiteral(v.toLowerCase())}`)
+        return `(${conditions.join(' OR ')})`
+      }
+      return `LOWER(CAST(${col} AS VARCHAR)) LIKE '%' || ${escapeLiteral(filterStr.toLowerCase())} || '%'`
+    }
+    case 'not_contains':
+      return `LOWER(CAST(${col} AS VARCHAR)) NOT LIKE '%' || ${escapeLiteral(String(f.value ?? '').toLowerCase())} || '%'`
+    case 'starts_with':
+      return `LOWER(CAST(${col} AS VARCHAR)) LIKE ${escapeLiteral(String(f.value ?? '').toLowerCase())} || '%'`
+    case 'ends_with':
+      return `LOWER(CAST(${col} AS VARCHAR)) LIKE '%' || ${escapeLiteral(String(f.value ?? '').toLowerCase())}`
+    case 'greater_than':
+      if (f.columnType === 'date' || f.columnType === 'datetime') {
+        return `${col} > CAST(${escapeLiteral(String(f.value))} AS DATE)`
+      }
+      return `${col} > ${Number(f.value)}`
+    case 'less_than':
+      if (f.columnType === 'date' || f.columnType === 'datetime') {
+        return `${col} < CAST(${escapeLiteral(String(f.value))} AS DATE)`
+      }
+      return `${col} < ${Number(f.value)}`
+    case 'greater_equal':
+      if (f.columnType === 'date' || f.columnType === 'datetime') {
+        return `${col} >= CAST(${escapeLiteral(String(f.value))} AS DATE)`
+      }
+      return `${col} >= ${Number(f.value)}`
+    case 'less_equal':
+      if (f.columnType === 'date' || f.columnType === 'datetime') {
+        return `${col} <= CAST(${escapeLiteral(String(f.value))} AS DATE)`
+      }
+      return `${col} <= ${Number(f.value)}`
+    case 'between':
+      if (f.value === undefined || f.value2 === undefined) return null
+      if (f.columnType === 'date' || f.columnType === 'datetime') {
+        return `${col} >= CAST(${escapeLiteral(String(f.value))} AS DATE) AND ${col} <= CAST(${escapeLiteral(String(f.value2))} AS DATE)`
+      }
+      return `${col} >= ${Number(f.value)} AND ${col} <= ${Number(f.value2)}`
+    default:
+      return null
+  }
+}
+
+function escapeLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`
+}
+
+function formatValue(value: CellValue): string {
+  if (value === null || value === undefined) return 'NULL'
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
+  if (typeof value === 'number') return String(value)
+  return `'${String(value).replace(/'/g, "''")}'`
 }

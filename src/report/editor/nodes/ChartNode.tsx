@@ -1,8 +1,9 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
-import { useDataStore } from '@/state/dataStore';
 import { useProjectStore } from '@/state/projectStore';
+import { getTableData } from '@/engine/materializationService';
+import type { TableRow } from '@/state/dataStore';
 import { useNavigation } from '@/layout/NavigationContext';
 import { ChartRenderer } from '@/charts/ChartRenderer';
 import { TableSelector } from './ChartNodeTablePicker';
@@ -17,10 +18,8 @@ interface ChartNodeAttrs {
   config: EnhancedChartConfig;
 }
 
-interface ChartNodeOptions {
-  reportId?: string;
-}
 
+const CHART_ROW_LIMIT = 1000;
 
 const ChartNodeView = memo(function ChartNodeView({ 
   node, 
@@ -31,12 +30,43 @@ const ChartNodeView = memo(function ChartNodeView({
   const attrs = node.attrs as ChartNodeAttrs;
   const { openTable } = useNavigation();
   
-  const tableDataEntry = useDataStore((state) => state.tableData[attrs.sourceTableId]);
-  const tableData = tableDataEntry?.rows || [];
   const tableNode = useProjectStore((state) => state.nodes[attrs.sourceTableId]) as TableNodeType | undefined;
   
   const [showConfig, setShowConfig] = useState(false);
   const hasAutoConfigured = useRef(false);
+  const [tableData, setTableData] = useState<TableRow[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | undefined>();
+  const fetchIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!attrs.sourceTableId) return;
+
+    const fetchId = ++fetchIdRef.current;
+    setIsLoading(true);
+    setLoadError(undefined);
+
+    getTableData(attrs.sourceTableId, 0, CHART_ROW_LIMIT)
+      .then((result) => {
+        if (fetchId !== fetchIdRef.current) return;
+        if (result.error) {
+          setLoadError(result.error);
+          setTableData([]);
+        } else {
+          setTableData(result.rows);
+          setLoadError(undefined);
+        }
+      })
+      .catch((err) => {
+        if (fetchId !== fetchIdRef.current) return;
+        setLoadError(err instanceof Error ? err.message : String(err));
+        setTableData([]);
+      })
+      .finally(() => {
+        if (fetchId !== fetchIdRef.current) return;
+        setIsLoading(false);
+      });
+  }, [attrs.sourceTableId]);
 
   const columns: ColumnSchema[] = useMemo(() => {
     return tableNode?.schema?.columns || [];
@@ -50,7 +80,6 @@ const ChartNodeView = memo(function ChartNodeView({
     return map;
   }, [columns]);
 
-  // Auto-configure axes on first render when columns/data become available
   useEffect(() => {
     if (hasAutoConfigured.current) return;
     if (columns.length === 0 || tableData.length === 0) return;
@@ -126,6 +155,36 @@ const ChartNodeView = memo(function ChartNodeView({
           <TableSelector 
             onSelect={(tableId) => updateAttributes({ sourceTableId: tableId })}
           />
+        </div>
+      </NodeViewWrapper>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <NodeViewWrapper className="chart-block">
+        <div className={`block-empty-state ${selected ? 'is-selected' : ''}`}>
+          <div className="animate-pulse flex flex-col items-center gap-2">
+            <div className="w-8 h-8 rounded-full border-2 border-accent-green border-t-transparent animate-spin" />
+            <div className="block-empty-state-title">Loading Data…</div>
+            <div className="block-empty-state-description">
+              Materializing "{tableNode?.name || 'table'}"
+            </div>
+          </div>
+        </div>
+      </NodeViewWrapper>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <NodeViewWrapper className="chart-block">
+        <div className={`block-empty-state ${selected ? 'is-selected' : ''}`}>
+          <svg className="w-8 h-8 mx-auto mb-2 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div className="block-empty-state-title">Error Loading Data</div>
+          <div className="block-empty-state-description">{loadError}</div>
         </div>
       </NodeViewWrapper>
     );
@@ -291,7 +350,7 @@ const ChartNodeView = memo(function ChartNodeView({
 });
 
 
-export const ChartNode = Node.create<ChartNodeOptions>({
+export const ChartNode = Node.create({
   name: 'chartBlock',
   
   group: 'block',
@@ -299,12 +358,6 @@ export const ChartNode = Node.create<ChartNodeOptions>({
   atom: true,
   
   draggable: true,
-
-  addOptions() {
-    return {
-      reportId: undefined,
-    };
-  },
 
   addAttributes() {
     return {

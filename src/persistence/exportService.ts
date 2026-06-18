@@ -12,7 +12,7 @@ import { exportProjectFile, loadProject, loadAllReports, } from './db'
 import { getTableData, ensureTableMaterialized } from '@/engine/materializationService'
 import { useDataStore } from '@/state/dataStore'
 import type { SourceTableNode } from '@/types'
-import { generateReportHtml } from './reportHtmlGenerator'
+import { generateReportHtml, collectEmbeddedTableIds, buildEmbeddedDataMap } from './reportHtmlGenerator'
 import { makeSheetNamesUnique, getTableNodes, loadSourceTableData } from './excelHelpers'
 
 export interface ZipExportOptions {
@@ -172,7 +172,23 @@ async function addReportsToZip(zip: JSZip): Promise<void> {
     const safeName = report.name.replace(/[^a-zA-Z0-9-_ ]/g, '_').substring(0, 50)
     const filename = `${safeName}.html`
 
-    const html = generateReportHtml(report)
+    let dataMap = {}
+    if (report.tiptapContent) {
+      const embeddedRefs = collectEmbeddedTableIds(report.tiptapContent)
+      const uniqueTableIds = [...new Set(embeddedRefs.map(r => r.tableId))]
+      const fetched = await Promise.all(
+        uniqueTableIds.map(async (tableId) => {
+          const maxLimit = Math.max(
+            ...embeddedRefs.filter(r => r.tableId === tableId).map(r => r.rowLimit),
+          )
+          const result = await getTableData(tableId, 0, maxLimit)
+          return { tableId, rows: result.rows }
+        }),
+      )
+      dataMap = buildEmbeddedDataMap(fetched)
+    }
+
+    const html = generateReportHtml(report, dataMap)
     reportsFolder?.file(filename, html)
     console.log(`[Export] Added report: ${filename}`)
   }

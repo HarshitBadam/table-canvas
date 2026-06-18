@@ -8,7 +8,11 @@ import {
   ValidationError,
   NotFoundError,
   AuthorizationError,
+  AppError,
 } from '../middleware/errorHandler.js';
+import { User } from '../models/User.js';
+import { checkProjectCount } from '../config/enforce.js';
+import type { Tier } from '../config/limits.js';
 
 const router = Router();
 
@@ -42,6 +46,18 @@ router.post(
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const { name, nodes, edges, patches } = req.body;
+
+    const userDoc = await User.findById(userId);
+    const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
+
+    const activeProjects = await Project.countDocuments({
+      userId: new Types.ObjectId(userId),
+      deletedAt: null,
+    });
+    const projCheck = checkProjectCount(activeProjects, tier);
+    if (!projCheck.ok) {
+      throw new AppError(projCheck.reason, 403);
+    }
 
     const project = new Project({
       userId: new Types.ObjectId(userId),

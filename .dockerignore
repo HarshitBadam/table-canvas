@@ -38,4 +38,5 @@ Thumbs.db
 # Docker files (prevent recursive copy)
 Dockerfile
 docker-compose.yml
+docker-compose.prod.yml
 .dockerignore

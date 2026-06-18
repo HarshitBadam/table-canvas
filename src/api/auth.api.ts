@@ -5,6 +5,8 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  tier: 'guest' | 'google';
+  avatarUrl?: string;
   createdAt: Date;
 }
 
@@ -21,6 +23,12 @@ export interface AuthResponse {
 
 export async function login(credentials: LoginCredentials): Promise<AuthResponse> {
   return api.post<AuthResponse>('/auth/login', credentials, {
+    skipAuth: true,
+  });
+}
+
+export async function loginWithGoogle(credential: string): Promise<AuthResponse> {
+  return api.post<AuthResponse>('/auth/google', { credential }, {
     skipAuth: true,
   });
 }

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, lazy, Suspense, useMemo } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useProjectStore } from '@/state/projectStore'
 import { FilterPanel } from './FilterPanel'
@@ -9,7 +10,7 @@ import { ColumnHeader } from './ColumnHeader'
 import { GridCell } from './GridCell'
 import { GridContextMenu } from './GridContextMenu'
 import { GridToolbar } from './GridToolbar'
-import { ROW_HEIGHT, HEADER_HEIGHT, BUFFER_ROWS } from './constants'
+import { ROW_HEIGHT, HEADER_HEIGHT } from './constants'
 import { useColumnResize } from './useColumnResize'
 import { useGridData } from './useGridData'
 import { useGridSelection } from './useGridSelection'
@@ -37,6 +38,7 @@ export function GridView({ tableId }: GridViewProps) {
     materializationError, setMaterializationError, computationError,
     highlightedCells, tableData, getDisplayValue,
     filters, handleFiltersChange,
+    windowed,
   } = useGridData(tableId)
 
   const {
@@ -87,25 +89,19 @@ export function GridView({ tableId }: GridViewProps) {
   const { getColumnWidth, handleResizeStart, resizingColumn } = useColumnResize()
 
   const containerRef = useRef<HTMLDivElement>(null)
-  const [scrollTop, setScrollTop] = useState(0)
-  const [containerHeight, setContainerHeight] = useState(0)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [chartBuilderOpen, setChartBuilderOpen] = useState(false)
   const [chartPreselectedColumn, setChartPreselectedColumn] = useState<string | undefined>(undefined)
 
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setScrollTop(e.currentTarget.scrollTop)
-  }, [])
+  const totalRows = filteredRows.length
 
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-    const observer = new ResizeObserver((entries) => setContainerHeight(entries[0].contentRect.height))
-    observer.observe(container)
-    setContainerHeight(container.clientHeight)
-    return () => observer.disconnect()
-  }, [])
+  const rowVirtualizer = useVirtualizer({
+    count: totalRows,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 15,
+  })
 
   useEffect(() => {
     if (!contextMenu) return
@@ -117,11 +113,6 @@ export function GridView({ tableId }: GridViewProps) {
   const handleAddRow = useCallback(() => doInsertRow(getRowInsertionIndex()), [getRowInsertionIndex, doInsertRow])
   const handleAddColumn = useCallback(() => openNewColumnModal(getColumnInsertionIndex()), [getColumnInsertionIndex, openNewColumnModal])
   const handleToggleFilters = useCallback(() => setShowFilterPanel(prev => !prev), [])
-
-  const totalRows = filteredRows.length
-  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER_ROWS)
-  const endIndex = Math.min(totalRows, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + BUFFER_ROWS)
-  const visibleRows = filteredRows.slice(startIndex, endIndex)
 
   const contextValue: GridContextValue = useMemo(() => ({
     tableId, isEditable, columns, getDisplayValue, getColumnWidth,
@@ -180,7 +171,7 @@ export function GridView({ tableId }: GridViewProps) {
     )
   }
 
-  const displayError = materializationError || computationError
+  const displayError = materializationError || computationError || windowed.error
   if (displayError) {
     return (
       <div className="flex flex-col h-full">
@@ -205,7 +196,7 @@ export function GridView({ tableId }: GridViewProps) {
             <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 text-left">
               <code className="text-xs text-red-700 dark:text-red-300 break-all">{displayError}</code>
             </div>
-            <button onClick={() => { setMaterializationError(null); ensureTableMaterialized(tableId) }} className="mt-4 btn btn-primary">
+            <button onClick={() => { setMaterializationError(null); ensureTableMaterialized(tableId).then(() => windowed.invalidate()) }} className="mt-4 btn btn-primary">
               Retry
             </button>
           </div>
@@ -214,7 +205,7 @@ export function GridView({ tableId }: GridViewProps) {
     )
   }
 
-  if ((isMaterializing || isComputing) && (!tableData || !tableData.rows)) {
+  if ((isMaterializing || isComputing) && totalRows === 0 && !tableData?.rows?.length) {
     return (
       <div className="flex flex-col h-full">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-surface">
@@ -251,7 +242,7 @@ export function GridView({ tableId }: GridViewProps) {
           onClearHighlights={clearHighlights}
         />
 
-        {rows.length === 0 && (
+        {totalRows === 0 && !windowed.isLoading && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center max-w-md">
               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-surface-secondary flex items-center justify-center">
@@ -268,10 +259,11 @@ export function GridView({ tableId }: GridViewProps) {
           </div>
         )}
 
-        {rows.length > 0 && (
-          <div ref={containerRef} className="flex-1 overflow-auto select-none" onScroll={handleScroll}>
+        {(totalRows > 0 || windowed.isLoading) && (
+          <div ref={containerRef} className="flex-1 overflow-auto select-none">
             <div style={{
-              height: totalRows * ROW_HEIGHT + HEADER_HEIGHT, position: 'relative',
+              height: rowVirtualizer.getTotalSize() + HEADER_HEIGHT,
+              position: 'relative',
               minWidth: 50 + columns.reduce((sum, col) => sum + getColumnWidth(col.id), 0) + (isEditable ? 40 : 0),
             }}>
               <div className="sticky top-0 z-20 flex border-b border-border table-header-bg" style={{ height: HEADER_HEIGHT }}>
@@ -299,14 +291,45 @@ export function GridView({ tableId }: GridViewProps) {
                 )}
               </div>
 
-              <div style={{ paddingTop: startIndex * ROW_HEIGHT }}>
-                {visibleRows.map((row, idx) => {
-                  const actualIndex = startIndex + idx
+              <div style={{ position: 'relative', height: rowVirtualizer.getTotalSize() }}>
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const actualIndex = virtualRow.index
+                  const row = filteredRows[actualIndex]
+                  if (!row) {
+                    return (
+                      <div
+                        key={`skeleton-${actualIndex}`}
+                        className="flex border-b border-border-subtle bg-surface animate-pulse"
+                        style={{
+                          position: 'absolute',
+                          top: virtualRow.start,
+                          height: ROW_HEIGHT,
+                          width: '100%',
+                        }}
+                      >
+                        <div className="sticky left-0 z-10 flex items-center justify-center px-3 text-xs border-r border-border-subtle text-text-tertiary bg-surface" style={{ width: 50, minWidth: 50 }}>
+                          {actualIndex + 1}
+                        </div>
+                        {columns.map((col) => (
+                          <div key={col.id} className="flex items-center px-3" style={{ width: getColumnWidth(col.id) }}>
+                            <div className="h-4 bg-surface-secondary rounded w-3/4" />
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }
+
                   const isRowSelected = selection?.type === 'row' && selection.rowIndex === actualIndex
                   return (
-                    <div key={row.__rowId}
+                    <div
+                      key={row.__rowId}
                       className={`flex border-b border-border-subtle ${actualIndex % 2 === 0 ? 'bg-surface' : 'bg-surface-secondary/50'} ${isRowSelected || isIndexColumnSelected ? 'bg-accent-green/10' : ''}`}
-                      style={{ height: ROW_HEIGHT }}
+                      style={{
+                        position: 'absolute',
+                        top: virtualRow.start,
+                        height: ROW_HEIGHT,
+                        width: '100%',
+                      }}
                     >
                       <div onClick={() => handleRowClick(actualIndex)} onContextMenu={(e) => handleContextMenu(e, 'row', actualIndex)}
                         className={`sticky left-0 z-10 flex items-center justify-center px-3 text-xs border-r border-border-subtle cursor-pointer ${

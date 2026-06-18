@@ -2,9 +2,13 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
+import { useAppAuth } from '@/state/AppContext'
 import { JoinType } from '@/types'
 import { ensureTableMaterialized } from '@/engine/materializationService'
 import { analyzeMatch, findBestKeys } from '@/canvas/joinUtils'
+import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
+import type { Tier } from '@/shared/limits'
+import { UpgradePrompt } from '@/components/UpgradePrompt'
 
 interface TransformModalProps {
   isOpen: boolean
@@ -118,6 +122,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
   const nodes = useProjectStore(s => s.nodes)
   const addDerivedTable = useProjectStore(s => s.addDerivedTable)
   const tableData = useDataStore(s => s.tableData)
+  const { user } = useAppAuth()
 
   const leftNode = nodes[sourceNodeId]
   const rightNode = nodes[targetNodeId]
@@ -127,6 +132,8 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
   const [rightKey, setRightKey] = useState('')
   const [outputName, setOutputName] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [upgradeViolation, setUpgradeViolation] = useState<LimitExceeded | null>(null)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   const leftCols = useMemo(() => 
     (leftNode?.kind === 'source_table' || leftNode?.kind === 'derived_table') 
@@ -178,6 +185,18 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
 
   const handleCreate = useCallback(() => {
     if (!leftKey || !rightKey) return
+
+    const tier: Tier = user?.tier ?? 'guest'
+    const currentTableCount = Object.values(nodes).filter(
+      (n) => n.kind === 'source_table' || n.kind === 'derived_table',
+    ).length
+    const tableCheck = checkTableCount(currentTableCount, tier)
+    if (!tableCheck.ok) {
+      setUpgradeViolation(tableCheck)
+      setUpgradeOpen(true)
+      return
+    }
+
     const lCols = allCols.filter(c => c.side === 'L' && selected.has(c.id)).map(c => c.colId)
     const rCols = allCols.filter(c => c.side === 'R' && selected.has(c.id) && c.colId !== rightKey).map(c => c.colId)
 
@@ -199,7 +218,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
     })
     ensureTableMaterialized(id).catch(console.error)
     onClose()
-  }, [leftKey, rightKey, selected, outputName, leftNode, rightNode, sourceNodeId, targetNodeId, joinType, leftCols, rightCols, allCols, addDerivedTable, onClose])
+  }, [leftKey, rightKey, selected, outputName, leftNode, rightNode, sourceNodeId, targetNodeId, joinType, leftCols, rightCols, allCols, addDerivedTable, onClose, nodes, user])
 
   const leftOpts = leftCols.map(c => ({ value: c.id, label: c.name, type: c.type }))
   const rightOpts = rightCols.map(c => ({ value: c.id, label: c.name, type: c.type }))
@@ -349,6 +368,12 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
           </div>
         </Dialog.Content>
       </Dialog.Portal>
+
+      <UpgradePrompt
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        violation={upgradeViolation}
+      />
     </Dialog.Root>
   )
 }

@@ -1,25 +1,102 @@
 import type { Report } from '@/report/types'
 import type { JSONContent } from '@tiptap/core'
+import type { TableRow } from '@/state/dataStore'
+import { useProjectStore } from '@/state/projectStore'
+import type { TableNode } from '@/types'
 
-function nodeToHtml(node: JSONContent): string {
+export interface EmbeddedTableData {
+  tableName: string
+  headers: string[]
+  rows: Record<string, unknown>[]
+}
+
+export type EmbeddedDataMap = Record<string, EmbeddedTableData>
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function renderEmbeddedTable(
+  tableId: string,
+  attrs: Record<string, unknown>,
+  dataMap: EmbeddedDataMap,
+): string {
+  const entry = dataMap[tableId]
+  if (!entry || entry.rows.length === 0) {
+    return `<div class="block-placeholder">[Embedded Table: ${entry?.tableName || 'unknown'} — no data]</div>\n`
+  }
+
+  const selectedColumns = (attrs.selectedColumns as string[]) || []
+  const rowSelectionMode = (attrs.rowSelectionMode as string) || 'first_n'
+  const rowLimit = (attrs.rowLimit as number) || 10
+  const caption = attrs.caption as string | undefined
+
+  const displayHeaders = selectedColumns.length > 0
+    ? selectedColumns.filter(id => entry.headers.includes(id))
+    : entry.headers
+
+  let displayRows = entry.rows
+  if (rowSelectionMode === 'first_n') {
+    displayRows = displayRows.slice(0, rowLimit)
+  } else if (rowSelectionMode === 'last_n') {
+    displayRows = displayRows.slice(-rowLimit)
+  }
+
+  const projectNodes = useProjectStore.getState().nodes
+  const tableNode = projectNodes[tableId] as TableNode | undefined
+  const colNameMap: Record<string, string> = {}
+  if (tableNode?.schema?.columns) {
+    for (const col of tableNode.schema.columns) {
+      colNameMap[col.id] = col.name
+    }
+  }
+
+  let html = ''
+  if (caption) {
+    html += `<p><em>${escapeHtml(caption)}</em></p>\n`
+  }
+  html += '<table border="1" style="border-collapse: collapse; width: 100%;">\n'
+  html += '<thead><tr>'
+  for (const colId of displayHeaders) {
+    const name = colNameMap[colId] || colId
+    html += `<th style="padding: 8px; text-align: left;">${escapeHtml(name)}</th>`
+  }
+  html += '</tr></thead>\n<tbody>'
+  for (const row of displayRows) {
+    html += '<tr>'
+    for (const colId of displayHeaders) {
+      const val = row[colId]
+      html += `<td style="padding: 8px;">${val != null ? escapeHtml(String(val)) : ''}</td>`
+    }
+    html += '</tr>\n'
+  }
+  html += '</tbody></table>\n'
+  return html
+}
+
+function nodeToHtml(node: JSONContent, dataMap: EmbeddedDataMap): string {
   if (!node) return ''
 
   const nodeType = node.type ?? ''
 
   switch (nodeType) {
     case 'paragraph': {
-      const pContent = node.content?.map((n) => nodeToHtml(n)).join('') || ''
+      const pContent = node.content?.map((n) => nodeToHtml(n, dataMap)).join('') || ''
       return `<p>${pContent}</p>\n`
     }
 
     case 'heading': {
       const level = node.attrs?.level || 1
-      const hContent = node.content?.map((n) => nodeToHtml(n)).join('') || ''
+      const hContent = node.content?.map((n) => nodeToHtml(n, dataMap)).join('') || ''
       return `<h${level}>${hContent}</h${level}>\n`
     }
 
     case 'text': {
-      let text = node.text || ''
+      let text = escapeHtml(node.text || '')
       if (node.marks) {
         for (const mark of node.marks) {
           switch (mark.type) {
@@ -42,27 +119,27 @@ function nodeToHtml(node: JSONContent): string {
     }
 
     case 'bulletList': {
-      const ulItems = node.content?.map((n) => nodeToHtml(n)).join('') || ''
+      const ulItems = node.content?.map((n) => nodeToHtml(n, dataMap)).join('') || ''
       return `<ul>${ulItems}</ul>\n`
     }
 
     case 'orderedList': {
-      const olItems = node.content?.map((n) => nodeToHtml(n)).join('') || ''
+      const olItems = node.content?.map((n) => nodeToHtml(n, dataMap)).join('') || ''
       return `<ol>${olItems}</ol>\n`
     }
 
     case 'listItem': {
-      const liContent = node.content?.map((n) => nodeToHtml(n)).join('') || ''
+      const liContent = node.content?.map((n) => nodeToHtml(n, dataMap)).join('') || ''
       return `<li>${liContent}</li>\n`
     }
 
     case 'blockquote': {
-      const bqContent = node.content?.map((n) => nodeToHtml(n)).join('') || ''
+      const bqContent = node.content?.map((n) => nodeToHtml(n, dataMap)).join('') || ''
       return `<blockquote>${bqContent}</blockquote>\n`
     }
 
     case 'codeBlock': {
-      const codeContent = node.content?.map((n) => n.text || '').join('') || ''
+      const codeContent = node.content?.map((n) => escapeHtml(n.text || '')).join('') || ''
       return `<pre><code>${codeContent}</code></pre>\n`
     }
 
@@ -72,24 +149,41 @@ function nodeToHtml(node: JSONContent): string {
     case 'hardBreak':
       return '<br>\n'
 
+    case 'embeddedTable': {
+      const tableId = node.attrs?.sourceTableId as string
+      if (tableId && dataMap[tableId]) {
+        return renderEmbeddedTable(tableId, node.attrs || {}, dataMap)
+      }
+      return `<div class="block-placeholder">[Embedded Table — no data available]</div>\n`
+    }
+
+    case 'chartBlock': {
+      const chartTableId = node.attrs?.sourceTableId as string
+      const chartType = node.attrs?.chartType as string || 'chart'
+      const chartEntry = chartTableId ? dataMap[chartTableId] : undefined
+      if (chartEntry) {
+        return `<div class="block-placeholder">[Chart: ${escapeHtml(chartType)} — source: ${escapeHtml(chartEntry.tableName)}, ${chartEntry.rows.length} rows]</div>\n`
+      }
+      return `<div class="block-placeholder">[Chart: ${escapeHtml(chartType)}]</div>\n`
+    }
+
     case 'tableBlock':
-    case 'chartBlock':
       return `<div class="block-placeholder">[${nodeType}]</div>\n`
 
     default:
       if (node.content) {
-        return node.content.map((n) => nodeToHtml(n)).join('')
+        return node.content.map((n) => nodeToHtml(n, dataMap)).join('')
       }
       return ''
   }
 }
 
-function tiptapToHtml(content: JSONContent): string {
+function tiptapToHtml(content: JSONContent, dataMap: EmbeddedDataMap): string {
   if (!content || !content.content) return ''
 
   let html = ''
   for (const node of content.content) {
-    html += nodeToHtml(node)
+    html += nodeToHtml(node, dataMap)
   }
   return html
 }
@@ -109,13 +203,13 @@ function renderTableHtml(headers: string[], rows: unknown[][]): string {
   let html = '<table border="1" style="border-collapse: collapse; width: 100%;">\n'
   html += '<thead><tr>'
   for (const header of headers) {
-    html += `<th style="padding: 8px; text-align: left;">${header}</th>`
+    html += `<th style="padding: 8px; text-align: left;">${escapeHtml(header)}</th>`
   }
   html += '</tr></thead>\n<tbody>'
   for (const row of rows) {
     html += '<tr>'
     for (const cell of row) {
-      html += `<td style="padding: 8px;">${cell ?? ''}</td>`
+      html += `<td style="padding: 8px;">${cell != null ? escapeHtml(String(cell)) : ''}</td>`
     }
     html += '</tr>\n'
   }
@@ -164,11 +258,62 @@ function blocksToHtml(blocks: LegacyBlock[]): string {
   return html
 }
 
-export function generateReportHtml(report: Report): string {
+/**
+ * Collect all embedded table/chart source table IDs from TipTap content,
+ * so callers can pre-fetch data.
+ */
+export function collectEmbeddedTableIds(content: JSONContent): Array<{ tableId: string; rowLimit: number }> {
+  const results: Array<{ tableId: string; rowLimit: number }> = []
+
+  function walk(node: JSONContent) {
+    if (!node) return
+
+    if (node.type === 'embeddedTable' || node.type === 'chartBlock') {
+      const tableId = node.attrs?.sourceTableId as string
+      if (tableId) {
+        const rowLimit = (node.attrs?.rowLimit as number) || 1000
+        results.push({ tableId, rowLimit })
+      }
+    }
+
+    if (node.content) {
+      for (const child of node.content) {
+        walk(child)
+      }
+    }
+  }
+
+  walk(content)
+  return results
+}
+
+/**
+ * Build an EmbeddedDataMap from pre-fetched rows.
+ */
+export function buildEmbeddedDataMap(
+  entries: Array<{ tableId: string; rows: TableRow[] }>,
+): EmbeddedDataMap {
+  const projectNodes = useProjectStore.getState().nodes
+  const map: EmbeddedDataMap = {}
+
+  for (const { tableId, rows } of entries) {
+    const tableNode = projectNodes[tableId] as TableNode | undefined
+    const colIds = tableNode?.schema?.columns.map(c => c.id) || []
+    map[tableId] = {
+      tableName: tableNode?.name || tableId,
+      headers: colIds.length > 0 ? colIds : (rows.length > 0 ? Object.keys(rows[0]).filter(k => k !== '__rowId') : []),
+      rows,
+    }
+  }
+
+  return map
+}
+
+export function generateReportHtml(report: Report, dataMap: EmbeddedDataMap = {}): string {
   let content = ''
 
   if (report.tiptapContent && report.tiptapContent.content && report.tiptapContent.content.length > 0) {
-    content = tiptapToHtml(report.tiptapContent)
+    content = tiptapToHtml(report.tiptapContent, dataMap)
   } else if (report.blocks && report.blocks.length > 0) {
     content = blocksToHtml(report.blocks)
   } else {
@@ -180,7 +325,7 @@ export function generateReportHtml(report: Report): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${report.name} - Table Canvas Report</title>
+  <title>${escapeHtml(report.name)} - Table Canvas Report</title>
   <style>
     * {
       box-sizing: border-box;
@@ -231,6 +376,11 @@ export function generateReportHtml(report: Report): string {
       border-top: 1px solid #ddd;
       margin: 2em 0;
     }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1em 0;
+    }
     .block-placeholder {
       background: #f0f0f0;
       border: 1px dashed #ccc;
@@ -260,7 +410,7 @@ export function generateReportHtml(report: Report): string {
   </style>
 </head>
 <body>
-  <h1>${report.name}</h1>
+  <h1>${escapeHtml(report.name)}</h1>
   <div class="report-meta">
     Created: ${new Date(report.createdAt).toLocaleDateString()}<br>
     Last updated: ${new Date(report.updatedAt).toLocaleDateString()}

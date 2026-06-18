@@ -54,15 +54,22 @@ export class WorkerRPC {
     return this.readyPromise
   }
 
-  async call<T>(type: WorkerRequest['type'], payload: unknown): Promise<T> {
+  async call<T>(type: WorkerRequest['type'], payload: unknown, timeoutMs: number = 120000): Promise<T> {
     await this.readyPromise
 
     const id = `req_${++this.requestId}`
     
     return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (this.pendingRequests.has(id)) {
+          this.pendingRequests.delete(id)
+          reject(new Error(`Worker RPC timeout after ${timeoutMs}ms for request type: ${type}`))
+        }
+      }, timeoutMs)
+
       this.pendingRequests.set(id, {
-        resolve: resolve as (data: unknown) => void,
-        reject,
+        resolve: (data: unknown) => { clearTimeout(timer); resolve(data as T) },
+        reject: (err: Error) => { clearTimeout(timer); reject(err) },
       })
 
       const request: WorkerRequest = { id, type, payload }
