@@ -9,7 +9,7 @@
  * Note: These tests mock external dependencies (DuckDB engine, stores, IndexedDB)
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach, type Mock } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import type { SourceTableNode, DerivedTableNode, TableSchema, CellValue } from '@/lib/types'
 
 // ============================================================================
@@ -382,7 +382,7 @@ describe('ensureTableMaterialized - Source Tables', () => {
     // Mock engine to succeed
     mockEngine.getSlice.mockRejectedValue(new Error('Table not found'))
 
-    const result = await ensureTableMaterialized('table_1')
+    await ensureTableMaterialized('table_1')
 
     expect(mockEngine.init).toHaveBeenCalled()
     expect(mockEngine.loadTable).toHaveBeenCalled()
