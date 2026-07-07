@@ -15,7 +15,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 
 import { useProjectStore } from '@/state/projectStore'
-import { useApp } from '@/state/AppContext'
+import { useApp } from '@/state/appContext'
 import { useProfilingStore, loadProfileForTable } from '@/profiling/profiler'
 import type { NodeViewMode, ProjectNode, Edge as ProjectEdge } from '@/lib/types'
 import { wouldCreateCycle } from '@/engine/dependencyGraph'
@@ -25,10 +25,10 @@ import { ImportButton } from '@/components/ImportButton'
 import { computeSmartEdges, SmartEdge } from './edgeRouter'
 import { CustomConnectionLine } from './ConnectionLine'
 import { getLayoutedNodes, LayoutDirection } from './autoLayout'
+import { NewTableModal } from './modals/NewTableModal'
 
 // Lazy loaded modals for code splitting
 const TransformModal = lazy(() => import('./modals/TransformModal').then(m => ({ default: m.TransformModal })))
-const NewTableModal = lazy(() => import('./modals/NewTableModal').then(m => ({ default: m.NewTableModal })))
 
 // Define custom node types
 const nodeTypes: NodeTypes = {
@@ -495,14 +495,12 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         </Suspense>
       )}
       
-      {/* New Table Modal - Lazy Loaded */}
+      {/* New Table Modal */}
       {newTableModalOpen && (
-        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center"><div className="bg-surface rounded-lg p-8 animate-pulse">Loading...</div></div>}>
-          <NewTableModal
-            isOpen={newTableModalOpen}
-            onClose={() => setNewTableModalOpen(false)}
-          />
-        </Suspense>
+        <NewTableModal
+          isOpen={newTableModalOpen}
+          onClose={() => setNewTableModalOpen(false)}
+        />
       )}
       
       {/* Cycle Warning Toast */}
