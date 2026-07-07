@@ -6,14 +6,29 @@
  * Includes toolbar for multi-report navigation and quick actions.
  */
 
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useMemo } from 'react';
 import { useReportStore } from './reportStore';
 import { TipTapEditor, TipTapEditorHandle } from './editor';
 import { ReportToolbar } from './ReportToolbar';
-import { migrateReport, needsMigration } from './migrations/migrateToTipTap';
 import type { JSONContent } from '@tiptap/react';
+import type { Report } from './types';
 
 import './PrintStyles.css';
+
+/** Default document for a report that has no content yet. */
+function defaultDocFor(report: Report): JSONContent {
+  return {
+    type: 'doc',
+    content: [
+      {
+        type: 'heading',
+        attrs: { level: 1 },
+        content: [{ type: 'text', text: report.name || 'Untitled' }],
+      },
+      { type: 'paragraph' },
+    ],
+  };
+}
 
 interface ReportViewProps {
   reportId: string;
@@ -24,18 +39,14 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
   const report = useReportStore((state) => state.reports[reportId]);
   const updateReport = useReportStore((state) => state.updateReport);
   const editorRef = useRef<TipTapEditorHandle>(null);
-  const hasMigrated = useRef(false);
 
-  // Migrate report if needed
-  useEffect(() => {
-    if (report && needsMigration(report) && !hasMigrated.current) {
-      hasMigrated.current = true;
-      const migratedReport = migrateReport(report);
-      updateReport(reportId, {
-        tiptapContent: migratedReport.tiptapContent,
-      });
-    }
-  }, [report, reportId, updateReport]);
+  // Resolve the content to display: the report's TipTap document, or a fresh
+  // default document titled after the report when it has no content yet.
+  const content = useMemo<JSONContent>(() => {
+    if (!report) return { type: 'doc', content: [] };
+    if (report.tiptapContent) return report.tiptapContent as unknown as JSONContent;
+    return defaultDocFor(report);
+  }, [report]);
 
   // Handle content changes - just save content, name is managed separately via toolbar
   const handleContentChange = useCallback((content: JSONContent) => {
@@ -75,21 +86,6 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
       </div>
     );
   }
-
-  // Get content - if no tiptapContent, create default with title as H1
-  const content: JSONContent = report.tiptapContent || {
-    type: 'doc',
-    content: [
-      {
-        type: 'heading',
-        attrs: { level: 1 },
-        content: [{ type: 'text', text: report.name || 'Untitled' }],
-      },
-      {
-        type: 'paragraph',
-      },
-    ],
-  };
 
   return (
     <div className="h-full flex flex-col bg-surface report-view">
