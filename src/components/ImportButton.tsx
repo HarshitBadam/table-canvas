@@ -345,7 +345,9 @@ function processData(
       name: field,
       type: inferredType,
       nullable: hasNulls,
-      duckDbName: columnId, // Source tables use column IDs in DuckDB
+      // The engine creates the DuckDB table using the column NAME (see
+      // EngineAdapter.loadTable), so the DuckDB column name equals `name`.
+      duckDbName: field,
     }
   })
 

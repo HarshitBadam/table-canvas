@@ -175,16 +175,11 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
     if (node.plan.fileRef) {
       const fileData = await loadFileWithSync(node.plan.fileRef)
       if (fileData) {
-        // Parse file data based on type, passing schema for proper column mapping
+        // Parse file data into id-keyed rows (convertToTableRows assigns __rowId
+        // and maps every file header to the correct schema column id).
         rows = await parseFileData(fileData, node.plan.fileType, node.plan.sheetName, node.schema)
-        
-        // Assign row IDs if missing
-        rows = rows.map((row, idx) => ({
-          ...row,
-          __rowId: row.__rowId || `row_${idx}`,
-        }))
-        
-        // Update dataStore with loaded rows from file
+
+        // The data store is the single source of truth and is always id-keyed.
         dataStore.setTableData(tableId, rows)
       } else {
         // File not in IndexedDB - user needs to re-import the data
@@ -268,7 +263,7 @@ async function parseFileData(
 /**
  * Parse CSV data from ArrayBuffer
  */
-function parseCSVData(fileData: ArrayBuffer, schema?: TableSchema): Promise<TableRow[]> {
+export function parseCSVData(fileData: ArrayBuffer, schema?: TableSchema): Promise<TableRow[]> {
   return new Promise((resolve) => {
     const decoder = new TextDecoder('utf-8')
     const text = decoder.decode(fileData)
@@ -290,7 +285,7 @@ function parseCSVData(fileData: ArrayBuffer, schema?: TableSchema): Promise<Tabl
 /**
  * Parse Excel data from ArrayBuffer
  */
-function parseExcelData(fileData: ArrayBuffer, sheetName?: string, schema?: TableSchema): Promise<TableRow[]> {
+export function parseExcelData(fileData: ArrayBuffer, sheetName?: string, schema?: TableSchema): Promise<TableRow[]> {
   return new Promise((resolve) => {
     try {
       const wb = XLSX.read(fileData, { type: 'array' })
@@ -331,52 +326,137 @@ function parseExcelData(fileData: ArrayBuffer, sheetName?: string, schema?: Tabl
 }
 
 /**
- * Convert parsed data to TableRow format with proper column IDs
+ * Map each parsed file field (header) to the schema column id it belongs to.
+ *
+ * The data store is ALWAYS keyed by column `id`, so parsing must resolve every
+ * file header to the correct column id. Resolution priority:
+ *   1. Exact name match against a schema column name (the common case).
+ *   2. Positional match: the i-th file field maps to the i-th schema column.
+ *      This keeps rows correctly keyed even after a column was renamed in the
+ *      grid (the underlying file still has the original header).
+ *   3. Schema-less import: derive a stable id from the field name/index.
  */
-function convertToTableRows(
+function buildFieldToColumnId(
+  fields: string[],
+  schema?: TableSchema
+): Map<string, string> {
+  const fieldToColId = new Map<string, string>()
+  const columns = schema?.columns ?? []
+  const columnsByName = new Map<string, ColumnSchema>()
+  columns.forEach((col) => columnsByName.set(col.name, col))
+
+  const usedColumnIds = new Set<string>()
+
+  fields.forEach((field, index) => {
+    let colId: string
+
+    const byName = columnsByName.get(field)
+    const byPosition = columns[index]
+
+    if (byName && !usedColumnIds.has(byName.id)) {
+      colId = byName.id
+    } else if (byPosition && !usedColumnIds.has(byPosition.id)) {
+      // Renamed column: header no longer matches, but position still lines up.
+      colId = byPosition.id
+    } else if (schema) {
+      // Schema present but no column left to map this field to (e.g. a column
+      // that was removed from the schema). Fall back to the raw field name so
+      // the value is preserved but simply ignored by id-keyed consumers.
+      colId = field
+    } else {
+      colId = `col_${index}_${field.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
+    }
+
+    usedColumnIds.add(colId)
+    fieldToColId.set(field, colId)
+  })
+
+  return fieldToColId
+}
+
+/**
+ * Coerce a raw string cell value to the type declared by its column schema.
+ */
+function coerceValue(value: CellValue, colSchema?: ColumnSchema): CellValue {
+  if (value === undefined) return null
+
+  if (colSchema?.type === 'number' && value !== '' && value !== null) {
+    const num = parseFloat(String(value).replace(/,/g, ''))
+    return isNaN(num) ? value : num
+  }
+
+  if (colSchema?.type === 'boolean') {
+    const lower = String(value).toLowerCase()
+    if (lower === 'true' || lower === '1' || lower === 'yes') return true
+    if (lower === 'false' || lower === '0' || lower === 'no') return false
+  }
+
+  return value
+}
+
+/**
+ * Convert parsed file data to TableRow format keyed by column id.
+ *
+ * This is the single entry point that turns parser output (keyed by file
+ * header) into the id-keyed rows that the data store, grid, canvas and export
+ * all consume. Exported for unit testing of the key mapping.
+ */
+export function convertToTableRows(
   data: Record<string, string>[],
   fields: string[],
   schema?: TableSchema
 ): TableRow[] {
-  // Create a mapping from column name to column id
-  const columnIdMap = new Map<string, string>()
-  
-  if (schema?.columns) {
-    schema.columns.forEach((col: ColumnSchema) => {
-      columnIdMap.set(col.name, col.id)
-    })
-  } else {
-    // Generate column IDs if no schema
-    fields.forEach((field, index) => {
-      const columnId = `col_${index}_${field.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
-      columnIdMap.set(field, columnId)
-    })
-  }
-  
+  const fieldToColId = buildFieldToColumnId(fields, schema)
+
+  const columnById = new Map<string, ColumnSchema>()
+  schema?.columns.forEach((c) => columnById.set(c.id, c))
+
   return data.map((row, index) => {
-    const rowId = `row_${index}`
-    const rowData: TableRow = { __rowId: rowId }
-    
+    const rowData: TableRow = { __rowId: `row_${index}` }
+
     fields.forEach((field) => {
-      const colId = columnIdMap.get(field) || field
-      let value: CellValue = row[field]
-      
-      // Find column schema for type conversion
-      const colSchema = schema?.columns.find((c: ColumnSchema) => c.id === colId || c.name === field)
-      
-      if (colSchema?.type === 'number' && value !== '' && value !== null) {
-        const num = parseFloat(String(value).replace(/,/g, ''))
-        value = isNaN(num) ? value : num
-      } else if (colSchema?.type === 'boolean') {
-        const lower = String(value).toLowerCase()
-        if (lower === 'true' || lower === '1' || lower === 'yes') value = true
-        else if (lower === 'false' || lower === '0' || lower === 'no') value = false
-      }
-      
-      rowData[colId] = value
+      const colId = fieldToColId.get(field) as string
+      rowData[colId] = coerceValue(row[field], columnById.get(colId))
     })
-    
+
     return rowData
+  })
+}
+
+/**
+ * Re-key rows produced by the DuckDB engine into the id-keyed shape used by the
+ * data store and every downstream consumer (grid, canvas, report, export).
+ *
+ * The DuckDB table for both source and derived tables is created using the
+ * column *name* (see EngineAdapter.loadTable and the transform SQL aliases), so
+ * `col.name` is the authoritative engine key. `duckDbName` and `id` are kept as
+ * fallbacks purely for resilience against older/edited schemas.
+ *
+ * This is the ONE place engine output crosses into the id-keyed world, so the
+ * whole pipeline stays consistent end-to-end. Exported for unit testing.
+ */
+export function keyRowsById(
+  engineRows: Record<string, CellValue>[],
+  schema: TableSchema,
+  rowIdPrefix = 'row'
+): TableRow[] {
+  return engineRows.map((row, idx) => {
+    const existingRowId = row.__rowId
+    const out: TableRow = {
+      __rowId: typeof existingRowId === 'string' && existingRowId
+        ? existingRowId
+        : `${rowIdPrefix}_${idx}`,
+    }
+
+    for (const col of schema.columns) {
+      const value =
+        row[col.name] ??
+        (col.duckDbName ? row[col.duckDbName] : undefined) ??
+        row[col.id]
+      out[col.id] = value ?? null
+    }
+
+    return out
   })
 }
 
@@ -502,44 +582,23 @@ async function computeDerivedTable(tableId: string): Promise<MaterializationResu
       projectStore.updateTableSchema(tableId, schemaWithIds)
     }
     
-    // Fetch ALL data from DuckDB (not just preview) and store in dataStore
-    // IMPORTANT: DuckDB returns rows with column names as keys (e.g., "Product Id"),
-    // but our schema uses original column IDs (e.g., "col_0_product_id").
-    // We need to transform row keys to match the schema column IDs.
-    const transformRowKeys = (row: Record<string, CellValue>, schema: TableSchema): TableRow => {
-      const transformedRow: TableRow = { __rowId: '' }
-      for (const col of schema.columns) {
-        // DuckDB key is the column name (which we stored in col.name)
-        const duckDbKey = col.name
-        // Our schema ID is what GridView expects
-        const schemaId = col.id
-        transformedRow[schemaId] = row[duckDbKey] ?? row[col.id] ?? null
-      }
-      return transformedRow
-    }
-    
+    // Fetch ALL data from DuckDB (not just preview) and store in dataStore.
+    // DuckDB returns rows keyed by the engine column name (duckDbName ?? name);
+    // keyRowsById re-keys them to the schema column ids that every consumer
+    // (grid, canvas, export) expects.
+    const updatedSchema = projectStore.getTableNode(tableId)?.schema
     try {
       const fullData = await engine.getSlice(tableId, 0, Math.max(result.rowCount, 10000))
-      const updatedSchema = projectStore.getTableNode(tableId)?.schema
-      const rows: TableRow[] = fullData.rows.map((row, idx) => {
-        const transformedRow = updatedSchema 
-          ? transformRowKeys(row, updatedSchema)
-          : { ...row } as TableRow
-        transformedRow.__rowId = `derived_row_${idx}`
-        return transformedRow
-      })
+      const rows: TableRow[] = updatedSchema
+        ? keyRowsById(fullData.rows, updatedSchema, 'derived_row')
+        : fullData.rows.map((row, idx) => ({ ...row, __rowId: `derived_row_${idx}` }) as TableRow)
       dataStore.setTableData(tableId, rows)
     } catch {
       // Fallback to preview if full fetch fails
       if (result.preview && result.preview.length > 0) {
-        const updatedSchema = projectStore.getTableNode(tableId)?.schema
-        const rows: TableRow[] = result.preview.map((row, idx) => {
-          const transformedRow = updatedSchema
-            ? transformRowKeys(row, updatedSchema)
-            : { ...row } as TableRow
-          transformedRow.__rowId = `derived_row_${idx}`
-          return transformedRow
-        })
+        const rows: TableRow[] = updatedSchema
+          ? keyRowsById(result.preview, updatedSchema, 'derived_row')
+          : result.preview.map((row, idx) => ({ ...row, __rowId: `derived_row_${idx}` }) as TableRow)
         dataStore.setTableData(tableId, rows)
       }
     }
@@ -777,17 +836,25 @@ export function getMaterializationStatus(tableId: string): {
 }
 
 /**
- * Get the full slice of data for a table.
- * This is used by GridView and other components to get the complete data.
+ * Get a slice of a table's data.
+ *
+ * This is the single canonical read API for table data. It returns rows in the
+ * exact same id-keyed shape as the data store (rows keyed by column `id` plus a
+ * `__rowId`), which is what the grid, canvas, report and export all consume.
+ *
+ * Materialization is the only writer that turns raw file/engine output into
+ * id-keyed rows in the data store, so reading straight from the store here
+ * guarantees a single consistent representation everywhere.
  */
 export async function getTableData(
-  tableId: string, 
-  offset: number = 0, 
+  tableId: string,
+  offset: number = 0,
   limit: number = 1000
 ): Promise<{ rows: TableRow[]; totalRows: number; error?: string }> {
-  // First ensure the table is materialized
+  // Ensure the table is materialized (loads source files / computes derived
+  // tables and populates the id-keyed data store).
   const result = await ensureTableMaterialized(tableId)
-  
+
   if (result.status === 'error') {
     return {
       rows: [],
@@ -795,27 +862,11 @@ export async function getTableData(
       error: result.error,
     }
   }
-  
-  // Get data from the engine
-  try {
-    const engine = getEngine()
-    const slice = await engine.getSlice(tableId, offset, limit)
-    
-    const rows: TableRow[] = slice.rows.map((row, idx) => ({
-      ...row,
-      __rowId: row.__rowId as string || `row_${offset + idx}`,
-    })) as TableRow[]
-    
-    return {
-      rows,
-      totalRows: slice.totalRows,
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    return {
-      rows: [],
-      totalRows: 0,
-      error: errorMessage,
-    }
+
+  const allRows = useDataStore.getState().tableData[tableId]?.rows ?? []
+
+  return {
+    rows: allRows.slice(offset, offset + limit),
+    totalRows: allRows.length,
   }
 }
