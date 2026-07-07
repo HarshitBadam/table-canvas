@@ -1,26 +1,29 @@
 /**
  * ChartNode - TipTap Custom Node for Charts
- * 
- * Renders chart blocks with configuration panel.
- * States: empty, configured, selected, configuring
+ *
+ * Renders a chart from a workspace table. Data is read through the shared
+ * `useTableSource` hook (which materializes the table on demand) and drawn
+ * with the app's ChartRenderer.
  */
 
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react';
-import { useDataStore } from '@/state/dataStore';
-import { useProjectStore } from '@/state/projectStore';
 import { ChartRenderer } from '@/charts/ChartRenderer';
 import type { EnhancedChartConfig } from '../../types';
-import type { TableNode as TableNodeType, ColumnSchema } from '@/lib/types';
+import type { ColumnSchema } from '@/lib/types';
+import { useTableSource } from '../tableData';
+import { TablePickerModal } from './TablePickerModal';
 
 // ============================================================================
 // Types
 // ============================================================================
 
+type ChartType = 'bar' | 'line' | 'pie' | 'scatter';
+
 interface ChartNodeAttrs {
   sourceTableId: string;
-  chartType: 'bar' | 'line' | 'pie' | 'scatter';
+  chartType: ChartType;
   config: EnhancedChartConfig;
 }
 
@@ -33,8 +36,8 @@ interface ChartNodeOptions {
 // React Component
 // ============================================================================
 
-const ChartNodeView = memo(function ChartNodeView({ 
-  node, 
+const ChartNodeView = memo(function ChartNodeView({
+  node,
   updateAttributes,
   selected,
   extension,
@@ -42,134 +45,183 @@ const ChartNodeView = memo(function ChartNodeView({
 }: NodeViewProps) {
   const attrs = node.attrs as ChartNodeAttrs;
   const options = extension.options as ChartNodeOptions;
-  
-  const tableDataEntry = useDataStore((state) => state.tableData[attrs.sourceTableId]);
-  const tableData = tableDataEntry?.rows || [];
-  const tableNode = useProjectStore((state) => state.nodes[attrs.sourceTableId]) as TableNodeType | undefined;
-  
-  const [showConfig, setShowConfig] = useState(false);
-  const hasAutoConfigured = useRef(false);
 
-  // Get columns from table schema
-  const columns: ColumnSchema[] = useMemo(() => {
-    return tableNode?.schema?.columns || [];
-  }, [tableNode]);
+  const { tableNode, columns, rows, status } = useTableSource(attrs.sourceTableId);
+  const tableData = rows;
+
+  const [showConfig, setShowConfig] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const hasAutoConfigured = useRef(false);
 
   // Map column ID to name for display
   const columnNames = useMemo(() => {
     const map: Record<string, string> = {};
-    columns.forEach(c => {
+    columns.forEach((c) => {
       map[c.id] = c.name;
     });
     return map;
   }, [columns]);
 
-  // Auto-configure axes if not set
+  // Auto-configure axes once we have columns + data
   useEffect(() => {
     if (hasAutoConfigured.current) return;
     if (columns.length === 0 || tableData.length === 0) return;
-    
-    const needsUpdate = !attrs.config.xAxis || !attrs.config.yAxis;
-    if (!needsUpdate) {
+
+    if (attrs.config.xAxis && attrs.config.yAxis) {
       hasAutoConfigured.current = true;
       return;
     }
-    
-    const stringCol = columns.find(c => c.type === 'string' || c.type === 'date');
-    const numberCol = columns.find(c => c.type === 'number');
-    
-    if (stringCol || numberCol) {
-      const updates: Partial<EnhancedChartConfig> = {};
-      if (!attrs.config.xAxis && stringCol) {
-        updates.xAxis = stringCol.id;
-      } else if (!attrs.config.xAxis && columns[0]) {
-        updates.xAxis = columns[0].id;
-      }
-      if (!attrs.config.yAxis && numberCol) {
-        updates.yAxis = numberCol.id;
-      } else if (!attrs.config.yAxis && columns[1]) {
-        updates.yAxis = columns[1].id;
-      }
-      
-      if (Object.keys(updates).length > 0) {
-        updateAttributes({
-          config: { ...attrs.config, ...updates },
-        });
-      }
+
+    const stringCol = columns.find((c) => c.type === 'string' || c.type === 'date');
+    const numberCol = columns.find((c) => c.type === 'number');
+
+    const updates: Partial<EnhancedChartConfig> = {};
+    if (!attrs.config.xAxis) {
+      updates.xAxis = (stringCol || columns[0])?.id;
     }
-    
+    if (!attrs.config.yAxis) {
+      updates.yAxis = (numberCol || columns[1] || columns[0])?.id;
+    }
+
+    if (updates.xAxis || updates.yAxis) {
+      updateAttributes({ config: { ...attrs.config, ...updates } });
+    }
     hasAutoConfigured.current = true;
   }, [columns, tableData.length, attrs.config, updateAttributes]);
 
-  const handleConfigChange = useCallback((updates: Partial<EnhancedChartConfig>) => {
-    updateAttributes({
-      config: { ...attrs.config, ...updates },
-    });
-  }, [attrs.config, updateAttributes]);
+  const handleConfigChange = useCallback(
+    (updates: Partial<EnhancedChartConfig>) => {
+      updateAttributes({ config: { ...attrs.config, ...updates } });
+    },
+    [attrs.config, updateAttributes]
+  );
 
-  const handleChartTypeChange = useCallback((chartType: 'bar' | 'line' | 'pie' | 'scatter') => {
-    updateAttributes({ chartType });
-  }, [updateAttributes]);
+  const handleChartTypeChange = useCallback(
+    (chartType: ChartType) => {
+      updateAttributes({ chartType });
+    },
+    [updateAttributes]
+  );
 
-  const canRender = tableData.length > 0 && attrs.config.xAxis && attrs.config.yAxis;
+  const handleSelectTable = useCallback(
+    (tableId: string) => {
+      // New table => reset axis config so it auto-configures for the new schema.
+      hasAutoConfigured.current = false;
+      updateAttributes({
+        sourceTableId: tableId,
+        config: { ...attrs.config, xAxis: undefined, yAxis: undefined },
+      });
+      setShowPicker(false);
+    },
+    [attrs.config, updateAttributes]
+  );
 
-  // No source table selected - empty state
-  if (!attrs.sourceTableId) {
+  const picker = showPicker ? (
+    <TablePickerModal
+      title="Select a table"
+      subtitle="Choose the data source for this chart"
+      onSelect={handleSelectTable}
+      onClose={() => setShowPicker(false)}
+    />
+  ) : null;
+
+  const canRender = tableData.length > 0 && !!attrs.config.xAxis && !!attrs.config.yAxis;
+
+  // ---- No source selected -------------------------------------------------
+  if (status === 'no-source') {
     return (
       <NodeViewWrapper className="chart-block">
-        <div 
-          className={`
-            flex flex-col items-center justify-center text-center transition-all
-            p-10 rounded-xl border border-dashed
-            ${selected 
-              ? 'border-accent-green bg-accent-green/5 ring-2 ring-accent-green ring-offset-2' 
+        <div
+          className={`flex flex-col items-center justify-center text-center transition-all p-10 rounded-xl border border-dashed ${
+            selected
+              ? 'border-accent-green bg-accent-green/5 ring-2 ring-accent-green ring-offset-2'
               : 'border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50 to-white dark:from-gray-800/50 dark:to-gray-900/50'
-            }
-          `}
+          }`}
         >
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-green/15 to-accent-green/5 flex items-center justify-center mb-3 text-accent-green">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round"/>
+              <path
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </div>
-          <div className="text-base font-semibold text-gray-900 dark:text-white mb-1">
-            Add Chart
-          </div>
+          <div className="text-base font-semibold text-gray-900 dark:text-white mb-1">Add Chart</div>
           <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Visualize data from your tables
           </div>
-          <TableSelector 
-            onSelect={(tableId) => updateAttributes({ sourceTableId: tableId })}
-          />
+          <button
+            onClick={() => setShowPicker(true)}
+            className="px-4 py-2 text-sm font-medium text-white bg-accent-green hover:bg-accent-green-hover rounded-lg transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            Select Table
+          </button>
+        </div>
+        {picker}
+      </NodeViewWrapper>
+    );
+  }
+
+  // ---- Loading ------------------------------------------------------------
+  if (status === 'loading') {
+    return (
+      <NodeViewWrapper className="chart-block">
+        <div className={`block-empty-state ${selected ? 'is-selected' : ''}`}>
+          <svg className="w-6 h-6 animate-spin text-accent-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <div className="block-empty-state-title">Loading data…</div>
+          <div className="block-empty-state-description">
+            {tableNode ? `Preparing "${tableNode.name}"` : 'Preparing table'}
+          </div>
         </div>
       </NodeViewWrapper>
     );
   }
 
-  // No data state
-  if (!tableData.length) {
+  // ---- Missing table / error / no data ------------------------------------
+  if (status === 'missing-table' || status === 'error' || status === 'empty') {
     return (
       <NodeViewWrapper className="chart-block">
-        <div className={`block-empty-state ${selected ? 'is-selected' : ''}`}>
+        <div
+          className={`block-empty-state ${selected ? 'is-selected' : ''}`}
+          onClick={() => setShowPicker(true)}
+        >
           <div className="block-empty-state-icon">📊</div>
-          <div className="block-empty-state-title">No Data</div>
-          <div className="block-empty-state-description">
-            {tableNode ? `No data in "${tableNode.name}"` : 'Table not found'}
+          <div className="block-empty-state-title">
+            {status === 'missing-table' ? 'Table not found' : status === 'error' ? 'Could not load data' : 'No Data'}
           </div>
-          {tableNode && options.onOpenTable && (
+          <div className="block-empty-state-description">
+            {status === 'missing-table'
+              ? 'The linked table was removed. Click to pick another.'
+              : tableNode
+                ? status === 'error'
+                  ? `"${tableNode.name}" failed to load. Click to pick another table.`
+                  : `"${tableNode.name}" has no rows yet.`
+                : 'Table not available'}
+          </div>
+          {tableNode && options.onOpenTable && status === 'empty' && (
             <button
-              onClick={() => options.onOpenTable?.(attrs.sourceTableId)}
+              onClick={(e) => {
+                e.stopPropagation();
+                options.onOpenTable?.(attrs.sourceTableId);
+              }}
               className="text-sm text-accent-green hover:underline mt-2"
             >
               Open table
             </button>
           )}
         </div>
+        {picker}
       </NodeViewWrapper>
     );
   }
 
-  // Not configured state
+  // ---- Ready but not configured ------------------------------------------
   if (!canRender) {
     return (
       <NodeViewWrapper className="chart-block">
@@ -177,18 +229,13 @@ const ChartNodeView = memo(function ChartNodeView({
           <div className="chart-block-container">
             <div className="chart-block-body" style={{ padding: '2rem', textAlign: 'center' }}>
               <div className="text-3xl mb-2 opacity-60">📊</div>
-              <p className="text-sm text-gray-500 mb-3">
-                Configure chart axes to display data
-              </p>
-              <button
-                onClick={() => setShowConfig(true)}
-                className="btn btn-primary btn-sm"
-              >
+              <p className="text-sm text-gray-500 mb-3">Configure chart axes to display data</p>
+              <button onClick={() => setShowConfig(true)} className="btn btn-primary btn-sm">
                 Configure Chart
               </button>
             </div>
           </div>
-          
+
           {showConfig && (
             <ChartConfigPanel
               config={attrs.config}
@@ -196,38 +243,43 @@ const ChartNodeView = memo(function ChartNodeView({
               columns={columns}
               onConfigChange={handleConfigChange}
               onChartTypeChange={handleChartTypeChange}
+              onChangeTable={() => {
+                setShowConfig(false);
+                setShowPicker(true);
+              }}
               onClose={() => setShowConfig(false)}
             />
           )}
         </div>
+        {picker}
       </NodeViewWrapper>
     );
   }
 
-  // Configured and rendering
+  // ---- Configured and rendering ------------------------------------------
   return (
     <NodeViewWrapper className="chart-block" data-drag-handle>
       <div className={`tiptap-block-wrapper ${selected ? 'is-selected' : ''}`}>
         <div className="chart-block-container relative group overflow-hidden">
-          {/* Full-area grid background */}
           {attrs.config.showGrid !== false && (
-            <div 
+            <div
               className="absolute inset-0 pointer-events-none z-0"
               style={{
-                backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px)',
+                backgroundImage:
+                  'linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px)',
                 backgroundSize: '24px 24px',
               }}
             />
           )}
-          
+
           {/* Floating toolbar when selected or hovered */}
-          <div className={`
-            absolute -top-10 left-1/2 -translate-x-1/2 z-20
-            flex items-center gap-1 px-2 py-1.5 rounded-lg
-            bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700
-            transition-all duration-150
-            ${selected ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto'}
-          `}>
+          <div
+            className={`absolute -top-10 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 transition-all duration-150 ${
+              selected
+                ? 'opacity-100 translate-y-0'
+                : 'opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto'
+            }`}
+          >
             <button
               onClick={() => setShowConfig(true)}
               className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-accent-green dark:hover:text-accent-green hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
@@ -250,16 +302,12 @@ const ChartNodeView = memo(function ChartNodeView({
               </svg>
             </button>
           </div>
-          
+
           {/* Header with title */}
           {(attrs.config.title || attrs.config.subtitle) && (
             <div className="chart-block-header relative z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-              {attrs.config.title && (
-                <div className="chart-block-title">{attrs.config.title}</div>
-              )}
-              {attrs.config.subtitle && (
-                <div className="chart-block-subtitle">{attrs.config.subtitle}</div>
-              )}
+              {attrs.config.title && <div className="chart-block-title">{attrs.config.title}</div>}
+              {attrs.config.subtitle && <div className="chart-block-subtitle">{attrs.config.subtitle}</div>}
             </div>
           )}
 
@@ -306,143 +354,18 @@ const ChartNodeView = memo(function ChartNodeView({
             columns={columns}
             onConfigChange={handleConfigChange}
             onChartTypeChange={handleChartTypeChange}
+            onChangeTable={() => {
+              setShowConfig(false);
+              setShowPicker(true);
+            }}
             onClose={() => setShowConfig(false)}
           />
         )}
       </div>
+      {picker}
     </NodeViewWrapper>
   );
 });
-
-// ============================================================================
-// Table Selector Component - Popup Style
-// ============================================================================
-
-function TableSelector({ onSelect }: { onSelect: (tableId: string) => void }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const nodes = useProjectStore((state) => state.nodes);
-  const tables = Object.values(nodes).filter((n): n is TableNodeType => 
-    n.kind === 'source_table' || n.kind === 'derived_table'
-  );
-
-  if (tables.length === 0) {
-    return (
-      <p className="text-xs text-gray-400 mt-2">No tables available. Import data first.</p>
-    );
-  }
-
-  return (
-    <>
-      <button
-        onClick={() => setIsOpen(true)}
-        className="mt-3 px-4 py-2 text-sm font-medium text-white bg-accent-green hover:bg-accent-green-hover rounded-lg transition-colors flex items-center gap-2"
-      >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-        </svg>
-        Select Table
-      </button>
-      
-      {isOpen && (
-        <TablePickerModal
-          tables={tables}
-          onSelect={(tableId) => {
-            onSelect(tableId);
-            setIsOpen(false);
-          }}
-          onClose={() => setIsOpen(false)}
-        />
-      )}
-    </>
-  );
-}
-
-// Table Picker Modal - Clean popup design
-function TablePickerModal({ 
-  tables, 
-  onSelect, 
-  onClose 
-}: { 
-  tables: TableNodeType[];
-  onSelect: (tableId: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)' }}
-      onClick={onClose}
-    >
-      <div 
-        className="bg-white dark:bg-[#1f1f1f] rounded-xl shadow-2xl w-[380px] max-h-[70vh] overflow-hidden"
-        style={{ 
-          animation: 'modalSlideIn 0.2s ease-out',
-          boxShadow: '0 24px 48px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05)'
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-b from-gray-50 to-white dark:from-gray-800/50 dark:to-transparent">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-accent-green rounded-lg flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                  Select Table
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Choose data source for your chart
-                </p>
-              </div>
-            </div>
-            <button 
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        
-        {/* Table List */}
-        <div className="p-3 max-h-[400px] overflow-y-auto">
-          <div className="space-y-1">
-            {tables.map(table => (
-              <button
-                key={table.id}
-                onClick={() => onSelect(table.id)}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-all hover:bg-accent-green/8 group"
-              >
-                <div className="w-9 h-9 rounded-lg bg-accent-green/10 flex items-center justify-center flex-shrink-0 group-hover:bg-accent-green/15 transition-colors">
-                  <svg className="w-4 h-4 text-accent-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {table.name}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {table.schema?.rowCount?.toLocaleString() || 0} rows · {table.schema?.columns?.length || 0} columns
-                  </div>
-                </div>
-                <svg className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-accent-green transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ============================================================================
 // Chart Config Panel Component
@@ -450,10 +373,11 @@ function TablePickerModal({
 
 interface ChartConfigPanelProps {
   config: EnhancedChartConfig;
-  chartType: 'bar' | 'line' | 'pie' | 'scatter';
+  chartType: ChartType;
   columns: ColumnSchema[];
   onConfigChange: (updates: Partial<EnhancedChartConfig>) => void;
-  onChartTypeChange: (type: 'bar' | 'line' | 'pie' | 'scatter') => void;
+  onChartTypeChange: (type: ChartType) => void;
+  onChangeTable: () => void;
   onClose: () => void;
 }
 
@@ -463,13 +387,11 @@ function ChartConfigPanel({
   columns,
   onConfigChange,
   onChartTypeChange,
+  onChangeTable,
   onClose,
 }: ChartConfigPanelProps) {
-  // Filter columns based on chart type
-  const xAxisColumns = chartType === 'scatter' 
-    ? columns.filter(c => c.type === 'number')
-    : columns;
-  const yAxisColumns = columns.filter(c => c.type === 'number');
+  const xAxisColumns = chartType === 'scatter' ? columns.filter((c) => c.type === 'number') : columns;
+  const yAxisColumns = columns.filter((c) => c.type === 'number');
 
   return (
     <div className="block-config-panel">
@@ -482,26 +404,38 @@ function ChartConfigPanel({
         </button>
       </div>
 
+      {/* Source table */}
+      <div className="block-config-section">
+        <label className="block-config-label">Source</label>
+        <button
+          onClick={onChangeTable}
+          className="input text-sm w-full text-left flex items-center justify-between"
+        >
+          <span>Change table…</span>
+          <svg className="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
       {/* Chart Type */}
       <div className="block-config-section">
         <label className="block-config-label">Chart Type</label>
         <div className="grid grid-cols-4 gap-2">
-          {[
-            { type: 'bar' as const, label: 'Bar' },
-            { type: 'line' as const, label: 'Line' },
-            { type: 'pie' as const, label: 'Pie' },
-            { type: 'scatter' as const, label: 'Scatter' },
-          ].map(({ type, label }) => (
+          {([
+            { type: 'bar', label: 'Bar' },
+            { type: 'line', label: 'Line' },
+            { type: 'pie', label: 'Pie' },
+            { type: 'scatter', label: 'Scatter' },
+          ] as { type: ChartType; label: string }[]).map(({ type, label }) => (
             <button
               key={type}
               onClick={() => onChartTypeChange(type)}
-              className={`
-                flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-lg border transition-all
-                ${chartType === type
+              className={`flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-lg border transition-all ${
+                chartType === type
                   ? 'border-accent-green bg-accent-green/5 text-accent-green'
                   : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }
-              `}
+              }`}
             >
               <ChartTypeIcon type={type} className="w-4 h-4" />
               <span className="text-xs font-medium">{label}</span>
@@ -512,21 +446,17 @@ function ChartConfigPanel({
 
       {/* X Axis */}
       <div className="block-config-section">
-        <label className="block-config-label">
-          {chartType === 'scatter' ? 'X Axis (Numeric)' : 'X Axis'}
-        </label>
+        <label className="block-config-label">{chartType === 'scatter' ? 'X Axis (Numeric)' : 'X Axis'}</label>
         <div className="flex flex-wrap gap-2 mt-2">
-          {xAxisColumns.slice(0, 8).map(col => (
+          {xAxisColumns.slice(0, 8).map((col) => (
             <button
               key={col.id}
               onClick={() => onConfigChange({ xAxis: col.id })}
-              className={`
-                px-3 py-1.5 text-xs font-medium rounded-lg transition-all
-                ${config.xAxis === col.id
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                config.xAxis === col.id
                   ? 'bg-accent-green text-white shadow-sm'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }
-              `}
+              }`}
             >
               {col.name}
             </button>
@@ -538,17 +468,15 @@ function ChartConfigPanel({
       <div className="block-config-section">
         <label className="block-config-label">Y Axis (Numeric)</label>
         <div className="flex flex-wrap gap-2 mt-2">
-          {yAxisColumns.slice(0, 8).map(col => (
+          {yAxisColumns.slice(0, 8).map((col) => (
             <button
               key={col.id}
               onClick={() => onConfigChange({ yAxis: col.id })}
-              className={`
-                px-3 py-1.5 text-xs font-medium rounded-lg transition-all
-                ${config.yAxis === col.id
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                config.yAxis === col.id
                   ? 'bg-accent-green text-white shadow-sm'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                }
-              `}
+              }`}
             >
               {col.name}
             </button>
@@ -589,13 +517,13 @@ function ChartConfigPanel({
 }
 
 // Custom Toggle Switch Component
-function ToggleSwitch({ 
-  checked, 
-  onChange, 
-  label 
-}: { 
-  checked: boolean; 
-  onChange: (checked: boolean) => void; 
+function ToggleSwitch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
   label: string;
 }) {
   return (
@@ -606,19 +534,14 @@ function ToggleSwitch({
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`
-          relative inline-flex h-5 w-9 items-center rounded-full transition-colors
-          ${checked 
-            ? 'bg-accent-green' 
-            : 'bg-gray-200 dark:bg-gray-700'
-          }
-        `}
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+          checked ? 'bg-accent-green' : 'bg-gray-200 dark:bg-gray-700'
+        }`}
       >
         <span
-          className={`
-            inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform
-            ${checked ? 'translate-x-4' : 'translate-x-1'}
-          `}
+          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${
+            checked ? 'translate-x-4' : 'translate-x-1'
+          }`}
         />
       </button>
     </label>
@@ -626,7 +549,7 @@ function ToggleSwitch({
 }
 
 // Chart Type Icon Component
-function ChartTypeIcon({ type, className }: { type: 'bar' | 'line' | 'pie' | 'scatter'; className?: string }) {
+function ChartTypeIcon({ type, className }: { type: ChartType; className?: string }) {
   switch (type) {
     case 'bar':
       return (
@@ -664,11 +587,11 @@ function ChartTypeIcon({ type, className }: { type: 'bar' | 'line' | 'pie' | 'sc
 
 export const ChartNode = Node.create<ChartNodeOptions>({
   name: 'chartBlock',
-  
+
   group: 'block',
-  
+
   atom: true,
-  
+
   draggable: true,
 
   addOptions() {

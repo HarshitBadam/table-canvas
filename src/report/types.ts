@@ -1,21 +1,14 @@
 /**
  * Report Type Definitions
- * 
- * Types for the Notion-like report editor with block-based content.
+ *
+ * Types for the TipTap-based report editor. Report content is stored as
+ * TipTap JSON (`tiptapContent`); there is no legacy block format.
  */
 
 import type { AggregationType } from '@/core/types/node.types';
 
 // ============================================================================
-// Block Types
-// ============================================================================
-
-export type BlockType = 'text' | 'heading' | 'chart' | 'table_snippet' | 'table_inline' | 'table_blank' | 'divider';
-
-export type HeadingLevel = 1 | 2 | 3;
-
-// ============================================================================
-// Enhanced Chart Configuration
+// Chart Configuration
 // ============================================================================
 
 export interface ChartAnnotation {
@@ -27,14 +20,14 @@ export interface ChartAnnotation {
 }
 
 export interface EnhancedChartConfig {
-  // Data mapping (from existing ChartConfig)
+  // Data mapping
   xAxis?: string;
   yAxis?: string;
   series?: string[];
   aggregation?: AggregationType;
   groupBy?: string;
-  
-  // Enhanced display options
+
+  // Display options
   title?: string;
   subtitle?: string;
   showLegend?: boolean;
@@ -47,121 +40,7 @@ export interface EnhancedChartConfig {
 }
 
 // ============================================================================
-// Base Block Interface
-// ============================================================================
-
-export interface BaseBlock {
-  id: string;
-  type: BlockType;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// ============================================================================
-// Text Block
-// ============================================================================
-
-export interface TextBlock extends BaseBlock {
-  type: 'text';
-  content: string; // Markdown content
-}
-
-// ============================================================================
-// Heading Block
-// ============================================================================
-
-export interface HeadingBlock extends BaseBlock {
-  type: 'heading';
-  level: HeadingLevel;
-  content: string;
-}
-
-// ============================================================================
-// Chart Block
-// ============================================================================
-
-export interface ChartBlock extends BaseBlock {
-  type: 'chart';
-  sourceTableId: string;
-  chartType: 'bar' | 'line' | 'pie' | 'scatter';
-  config: EnhancedChartConfig;
-}
-
-// ============================================================================
-// Table Snippet Block
-// ============================================================================
-
-export type RowSelectionMode = 'all' | 'first_n' | 'last_n' | 'selected';
-
-export type TableDisplayMode = 'full' | 'embedded';
-
-export interface TableSnippetBlock extends BaseBlock {
-  type: 'table_snippet';
-  sourceTableId: string;
-  selectedColumns: string[]; // Column IDs to include
-  rowSelectionMode: RowSelectionMode;
-  selectedRowIds?: string[]; // For 'selected' mode
-  rowLimit?: number; // For 'first_n' and 'last_n' modes
-  caption?: string;
-  showRowNumbers?: boolean;
-  displayMode?: TableDisplayMode; // 'full' (default) or 'embedded' (MiniTableView style)
-}
-
-// ============================================================================
-// Divider Block
-// ============================================================================
-
-export interface DividerBlock extends BaseBlock {
-  type: 'divider';
-}
-
-// ============================================================================
-// Inline Table Block (for pasted data from grid)
-// ============================================================================
-
-export interface InlineTableBlock extends BaseBlock {
-  type: 'table_inline';
-  data: {
-    headers: string[];
-    rows: (string | number | boolean | null | undefined)[][];
-  };
-  sourceInfo?: {
-    tableId: string;
-    tableName: string;
-  };
-  caption?: string;
-}
-
-// ============================================================================
-// Blank Table Block (user-defined empty table)
-// ============================================================================
-
-export interface BlankTableBlock extends BaseBlock {
-  type: 'table_blank';
-  rowCount: number;
-  columnCount: number;
-  data: {
-    headers: string[];
-    rows: (string | number | null)[][];
-  };
-  caption?: string;
-}
-
-// ============================================================================
-// Union Block Type
-// ============================================================================
-
-export type ReportBlock = 
-  | TextBlock 
-  | HeadingBlock 
-  | ChartBlock 
-  | TableSnippetBlock 
-  | InlineTableBlock
-  | BlankTableBlock
-  | DividerBlock;
-
-// ============================================================================
-// TipTap Content Type
+// TipTap Content
 // ============================================================================
 
 export interface TipTapContent {
@@ -183,67 +62,35 @@ export interface TipTapMark {
 }
 
 // ============================================================================
-// Report Interface
+// Report
 // ============================================================================
 
 export interface Report {
   id: string;
   name: string;
-  /** @deprecated Use tiptapContent instead. Kept for backward compatibility. */
-  blocks: ReportBlock[];
-  /** TipTap JSON content - new format */
+  /** TipTap JSON content. */
   tiptapContent?: TipTapContent;
   createdAt: string;
   updatedAt: string;
 }
 
 // ============================================================================
-// Report Store State Types
+// Report Store State
 // ============================================================================
 
 export interface ReportStoreState {
   reports: Record<string, Report>;
   selectedReportId: string | null;
-  
+
   // Report actions
   addReport: (name?: string) => string;
   updateReport: (id: string, updates: Partial<Omit<Report, 'id' | 'createdAt'>>) => void;
   deleteReport: (id: string) => void;
   selectReport: (id: string | null) => void;
-  
-  // Block actions
-  addBlock: (reportId: string, block: Omit<ReportBlock, 'id' | 'createdAt' | 'updatedAt'>, index?: number) => string;
-  updateBlock: (reportId: string, blockId: string, updates: Partial<ReportBlock>) => void;
-  deleteBlock: (reportId: string, blockId: string) => void;
-  reorderBlocks: (reportId: string, fromIndex: number, toIndex: number) => void;
-  duplicateBlock: (reportId: string, blockId: string) => string | null;
-  transformBlock: (reportId: string, blockId: string, newType: BlockType, newProps?: Record<string, unknown>) => void;
-  
+
   // Selectors
   getReport: (id: string) => Report | undefined;
-  getBlock: (reportId: string, blockId: string) => ReportBlock | undefined;
 }
-
-// ============================================================================
-// Block Creation Helpers
-// ============================================================================
-
-export type NewTextBlock = Omit<TextBlock, 'id' | 'createdAt' | 'updatedAt'>;
-export type NewHeadingBlock = Omit<HeadingBlock, 'id' | 'createdAt' | 'updatedAt'>;
-export type NewChartBlock = Omit<ChartBlock, 'id' | 'createdAt' | 'updatedAt'>;
-export type NewTableSnippetBlock = Omit<TableSnippetBlock, 'id' | 'createdAt' | 'updatedAt'>;
-export type NewInlineTableBlock = Omit<InlineTableBlock, 'id' | 'createdAt' | 'updatedAt'>;
-export type NewBlankTableBlock = Omit<BlankTableBlock, 'id' | 'createdAt' | 'updatedAt'>;
-export type NewDividerBlock = Omit<DividerBlock, 'id' | 'createdAt' | 'updatedAt'>;
-
-export type NewBlock = 
-  | NewTextBlock 
-  | NewHeadingBlock 
-  | NewChartBlock 
-  | NewTableSnippetBlock 
-  | NewInlineTableBlock
-  | NewBlankTableBlock
-  | NewDividerBlock;
 
 // ============================================================================
 // Color Schemes
