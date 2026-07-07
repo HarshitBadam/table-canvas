@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useProjectStore } from '@/state/projectStore'
-import { useApp } from '@/state/AppContext'
+import { useApp } from '@/state/appContext'
 import { ImportButton } from '@/components/ImportButton'
 import { NewTableModal } from '@/canvas/modals/NewTableModal'
 import { ThemeToggle } from '@/components/ThemeToggle'
