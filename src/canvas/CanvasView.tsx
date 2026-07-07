@@ -15,7 +15,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 
 import { useProjectStore } from '@/state/projectStore'
-import { useApp } from '@/state/AppContext'
+import { useApp } from '@/state/appContext'
 import { useProfilingStore, loadProfileForTable } from '@/profiling/profiler'
 import type { NodeViewMode, ProjectNode, Edge as ProjectEdge } from '@/lib/types'
 import { wouldCreateCycle } from '@/engine/dependencyGraph'

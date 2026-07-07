@@ -11,8 +11,6 @@
  */
 
 import {
-  createContext,
-  useContext,
   useState,
   useEffect,
   useCallback,
@@ -28,7 +26,6 @@ import {
   logout as apiLogout,
   login as apiLogin,
   LoginCredentials,
-  User,
 } from '@/api/auth.api';
 import { setAuthErrorHandler } from '@/api/client';
 import {
@@ -38,53 +35,18 @@ import {
   saveProjectWithSync,
 } from '@/persistence/syncService';
 import { deleteFile } from '@/persistence/db';
-import { ProjectSummary } from '@/api/projects.api';
 import type { SourceTableNode } from '@/lib/types';
 import { initializeReportStore } from '@/report/reportStore';
+import {
+  AppContext,
+  type AppPhase,
+  type AppState,
+  type AppContextValue,
+} from './appContext';
 
 // ============================================================================
-// Types
+// Phase Messages
 // ============================================================================
-
-export type AppPhase =
-  | 'idle'
-  | 'initializing_engine'
-  | 'checking_auth'
-  | 'loading_project'
-  | 'materializing'
-  | 'ready'
-  | 'error';
-
-interface AppState {
-  phase: AppPhase;
-  phaseMessage: string;
-  engineReady: boolean;
-  user: User | null;
-  isAuthenticated: boolean;
-  projectId: string | null;
-  projectName: string;
-  projects: ProjectSummary[];
-  isSaving: boolean;
-  error: string | null;
-}
-
-interface AppContextValue extends AppState {
-  // Auth actions
-  login: (credentials: LoginCredentials) => Promise<void>;
-  logout: () => Promise<void>;
-  
-  // Project actions
-  createNewProject: (name?: string) => Promise<void>;
-  loadProject: (projectId: string) => Promise<void>;
-  refreshProjects: () => Promise<void>;
-  
-  // Node actions
-  deleteNodeWithSync: (nodeId: string) => Promise<void>;
-  
-  // Computed
-  isReady: boolean;
-  isLoading: boolean;
-}
 
 const PHASE_MESSAGES: Record<AppPhase, string> = {
   idle: 'Starting...',
@@ -95,12 +57,6 @@ const PHASE_MESSAGES: Record<AppPhase, string> = {
   ready: 'Ready',
   error: 'Something went wrong',
 };
-
-// ============================================================================
-// Context
-// ============================================================================
-
-const AppContext = createContext<AppContextValue | null>(null);
 
 // ============================================================================
 // Provider
@@ -624,28 +580,4 @@ export function AppProvider({ children }: AppProviderProps) {
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
-}
-
-// ============================================================================
-// Hook
-// ============================================================================
-
-export function useApp(): AppContextValue {
-  const context = useContext(AppContext);
-  
-  if (!context) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
-  
-  return context;
-}
-
-// Convenience hooks
-export function useAppReady(): boolean {
-  return useApp().isReady;
-}
-
-export function useAppAuth() {
-  const { user, isAuthenticated, login, logout } = useApp();
-  return { user, isAuthenticated, login, logout };
 }

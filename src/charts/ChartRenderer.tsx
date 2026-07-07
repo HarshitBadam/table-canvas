@@ -23,7 +23,7 @@ import {
   Cell,
 } from 'recharts'
 import type { ChartConfig, CellValue } from '@/lib/types'
-import { useTheme } from '@/components/ThemeToggle'
+import { useTheme } from '@/components/themeContext'
 
 interface ChartRendererProps {
   type: 'bar' | 'line' | 'pie' | 'scatter'

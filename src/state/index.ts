@@ -13,4 +13,5 @@ export * from './providers';
 // Legacy exports for backward compatibility
 export { useProjectStore, useCanUndo, useCanRedo } from './projectStore';
 export { useDataStore } from './dataStore';
-export { AppProvider, useApp, useAppReady, useAppAuth } from './AppContext';
+export { AppProvider } from './AppContext';
+export { useApp, useAppReady, useAppAuth } from './appContext';
