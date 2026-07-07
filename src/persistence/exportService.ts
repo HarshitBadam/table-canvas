@@ -138,108 +138,15 @@ function nodeToHtml(node: TipTapNode): string {
   }
 }
 
-interface LegacyBlock {
-  type: string
-  content?: string
-  level?: number
-  chartType?: string
-  data?: {
-    headers?: string[]
-    rows?: unknown[][]
-  }
-}
-
-/**
- * Convert legacy blocks to HTML
- */
-function blocksToHtml(blocks: LegacyBlock[]): string {
-  if (!blocks || blocks.length === 0) return ''
-  
-  let html = ''
-  
-  for (const block of blocks) {
-    switch (block.type) {
-      case 'text':
-        html += `<p>${block.content || ''}</p>\n`
-        break
-      case 'heading': {
-        const level = block.level || 1
-        html += `<h${level}>${block.content || ''}</h${level}>\n`
-        break
-      }
-      case 'divider':
-        html += '<hr>\n'
-        break
-      case 'chart':
-        html += `<div class="block-placeholder">[Chart: ${block.chartType || 'Unknown'}]</div>\n`
-        break
-      case 'table_snippet':
-        html += `<div class="block-placeholder">[Table Snippet]</div>\n`
-        break
-      case 'table_inline':
-        if (block.data?.headers && block.data?.rows) {
-          html += '<table border="1" style="border-collapse: collapse; width: 100%;">\n'
-          html += '<thead><tr>'
-          for (const header of block.data.headers) {
-            html += `<th style="padding: 8px; text-align: left;">${header}</th>`
-          }
-          html += '</tr></thead>\n<tbody>'
-          for (const row of block.data.rows) {
-            html += '<tr>'
-            for (const cell of row) {
-              html += `<td style="padding: 8px;">${cell ?? ''}</td>`
-            }
-            html += '</tr>\n'
-          }
-          html += '</tbody></table>\n'
-        } else {
-          html += '<div class="block-placeholder">[Inline Table]</div>\n'
-        }
-        break
-      case 'table_blank':
-        if (block.data?.headers && block.data?.rows) {
-          html += '<table border="1" style="border-collapse: collapse; width: 100%;">\n'
-          html += '<thead><tr>'
-          for (const header of block.data.headers) {
-            html += `<th style="padding: 8px; text-align: left;">${header}</th>`
-          }
-          html += '</tr></thead>\n<tbody>'
-          for (const row of block.data.rows) {
-            html += '<tr>'
-            for (const cell of row) {
-              html += `<td style="padding: 8px;">${cell ?? ''}</td>`
-            }
-            html += '</tr>\n'
-          }
-          html += '</tbody></table>\n'
-        } else {
-          html += '<div class="block-placeholder">[Blank Table]</div>\n'
-        }
-        break
-      default:
-        html += `<div class="block-placeholder">[${block.type || 'Unknown Block'}]</div>\n`
-    }
-  }
-  
-  return html
-}
-
 /**
  * Generate HTML page for a report
  */
 function generateReportHtml(report: Report): string {
   let content = ''
-  
-  // Try TipTap content first
+
   if (report.tiptapContent && report.tiptapContent.content && report.tiptapContent.content.length > 0) {
     content = tiptapToHtml(report.tiptapContent)
-  } 
-  // Fall back to legacy blocks
-  else if (report.blocks && report.blocks.length > 0) {
-    content = blocksToHtml(report.blocks)
-  }
-  // No content
-  else {
+  } else {
     content = '<p><em>This report is empty.</em></p>'
   }
   
