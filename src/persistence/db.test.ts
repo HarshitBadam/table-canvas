@@ -108,9 +108,12 @@ function createMockReport(id: string, name: string) {
   return {
     id,
     name,
-    blocks: [
-      { id: 'block_1', type: 'text' as const, content: 'Hello World' },
-    ],
+    tiptapContent: {
+      type: 'doc' as const,
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'Hello World' }] },
+      ],
+    },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
@@ -398,7 +401,7 @@ describe('Report Operations', () => {
 
     expect(loaded).not.toBeNull()
     expect(loaded?.name).toBe('Monthly Report')
-    expect(loaded?.blocks).toHaveLength(1)
+    expect(loaded?.tiptapContent?.content).toHaveLength(1)
   })
 
   it('returns null for non-existent report', async () => {

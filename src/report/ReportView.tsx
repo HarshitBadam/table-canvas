@@ -10,7 +10,6 @@ import { useCallback, useRef, useEffect, useMemo } from 'react';
 import { useReportStore } from './reportStore';
 import { TipTapEditor, TipTapEditorHandle } from './editor';
 import { ReportToolbar } from './ReportToolbar';
-import { migrateReport, needsMigration } from './migrations/migrateToTipTap';
 import type { JSONContent } from '@tiptap/react';
 import type { Report } from './types';
 
@@ -40,34 +39,14 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
   const report = useReportStore((state) => state.reports[reportId]);
   const updateReport = useReportStore((state) => state.updateReport);
   const editorRef = useRef<TipTapEditorHandle>(null);
-  // Tracks the report id we have already migrated so switching between several
-  // legacy reports migrates each one exactly once.
-  const migratedReportId = useRef<string | null>(null);
 
-  // Resolve the content to display. Legacy reports (with a `blocks` array and
-  // no `tiptapContent`) are migrated synchronously here so the editor mounts
-  // with the correct content immediately, rather than waiting for the async
-  // store update — which the editor only picks up on a report switch.
+  // Resolve the content to display: the report's TipTap document, or a fresh
+  // default document titled after the report when it has no content yet.
   const content = useMemo<JSONContent>(() => {
     if (!report) return { type: 'doc', content: [] };
     if (report.tiptapContent) return report.tiptapContent as unknown as JSONContent;
-    if (needsMigration(report)) {
-      return migrateReport(report).tiptapContent as unknown as JSONContent;
-    }
     return defaultDocFor(report);
   }, [report]);
-
-  // Persist the migration once per report so we don't re-migrate on every
-  // render and the converted content is saved to IndexedDB.
-  useEffect(() => {
-    if (report && needsMigration(report) && migratedReportId.current !== reportId) {
-      migratedReportId.current = reportId;
-      const migratedReport = migrateReport(report);
-      updateReport(reportId, {
-        tiptapContent: migratedReport.tiptapContent,
-      });
-    }
-  }, [report, reportId, updateReport]);
 
   // Handle content changes - just save content, name is managed separately via toolbar
   const handleContentChange = useCallback((content: JSONContent) => {
