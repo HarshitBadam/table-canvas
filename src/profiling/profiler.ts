@@ -6,6 +6,7 @@
 import { useCallback } from 'react'
 import { create } from 'zustand'
 import { getEngine } from '@/engine'
+import { ensureTableMaterialized } from '@/engine/materializationService'
 import type { ProfileResult } from '@/engine/types'
 import type { CellValue, ColumnProfile, SemanticHint } from '@/lib/types'
 import { useDataStore } from '@/state/dataStore'
@@ -219,7 +220,6 @@ async function ensureTableInEngine(tableId: string, _force: boolean = false): Pr
     
     // For derived tables, use materialization service to compute the table
     if (node.kind === 'derived_table') {
-      const { ensureTableMaterialized } = await import('@/engine/materializationService')
       const result = await ensureTableMaterialized(tableId)
       return result.status !== 'error'
     }
@@ -228,7 +228,6 @@ async function ensureTableInEngine(tableId: string, _force: boolean = false): Pr
     const tableData = useDataStore.getState().tableData[tableId]
     if (!tableData?.rows || !node?.schema) {
       // Try materialization for source tables too if data not in store
-      const { ensureTableMaterialized } = await import('@/engine/materializationService')
       const result = await ensureTableMaterialized(tableId)
       return result.status !== 'error'
     }
