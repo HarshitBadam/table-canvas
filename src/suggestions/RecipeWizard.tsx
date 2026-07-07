@@ -3,7 +3,7 @@
  * Modal wizard for configuring and executing recipe suggestions
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import type { Suggestion, ColumnSchema, TransformDef } from '@/lib/types'
@@ -224,7 +224,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
   const [isExecuting, setIsExecuting] = useState(false)
   
   // Reset bindings when suggestion changes
-  useMemo(() => {
+  useEffect(() => {
     if (suggestion?.action.kind === 'launchRecipe') {
       setBindings((suggestion.action.initialBindings as Record<string, string> | undefined) ?? {})
     }
