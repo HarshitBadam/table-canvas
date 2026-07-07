@@ -53,17 +53,6 @@ interface ContextMenuState {
 export function GridView({ tableId }: GridViewProps) {
   const node = useProjectStore((state) => state.getTableNode(tableId))
   const patches = useProjectStore((state) => state.patches[tableId])
-  const patchVersion = useProjectStore((state) => {
-    const p = state.patches[tableId]
-    if (!p) return '0-0-0-0'
-    // Count total cell patches across all columns (not just number of columns)
-    const cellPatchCount = Object.values(p.cellPatches || {}).reduce(
-      (sum, colPatches) => sum + Object.keys(colPatches).length, 
-      0
-    )
-    const highlightCount = p.highlightedCells?.size || 0
-    return `${p.insertedRows?.length || 0}-${cellPatchCount}-${p.deletedRows?.size || 0}-${highlightCount}`
-  })
   const setCellValue = useProjectStore((state) => state.setCellValue)
   const saveSnapshot = useProjectStore((state) => state.saveSnapshot)
   const insertRow = useProjectStore((state) => state.insertRow)
@@ -184,7 +173,7 @@ export function GridView({ tableId }: GridViewProps) {
   const computationError = cacheInfo?.error
 
   const schema = node?.schema
-  const columns = schema?.columns ?? []
+  const columns = useMemo(() => schema?.columns ?? [], [schema])
   const isEditable = node?.kind === 'source_table'
   
   // Get data rows merged with inserted rows from patches
@@ -214,7 +203,10 @@ export function GridView({ tableId }: GridViewProps) {
     }
     
     return baseRows
-  }, [tableData, patches, columns, patchVersion])
+    // The immer `patches` reference changes on any patch mutation (incl.
+    // inserted rows), so it already covers this memo; patchVersion would be
+    // a redundant dependency.
+  }, [tableData, patches, columns])
 
   // Apply patches to get display values, including formula evaluation
   const getDisplayValue = useCallback((rowId: string, columnId: string, baseValue: CellValue, row?: GridRow): CellValue => {
@@ -283,7 +275,10 @@ export function GridView({ tableId }: GridViewProps) {
   const visibleRows = filteredRows.slice(startIndex, endIndex)
 
   // Derive selection state for rendering
-  const selectedCell = selection?.type === 'cell' ? { rowIndex: selection.rowIndex, columnId: selection.columnId } : null
+  const selectedCell = useMemo(
+    () => (selection?.type === 'cell' ? { rowIndex: selection.rowIndex, columnId: selection.columnId } : null),
+    [selection]
+  )
   const selectedColumn = selection?.type === 'column' ? selection.columnId : (selection?.type === 'cell' ? selection.columnId : null)
   const isHeaderRowSelected = selection?.type === 'header-row' || selection?.type === 'corner'
   const isIndexColumnSelected = selection?.type === 'index-column' || selection?.type === 'corner'
@@ -858,7 +853,7 @@ export function GridView({ tableId }: GridViewProps) {
     }))
 
     setAutofillPreview(preview)
-  }, [autofillDragging, cellRangeSelection, selection, rows, getDisplayValue])
+  }, [autofillDragging, cellRangeSelection, selection, rows, getDisplayValue, columns])
 
   // Autofill: End dragging and apply values
   const handleAutofillEnd = useCallback(() => {
@@ -920,7 +915,7 @@ export function GridView({ tableId }: GridViewProps) {
     setAutofillEndRow(null)
     setAutofillPreview([])
     autofillColumnId.current = null
-  }, [autofillDragging, autofillEndRow, cellRangeSelection, selection, rows, getDisplayValue, saveSnapshot, setCellValue, tableId])
+  }, [autofillDragging, autofillEndRow, cellRangeSelection, selection, rows, getDisplayValue, saveSnapshot, setCellValue, tableId, columns])
 
   // Global mouse event handlers for autofill
   useEffect(() => {
