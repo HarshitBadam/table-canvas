@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import 'fake-indexeddb/auto'
 import { IDBFactory } from 'fake-indexeddb'
 import JSZip from 'jszip'
+import * as XLSX from 'xlsx'
 
 // Polyfill for Blob.text() which isn't available in jsdom
 if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
@@ -38,19 +39,11 @@ vi.mock('./db', () => ({
   loadFile: vi.fn(),
 }))
 
-// Mock the materialization service
+// Mock the materialization service. getTableData is the single canonical,
+// id-keyed read API that the export service now relies on for every table.
 vi.mock('@/engine/materializationService', () => ({
   getTableData: vi.fn(),
   ensureTableMaterialized: vi.fn(),
-}))
-
-// Mock the data store
-vi.mock('@/state/dataStore', () => ({
-  useDataStore: {
-    getState: vi.fn(() => ({
-      tableData: {},
-    })),
-  },
 }))
 
 // Import after mocks are set up
@@ -62,7 +55,6 @@ import {
 } from './exportService'
 import * as db from './db'
 import * as materializationService from '@/engine/materializationService'
-import { useDataStore } from '@/state/dataStore'
 
 // ============================================================================
 // Test Fixtures
@@ -200,6 +192,21 @@ function createCSVContent(rows: Record<string, unknown>[]): ArrayBuffer {
   return new TextEncoder().encode(lines.join('\n')).buffer
 }
 
+/**
+ * Read a worksheet from an exported ZIP's data.xlsx as an array-of-arrays.
+ * Used to assert the actual exported cell content (not just that a sheet exists).
+ */
+async function readExportedSheet(zipBlob: Blob, sheetName: string): Promise<unknown[][]> {
+  const zip = await JSZip.loadAsync(zipBlob)
+  const xlsxFile = zip.files['data.xlsx']
+  if (!xlsxFile) throw new Error('data.xlsx not found in export')
+  const buffer = await xlsxFile.async('arraybuffer')
+  const wb = XLSX.read(buffer, { type: 'array' })
+  const sheet = wb.Sheets[sheetName]
+  if (!sheet) throw new Error(`Sheet "${sheetName}" not found. Available: ${wb.SheetNames.join(', ')}`)
+  return XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][]
+}
+
 // ============================================================================
 // Setup
 // ============================================================================
@@ -253,13 +260,6 @@ describe('exportProjectAsZip', () => {
 
     it('includes data.xlsx when includeExcel is true with source tables', async () => {
       // Arrange
-      const csvData = [
-        { ID: '1', Value: 100 },
-        { ID: '2', Value: 200 },
-        { ID: '3', Value: 300 },
-      ]
-      const csvBuffer = createCSVContent(csvData)
-
       const mockProject = {
         id: 'test-project',
         name: 'Test Project',
@@ -274,8 +274,16 @@ describe('exportProjectAsZip', () => {
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
       vi.mocked(db.loadProject).mockResolvedValue(mockProject)
-      vi.mocked(db.loadFile).mockResolvedValue(csvBuffer)
       vi.mocked(db.loadAllReports).mockResolvedValue({})
+      // The data store is the single source of truth: rows are keyed by column id.
+      vi.mocked(materializationService.getTableData).mockResolvedValue({
+        rows: [
+          { __rowId: 'row_0', col_1: '1', col_2: 100 },
+          { __rowId: 'row_1', col_1: '2', col_2: 200 },
+          { __rowId: 'row_2', col_1: '3', col_2: 300 },
+        ],
+        totalRows: 3,
+      })
 
       // Act
       const zipBlob = await exportProjectAsZip('test-project', {
@@ -287,6 +295,12 @@ describe('exportProjectAsZip', () => {
       const zip = await JSZip.loadAsync(zipBlob)
       expect(zip.files['project.tablecanvas.json']).toBeDefined()
       expect(zip.files['data.xlsx']).toBeDefined()
+
+      // The sheet must contain the human-readable headers and the id-keyed cells.
+      const sheet = await readExportedSheet(zipBlob, 'Sales Data')
+      expect(sheet[0]).toEqual(['ID', 'Value'])
+      expect(sheet[1]).toEqual(['1', 100])
+      expect(sheet[3]).toEqual(['3', 300])
     })
 
     it('includes reports folder when includeReportHtml is true', async () => {
@@ -357,13 +371,8 @@ describe('exportProjectAsZip', () => {
     })
 
     it('exports derived tables by materializing them', async () => {
-      // Arrange
-      const sourceData = [
-        { ID: '1', Value: 100 },
-        { ID: '2', Value: 200 },
-      ]
-      const derivedData = [{ ID: '1', Value: 100 }]
-
+      // Arrange - both source and derived tables are read via getTableData,
+      // which returns id-keyed rows (col_1, col_2) from the data store.
       const mockProject = {
         id: 'test-project',
         name: 'Test Project',
@@ -381,15 +390,22 @@ describe('exportProjectAsZip', () => {
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
       vi.mocked(db.loadProject).mockResolvedValue(mockProject)
-      vi.mocked(db.loadFile).mockResolvedValue(createCSVContent(sourceData))
       vi.mocked(db.loadAllReports).mockResolvedValue({})
-      vi.mocked(materializationService.ensureTableMaterialized).mockResolvedValue({
-        status: 'fresh',
-        tableId: 'table_2',
-      })
-      vi.mocked(materializationService.getTableData).mockResolvedValue({
-        rows: derivedData,
-        totalRows: 1,
+      vi.mocked(materializationService.getTableData).mockImplementation(async (tableId: string) => {
+        if (tableId === 'table_1') {
+          return {
+            rows: [
+              { __rowId: 'row_0', col_1: '1', col_2: 100 },
+              { __rowId: 'row_1', col_1: '2', col_2: 200 },
+            ],
+            totalRows: 2,
+          }
+        }
+        // Derived table (filtered) - the regression was these coming out EMPTY.
+        return {
+          rows: [{ __rowId: 'derived_row_0', col_1: '1', col_2: 100 }],
+          totalRows: 1,
+        }
       })
 
       // Act
@@ -398,12 +414,17 @@ describe('exportProjectAsZip', () => {
         includeReportHtml: false,
       })
 
-      // Assert
-      expect(materializationService.ensureTableMaterialized).toHaveBeenCalledWith('table_2')
-      expect(materializationService.getTableData).toHaveBeenCalledWith('table_2', 0, 100000)
-      
+      // Assert - getTableData is the single read path for every table.
+      expect(materializationService.getTableData).toHaveBeenCalledWith('table_1', 0, 1_000_000)
+      expect(materializationService.getTableData).toHaveBeenCalledWith('table_2', 0, 1_000_000)
+
       const zip = await JSZip.loadAsync(zipBlob)
       expect(zip.files['data.xlsx']).toBeDefined()
+
+      // The derived sheet must NOT be empty and must contain the mapped cells.
+      const derivedSheet = await readExportedSheet(zipBlob, 'Derived')
+      expect(derivedSheet[0]).toEqual(['ID', 'Value'])
+      expect(derivedSheet[1]).toEqual(['1', 100])
     })
   })
 
@@ -548,12 +569,13 @@ describe('exportProjectAsZip', () => {
         new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
       )
       vi.mocked(db.loadProject).mockResolvedValue(mockProject)
-      vi.mocked(db.loadFile).mockResolvedValue(createCSVContent([{ ID: '1', Value: 100 }]))
       vi.mocked(db.loadAllReports).mockResolvedValue({})
-      vi.mocked(materializationService.ensureTableMaterialized).mockResolvedValue({
-        status: 'error',
-        tableId: 'table_2',
-        error: 'Upstream table not found',
+      // getTableData surfaces the materialization error for the derived table.
+      vi.mocked(materializationService.getTableData).mockImplementation(async (tableId: string) => {
+        if (tableId === 'table_1') {
+          return { rows: [{ __rowId: 'row_0', col_1: '1', col_2: 100 }], totalRows: 1 }
+        }
+        return { rows: [], totalRows: 0, error: 'Upstream table not found' }
       })
 
       // Act - should not throw
@@ -563,9 +585,11 @@ describe('exportProjectAsZip', () => {
 
       // Assert
       expect(zipBlob).toBeInstanceOf(Blob)
-      // Excel should still be generated with error sheet
+      // Excel should still be generated with an error sheet for the failed table.
       const zip = await JSZip.loadAsync(zipBlob)
       expect(zip.files['data.xlsx']).toBeDefined()
+      const errorSheet = await readExportedSheet(zipBlob, 'Failed Derived')
+      expect(String(errorSheet[1]?.[0])).toContain('Error')
     })
 
     it('handles tables with duplicate names by making sheet names unique', async () => {
@@ -1011,25 +1035,16 @@ describe('exportAndDownloadProject', () => {
 })
 
 // ============================================================================
-// Data Store Fallback Tests
+// Single Source of Truth Tests
 // ============================================================================
 
-describe('Data Store Fallback', () => {
-  it('falls back to data store when materialization returns empty rows', async () => {
-    // Arrange
-    const storeData = {
-      table_2: {
-        rows: [{ ID: 'store-1', Value: 999 }],
-      },
-    }
-
-    vi.mocked(useDataStore.getState).mockReturnValue({
-      tableData: storeData,
-    } as ReturnType<typeof useDataStore.getState>)
-
+describe('Single data source', () => {
+  it('reads every table through getTableData (the id-keyed store)', async () => {
+    // Arrange - a table whose data getTableData genuinely returns empty for
+    // should produce an empty (headers-only) sheet, not throw or hang.
     const mockProject = {
-      id: 'fallback-test',
-      name: 'Fallback Test',
+      id: 'sot-test',
+      name: 'Single Source Test',
       nodes: {
         table_1: createMockSourceTableNode('table_1', 'Source'),
         table_2: createMockDerivedTableNode('table_2', 'Derived', 'table_1'),
@@ -1042,26 +1057,32 @@ describe('Data Store Fallback', () => {
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
     )
     vi.mocked(db.loadProject).mockResolvedValue(mockProject)
-    vi.mocked(db.loadFile).mockResolvedValue(createCSVContent([{ ID: '1', Value: 100 }]))
     vi.mocked(db.loadAllReports).mockResolvedValue({})
-    vi.mocked(materializationService.ensureTableMaterialized).mockResolvedValue({
-      status: 'fresh',
-      tableId: 'table_2',
-    })
-    vi.mocked(materializationService.getTableData).mockResolvedValue({
-      rows: [], // Empty rows triggers fallback
-      totalRows: 0,
+    vi.mocked(materializationService.getTableData).mockImplementation(async (tableId: string) => {
+      if (tableId === 'table_1') {
+        return { rows: [{ __rowId: 'row_0', col_1: 'a', col_2: 1 }], totalRows: 1 }
+      }
+      return { rows: [], totalRows: 0 }
     })
 
     // Act
-    const zipBlob = await exportProjectAsZip('fallback-test', {
+    const zipBlob = await exportProjectAsZip('sot-test', {
       includeExcel: true,
       includeReportHtml: false,
     })
 
-    // Assert
-    expect(useDataStore.getState).toHaveBeenCalled()
-    expect(zipBlob).toBeInstanceOf(Blob)
+    // Assert - getTableData is called for both tables; no other data path.
+    expect(materializationService.getTableData).toHaveBeenCalledWith('table_1', 0, 1_000_000)
+    expect(materializationService.getTableData).toHaveBeenCalledWith('table_2', 0, 1_000_000)
+
+    const populated = await readExportedSheet(zipBlob, 'Source')
+    expect(populated[0]).toEqual(['ID', 'Value'])
+    expect(populated[1]).toEqual(['a', 1])
+
+    // Empty table -> headers-only sheet.
+    const empty = await readExportedSheet(zipBlob, 'Derived')
+    expect(empty[0]).toEqual(['ID', 'Value'])
+    expect(empty.length).toBe(1)
   })
 })
 
@@ -1069,12 +1090,9 @@ describe('Data Store Fallback', () => {
 // CSV and Excel Parsing Tests
 // ============================================================================
 
-describe('File Parsing', () => {
-  it('parses CSV data correctly', async () => {
-    // Arrange
-    const csvContent = 'Name,Age,City\nAlice,30,NYC\nBob,25,LA'
-    const csvBuffer = new TextEncoder().encode(csvContent).buffer
-
+describe('Excel content mapping', () => {
+  it('maps id-keyed rows to named-header cells (source table)', async () => {
+    // Arrange - a 3-column table; the store returns id-keyed rows.
     const mockProject = {
       id: 'csv-test',
       name: 'CSV Test',
@@ -1099,8 +1117,14 @@ describe('File Parsing', () => {
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
     )
     vi.mocked(db.loadProject).mockResolvedValue(mockProject)
-    vi.mocked(db.loadFile).mockResolvedValue(csvBuffer)
     vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(materializationService.getTableData).mockResolvedValue({
+      rows: [
+        { __rowId: 'row_0', col_1: 'Alice', col_2: 30, col_3: 'NYC' },
+        { __rowId: 'row_1', col_1: 'Bob', col_2: 25, col_3: 'LA' },
+      ],
+      totalRows: 2,
+    })
 
     // Act
     const zipBlob = await exportProjectAsZip('csv-test', {
@@ -1108,14 +1132,15 @@ describe('File Parsing', () => {
       includeReportHtml: false,
     })
 
-    // Assert
-    expect(zipBlob).toBeInstanceOf(Blob)
-    const zip = await JSZip.loadAsync(zipBlob)
-    expect(zip.files['data.xlsx']).toBeDefined()
+    // Assert - headers are the human-readable names, cells come from ids.
+    const sheet = await readExportedSheet(zipBlob, 'People')
+    expect(sheet[0]).toEqual(['Name', 'Age', 'City'])
+    expect(sheet[1]).toEqual(['Alice', 30, 'NYC'])
+    expect(sheet[2]).toEqual(['Bob', 25, 'LA'])
   })
 
-  it('handles Excel source files', async () => {
-    // Arrange - Create a simple mock for xlsx file type
+  it('produces a headers-only sheet when a table has no data', async () => {
+    // Arrange
     const mockProject = {
       id: 'xlsx-test',
       name: 'Excel Test',
@@ -1135,14 +1160,15 @@ describe('File Parsing', () => {
       patches: {},
     }
 
-    // Note: We can't easily mock the XLSX binary format, so we return null
-    // to test the graceful handling of unparseable files
     vi.mocked(db.exportProjectFile).mockResolvedValue(
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
     )
     vi.mocked(db.loadProject).mockResolvedValue(mockProject)
-    vi.mocked(db.loadFile).mockResolvedValue(null) // Simulating file not found
     vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(materializationService.getTableData).mockResolvedValue({
+      rows: [],
+      totalRows: 0,
+    })
 
     // Act - should not throw
     const zipBlob = await exportProjectAsZip('xlsx-test', {
@@ -1151,5 +1177,8 @@ describe('File Parsing', () => {
 
     // Assert
     expect(zipBlob).toBeInstanceOf(Blob)
+    const sheet = await readExportedSheet(zipBlob, 'Excel Data')
+    expect(sheet[0]).toEqual(['ID', 'Value'])
+    expect(sheet.length).toBe(1)
   })
 })
