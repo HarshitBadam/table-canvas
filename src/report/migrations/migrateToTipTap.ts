@@ -18,10 +18,7 @@ export function migrateBlocksToTipTap(blocks: ReportBlock[]): TipTapContent {
   const content: TipTapNode[] = [];
 
   for (const block of blocks) {
-    const node = convertBlockToNode(block);
-    if (node) {
-      content.push(node);
-    }
+    content.push(...convertBlockToNodes(block));
   }
 
   // Ensure at least one paragraph
@@ -36,96 +33,102 @@ export function migrateBlocksToTipTap(blocks: ReportBlock[]): TipTapContent {
 }
 
 /**
- * Convert a single block to TipTap node
+ * Convert a single block to one or more TipTap nodes.
+ *
+ * Most blocks map to a single node; a text block may expand into several
+ * paragraphs, so this always returns an array.
  */
-function convertBlockToNode(block: ReportBlock): TipTapNode | null {
+function convertBlockToNodes(block: ReportBlock): TipTapNode[] {
   switch (block.type) {
     case 'text':
       return convertTextBlock(block.content);
 
     case 'heading':
-      return {
-        type: 'heading',
-        attrs: { level: block.level },
-        content: block.content ? [{ type: 'text', text: block.content }] : [],
-      };
+      return [
+        {
+          type: 'heading',
+          attrs: { level: block.level },
+          content: block.content ? [{ type: 'text', text: block.content }] : [],
+        },
+      ];
 
     case 'divider':
-      return { type: 'horizontalRule' };
+      return [{ type: 'horizontalRule' }];
 
     case 'chart':
-      return {
-        type: 'chartBlock',
-        attrs: {
-          sourceTableId: block.sourceTableId,
-          chartType: block.chartType,
-          config: block.config,
+      return [
+        {
+          type: 'chartBlock',
+          attrs: {
+            sourceTableId: block.sourceTableId,
+            chartType: block.chartType,
+            config: block.config,
+          },
         },
-      };
+      ];
 
     case 'table_snippet':
-      return {
-        type: 'embeddedTable',
-        attrs: {
-          sourceTableId: block.sourceTableId,
-          selectedColumns: block.selectedColumns,
-          rowSelectionMode: block.rowSelectionMode,
-          rowLimit: block.rowLimit,
-          caption: block.caption,
+      return [
+        {
+          type: 'embeddedTable',
+          attrs: {
+            sourceTableId: block.sourceTableId,
+            selectedColumns: block.selectedColumns,
+            rowSelectionMode: block.rowSelectionMode,
+            rowLimit: block.rowLimit,
+            caption: block.caption,
+          },
         },
-      };
+      ];
 
     case 'table_inline':
-      return {
-        type: 'inlineTable',
-        attrs: {
-          headers: block.data.headers,
-          rows: block.data.rows,
-          caption: block.caption,
-          sourceInfo: block.sourceInfo,
+      return [
+        {
+          type: 'inlineTable',
+          attrs: {
+            headers: block.data.headers,
+            rows: block.data.rows,
+            caption: block.caption,
+            sourceInfo: block.sourceInfo,
+          },
         },
-      };
+      ];
 
     case 'table_blank':
-      return {
-        type: 'editableTable',
-        attrs: {
-          headers: block.data.headers,
-          rows: block.data.rows,
-          caption: block.caption,
+      return [
+        {
+          type: 'editableTable',
+          attrs: {
+            headers: block.data.headers,
+            rows: block.data.rows,
+            caption: block.caption,
+          },
         },
-      };
+      ];
 
     default:
       console.warn(`Unknown block type during migration:`, block);
-      return null;
+      return [];
   }
 }
 
 /**
- * Convert markdown-like text content to TipTap nodes
+ * Convert markdown-like text content to TipTap paragraph nodes, preserving
+ * paragraph breaks (double newlines) so no content is dropped.
  */
-function convertTextBlock(content: string): TipTapNode {
+function convertTextBlock(content: string): TipTapNode[] {
   if (!content || content.trim() === '') {
-    return { type: 'paragraph' };
+    return [{ type: 'paragraph' }];
   }
 
-  // Split by double newlines for paragraphs
-  const paragraphs = content.split(/\n\n+/);
-  
-  if (paragraphs.length === 1) {
-    return {
+  return content
+    .split(/\n\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph.length > 0)
+    .map((paragraph) => ({
       type: 'paragraph',
-      content: parseInlineContent(content),
-    };
-  }
-
-  // Multiple paragraphs - return just the first one
-  // (In a real implementation, you might want to return multiple nodes)
-  return {
-    type: 'paragraph',
-    content: parseInlineContent(paragraphs[0]),
-  };
+      content: parseInlineContent(paragraph),
+    }));
 }
 
 /**
