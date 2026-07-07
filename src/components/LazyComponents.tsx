@@ -112,28 +112,3 @@ export const RecipeWizardLazy = withSuspense(LazyRecipeWizard, PanelFallback)
 
 /** ChartView with Suspense wrapper */
 export const ChartViewLazy = withSuspense(LazyChartView, ChartFallback)
-
-// ============================================================================
-// Preload Functions
-// ============================================================================
-
-/**
- * Preload ChartBuilder when user hovers over chart-related UI.
- */
-export function preloadChartBuilder(): void {
-  import('@/charts/ChartBuilder')
-}
-
-/**
- * Preload FilterPanel when user hovers over filter button.
- */
-export function preloadFilterPanel(): void {
-  import('@/grid/FilterPanel')
-}
-
-/**
- * Preload SuggestionsPanel when user hovers over suggestions button.
- */
-export function preloadSuggestionsPanel(): void {
-  import('@/suggestions/SuggestionsPanel')
-}
