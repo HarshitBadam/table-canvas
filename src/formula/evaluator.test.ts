@@ -16,9 +16,8 @@ import {
   evaluateFormulaForRows,
   inferFormulaType, 
   validateFormulaWithColumns,
-  FormulaEvaluator
 } from './evaluator'
-import { parseFormula, extractColumnReferences } from './parser'
+import { extractColumnReferences } from './parser'
 import type { EvaluationContext } from './types'
 
 // ============================================================================

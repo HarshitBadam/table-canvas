@@ -4,7 +4,7 @@
  * Tests for validation, soft-delete functionality, and static methods.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { Types } from 'mongoose';
 import { Project } from './Project.js';
 import {
@@ -222,8 +222,8 @@ describe('Project Model', () => {
       const userId = createMockUserId();
 
       const project1 = await createTestProject({ userId, name: 'First' });
-      const project2 = await createTestProject({ userId, name: 'Second' });
-      const project3 = await createTestProject({ userId, name: 'Third' });
+      await createTestProject({ userId, name: 'Second' });
+      await createTestProject({ userId, name: 'Third' });
 
       // Update project1 to make it most recent
       project1.name = 'First Updated';

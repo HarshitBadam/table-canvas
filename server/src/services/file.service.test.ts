@@ -4,11 +4,9 @@
  * Tests for GridFS file operations with mocked dependencies.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Readable } from 'stream';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import mongoose from 'mongoose';
-import { Types, mongo } from 'mongoose';
-import * as fileService from './file.service.js';
+import { Types } from 'mongoose';
 
 // ============================================================================
 // Mock Setup
@@ -60,15 +58,6 @@ describe('FileService', () => {
 
   describe('uploadFile', () => {
     it('should upload file to GridFS and return metadata', async () => {
-      const buffer = Buffer.from('test content');
-      const filename = 'test.csv';
-      const contentType = 'text/csv';
-      const metadata = {
-        originalName: 'original.csv',
-        userId: 'user123',
-        projectId: 'project456',
-      };
-
       // Mock stream events
       mockUploadStream.on.mockImplementation((event, callback) => {
         if (event === 'finish') {
@@ -238,7 +227,6 @@ describe('FileService', () => {
 
   describe('listUserFiles', () => {
     it('should return all files for a user', async () => {
-      const userId = 'user123';
       const files = [
         {
           _id: new Types.ObjectId(),
