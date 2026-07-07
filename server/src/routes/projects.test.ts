@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import { Types } from 'mongoose';
-import { createTestApp, createDefaultMockUser, createSecondMockUser, MockUser } from '../test/testApp.js';
+import { createTestApp, createDefaultMockUser, MockUser } from '../test/testApp.js';
 import { Project } from '../models/Project.js';
 import {
   createTestProject,
@@ -114,9 +114,9 @@ describe('Projects API', () => {
       // Create projects with different timestamps
       const p1 = await createTestProject({ userId, name: 'Project 1' });
       await new Promise((r) => setTimeout(r, 10));
-      const p2 = await createTestProject({ userId, name: 'Project 2' });
+      await createTestProject({ userId, name: 'Project 2' });
       await new Promise((r) => setTimeout(r, 10));
-      const p3 = await createTestProject({ userId, name: 'Project 3' });
+      await createTestProject({ userId, name: 'Project 3' });
 
       // Update p1 to make it most recent
       p1.name = 'Project 1 Updated';

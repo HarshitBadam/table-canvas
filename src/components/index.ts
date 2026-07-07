@@ -9,7 +9,8 @@ export { ImportButton } from './ImportButton'
 export { LoadingScreen } from './LoadingScreen'
 export { LoadingSpinner } from './LoadingSpinner'
 export { Select } from './Select'
-export { ThemeToggle, useTheme, ThemeProvider } from './ThemeToggle'
+export { ThemeToggle, ThemeProvider } from './ThemeToggle'
+export { useTheme } from './themeContext'
 export { Tooltip } from './Tooltip'
 
 // Error boundaries
@@ -37,7 +38,9 @@ export {
   SuggestionsPanelLazy,
   RecipeWizardLazy,
   ChartViewLazy,
+} from './LazyComponents'
+export {
   preloadChartBuilder,
   preloadFilterPanel,
   preloadSuggestionsPanel,
-} from './LazyComponents'
+} from './preloaders'

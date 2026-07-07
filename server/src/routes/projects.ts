@@ -7,7 +7,6 @@ import {
   asyncHandler,
   ValidationError,
   NotFoundError,
-  AuthorizationError,
 } from '../middleware/errorHandler.js';
 
 const router = Router();

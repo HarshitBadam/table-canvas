@@ -81,7 +81,8 @@ export const useDataStore = create<DataStoreState>((set, get) => ({
   
   clearTableData: (tableId) => {
     set((state) => {
-      const { [tableId]: _, ...rest } = state.tableData
+      const rest = { ...state.tableData }
+      delete rest[tableId]
       return { tableData: rest }
     })
   },

@@ -8,7 +8,7 @@
 
 import { Component, ReactNode, ErrorInfo } from 'react'
 
-interface FeatureErrorBoundaryProps {
+export interface FeatureErrorBoundaryProps {
   /** The content to render */
   children: ReactNode
   /** Name of the feature for error reporting */
@@ -172,23 +172,6 @@ export class FeatureErrorBoundary extends Component<
           </div>
         </div>
       </div>
-    )
-  }
-}
-
-/**
- * Hook-based error boundary wrapper for function components.
- */
-export function withFeatureErrorBoundary<P extends object>(
-  Component: React.ComponentType<P>,
-  featureName: string,
-  options?: Omit<FeatureErrorBoundaryProps, 'children' | 'featureName'>
-) {
-  return function WrappedComponent(props: P) {
-    return (
-      <FeatureErrorBoundary featureName={featureName} {...options}>
-        <Component {...props} />
-      </FeatureErrorBoundary>
     )
   }
 }
