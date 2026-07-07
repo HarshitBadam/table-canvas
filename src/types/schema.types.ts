@@ -42,11 +42,10 @@ export interface ColumnSchema {
   formula?: string
   /** Flag for virtual/computed columns */
   isComputed?: boolean
-  /** 
-   * The actual column name used in DuckDB queries.
-   * - For source tables: same as `id` (e.g., "col_1_date")
-   * - For derived tables: same as `name` (e.g., "Date")
-   * This field ensures queries always use what DuckDB expects.
+  /**
+   * The actual column name used in DuckDB queries. The engine builds every
+   * table (source and derived) from column NAMES, so this always equals `name`.
+   * Retained as an optional hint/fallback; consumers should prefer `name`.
    */
   duckDbName?: string
 }
