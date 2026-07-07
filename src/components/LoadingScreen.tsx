@@ -3,7 +3,7 @@
  * Shows a clean loading state with phase indicator during app initialization
  */
 
-import type { AppPhase } from '@/state/AppContext'
+import type { AppPhase } from '@/state/appContext'
 
 interface LoadingScreenProps {
   phase: AppPhase

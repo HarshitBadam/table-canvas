@@ -511,7 +511,11 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
       if (currentJson !== newJson) {
         editor.commands.setContent(content);
       }
-    }, [editor, reportId]); // Use reportId as trigger, not content (to avoid loops)
+      // Intentionally sync only when reportId changes (switching reports).
+      // Depending on `content` would re-run setContent on every keystroke,
+      // causing update loops and cursor jumps.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editor, reportId]);
 
     // Handle click on editor container to focus at end
     const handleContainerClick = useCallback((e: React.MouseEvent) => {

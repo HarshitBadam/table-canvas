@@ -6,6 +6,7 @@
 import { useCallback } from 'react'
 import { create } from 'zustand'
 import { getEngine } from '@/engine'
+import { ensureTableMaterialized } from '@/engine/materializationService'
 import type { ProfileResult } from '@/engine/types'
 import type { CellValue, ColumnProfile, SemanticHint } from '@/lib/types'
 import { useDataStore } from '@/state/dataStore'
@@ -188,8 +189,10 @@ export const useProfilingStore = create<ProfilingState>((set, get) => ({
   
   clearProfile: (tableId) => {
     set((state) => {
-      const { [tableId]: _, ...profiles } = state.profiles
-      const { [tableId]: __, ...loading } = state.loading
+      const profiles = { ...state.profiles }
+      const loading = { ...state.loading }
+      delete profiles[tableId]
+      delete loading[tableId]
       return { profiles, loading }
     })
   },
@@ -197,7 +200,8 @@ export const useProfilingStore = create<ProfilingState>((set, get) => ({
   // Clear profile but set loading=true to prevent race conditions
   clearAndStartLoading: (tableId) => {
     set((state) => {
-      const { [tableId]: _, ...profiles } = state.profiles
+      const profiles = { ...state.profiles }
+      delete profiles[tableId]
       return { 
         profiles, 
         loading: { ...state.loading, [tableId]: true }
@@ -219,7 +223,6 @@ async function ensureTableInEngine(tableId: string, _force: boolean = false): Pr
     
     // For derived tables, use materialization service to compute the table
     if (node.kind === 'derived_table') {
-      const { ensureTableMaterialized } = await import('@/engine/materializationService')
       const result = await ensureTableMaterialized(tableId)
       return result.status !== 'error'
     }
@@ -228,7 +231,6 @@ async function ensureTableInEngine(tableId: string, _force: boolean = false): Pr
     const tableData = useDataStore.getState().tableData[tableId]
     if (!tableData?.rows || !node?.schema) {
       // Try materialization for source tables too if data not in store
-      const { ensureTableMaterialized } = await import('@/engine/materializationService')
       const result = await ensureTableMaterialized(tableId)
       return result.status !== 'error'
     }

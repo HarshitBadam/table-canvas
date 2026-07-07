@@ -51,7 +51,6 @@ import {
   exportProjectAsZip,
   downloadBlob,
   exportAndDownloadProject,
-  type ZipExportOptions,
 } from './exportService'
 import * as db from './db'
 import * as materializationService from '@/engine/materializationService'

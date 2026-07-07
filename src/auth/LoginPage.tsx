@@ -1,6 +1,6 @@
 import { useState, FormEvent, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { useApp } from '@/state/AppContext';
+import { useApp } from '@/state/appContext';
 import { ApiError } from '@/api/client';
 
 // ============================================================================

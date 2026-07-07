@@ -1,13 +1,10 @@
 import {
-  createContext,
-  useContext,
   useState,
   useEffect,
   useCallback,
   ReactNode,
 } from 'react';
 import {
-  User,
   LoginCredentials,
   RegisterCredentials,
   login as apiLogin,
@@ -15,30 +12,8 @@ import {
   register as apiRegister,
   checkAuth,
 } from '@/api/auth.api';
-import { setAuthErrorHandler, ApiError } from '@/api/client';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface AuthState {
-  user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-}
-
-interface AuthContextValue extends AuthState {
-  login: (credentials: LoginCredentials) => Promise<void>;
-  register: (credentials: RegisterCredentials) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshAuth: () => Promise<void>;
-}
-
-// ============================================================================
-// Context
-// ============================================================================
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+import { setAuthErrorHandler } from '@/api/client';
+import { AuthContext, type AuthState, type AuthContextValue } from './authContext';
 
 // ============================================================================
 // Provider
@@ -167,46 +142,4 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-// ============================================================================
-// Hook
-// ============================================================================
-
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
-  
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  
-  return context;
-}
-
-// ============================================================================
-// Utility Hook for Auth Errors
-// ============================================================================
-
-export function useAuthError() {
-  const [error, setError] = useState<string | null>(null);
-
-  const handleError = useCallback((err: unknown) => {
-    if (err instanceof ApiError) {
-      if (err.errors && err.errors.length > 0) {
-        setError(err.errors.join('. '));
-      } else {
-        setError(err.message);
-      }
-    } else if (err instanceof Error) {
-      setError(err.message);
-    } else {
-      setError('An unexpected error occurred');
-    }
-  }, []);
-
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-
-  return { error, setError: handleError, clearError };
 }

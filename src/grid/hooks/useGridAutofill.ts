@@ -140,6 +140,14 @@ export function useGridAutofill(context: AutofillContext): UseGridAutofillReturn
     setAutofillPreview(preview)
   }, [autofillDragging, cellRangeSelection, selectedCell, columns, rows, getDisplayValue])
 
+  // Reset autofill state
+  const resetAutofill = useCallback(() => {
+    setAutofillDragging(false)
+    setAutofillEndRow(null)
+    setAutofillPreview([])
+    autofillColumnIdRef.current = null
+  }, [])
+
   // End dragging and return values to apply
   const handleAutofillEnd = useCallback((): { columnId: string; values: { rowIndex: number; value: CellValue }[] } | null => {
     if (!autofillDragging || autofillEndRow === null || !autofillColumnIdRef.current) {
@@ -200,15 +208,7 @@ export function useGridAutofill(context: AutofillContext): UseGridAutofillReturn
     resetAutofill()
 
     return { columnId, values: result }
-  }, [autofillDragging, autofillEndRow, cellRangeSelection, selectedCell, columns, rows, getDisplayValue])
-
-  // Reset autofill state
-  const resetAutofill = useCallback(() => {
-    setAutofillDragging(false)
-    setAutofillEndRow(null)
-    setAutofillPreview([])
-    autofillColumnIdRef.current = null
-  }, [])
+  }, [autofillDragging, autofillEndRow, cellRangeSelection, selectedCell, columns, rows, getDisplayValue, resetAutofill])
 
   // Check if a cell is in the autofill range
   const isInAutofillRange = useCallback((
