@@ -5,7 +5,7 @@
  * re-fetches when the source table's data changes (via version hash).
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { CellValue, ChartConfig, ColumnSchema } from '@/lib/types'
 import { getEngine } from '@/engine/EngineAdapter'
 import { ensureTableMaterialized } from '@/engine/materializationService'
@@ -42,7 +42,7 @@ export function useChartData(
   // for queries. For both source and derived tables the DuckDB column name is
   // `col.name` (the engine builds tables from names, not ids), so that is the
   // authoritative query key. `duckDbName` is kept only as a resilience fallback.
-  const getColumnForDuckDB = (columnRef: string): { duckDbName: string; name: string } | null => {
+  const getColumnForDuckDB = useCallback((columnRef: string): { duckDbName: string; name: string } | null => {
     if (!columns || columns.length === 0) {
       // If no columns schema, assume columnRef is what we need
       return { duckDbName: columnRef, name: columnRef }
@@ -68,7 +68,7 @@ export function useChartData(
 
     // Column not found
     return null
-  }
+  }, [columns])
 
   useEffect(() => {
     let cancelled = false
@@ -186,6 +186,7 @@ export function useChartData(
     sourceVersionHash, // Re-fetch when source data changes
     refetchTrigger,
     columns, // Re-fetch if columns change
+    getColumnForDuckDB, // Stable via useCallback (only changes with columns)
   ])
 
   return { data, loading, error, refetch }
