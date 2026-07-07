@@ -204,46 +204,16 @@ export interface Report {
 export interface ReportStoreState {
   reports: Record<string, Report>;
   selectedReportId: string | null;
-  
+
   // Report actions
   addReport: (name?: string) => string;
   updateReport: (id: string, updates: Partial<Omit<Report, 'id' | 'createdAt'>>) => void;
   deleteReport: (id: string) => void;
   selectReport: (id: string | null) => void;
-  
-  // Block actions
-  addBlock: (reportId: string, block: Omit<ReportBlock, 'id' | 'createdAt' | 'updatedAt'>, index?: number) => string;
-  updateBlock: (reportId: string, blockId: string, updates: Partial<ReportBlock>) => void;
-  deleteBlock: (reportId: string, blockId: string) => void;
-  reorderBlocks: (reportId: string, fromIndex: number, toIndex: number) => void;
-  duplicateBlock: (reportId: string, blockId: string) => string | null;
-  transformBlock: (reportId: string, blockId: string, newType: BlockType, newProps?: Record<string, unknown>) => void;
-  
+
   // Selectors
   getReport: (id: string) => Report | undefined;
-  getBlock: (reportId: string, blockId: string) => ReportBlock | undefined;
 }
-
-// ============================================================================
-// Block Creation Helpers
-// ============================================================================
-
-export type NewTextBlock = Omit<TextBlock, 'id' | 'createdAt' | 'updatedAt'>;
-export type NewHeadingBlock = Omit<HeadingBlock, 'id' | 'createdAt' | 'updatedAt'>;
-export type NewChartBlock = Omit<ChartBlock, 'id' | 'createdAt' | 'updatedAt'>;
-export type NewTableSnippetBlock = Omit<TableSnippetBlock, 'id' | 'createdAt' | 'updatedAt'>;
-export type NewInlineTableBlock = Omit<InlineTableBlock, 'id' | 'createdAt' | 'updatedAt'>;
-export type NewBlankTableBlock = Omit<BlankTableBlock, 'id' | 'createdAt' | 'updatedAt'>;
-export type NewDividerBlock = Omit<DividerBlock, 'id' | 'createdAt' | 'updatedAt'>;
-
-export type NewBlock = 
-  | NewTextBlock 
-  | NewHeadingBlock 
-  | NewChartBlock 
-  | NewTableSnippetBlock 
-  | NewInlineTableBlock
-  | NewBlankTableBlock
-  | NewDividerBlock;
 
 // ============================================================================
 // Color Schemes
