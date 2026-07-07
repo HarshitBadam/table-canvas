@@ -2,8 +2,7 @@
  * Report Store
  *
  * Zustand store for managing reports. Content is stored as TipTap JSON
- * (`tiptapContent`); the legacy `blocks` array is only retained for
- * backward-compatible migration of old reports.
+ * (`tiptapContent`).
  *
  * Uses immer for immutable state updates and debounced persistence to
  * IndexedDB.
@@ -57,11 +56,22 @@ export const useReportStore = create<ReportStoreState>()(
     addReport: (name?: string) => {
       const id = generateId();
       const now = new Date().toISOString();
+      const reportName = name || 'Untitled Report';
 
       const report: Report = {
         id,
-        name: name || 'Untitled Report',
-        blocks: [],
+        name: reportName,
+        tiptapContent: {
+          type: 'doc',
+          content: [
+            {
+              type: 'heading',
+              attrs: { level: 1 },
+              content: [{ type: 'text', text: reportName }],
+            },
+            { type: 'paragraph' },
+          ],
+        },
         createdAt: now,
         updatedAt: now,
       };

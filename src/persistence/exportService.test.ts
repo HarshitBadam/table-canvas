@@ -134,58 +134,30 @@ function createMockChartNode(id: string, name: string) {
   }
 }
 
-function createMockReport(id: string, name: string, options?: { useTipTap?: boolean }) {
-  const base = {
+function createMockReport(id: string, name: string) {
+  return {
     id,
     name,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
-  }
-
-  if (options?.useTipTap) {
-    return {
-      ...base,
-      tiptapContent: {
-        type: 'doc',
-        content: [
-          {
-            type: 'heading',
-            attrs: { level: 1 },
-            content: [{ type: 'text', text: 'Report Title' }],
-          },
-          {
-            type: 'paragraph',
-            content: [
-              { type: 'text', text: 'This is ' },
-              { type: 'text', text: 'bold', marks: [{ type: 'bold' }] },
-              { type: 'text', text: ' text.' },
-            ],
-          },
-        ],
-      },
-      blocks: [],
-    }
-  }
-
-  return {
-    ...base,
-    blocks: [
-      { id: 'block_1', type: 'heading', level: 1, content: 'Monthly Report' },
-      { id: 'block_2', type: 'text', content: 'This is the summary.' },
-      { id: 'block_3', type: 'divider' },
-      { id: 'block_4', type: 'chart', chartType: 'bar' },
-      {
-        id: 'block_5',
-        type: 'table_inline',
-        data: {
-          headers: ['Name', 'Value'],
-          rows: [
-            ['Item A', 100],
-            ['Item B', 200],
+    tiptapContent: {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: 'Report Title' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'This is ' },
+            { type: 'text', text: 'bold', marks: [{ type: 'bold' }] },
+            { type: 'text', text: ' text.' },
           ],
         },
-      },
-    ],
+      ],
+    },
   }
 }
 
@@ -748,43 +720,6 @@ describe('exportProjectAsZip', () => {
 // ============================================================================
 
 describe('Report HTML Generation', () => {
-  it('generates HTML for reports with legacy blocks', async () => {
-    // Arrange
-    const mockProject = {
-      id: 'test',
-      name: 'Test',
-      nodes: {},
-      edges: {},
-      patches: {},
-    }
-
-    const mockReport = createMockReport('r1', 'Test Report')
-
-    vi.mocked(db.exportProjectFile).mockResolvedValue(
-      new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
-    )
-    vi.mocked(db.loadProject).mockResolvedValue(mockProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({ r1: mockReport })
-
-    // Act
-    const zipBlob = await exportProjectAsZip('test', {
-      includeExcel: false,
-      includeReportHtml: true,
-    })
-
-    // Assert
-    const zip = await JSZip.loadAsync(zipBlob)
-    const htmlFile = zip.files['reports/Test Report.html']
-    expect(htmlFile).toBeDefined()
-
-    const html = await htmlFile.async('string')
-    expect(html).toContain('<!DOCTYPE html>')
-    expect(html).toContain('Test Report')
-    expect(html).toContain('<h1>Monthly Report</h1>')
-    expect(html).toContain('<p>This is the summary.</p>')
-    expect(html).toContain('<hr>')
-  })
-
   it('generates HTML for reports with TipTap content', async () => {
     // Arrange
     const mockProject = {
@@ -795,7 +730,7 @@ describe('Report HTML Generation', () => {
       patches: {},
     }
 
-    const mockReport = createMockReport('r1', 'TipTap Report', { useTipTap: true })
+    const mockReport = createMockReport('r1', 'TipTap Report')
 
     vi.mocked(db.exportProjectFile).mockResolvedValue(
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
@@ -815,6 +750,7 @@ describe('Report HTML Generation', () => {
     expect(htmlFile).toBeDefined()
 
     const html = await htmlFile.async('string')
+    expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('<h1>Report Title</h1>')
     expect(html).toContain('<strong>bold</strong>')
   })
@@ -832,7 +768,6 @@ describe('Report HTML Generation', () => {
     const emptyReport = {
       id: 'empty',
       name: 'Empty Report',
-      blocks: [],
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
     }
@@ -869,7 +804,10 @@ describe('Report HTML Generation', () => {
     const reportWithSpecialChars = {
       id: 'special',
       name: 'Report: Q1/Q2 <2024>',
-      blocks: [{ id: 'b1', type: 'text', content: 'Test' }],
+      tiptapContent: {
+        type: 'doc' as const,
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Test' }] }],
+      },
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
     }
