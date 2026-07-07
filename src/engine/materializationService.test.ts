@@ -29,10 +29,14 @@ const mockProjectStore = {
   getState: vi.fn(() => mockProjectStore),
 }
 
-// Mock the data store
+// Mock the data store. `setTableData` mirrors the real store by actually
+// persisting rows, because the code (and getTableData) now treats the data
+// store as the single source of truth for id-keyed rows.
 const mockDataStore = {
-  tableData: {} as Record<string, { rows: unknown[]; isLoading?: boolean }>,
-  setTableData: vi.fn(),
+  tableData: {} as Record<string, { tableId: string; rows: unknown[]; isLoading?: boolean }>,
+  setTableData: vi.fn((tableId: string, rows: unknown[]) => {
+    mockDataStore.tableData[tableId] = { tableId, rows, isLoading: false }
+  }),
   getState: vi.fn(() => mockDataStore),
 }
 
@@ -112,6 +116,8 @@ import {
   forceMaterialize,
   getMaterializationStatus,
   getTableData,
+  convertToTableRows,
+  keyRowsById,
 } from './materializationService'
 
 // ============================================================================
@@ -207,6 +213,9 @@ beforeEach(() => {
   
   // Reset mock implementations
   mockProjectStore.getTableNode.mockImplementation((id: string) => mockProjectStore.nodes[id])
+  mockDataStore.setTableData.mockImplementation((tableId: string, rows: unknown[]) => {
+    mockDataStore.tableData[tableId] = { tableId, rows, isLoading: false }
+  })
   mockLoadFile.mockResolvedValue(null)
   
   mockEngine.init.mockResolvedValue(undefined)
@@ -518,6 +527,125 @@ describe('forceMaterialize', () => {
 })
 
 // ============================================================================
+// Column key mapping (the core empty-table / empty-export regression)
+// ============================================================================
+
+describe('convertToTableRows', () => {
+  const schema: TableSchema = {
+    columns: [
+      { id: 'col_0_id', name: 'ID', type: 'string', nullable: false },
+      { id: 'col_1_value', name: 'Value', type: 'number', nullable: true },
+    ],
+  }
+
+  it('keys parsed rows by column id (not by file header)', () => {
+    const rows = convertToTableRows(
+      [
+        { ID: '1', Value: '100' },
+        { ID: '2', Value: '200' },
+      ],
+      ['ID', 'Value'],
+      schema
+    )
+
+    expect(rows).toHaveLength(2)
+    // Values must be reachable by column id, which is what the grid/canvas read.
+    expect(rows[0].col_0_id).toBe('1')
+    expect(rows[0].col_1_value).toBe(100) // coerced to number per schema
+    expect(rows[1].col_0_id).toBe('2')
+    // The raw file header must NOT be a key on the row.
+    expect(rows[0]).not.toHaveProperty('ID')
+    expect(rows[0]).not.toHaveProperty('Value')
+    expect(rows[0].__rowId).toBe('row_0')
+  })
+
+  it('maps by position when a column was renamed (header no longer matches)', () => {
+    // Schema column was renamed to "Amount" in the grid, but the underlying
+    // file still has the original "Value" header. Positional fallback keeps the
+    // value attached to the right column id.
+    const renamedSchema: TableSchema = {
+      columns: [
+        { id: 'col_0_id', name: 'ID', type: 'string', nullable: false },
+        { id: 'col_1_value', name: 'Amount', type: 'number', nullable: true },
+      ],
+    }
+
+    const rows = convertToTableRows(
+      [{ ID: '1', Value: '100' }],
+      ['ID', 'Value'],
+      renamedSchema
+    )
+
+    expect(rows[0].col_0_id).toBe('1')
+    expect(rows[0].col_1_value).toBe(100)
+  })
+
+  it('produces stable ids when no schema is provided', () => {
+    const rows = convertToTableRows(
+      [{ Name: 'Alice', Age: '30' }],
+      ['Name', 'Age']
+    )
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0].__rowId).toBe('row_0')
+    // Without a schema, keys are derived deterministically from field + index.
+    const keys = Object.keys(rows[0]).filter((k) => k !== '__rowId')
+    expect(keys).toHaveLength(2)
+    expect(rows[0][keys[0]]).toBe('Alice')
+  })
+})
+
+describe('keyRowsById', () => {
+  const schema: TableSchema = {
+    columns: [
+      { id: 'col_5_date', name: 'Date', type: 'string', nullable: false },
+      { id: 'col_6_total', name: 'Total', type: 'number', nullable: true },
+    ],
+  }
+
+  it('re-keys engine rows (keyed by column name) into id-keyed rows', () => {
+    // DuckDB returns rows keyed by the human-readable column NAME.
+    const engineRows: Record<string, CellValue>[] = [
+      { Date: '2024-01-01', Total: 42 },
+      { Date: '2024-01-02', Total: 99 },
+    ]
+
+    const rows = keyRowsById(engineRows, schema, 'derived_row')
+
+    expect(rows).toHaveLength(2)
+    expect(rows[0].col_5_date).toBe('2024-01-01')
+    expect(rows[0].col_6_total).toBe(42)
+    expect(rows[0].__rowId).toBe('derived_row_0')
+    // The engine name must not leak through as a row key.
+    expect(rows[0]).not.toHaveProperty('Date')
+  })
+
+  it('falls back to duckDbName then id when the name key is absent', () => {
+    const dupSchema: TableSchema = {
+      columns: [
+        { id: 'col_a', name: 'A', type: 'string', nullable: true, duckDbName: 'a_alias' },
+        { id: 'col_b', name: 'B', type: 'string', nullable: true },
+      ],
+    }
+    const engineRows: Record<string, CellValue>[] = [
+      { a_alias: 'via-duckdbname', col_b: 'via-id' },
+    ]
+
+    const rows = keyRowsById(engineRows, dupSchema)
+
+    expect(rows[0].col_a).toBe('via-duckdbname')
+    expect(rows[0].col_b).toBe('via-id')
+  })
+
+  it('fills missing values with null', () => {
+    const rows = keyRowsById([{ Date: '2024-01-01' }], schema)
+
+    expect(rows[0].col_5_date).toBe('2024-01-01')
+    expect(rows[0].col_6_total).toBeNull()
+  })
+})
+
+// ============================================================================
 // getTableData Tests
 // ============================================================================
 
@@ -530,45 +658,52 @@ describe('getTableData', () => {
     expect(result.totalRows).toBe(0)
   })
 
-  it('returns data after materializing', async () => {
-    const table = createSourceTableNode('table_1', 'Test')
+  it('returns id-keyed data from the data store after materializing', async () => {
+    const schema: TableSchema = {
+      columns: [
+        { id: 'col_0_id', name: 'ID', type: 'string', nullable: false },
+        { id: 'col_1_value', name: 'Value', type: 'number', nullable: true },
+      ],
+    }
+    const table = createSourceTableNode('table_1', 'Test', { schema })
     mockProjectStore.nodes = { table_1: table }
-    
+
     const csvContent = 'ID,Value\n1,100\n2,200'
     const encoder = new TextEncoder()
     mockLoadFile.mockResolvedValue(encoder.encode(csvContent).buffer)
-    
-    // Mock engine slice
-    mockEngine.getSlice.mockResolvedValue({
-      rows: [
-        { ID: '1', Value: 100 },
-        { ID: '2', Value: 200 },
-      ],
-      totalRows: 2,
-    })
 
     const result = await getTableData('table_1')
 
     expect(result.rows).toHaveLength(2)
     expect(result.totalRows).toBe(2)
+    // Rows must be keyed by column id (the data store's canonical shape),
+    // not by the DuckDB/file column name.
+    expect(result.rows[0].col_0_id).toBe('1')
+    expect(result.rows[0].col_1_value).toBe(100)
+    expect(result.rows[0].__rowId).toBeDefined()
   })
 
   it('respects offset and limit parameters', async () => {
-    const table = createSourceTableNode('table_1', 'Test')
+    const schema: TableSchema = {
+      columns: [
+        { id: 'col_0_id', name: 'ID', type: 'string', nullable: false },
+        { id: 'col_1_value', name: 'Value', type: 'number', nullable: true },
+      ],
+    }
+    const table = createSourceTableNode('table_1', 'Test', { schema })
     mockProjectStore.nodes = { table_1: table }
-    
-    const csvContent = 'ID,Value\n1,100'
+
+    const csvContent = 'ID,Value\n1,10\n2,20\n3,30\n4,40'
     const encoder = new TextEncoder()
     mockLoadFile.mockResolvedValue(encoder.encode(csvContent).buffer)
-    
-    mockEngine.getSlice.mockResolvedValue({
-      rows: [{ ID: '2', Value: 200 }],
-      totalRows: 10,
-    })
 
-    await getTableData('table_1', 5, 10)
+    const result = await getTableData('table_1', 1, 2)
 
-    expect(mockEngine.getSlice).toHaveBeenCalledWith('table_1', 5, 10)
+    // Slice of the id-keyed store: rows at index 1 and 2.
+    expect(result.rows).toHaveLength(2)
+    expect(result.totalRows).toBe(4)
+    expect(result.rows[0].col_0_id).toBe('2')
+    expect(result.rows[1].col_0_id).toBe('3')
   })
 })
 
