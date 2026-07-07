@@ -234,8 +234,9 @@ const CommandList = memo(forwardRef<CommandListRef, CommandListProps>(
 // ============================================================================
 
 function getCommands(_options: SlashCommandsOptions): SlashCommandItem[] {
-  const tables = Object.values(useProjectStore.getState().nodes)
-    .filter(n => 'type' in n && n.type === 'table') as TableNodeType[];
+  const tables = Object.values(useProjectStore.getState().nodes).filter(
+    (n): n is TableNodeType => n.kind === 'source_table' || n.kind === 'derived_table'
+  );
 
   return [
     // Basic blocks
