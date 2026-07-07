@@ -27,7 +27,7 @@ export function ChartView({ chartId, onNavigateToTable }: ChartViewProps) {
   )
   const sourceVersionHash = sourceTable?.cacheInfo?.currentVersionHash
   
-  const columns = sourceTable?.schema?.columns || []
+  const columns = useMemo(() => sourceTable?.schema?.columns || [], [sourceTable])
   const numericColumns = columns.filter(c => c.type === 'number')
   const categoricalColumns = columns.filter(c => c.type === 'string' || c.type === 'date')
   

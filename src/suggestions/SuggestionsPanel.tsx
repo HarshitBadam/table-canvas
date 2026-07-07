@@ -258,7 +258,7 @@ export function SuggestionsPanel({
         clearTimeout(debounceRef.current)
       }
     }
-  }, [isOpen, node, nodes, profile, profileLoading, selectedColumnId, contextKey, getSuggestions, setSuggestions, setLoading, setCurrentRequestId, shouldCancelRequest, tableId])
+  }, [isOpen, node, nodes, profile, profileLoading, selectedColumnId, contextKey, getSuggestions, setSuggestions, setLoading, setCurrentRequestId, shouldCancelRequest, tableId, hasPhase2Stats])
 
   // Get suggestions from cache - depend on suggestionsCache to trigger re-render
   const cachedSuggestions = useMemo(() => {
