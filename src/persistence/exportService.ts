@@ -8,11 +8,9 @@
 
 import JSZip from 'jszip'
 import * as XLSX from 'xlsx'
-import Papa from 'papaparse'
-import { exportProjectFile, loadProject, loadAllReports, loadFile } from './db'
-import { getTableData, ensureTableMaterialized } from '@/engine/materializationService'
-import { useDataStore } from '@/state/dataStore'
-import type { ProjectNode, TableNode, SourceTableNode } from '@/lib/types'
+import { exportProjectFile, loadProject, loadAllReports } from './db'
+import { getTableData } from '@/engine/materializationService'
+import type { ProjectNode, TableNode } from '@/lib/types'
 import type { Report } from '@/report/types'
 
 /**
@@ -307,85 +305,6 @@ function getTableNodes(nodes: Record<string, ProjectNode>): TableNode[] {
 }
 
 /**
- * Directly load and parse source table data from IndexedDB
- * This bypasses the materialization system for more reliable export
- */
-async function loadSourceTableData(table: SourceTableNode): Promise<Record<string, unknown>[]> {
-  const { fileRef, fileType, sheetName } = table.plan
-  
-  if (!fileRef) {
-    console.warn(`[Export] Source table ${table.name} has no fileRef`)
-    return []
-  }
-  
-  // Load file from IndexedDB
-  const fileData = await loadFile(fileRef)
-  if (!fileData) {
-    console.warn(`[Export] File not found in IndexedDB for ${table.name}: ${fileRef}`)
-    return []
-  }
-  
-  console.log(`[Export] Loaded file for ${table.name}: ${fileData.byteLength} bytes`)
-  
-  // Parse based on file type
-  if (fileType === 'csv') {
-    return parseCSVForExport(fileData)
-  } else if (fileType === 'xlsx') {
-    return parseExcelForExport(fileData, sheetName)
-  }
-  
-  return []
-}
-
-/**
- * Parse CSV data for export
- */
-function parseCSVForExport(fileData: ArrayBuffer): Promise<Record<string, unknown>[]> {
-  return new Promise((resolve) => {
-    const decoder = new TextDecoder('utf-8')
-    const text = decoder.decode(fileData)
-    
-    Papa.parse<Record<string, unknown>>(text, {
-      header: true,
-      skipEmptyLines: true,
-      dynamicTyping: true,
-      complete: (results) => {
-        console.log(`[Export] Parsed CSV: ${results.data.length} rows`)
-        resolve(results.data)
-      },
-      error: (err: Error) => {
-        console.error('[Export] CSV parse error:', err)
-        resolve([])
-      },
-    })
-  })
-}
-
-/**
- * Parse Excel data for export
- */
-function parseExcelForExport(fileData: ArrayBuffer, sheetName?: string): Record<string, unknown>[] {
-  try {
-    const wb = XLSX.read(fileData, { type: 'array' })
-    const targetSheet = sheetName || wb.SheetNames[0]
-    const sheet = wb.Sheets[targetSheet]
-    
-    if (!sheet) {
-      console.warn(`[Export] Sheet not found: ${targetSheet}`)
-      return []
-    }
-    
-    // Use sheet_to_json to get rows with headers
-    const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet)
-    console.log(`[Export] Parsed Excel sheet "${targetSheet}": ${data.length} rows`)
-    return data
-  } catch (error) {
-    console.error('[Export] Excel parse error:', error)
-    return []
-  }
-}
-
-/**
  * Export project as a ZIP archive
  * 
  * Creates a ZIP file containing:
@@ -441,69 +360,40 @@ export async function exportProjectAsZip(
         )
         
         try {
-          let rows: Record<string, unknown>[] = []
-          
-          // For source tables, load directly from IndexedDB file
-          if (table.kind === 'source_table') {
-            console.log(`[Export] Loading source table ${table.name} directly from file...`)
-            rows = await loadSourceTableData(table as SourceTableNode)
-          } else {
-            // For derived tables, use materialization + getTableData
-            console.log(`[Export] Materializing derived table: ${table.name}...`)
-            const materializeResult = await ensureTableMaterialized(table.id)
-            
-            if (materializeResult.status === 'error') {
-              console.error(`[Export] Failed to materialize table ${table.name}:`, materializeResult.error)
-              const columns = table.schema?.columns.map(c => c.name) || ['Error']
-              const worksheet = XLSX.utils.aoa_to_sheet([
-                columns,
-                [`Error: ${materializeResult.error}`]
-              ])
-              XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
-              processed++
-              continue
-            }
-            
-            const { rows: tableRows, error } = await getTableData(table.id, 0, 100000)
-            
-            if (error) {
-              console.error(`[Export] Error getting data for table ${table.name}:`, error)
-              const columns = table.schema?.columns.map(c => c.name) || ['Error']
-              const worksheet = XLSX.utils.aoa_to_sheet([
-                columns,
-                [`Error: ${error}`]
-              ])
-              XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
-              processed++
-              continue
-            }
-            
-            rows = tableRows as Record<string, unknown>[]
-            
-            // If still empty, try data store
-            if (rows.length === 0) {
-              const dataStore = useDataStore.getState()
-              const storeData = dataStore.tableData[table.id]
-              if (storeData?.rows && storeData.rows.length > 0) {
-                rows = storeData.rows as Record<string, unknown>[]
-                console.log(`[Export] Got ${rows.length} rows from data store for ${table.name}`)
-              }
-            }
+          // Every table (source or derived) is read through the single
+          // canonical, id-keyed read API. Materialization loads source files /
+          // computes derived tables and populates the id-keyed data store.
+          console.log(`[Export] Reading table: ${table.name}...`)
+          const { rows, error } = await getTableData(table.id, 0, 1_000_000)
+
+          if (error) {
+            console.error(`[Export] Error getting data for table ${table.name}:`, error)
+            const headers = table.schema?.columns.map(c => c.name) || ['Error']
+            const worksheet = XLSX.utils.aoa_to_sheet([headers, [`Error: ${error}`]])
+            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
+            processed++
+            continue
           }
-          
+
           console.log(`[Export] Table ${table.name}: ${rows.length} rows`)
-          
+
           if (rows.length > 0) {
-            // Get column names from schema or first row
-            const columns = table.schema?.columns.map(c => c.name) || 
-                           Object.keys(rows[0]).filter(k => !k.startsWith('__'))
-            
+            // Header row uses human-readable column names; cell values are read
+            // by column id, which is the data store's canonical row key.
+            const schemaColumns = table.schema?.columns ?? []
+            const headers = schemaColumns.length > 0
+              ? schemaColumns.map(c => c.name)
+              : Object.keys(rows[0]).filter(k => !k.startsWith('__'))
+            const cellKeys = schemaColumns.length > 0
+              ? schemaColumns.map(c => c.id)
+              : headers
+
             // Prepare data for Excel (array of arrays)
-            const data: unknown[][] = [columns] // Header row
-            
+            const data: unknown[][] = [headers] // Header row
+
             for (const row of rows) {
-              const rowData = columns.map(col => {
-                const value = row[col]
+              const rowData = cellKeys.map(key => {
+                const value = (row as Record<string, unknown>)[key]
                 // Handle special types
                 if (value === null || value === undefined) return ''
                 if (typeof value === 'object') return JSON.stringify(value)
@@ -511,13 +401,13 @@ export async function exportProjectAsZip(
               })
               data.push(rowData)
             }
-            
+
             // Create worksheet
             const worksheet = XLSX.utils.aoa_to_sheet(data)
-            
+
             // Auto-size columns (approximate)
-            const colWidths = columns.map((col, idx) => {
-              let maxWidth = col.length
+            const colWidths = headers.map((header, idx) => {
+              let maxWidth = header.length
               // Check first 100 rows for max width
               for (let r = 0; r < Math.min(100, rows.length); r++) {
                 const cellValue = String(data[r + 1]?.[idx] ?? '')
@@ -526,16 +416,16 @@ export async function exportProjectAsZip(
               return { wch: maxWidth + 2 }
             })
             worksheet['!cols'] = colWidths
-            
+
             // Add to workbook
             XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
-            
+
             console.log(`[Export] Added sheet "${sheetName}" with ${rows.length} rows`)
           } else {
             // Empty table - create empty sheet with headers
             console.warn(`[Export] Table "${table.name}" returned 0 rows`)
-            const columns = table.schema?.columns.map(c => c.name) || ['(empty)']
-            const worksheet = XLSX.utils.aoa_to_sheet([columns])
+            const headers = table.schema?.columns.map(c => c.name) || ['(empty)']
+            const worksheet = XLSX.utils.aoa_to_sheet([headers])
             XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
             console.log(`[Export] Added empty sheet "${sheetName}"`)
           }
