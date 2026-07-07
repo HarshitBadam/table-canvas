@@ -44,7 +44,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
     return tables.find(t => t.id === tableId)
   }, [tables, sourceTableId, selectedTableId])
 
-  const columns = selectedTable?.schema?.columns || []
+  const columns = useMemo(() => selectedTable?.schema?.columns || [], [selectedTable])
   const numericColumns = useMemo(() => 
     columns.filter(c => c.type === 'number' && !isLikelyIdColumn(c.name)),
     [columns]

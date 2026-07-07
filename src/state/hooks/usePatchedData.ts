@@ -64,7 +64,6 @@ export function useIsCellHighlighted(tableId: string, rowId: string, columnId: s
 export function usePatchedRows(tableId: string, columns: ColumnSchema[]): PatchedRow[] {
   const tableData = useDataStore((state) => state.tableData[tableId])
   const patches = useProjectStore((state) => state.patches[tableId])
-  const patchVersion = usePatchVersion(tableId)
 
   return useMemo(() => {
     let baseRows: PatchedRow[] = []
@@ -92,13 +91,16 @@ export function usePatchedRows(tableId: string, columns: ColumnSchema[]): Patche
     }
 
     return baseRows
-  }, [tableData, patches, columns, patchVersion])
+    // `patches` (from the immer store) gets a new reference whenever this
+    // table's patches change, so it already covers inserted-row changes;
+    // patchVersion would be a redundant dependency.
+  }, [tableData, patches, columns])
 }
 
 /**
  * Create a display value getter that includes patches
  */
-export function useDisplayValueGetter(tableId: string, columns: ColumnSchema[]) {
+export function useDisplayValueGetter(tableId: string, _columns: ColumnSchema[]) {
   const patches = useProjectStore((state) => state.patches[tableId])
 
   return useCallback((rowId: string, columnId: string, baseValue: CellValue): CellValue => {
@@ -107,7 +109,7 @@ export function useDisplayValueGetter(tableId: string, columns: ColumnSchema[]) 
       return patches.cellPatches[columnId][rowId]
     }
     return baseValue
-  }, [patches, columns])
+  }, [patches])
 }
 
 /**

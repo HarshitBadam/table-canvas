@@ -6,7 +6,7 @@
 
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
-import { useState, useCallback, memo, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, memo, useRef, useEffect } from 'react';
 
 // ============================================================================
 // Types
@@ -56,9 +56,15 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
     setShowDimensionPicker(false);
   }, [updateAttributes]);
 
-  // Initialize with default if empty
-  const headers = attrs.headers.length > 0 ? attrs.headers : ['Column 1', 'Column 2', 'Column 3'];
-  const rows = attrs.rows.length > 0 ? attrs.rows : [['', '', ''], ['', '', ''], ['', '', '']];
+  // Initialize with default if empty (memoized so callback deps stay stable)
+  const headers = useMemo(
+    () => (attrs.headers.length > 0 ? attrs.headers : ['Column 1', 'Column 2', 'Column 3']),
+    [attrs.headers]
+  );
+  const rows = useMemo(
+    () => (attrs.rows.length > 0 ? attrs.rows : [['', '', ''], ['', '', ''], ['', '', '']]),
+    [attrs.rows]
+  );
 
   // Close context menu on click outside
   useEffect(() => {
@@ -128,7 +134,7 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
     } else if (e.key === 'Escape') {
       setEditingCell(null);
     }
-  }, [handleCellBlur, editingCell, rows, headers, updateAttributes]);
+  }, [handleCellBlur, editingCell, editValue, rows, headers, updateAttributes]);
 
   const handleHeaderClick = useCallback((colIndex: number) => {
     setEditValue(headers[colIndex] || '');
