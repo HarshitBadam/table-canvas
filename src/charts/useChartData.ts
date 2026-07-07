@@ -38,41 +38,34 @@ export function useChartData(
 
   const refetch = () => setRefetchTrigger(prev => prev + 1)
 
-  // Resolve a column reference (id or name) to get the duckDbName for queries.
-  // Returns the duckDbName (what DuckDB actually uses) and the display name.
+  // Resolve a column reference (id or name) to the name DuckDB actually uses
+  // for queries. For both source and derived tables the DuckDB column name is
+  // `col.name` (the engine builds tables from names, not ids), so that is the
+  // authoritative query key. `duckDbName` is kept only as a resilience fallback.
   const getColumnForDuckDB = (columnRef: string): { duckDbName: string; name: string } | null => {
     if (!columns || columns.length === 0) {
       // If no columns schema, assume columnRef is what we need
       return { duckDbName: columnRef, name: columnRef }
     }
-    
+
     // First try to find by ID
     const colById = columns.find(c => c.id === columnRef)
     if (colById) {
-      return { 
-        duckDbName: colById.duckDbName || colById.id, // fallback to id if duckDbName not set
-        name: colById.name 
-      }
+      return { duckDbName: colById.name, name: colById.name }
     }
-    
+
     // Fallback: check if columnRef is a column name
     const colByName = columns.find(c => c.name === columnRef)
     if (colByName) {
-      return { 
-        duckDbName: colByName.duckDbName || colByName.name, // for derived tables, name = duckDbName
-        name: colByName.name 
-      }
+      return { duckDbName: colByName.name, name: colByName.name }
     }
-    
+
     // Fallback: case-insensitive name match
     const colByNameLower = columns.find(c => c.name.toLowerCase() === columnRef.toLowerCase())
     if (colByNameLower) {
-      return { 
-        duckDbName: colByNameLower.duckDbName || colByNameLower.name,
-        name: colByNameLower.name 
-      }
+      return { duckDbName: colByNameLower.name, name: colByNameLower.name }
     }
-    
+
     // Column not found
     return null
   }
