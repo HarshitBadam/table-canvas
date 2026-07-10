@@ -15,17 +15,12 @@ export async function parseFileData(
   sheetName?: string,
   schema?: TableSchema
 ): Promise<TableRow[]> {
-  try {
-    if (fileType === 'csv') {
-      return (await parseCsvBuffer(fileData, schema)).rows
-    }
-
-    const workbook = readWorkbook(fileData)
-    return parseWorkbookSheet(workbook, sheetName ?? workbook.SheetNames[0], schema).rows
-  } catch (error) {
-    console.error('[MaterializationService] File parsing error:', error)
-    return []
+  if (fileType === 'csv') {
+    return (await parseCsvBuffer(fileData, schema)).rows
   }
+
+  const workbook = readWorkbook(fileData)
+  return parseWorkbookSheet(workbook, sheetName ?? workbook.SheetNames[0], schema).rows
 }
 
 export function parseCsvBuffer(

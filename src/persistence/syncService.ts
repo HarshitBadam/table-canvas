@@ -7,6 +7,7 @@ export {
   importProjectWithSync,
   loadProjectWithSync,
   saveProjectWithSync,
+  syncLocalProjectsToBackend,
 } from './projectSync'
 export {
   deleteFileWithSync,

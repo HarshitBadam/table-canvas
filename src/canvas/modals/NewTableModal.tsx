@@ -103,6 +103,18 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   const [upgradeViolation, setUpgradeViolation] = useState<LimitExceeded | null>(null)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+
+  const trimmedColumnNames = columns.map(column => column.name.trim())
+  const hasEmptyColumnName = trimmedColumnNames.some(name => name.length === 0)
+  const hasDuplicateColumnName =
+    new Set(trimmedColumnNames.map(name => name.toLocaleLowerCase())).size
+    !== trimmedColumnNames.length
+  const columnError = hasEmptyColumnName
+    ? 'Every column needs a name.'
+    : hasDuplicateColumnName
+      ? 'Column names must be unique.'
+      : null
 
   const addColumn = () => {
     setColumns([
@@ -122,6 +134,8 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   }
 
   const handleCreate = async () => {
+    if (!tableName.trim() || columnError) return
+
     const tier: Tier = user?.tier ?? 'guest'
     const currentTableCount = Object.values(nodes).filter(
       (n) => n.kind === 'source_table' || n.kind === 'derived_table',
@@ -135,7 +149,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
 
     const schemaColumns: ColumnSchema[] = columns.map((col, index) => ({
       id: `col_${index}_${col.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-      name: col.name,
+      name: col.name.trim(),
       type: col.type,
       nullable: true,
     }))
@@ -153,8 +167,10 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
       return row
     })
 
+    setIsCreating(true)
+    setCreateError(null)
     const tableId = addSourceTable({
-      name: tableName,
+      name: tableName.trim(),
       fileRef: '',
       fileName: '',
       fileType: 'csv',
@@ -162,12 +178,20 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
       initialRows: rows,
     })
 
-    setTableData(tableId, rows)
-    setIsCreating(true)
-    await loadTableIntoEngine(tableId, schema, rows)
-    setIsCreating(false)
-    resetForm()
-    onClose()
+    try {
+      setTableData(tableId, rows)
+      const loaded = await loadTableIntoEngine(tableId, schema, rows)
+      if (!loaded) {
+        useProjectStore.getState().deleteNode(tableId)
+        useDataStore.getState().clearTableData(tableId)
+        setCreateError('The table could not be initialized. Please try again.')
+        return
+      }
+      resetForm()
+      onClose()
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   const resetForm = () => {
@@ -177,6 +201,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
       { id: generateId(), name: 'Name', type: 'string' },
       { id: generateId(), name: 'Value', type: 'number' },
     ])
+    setCreateError(null)
   }
 
   const handleClose = () => {
@@ -284,9 +309,16 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
           </div>
 
           <div className="px-5 py-4 border-t border-border-subtle flex items-center justify-between bg-surface-secondary/50">
-            <span className="text-xs text-text-secondary">
-              {rowCount} rows × {columns.length} columns
-            </span>
+            <div>
+              <span className="text-xs text-text-secondary">
+                {rowCount} rows × {columns.length} columns
+              </span>
+              {(columnError || createError) && (
+                <p className="mt-1 text-xs text-red-600" role="alert">
+                  {columnError || createError}
+                </p>
+              )}
+            </div>
             <div className="flex gap-2">
               <Dialog.Close asChild>
                 <button className="px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-tertiary rounded-lg transition-colors">
@@ -295,7 +327,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
               </Dialog.Close>
               <button 
                 onClick={() => void handleCreate()}
-                disabled={isCreating || !tableName.trim() || columns.length === 0}
+                disabled={isCreating || !tableName.trim() || columns.length === 0 || Boolean(columnError)}
                 className="px-4 py-2 text-sm font-medium text-white bg-accent-green hover:bg-accent-green/90 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isCreating ? 'Creating...' : 'Create Table'}

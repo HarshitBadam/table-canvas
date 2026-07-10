@@ -34,11 +34,15 @@ import {
   fetchProjects,
   loadProjectWithSync,
   saveProjectWithSync,
+  syncLocalProjectsToBackend,
 } from './syncService'
 
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
+  mocks.listProjectsLocal.mockResolvedValue([])
+  mocks.loadProjectLocal.mockResolvedValue(null)
+  mocks.updateProject.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -79,6 +83,29 @@ describe('fetchProjects', () => {
     expect(result).toHaveLength(1)
     expect(result[0].name).toBe('Local Project')
   })
+
+  it('keeps newer cached metadata and includes unsynced local projects', async () => {
+    const remote = createMockProject('proj_1', 'Remote name')
+    remote.updatedAt = new Date('2026-01-01T00:00:00.000Z')
+    mockListProjects.mockResolvedValue([remote])
+    mockListProjectsLocal.mockResolvedValue([
+      {
+        id: 'proj_1',
+        name: 'Newer local name',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+      },
+      {
+        id: 'local_1',
+        name: 'Offline project',
+        updatedAt: '2026-01-03T00:00:00.000Z',
+      },
+    ])
+
+    const result = await fetchProjects()
+
+    expect(result.map(project => project.id)).toEqual(['local_1', 'proj_1'])
+    expect(result[1].name).toBe('Newer local name')
+  })
 })
 
 describe('loadProjectWithSync', () => {
@@ -110,6 +137,49 @@ describe('loadProjectWithSync', () => {
     mockGetProject.mockRejectedValue(new Error('Not found'))
     mockLoadProjectLocal.mockResolvedValue(null)
     expect(await loadProjectWithSync('nonexistent')).toBeNull()
+  })
+
+  it('preserves and uploads a newer local project instead of overwriting it', async () => {
+    const remote = createMockProject('proj_123', 'Stale remote project')
+    remote.updatedAt = new Date('2026-01-01T00:00:00.000Z')
+    mockGetProject.mockResolvedValue(remote)
+    mockLoadProjectLocal.mockResolvedValue({
+      id: 'proj_123',
+      name: 'Newer local project',
+      nodes: {},
+      edges: {},
+      patches: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    })
+
+    const result = await loadProjectWithSync('proj_123')
+
+    expect(mockUpdateProject).toHaveBeenCalledWith(
+      'proj_123',
+      expect.objectContaining({ name: 'Newer local project' }),
+    )
+    expect(result?.name).toBe('Newer local project')
+    expect(result?.needsSync).toBe(false)
+    expect(mockSaveProjectLocal).not.toHaveBeenCalled()
+  })
+
+  it('loads local-only projects without making a doomed backend request', async () => {
+    mockLoadProjectLocal.mockResolvedValue({
+      id: 'local_123',
+      name: 'Offline project',
+      nodes: {},
+      edges: {},
+      patches: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    })
+
+    const result = await loadProjectWithSync('local_123')
+
+    expect(mockGetProject).not.toHaveBeenCalled()
+    expect(result?.isLocalOnly).toBe(true)
+    expect(result?.needsSync).toBe(true)
   })
 })
 
@@ -174,6 +244,40 @@ describe('saveProjectWithSync', () => {
     expect(mockUpdateProject).toHaveBeenCalledWith(
       'proj_1',
       expect.objectContaining({ name: 'Version 3' }),
+    )
+  })
+})
+
+describe('syncLocalProjectsToBackend', () => {
+  it('promotes an offline project when sync is triggered after login', async () => {
+    mockListProjectsLocal.mockResolvedValue([
+      { id: 'local_123', name: 'Offline project', updatedAt: '2026-01-01T00:00:00.000Z' },
+    ])
+    mockLoadProjectLocal.mockResolvedValue({
+      id: 'local_123',
+      name: 'Offline project',
+      nodes: {},
+      edges: {},
+      patches: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    mockCreateProject.mockResolvedValue(createMockProject('server_123', 'Offline project'))
+
+    await syncLocalProjectsToBackend()
+
+    expect(mockCreateProject).toHaveBeenCalledWith({ name: 'Offline project' })
+    expect(mockUpdateProject).toHaveBeenCalledWith(
+      'server_123',
+      expect.objectContaining({ name: 'Offline project' }),
+    )
+    expect(mockDeleteProjectLocal).toHaveBeenCalledWith('local_123')
+    expect(mockSaveProjectLocal).toHaveBeenCalledWith(
+      'server_123',
+      'Offline project',
+      {},
+      {},
+      {},
     )
   })
 })

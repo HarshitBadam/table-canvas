@@ -5,10 +5,6 @@ import { simpleHash, computeDerivedVersionHash, getEngineTableRowCount } from '.
 import type { DerivedTableNode } from '@/types'
 import type { MaterializationResult } from './materializationService'
 
-/**
- * Compute a derived table by executing its transform against DuckDB.
- * Handles column ID mapping between DuckDB (human-readable names) and our schema (stable IDs).
- */
 export async function computeDerivedTable(tableId: string): Promise<MaterializationResult> {
   const projectStore = useProjectStore.getState()
   const dataStore = useDataStore.getState()
@@ -43,13 +39,11 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
       upstreamHashes
     )
 
-    // The grid reads from DuckDB, not the data store, so validate the cache against the
-    // engine. The store is intentionally emptied after compute, so checking it here would
-    // force a needless recompute on every view.
     const engineRowCount = await getEngineTableRowCount(tableId)
     const existsInEngine = engineRowCount >= 0
-    const expectedRows = node.cacheInfo?.lastRowCount ?? 0
-    const engineHasExpectedData = expectedRows === 0 || engineRowCount > 0
+    const expectedRows = node.cacheInfo?.lastRowCount
+    const engineHasExpectedData =
+      expectedRows !== undefined && engineRowCount === expectedRows
 
     if (
       existsInEngine &&
@@ -67,8 +61,6 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
       }
     }
 
-    // Build bidirectional column name <-> ID maps from upstream schemas.
-    // DuckDB operates on human-readable names; our schema uses stable generated IDs.
     const nameToId = new Map<string, string>()
     const idToName = new Map<string, string>()
 
@@ -109,9 +101,6 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
       projectStore.updateTableSchema(tableId, schemaWithIds)
     }
 
-    // No longer hydrate full result into dataStore — the grid reads
-    // windowed slices directly from DuckDB via useWindowedRows.
-    // Set a minimal marker so downstream code knows the table is ready.
     dataStore.setTableData(tableId, [])
 
     projectStore.updateCacheInfo(tableId, {
