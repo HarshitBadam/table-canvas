@@ -1,17 +1,8 @@
 import { useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useApp } from '@/state/AppContext'
+import { getDependentNodeIds } from '@/engine/workflowGraph'
 
-/**
- * Registers global keydown handlers for the canvas:
- *   - Delete / Backspace  → delete the selected node
- *   - Cmd/Ctrl + Z        → undo
- *   - Cmd/Ctrl + Y  or
- *     Cmd/Ctrl + Shift+Z  → redo
- *
- * Guards against firing while the user is typing in an input / textarea /
- * contenteditable element.
- */
 export function useCanvasKeyboard() {
   const undo = useProjectStore((state) => state.undo)
   const redo = useProjectStore((state) => state.redo)
@@ -29,7 +20,19 @@ export function useCanvasKeyboard() {
       if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping) {
         if (selectedNodeId) {
           e.preventDefault()
-          deleteNodeWithSync(selectedNodeId)
+          const project = useProjectStore.getState()
+          const node = project.nodes[selectedNodeId]
+          const dependents = getDependentNodeIds(
+            project.nodes,
+            project.edges,
+            selectedNodeId,
+          )
+          const dependentMessage = dependents.size > 0
+            ? ` This will also delete ${dependents.size} dependent node${dependents.size === 1 ? '' : 's'}.`
+            : ''
+          if (window.confirm(`Delete "${node?.name ?? 'this node'}"?${dependentMessage}`)) {
+            void deleteNodeWithSync(selectedNodeId)
+          }
         }
       }
 

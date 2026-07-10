@@ -1,4 +1,5 @@
 import { getEngine } from './EngineAdapter'
+import type { Patches } from '@/types'
 
 export function simpleHash(str: string): string {
   let hash = 0
@@ -18,6 +19,27 @@ export function computeSourceVersionHash(
   return simpleHash(`source:${tableId}:${fileRef}:${patchVersion}`)
 }
 
+export function computePatchesVersion(patches: Patches | undefined): string {
+  if (!patches) return 'none'
+
+  const cellPatches = Object.keys(patches.cellPatches)
+    .sort()
+    .map((columnId) => [
+      columnId,
+      Object.keys(patches.cellPatches[columnId])
+        .sort()
+        .map((rowId) => [rowId, patches.cellPatches[columnId][rowId]]),
+    ])
+  const insertedRows = patches.insertedRows.map((row) => ({
+    rowId: row.rowId,
+    insertedAt: row.insertedAt,
+    values: Object.fromEntries(Object.entries(row.values).sort(([a], [b]) => a.localeCompare(b))),
+  }))
+  const deletedRows = [...patches.deletedRows].sort()
+
+  return simpleHash(JSON.stringify({ cellPatches, insertedRows, deletedRows }))
+}
+
 export function computeDerivedVersionHash(
   tableId: string,
   transformDefJson: string,
@@ -27,11 +49,6 @@ export function computeDerivedVersionHash(
   return simpleHash(`derived:${tableId}:${transformDefJson}:${upstreamHashStr}`)
 }
 
-/**
- * Returns the engine row count for a table, or -1 if the table doesn't exist.
- * Used to detect a stale empty "shell" table (exists in DuckDB but holds 0 rows)
- * so we don't treat it as a valid cache hit and leave the grid blank.
- */
 export async function getEngineTableRowCount(tableId: string): Promise<number> {
   try {
     const slice = await getEngine().getSlice(tableId, 0, 1)

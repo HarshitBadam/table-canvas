@@ -5,6 +5,7 @@ type TransformType =
   | 'calculated_column'
   | 'group_summarize'
   | 'union'
+  | 'reference'
 
 export interface Edge {
   id: string
@@ -31,11 +32,8 @@ interface JoinTransformDef {
   joinType: JoinType
   leftKey: string
   rightKey: string
-  /** Column IDs to include from left table (if omitted, include all) */
   leftColumns?: string[]
-  /** Column IDs to include from right table (join key excluded by default) */
   rightColumns?: string[]
-  /** Column naming strategy for disambiguation */
   columnPrefix?: 'table_name' | 'left_right' | 'none'
   leftTableName?: string
   rightTableName?: string
@@ -61,7 +59,6 @@ export interface FilterCondition {
   columnId: string
   operator: FilterOperator
   value?: string | number | boolean | null
-  /** Second value for 'between' operator */
   value2?: string | number
 }
 
@@ -79,7 +76,6 @@ interface SelectColumn {
   include: boolean
 }
 
-/** Select transform definition (column projection/renaming) */
 interface SelectTransformDef {
   type: 'select'
   sourceTableId: string
@@ -117,7 +113,6 @@ interface UnionTransformDef {
 }
 
 
-/** View filter configuration (persisted per table) */
 export interface ViewFilterConfig {
   conditions: FilterCondition[]
   logic: 'and' | 'or'

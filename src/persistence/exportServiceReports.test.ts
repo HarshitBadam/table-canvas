@@ -88,6 +88,12 @@ describe('Report HTML Generation', () => {
               sourceTableId: 'sales',
               chartType: 'bar',
               rowLimit: 5,
+              config: {
+                xAxis: 'customer',
+                yAxis: 'total',
+                aggregation: 'sum',
+                title: 'Sales by customer',
+              },
             },
           },
         ],
@@ -120,8 +126,10 @@ describe('Report HTML Generation', () => {
     expect(html).toContain('Order Total')
     expect(html).toContain('Alice')
     expect(html).toContain('Bob')
-    expect(html).toContain('Chart: bar')
-    expect(html).toContain('source: Sales Export, 2 rows')
+    expect(html).toContain('class="report-chart"')
+    expect(html).toContain('Sales by customer')
+    expect(html).toContain('<rect')
+    expect(html).toContain('Source: Sales Export')
   })
 
   it('keeps report export usable when an embedded table read fails', async () => {

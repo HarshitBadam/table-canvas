@@ -2,6 +2,7 @@ import type * as duckdb from '@duckdb/duckdb-wasm'
 import type { ProfileResult } from '../types'
 import type { CellValue, ColumnProfile } from '@/types'
 import { computeCardinalityClass, quoteIdentifier, sanitizeTableName } from './sqlHelpers'
+import { INTERNAL_ROW_ID_COLUMN } from '../internalColumns'
 
 const isNumericType = (type: string) => /int|float|double|decimal/.test(type)
 const isStringType = (type: string) => /varchar|char|text/.test(type)
@@ -110,10 +111,10 @@ export async function getProfile(
 ): Promise<ProfileResult> {
   const tableName = quoteIdentifier(sanitizeTableName(tableId))
   const rowCount = Number((await conn.query(`SELECT COUNT(*) as cnt FROM ${tableName}`)).toArray()[0]?.cnt ?? 0)
-  const schema = (await conn.query(`DESCRIBE ${tableName}`)).toArray() as {
+  const schema = ((await conn.query(`DESCRIBE ${tableName}`)).toArray() as {
     column_name: string
     column_type: string
-  }[]
+  }[]).filter((definition) => definition.column_name !== INTERNAL_ROW_ID_COLUMN)
   const columns: ColumnProfile[] = []
 
   for (const definition of schema) {

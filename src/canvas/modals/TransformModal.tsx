@@ -1,14 +1,15 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
-import { useDataStore } from '@/state/dataStore'
+import type { TableRow } from '@/state/dataStore'
 import { useAppAuth } from '@/state/AppContext'
 import { JoinType } from '@/types'
-import { ensureTableMaterialized } from '@/engine/materializationService'
+import { ensureTableMaterialized, getTableData } from '@/engine/materializationService'
 import { analyzeMatch, findBestKeys } from '@/canvas/joinUtils'
 import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
+import { JoinColumnSelect } from './JoinColumnSelect'
 
 interface TransformModalProps {
   isOpen: boolean
@@ -18,122 +19,26 @@ interface TransformModalProps {
 }
 
 
-function ColumnSelect({
-  value,
-  options,
-  onChange,
-  placeholder,
-}: {
-  value: string
-  options: { value: string; label: string; type: string }[]
-  onChange: (value: string) => void
-  placeholder?: string
-}) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const ref = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const selected = options.find(o => o.value === value)
-
-  const filtered = useMemo(() => {
-    if (!search) return options
-    const q = search.toLowerCase()
-    return options.filter(o => o.label.toLowerCase().includes(q))
-  }, [options, search])
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-        setSearch('')
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  useEffect(() => {
-    if (open) inputRef.current?.focus()
-  }, [open])
-
-  return (
-    <div ref={ref} className="join-select">
-      <button type="button" onClick={() => setOpen(!open)} className="join-select-btn">
-        {selected ? (
-          <>
-            <span className="join-select-value">{selected.label}</span>
-            <span className="join-select-type">{selected.type}</span>
-          </>
-        ) : (
-          <span className="join-select-placeholder">{placeholder}</span>
-        )}
-        <svg className="join-select-arrow" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M4.427 6.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 6H4.604a.25.25 0 00-.177.427z"/>
-        </svg>
-      </button>
-      
-      {open && (
-        <div className="join-select-popup">
-          <div className="join-select-search-wrap">
-            <svg className="join-select-search-icon" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M11.5 7a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zm-.82 4.74a6 6 0 111.06-1.06l2.79 2.79a.75.75 0 11-1.06 1.06l-2.79-2.79z"/>
-            </svg>
-            <input
-              ref={inputRef}
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search columns..."
-              className="join-select-search"
-            />
-          </div>
-          <div className="join-select-list">
-            {filtered.length === 0 ? (
-              <div className="join-select-empty">No columns found</div>
-            ) : (
-              filtered.map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => { onChange(opt.value); setOpen(false); setSearch('') }}
-                  className={`join-select-option ${value === opt.value ? 'selected' : ''}`}
-                >
-                  <span className="join-select-option-name">{opt.label}</span>
-                  <span className="join-select-option-type">{opt.type}</span>
-                  {value === opt.value && (
-                    <svg className="join-select-check" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
-                    </svg>
-                  )}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-
-
 export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: TransformModalProps) {
   const nodes = useProjectStore(s => s.nodes)
   const addDerivedTable = useProjectStore(s => s.addDerivedTable)
-  const tableData = useDataStore(s => s.tableData)
   const { user } = useAppAuth()
 
   const leftNode = nodes[sourceNodeId]
   const rightNode = nodes[targetNodeId]
 
   const [joinType, setJoinType] = useState<JoinType>('left')
+  const [operation, setOperation] = useState<'join' | 'union'>('join')
   const [leftKey, setLeftKey] = useState('')
   const [rightKey, setRightKey] = useState('')
   const [outputName, setOutputName] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [upgradeViolation, setUpgradeViolation] = useState<LimitExceeded | null>(null)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [leftData, setLeftData] = useState<TableRow[]>([])
+  const [rightData, setRightData] = useState<TableRow[]>([])
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<string>()
 
   const leftCols = useMemo(() => 
     (leftNode?.kind === 'source_table' || leftNode?.kind === 'derived_table') 
@@ -144,9 +49,6 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
     (rightNode?.kind === 'source_table' || rightNode?.kind === 'derived_table') 
       ? rightNode.schema?.columns ?? [] : []
   , [rightNode])
-
-  const leftData = useMemo(() => tableData[sourceNodeId]?.rows ?? [], [tableData, sourceNodeId])
-  const rightData = useMemo(() => tableData[targetNodeId]?.rows ?? [], [tableData, targetNodeId])
 
   const allCols = useMemo(() => [
     ...leftCols.map(c => ({ id: `L:${c.id}`, colId: c.id, name: c.name, type: c.type, side: 'L' as const, table: leftNode?.name })),
@@ -162,6 +64,33 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
   }, [allCols])
 
   useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    setPreviewLoading(true)
+    setPreviewError(undefined)
+
+    void Promise.all([
+      getTableData(sourceNodeId, 0, 1_000),
+      getTableData(targetNodeId, 0, 1_000),
+    ]).then(([left, right]) => {
+      if (cancelled) return
+      setLeftData(left.rows)
+      setRightData(right.rows)
+      setPreviewError(left.error || right.error)
+    }).catch((error) => {
+      if (!cancelled) {
+        setPreviewError(error instanceof Error ? error.message : 'Unable to preview join data')
+      }
+    }).finally(() => {
+      if (!cancelled) setPreviewLoading(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, sourceNodeId, targetNodeId])
+
+  useEffect(() => {
     if (leftCols.length && rightCols.length) {
       const best = findBestKeys(leftCols, rightCols, leftData, rightData)
       if (best) { setLeftKey(best.left); setRightKey(best.right) }
@@ -170,6 +99,9 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
   }, [leftCols, rightCols, leftData, rightData])
 
   const match = useMemo(() => analyzeMatch(leftData, rightData, leftKey, rightKey), [leftData, rightData, leftKey, rightKey])
+  const canUnion = leftCols.length === rightCols.length && leftCols.every(
+    (column, index) => column.type === rightCols[index]?.type,
+  )
 
   const toggle = useCallback((id: string) => {
     setSelected(prev => {
@@ -184,7 +116,8 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
   }, [])
 
   const handleCreate = useCallback(() => {
-    if (!leftKey || !rightKey) return
+    if (operation === 'join' && (!leftKey || !rightKey)) return
+    if (operation === 'union' && !canUnion) return
 
     const tier: Tier = user?.tier ?? 'guest'
     const currentTableCount = Object.values(nodes).filter(
@@ -202,23 +135,28 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
 
     const id = addDerivedTable({
       name: outputName || `${leftNode?.name} + ${rightNode?.name}`,
-      transformDef: {
-        type: 'join',
-        leftTableId: sourceNodeId,
-        rightTableId: targetNodeId,
-        joinType,
-        leftKey,
-        rightKey,
-        leftColumns: lCols.length < leftCols.length ? lCols : undefined,
-        rightColumns: rCols.length < rightCols.length - 1 ? rCols : undefined,
-        leftTableName: leftNode?.name,
-        rightTableName: rightNode?.name,
-      },
+      transformDef: operation === 'union'
+        ? {
+            type: 'union',
+            sourceTableIds: [sourceNodeId, targetNodeId],
+          }
+        : {
+            type: 'join',
+            leftTableId: sourceNodeId,
+            rightTableId: targetNodeId,
+            joinType,
+            leftKey,
+            rightKey,
+            leftColumns: lCols.length < leftCols.length ? lCols : undefined,
+            rightColumns: rCols.length < rightCols.length - 1 ? rCols : undefined,
+            leftTableName: leftNode?.name,
+            rightTableName: rightNode?.name,
+          },
       upstreamNodeIds: [sourceNodeId, targetNodeId],
     })
     ensureTableMaterialized(id).catch(console.error)
     onClose()
-  }, [leftKey, rightKey, selected, outputName, leftNode, rightNode, sourceNodeId, targetNodeId, joinType, leftCols, rightCols, allCols, addDerivedTable, onClose, nodes, user])
+  }, [leftKey, rightKey, operation, canUnion, selected, outputName, leftNode, rightNode, sourceNodeId, targetNodeId, joinType, leftCols, rightCols, allCols, addDerivedTable, onClose, nodes, user])
 
   const leftOpts = leftCols.map(c => ({ value: c.id, label: c.name, type: c.type }))
   const rightOpts = rightCols.map(c => ({ value: c.id, label: c.name, type: c.type }))
@@ -243,8 +181,8 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               </svg>
             </div>
             <div className="join-header-text">
-              <h2>Join Tables</h2>
-              <p>Combine <strong>{leftNode?.name}</strong> with <strong>{rightNode?.name}</strong></p>
+              <h2>Combine Tables</h2>
+              <p>Link <strong>{leftNode?.name}</strong> with <strong>{rightNode?.name}</strong></p>
             </div>
             <Dialog.Close className="join-close">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -254,6 +192,35 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
           </div>
 
           <div className="join-body">
+            <section className="join-section">
+              <h3>Operation</h3>
+              <div className="join-types">
+                <button
+                  type="button"
+                  onClick={() => setOperation('join')}
+                  className={`join-type-card ${operation === 'join' ? 'active' : ''}`}
+                >
+                  <span className="join-type-name">Join</span>
+                  <span className="join-type-desc">Match rows by key</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOperation('union')}
+                  className={`join-type-card ${operation === 'union' ? 'active' : ''}`}
+                >
+                  <span className="join-type-name">Append</span>
+                  <span className="join-type-desc">Stack compatible rows</span>
+                </button>
+              </div>
+              {operation === 'union' && !canUnion && (
+                <p className="text-xs text-red-600 mt-2" role="alert">
+                  Append requires the same number of columns in the same type order.
+                </p>
+              )}
+            </section>
+
+            {operation === 'join' && (
+              <>
             <section className="join-section">
               <h3>Join Type</h3>
               <div className="join-types">
@@ -276,7 +243,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               <div className="join-keys">
                 <div className="join-key-group">
                   <label>{leftNode?.name}</label>
-                  <ColumnSelect
+                  <JoinColumnSelect
                     value={leftKey}
                     options={leftOpts}
                     onChange={setLeftKey}
@@ -286,7 +253,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
                 <div className="join-key-equals">=</div>
                 <div className="join-key-group">
                   <label>{rightNode?.name}</label>
-                  <ColumnSelect
+                  <JoinColumnSelect
                     value={rightKey}
                     options={rightOpts}
                     onChange={setRightKey}
@@ -295,14 +262,17 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
                 </div>
               </div>
               <div className={`join-match-badge ${match.rate >= 70 ? 'good' : match.rate >= 30 ? 'warn' : 'bad'}`}>
-                {match.rate > 0 ? (
+                {previewLoading ? (
+                  <>Analyzing sample rows...</>
+                ) : previewError ? (
+                  <>Preview unavailable — the join can still be created</>
+                ) : match.rate > 0 ? (
                   <>{match.rate}% match · {match.rows} rows</>
                 ) : (
                   <>No matching values found</>
                 )}
               </div>
             </section>
-
             <section className="join-section">
               <div className="join-section-header">
                 <h3>Output Columns</h3>
@@ -340,6 +310,8 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
                 })}
               </div>
             </section>
+              </>
+            )}
 
             <section className="join-section">
               <h3>Output Table Name</h3>
@@ -357,7 +329,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
             <Dialog.Close className="join-btn-cancel">Cancel</Dialog.Close>
             <button 
               onClick={handleCreate} 
-              disabled={!leftKey || !rightKey}
+              disabled={operation === 'join' ? (!leftKey || !rightKey) : !canUnion}
               className="join-btn-create"
             >
               <svg viewBox="0 0 16 16" fill="currentColor">

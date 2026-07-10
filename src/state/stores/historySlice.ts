@@ -1,7 +1,20 @@
 import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, HistorySliceState, HistoryEntry } from './types'
-import type { Patches } from '@/types'
+import type { Patches, ProjectNode } from '@/types'
 const MAX_UNDO_HISTORY = 50
+
+function invalidateAllTableCaches(nodes: Record<string, ProjectNode>) {
+  Object.values(nodes).forEach((node) => {
+    if (node.kind === 'source_table' || node.kind === 'derived_table') {
+      node.cacheInfo ??= {}
+      node.cacheInfo.isDirty = true
+      node.cacheInfo.isComputing = false
+      node.cacheInfo.error = undefined
+      node.cacheInfo.currentVersionHash = undefined
+      node.cacheInfo.dataRevision = (node.cacheInfo.dataRevision ?? 0) + 1
+    }
+  })
+}
 
 export const createHistorySlice: StateCreator<
   ProjectStoreState,
@@ -63,6 +76,7 @@ export const createHistorySlice: StateCreator<
           highlightedCells: new Set((patches as unknown as { highlightedCells: string[] }).highlightedCells || []),
         }
       })
+      invalidateAllTableCaches(state.nodes)
     })
   },
 
@@ -95,6 +109,7 @@ export const createHistorySlice: StateCreator<
           highlightedCells: new Set((patches as unknown as { highlightedCells: string[] }).highlightedCells || []),
         }
       })
+      invalidateAllTableCaches(state.nodes)
     })
   },
 

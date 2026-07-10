@@ -13,8 +13,7 @@ import {
   loadProjectWithSync,
   saveProjectWithSync,
 } from '@/persistence/syncService'
-import { deleteFile } from '@/persistence/db'
-import type { SourceTableNode } from '@/types'
+import { getDependentNodeIds } from '@/engine/workflowGraph'
 import { useReportStore } from '@/report/reportStore'
 import { checkProjectCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
@@ -22,6 +21,7 @@ import { useProjectStore } from './projectStore'
 import { useDataStore } from './dataStore'
 import { useAuthState } from './useAuthState'
 import {
+  clearProjectRuntime,
   initializeEngine,
   loadOrCreateProject,
   materializeProjectTables,
@@ -81,11 +81,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
   })
   const initialized = useRef(false)
   const saving = useRef(false)
+  const savePending = useRef(false)
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nodes = useProjectStore(store => store.nodes)
   const edges = useProjectStore(store => store.edges)
   const patches = useProjectStore(store => store.patches)
   const projectName = useProjectStore(store => store.projectName)
+
+  const saveLatestProject = useCallback(async () => {
+    if (saving.current) {
+      savePending.current = true
+      return
+    }
+
+    saving.current = true
+    setState(previous => ({ ...previous, isSaving: true }))
+    try {
+      do {
+        savePending.current = false
+        const project = useProjectStore.getState()
+        if (!project.projectId) break
+        await saveProjectWithSync(
+          project.projectId,
+          project.projectName,
+          project.nodes,
+          project.edges,
+          project.patches,
+        )
+      } while (savePending.current)
+    } catch (error) {
+      console.error('[AppContext] Auto-save failed:', error)
+    } finally {
+      saving.current = false
+      setState(previous => ({ ...previous, isSaving: false }))
+    }
+  }, [])
 
   const setPhase = useCallback((phase: AppPhase, error?: string) => {
     setState(previous => ({
@@ -148,18 +178,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (state.phase !== 'ready' || !state.isAuthenticated || !state.projectId) return
     if (saveTimeout.current) clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(async () => {
-      if (saving.current) return
-      saving.current = true
-      setState(previous => ({ ...previous, isSaving: true }))
-      try {
-        await saveProjectWithSync(state.projectId!, projectName, nodes, edges, patches)
-      } catch (error) {
-        console.error('[AppContext] Auto-save failed:', error)
-      } finally {
-        saving.current = false
-        setState(previous => ({ ...previous, isSaving: false }))
-      }
+    saveTimeout.current = setTimeout(() => {
+      void saveLatestProject()
     }, 1500)
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current)
@@ -172,6 +192,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     state.isAuthenticated,
     state.phase,
     state.projectId,
+    saveLatestProject,
   ])
 
   const postLoginSetup = useCallback(async () => {
@@ -214,6 +235,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('[AppContext] Failed to flush reports before logout:', error)
     }
+    await clearProjectRuntime(useProjectStore.getState().nodes)
     await performLogout()
     setState(previous => ({
       ...previous,
@@ -241,6 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return
     }
     const project = await createProjectWithSync(name || 'Untitled Project')
+    await clearProjectRuntime(useProjectStore.getState().nodes)
     useProjectStore.setState({
       projectId: project.id,
       projectName: project.name,
@@ -267,6 +290,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setPhase('loading_project')
       const project = await loadProjectWithSync(projectId)
       if (!project) throw new Error('Project not found')
+      await clearProjectRuntime(useProjectStore.getState().nodes)
       useProjectStore.setState({
         projectId: project.id,
         projectName: project.name,
@@ -300,24 +324,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const deleteNodeWithSync = useCallback(async (nodeId: string) => {
-    const node = useProjectStore.getState().nodes[nodeId]
+    const project = useProjectStore.getState()
+    const node = project.nodes[nodeId]
     if (!node) return
-    const fileRef = node.kind === 'source_table'
-      ? (node as SourceTableNode).plan.fileRef
-      : null
-    useProjectStore.getState().deleteNode(nodeId)
-    useDataStore.getState().clearTableData(nodeId)
-    if (fileRef) {
+    const nodeIds = [
+      nodeId,
+      ...getDependentNodeIds(project.nodes, project.edges, nodeId),
+    ]
+    project.deleteNode(nodeId)
+    for (const id of nodeIds) {
+      useDataStore.getState().clearTableData(id)
       try {
-        await deleteFile(fileRef)
+        await getEngine().dropTable(id)
       } catch (error) {
-        console.error('[AppContext] Failed to delete file from storage:', error)
+        console.error('[AppContext] Failed to drop table from engine:', error)
       }
-    }
-    try {
-      await getEngine().dropTable(nodeId)
-    } catch (error) {
-      console.error('[AppContext] Failed to drop table from engine:', error)
     }
   }, [])
 

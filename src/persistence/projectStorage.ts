@@ -20,6 +20,8 @@ export async function saveProject(
   patches: Record<string, Patches>
 ): Promise<void> {
   const db = await getDB()
+  const existing = await db.get('projects', id)
+  const now = new Date().toISOString()
 
   const project = {
     id,
@@ -27,8 +29,8 @@ export async function saveProject(
     nodes,
     edges,
     patches: serializePatches(patches),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
   }
 
   await db.put('projects', project as unknown as import('./dbCore').TableCanvasDB['projects']['value'])

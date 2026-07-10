@@ -3,7 +3,11 @@ import { getComputationOrder } from './dependencyGraph'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
 import { loadFileWithSync } from '@/persistence/syncService'
-import { computeSourceVersionHash, getEngineTableRowCount } from './cacheUtils'
+import {
+  computePatchesVersion,
+  computeSourceVersionHash,
+  getEngineTableRowCount,
+} from './cacheUtils'
 import { parseFileData } from './fileParsers'
 import { computeDerivedTable } from './derivedTableComputation'
 import type {
@@ -27,10 +31,8 @@ export interface MaterializationResult {
   error?: string
 }
 
-// Deduplicates concurrent requests for the same table
 const inProgressMaterializations = new Map<string, Promise<MaterializationResult>>()
 
-// Sequential execution mutex to avoid race conditions
 let materializationQueue = Promise.resolve()
 
 
@@ -56,9 +58,7 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
     const existingData = dataStore.tableData[tableId]
     const patches = projectStore.patches[tableId]
 
-    const patchVersion = patches
-      ? `${patches.insertedRows?.length || 0}-${Object.keys(patches.cellPatches || {}).length}-${patches.deletedRows?.size || 0}`
-      : '0-0-0'
+    const patchVersion = computePatchesVersion(patches)
 
     const currentVersionHash = computeSourceVersionHash(
       tableId,
@@ -69,8 +69,6 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
     const engineRowCount = await getEngineTableRowCount(tableId)
     const existsInEngine = engineRowCount >= 0
     const expectedRows = node.cacheInfo?.lastRowCount ?? 0
-    // Guard against a stale empty shell: if we expect rows but the engine table is
-    // empty, fall through and reload rather than serving a blank "cached" table.
     const engineHasExpectedData = expectedRows === 0 || engineRowCount > 0
 
     if (
@@ -99,8 +97,6 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
           __rowId: row.__rowId || `row_${idx}`,
         }))
 
-        // No longer hydrate full rows into the data store — the grid
-        // reads windowed slices from DuckDB. Store an empty marker.
         dataStore.setTableData(tableId, [])
       } else {
         projectStore.updateCacheInfo(tableId, {
@@ -115,9 +111,14 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
         }
       }
     } else {
-      // Manually created table with no file backing
-      rows = existingData?.rows ?? []
-      if (!existingData?.rows) {
+      const initialRows = node.plan.initialRows as TableRow[] | undefined
+      const runtimeRows = existingData?.rows
+      rows = initialRows
+        ?? (runtimeRows?.length ? runtimeRows : Array.from(
+          { length: node.schema?.rowCount ?? 0 },
+          (_, index) => ({ __rowId: `row_${index}` }),
+        ))
+      if (!initialRows && !runtimeRows?.length) {
         dataStore.setTableData(tableId, [])
       }
     }
@@ -125,20 +126,22 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
     if (node.schema) {
       await engine.loadTable(tableId, node.schema, rows as Record<string, CellValue>[], patches)
     }
+    const loadedRowCount = await getEngineTableRowCount(tableId)
+    const rowCount = loadedRowCount >= 0 ? loadedRowCount : rows.length
 
     projectStore.updateCacheInfo(tableId, {
       isDirty: false,
       isComputing: false,
       lastComputedAt: new Date().toISOString(),
       currentVersionHash,
-      lastRowCount: rows.length,
+      lastRowCount: rowCount,
       error: undefined,
     })
 
     return {
       status: 'computed',
       tableId,
-      rowCount: rows.length,
+      rowCount,
       schema: node.schema,
     }
 

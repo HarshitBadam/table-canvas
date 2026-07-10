@@ -87,7 +87,9 @@ function processTabularData(
   existingSchema?: TableSchema,
 ): ParsedTableData {
   const columns = existingSchema?.columns ?? inferColumns(data, fields)
-  const columnsByName = new Map(columns.map((column) => [column.name, column]))
+  const columnsByName = new Map(
+    columns.map((column) => [column.sourceName ?? column.name, column]),
+  )
 
   const rows = data.map((record, rowIndex) => {
     const row: TableRow = { __rowId: `row_${rowIndex}` }
@@ -112,6 +114,7 @@ function inferColumns(data: Record<string, string>[], fields: string[]): ColumnS
   return fields.map((field, index) => ({
     id: `col_${index}_${field.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
     name: field,
+    sourceName: field,
     type: inferColumnType(
       data.slice(0, 100).map((row) => row[field]).filter(Boolean),
     ),

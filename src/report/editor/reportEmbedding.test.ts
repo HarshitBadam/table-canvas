@@ -1,17 +1,7 @@
-/**
- * Regression tests for report-embedding bug fixes:
- * (a) Node filter correctly selects table nodes by kind
- * (b) Column toggle produces correct explicit column list when "all" is selected
- * (c) HTML export includes embedded table data
- * (d) Materialization trigger for embedded nodes
- */
-
 import { describe, it, expect } from 'vitest'
 import type { SourceTableNode, DerivedTableNode } from '@/types'
 import { generateReportHtml, collectEmbeddedTableIds, buildEmbeddedDataMap } from '@/persistence/reportHtmlGenerator'
 import type { Report } from '@/report/types'
-
-// ---- Helpers ----
 
 function createSourceTable(id: string, name: string): SourceTableNode {
   return {
@@ -51,8 +41,6 @@ function createDerivedTable(id: string, name: string): DerivedTableNode {
   }
 }
 
-// ---------- (a) Node filter ----------
-
 describe('Node filter for table nodes', () => {
   it('filters source and derived tables by kind (not type)', () => {
     const source = createSourceTable('t1', 'Sales')
@@ -69,16 +57,12 @@ describe('Node filter for table nodes', () => {
     expect(tableNodes).toHaveLength(2)
     expect(tableNodes.map(n => n.id).sort()).toEqual(['t1', 't2'])
 
-    // Old buggy filter should NOT match
     const buggyFilter = Object.values(allNodes).filter(
       (n) => 'type' in n && (n as Record<string, unknown>).type === 'table'
     )
     expect(buggyFilter).toHaveLength(0)
   })
 })
-
-
-// ---------- (b) Column toggle ----------
 
 describe('Column checkbox toggle semantics', () => {
   const allColumnIds = ['col_a', 'col_b', 'col_c']
@@ -123,8 +107,6 @@ describe('Column checkbox toggle semantics', () => {
   })
 })
 
-
-// ---------- (c) HTML export includes embedded tables ----------
 
 describe('Report HTML export for embedded tables', () => {
   it('renders embeddedTable nodes as HTML <table> elements', () => {
@@ -223,7 +205,11 @@ describe('Report HTML export for embedded tables', () => {
             attrs: {
               sourceTableId: 't1',
               chartType: 'bar',
-              config: {},
+              config: {
+                xAxis: 'col_a',
+                yAxis: 'col_b',
+                title: 'Sales by category',
+              },
             },
           },
         ],
@@ -239,9 +225,9 @@ describe('Report HTML export for embedded tables', () => {
 
     const html = generateReportHtml(report, dataMap)
 
-    expect(html).toContain('Chart')
-    expect(html).toContain('bar')
-    expect(html).toContain('Sales')
+    expect(html).toContain('class="report-chart"')
+    expect(html).toContain('Sales by category')
+    expect(html).toContain('Source: Sales')
   })
 
   it('shows placeholder when no data is available for embedded table', () => {
@@ -273,8 +259,6 @@ describe('Report HTML export for embedded tables', () => {
   })
 })
 
-
-// ---------- (d) collectEmbeddedTableIds ----------
 
 describe('collectEmbeddedTableIds', () => {
   it('collects table IDs from embeddedTable and chartBlock nodes', () => {
