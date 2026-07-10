@@ -126,37 +126,6 @@ export const useReportStore = create<ReportStoreState>()(
 );
 
 // ============================================================================
-// Convenience Hooks
-// ============================================================================
-
-/**
- * Hook to get the currently selected report
- */
-export const useSelectedReport = () => {
-  return useReportStore((state) => {
-    const { selectedReportId, reports } = state;
-    return selectedReportId ? reports[selectedReportId] : null;
-  });
-};
-
-/**
- * Hook to get the map of all reports.
- *
- * Note: returns the reports record directly. Memoize/derive arrays in the
- * consuming component to avoid unnecessary re-renders.
- */
-export const useReportsList = () => {
-  return useReportStore((state) => state.reports);
-};
-
-/**
- * Hook to check if there are any reports
- */
-export const useHasReports = () => {
-  return useReportStore((state) => Object.keys(state.reports).length > 0);
-};
-
-// ============================================================================
 // Initialization
 // ============================================================================
 

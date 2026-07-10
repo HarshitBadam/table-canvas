@@ -1,0 +1,113 @@
+@media print {
+
+  .chart-block,
+  .chart-block-container {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin: 12pt 0 !important;
+    border: 1px solid #e0e0e0 !important;
+    border-radius: 4pt !important;
+    padding: 10pt !important;
+    background: white !important;
+    max-height: 5in !important; /* Prevent charts from being too tall */
+  }
+
+  .chart-block svg,
+  .chart-block-body {
+    max-width: 100% !important;
+    max-height: 4in !important;
+    height: auto !important;
+  }
+
+  .chart-block-header {
+    border-bottom: 1px solid #e5e5e5 !important;
+    padding-bottom: 6pt !important;
+    margin-bottom: 6pt !important;
+    font-size: 11pt !important;
+  }
+
+  .chart-block-footer {
+    font-size: 8pt !important;
+    color: #888 !important;
+    border-top: 1px solid #e5e5e5 !important;
+    padding-top: 6pt !important;
+    margin-top: 6pt !important;
+  }
+
+  .chart-block-container > div:first-child[style*="background"],
+  .chart-block-footer button {
+    display: none !important;
+  }
+
+  /* Tables - can span pages with repeating headers */
+
+  .table-snippet-block,
+  .table-block-container {
+    margin: 12pt 0 !important;
+    /* Keep tables together - avoid splitting */
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Only allow large tables to break if absolutely necessary */
+  .table-block-container.table-large {
+    page-break-inside: auto !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 8.5pt !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* For large tables that must break, repeat header on each page */
+  .table-large table {
+    page-break-inside: auto !important;
+  }
+
+  .table-large thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: auto;
+  }
+
+  th, td {
+    border: 1px solid #d5d5d5 !important;
+    padding: 5pt 8pt !important;
+    text-align: left !important;
+  }
+
+  th {
+    background: #f5f7f5 !important;
+    font-weight: 600 !important;
+    color: #333 !important;
+    border-bottom: 2px solid #217346 !important;
+  }
+
+  tr:nth-child(even) td {
+    background: #fbfcfb !important;
+  }
+
+  .table-block-footer {
+    font-size: 8pt !important;
+    color: #888 !important;
+    padding-top: 4pt !important;
+  }
+
+  /* Keep table with its header */
+  .table-block-header {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+}

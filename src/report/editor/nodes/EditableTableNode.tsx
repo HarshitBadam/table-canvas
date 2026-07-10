@@ -1,16 +1,7 @@
-/**
- * EditableTableNode - TipTap Custom Node for Editable Tables
- *
- * A blank table that users can edit directly.
- */
-
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 import { useState, useCallback, useMemo, memo, useRef, useEffect } from 'react';
-
-// ============================================================================
-// Types
-// ============================================================================
+import { DimensionPicker } from './DimensionPicker';
 
 interface EditableTableNodeAttrs {
   headers: string[];
@@ -32,10 +23,6 @@ interface ContextMenuState {
   colIndex?: number;
 }
 
-// ============================================================================
-// React Component
-// ============================================================================
-
 const EditableTableNodeView = memo(function EditableTableNodeView({
   node,
   updateAttributes,
@@ -48,7 +35,6 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
   const [showDimensionPicker, setShowDimensionPicker] = useState(!attrs.initialized);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
-  // Handle dimension selection
   const handleDimensionSelect = useCallback((rows: number, cols: number) => {
     const newHeaders = Array.from({ length: cols }, (_, i) => `Column ${i + 1}`);
     const newRows = Array.from({ length: rows }, () => newHeaders.map(() => ''));
@@ -56,7 +42,6 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
     setShowDimensionPicker(false);
   }, [updateAttributes]);
 
-  // Initialize with default if empty (memoized so callback deps stay stable)
   const headers = useMemo(
     () => (attrs.headers.length > 0 ? attrs.headers : ['Column 1', 'Column 2', 'Column 3']),
     [attrs.headers]
@@ -66,7 +51,6 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
     [attrs.rows]
   );
 
-  // Close context menu on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as globalThis.Node)) {
@@ -188,11 +172,10 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
     setContextMenu(null);
   }, [headers, rows, updateAttributes]);
 
-  // Show dimension picker modal for new tables
   if (showDimensionPicker) {
     return (
       <NodeViewWrapper className="editable-table-block">
-        <DimensionPickerModal
+        <DimensionPicker
           onSelect={handleDimensionSelect}
           onCancel={() => {
             // Use default 3x3
@@ -206,13 +189,11 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
   return (
     <NodeViewWrapper className="editable-table-block">
       <div className={`editable-table-outer ${selected ? 'is-selected' : ''}`}>
-        {/* Caption */}
         {attrs.caption && (
           <div className="editable-table-caption">{attrs.caption}</div>
         )}
 
         <div className="editable-table-layout">
-          {/* Main table */}
           <div className="editable-table-container">
             <table className="editable-table">
               <thead>
@@ -274,7 +255,6 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
             </table>
           </div>
 
-          {/* Add column button - right side */}
           {selected && (
             <button
               onClick={() => addColumn()}
@@ -288,7 +268,6 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
           )}
         </div>
 
-        {/* Add row button - bottom */}
         {selected && (
           <button
             onClick={() => addRow()}
@@ -301,7 +280,6 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
           </button>
         )}
 
-        {/* Context Menu */}
         {contextMenu && (
           <div
             ref={contextMenuRef}
@@ -371,71 +349,6 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
     </NodeViewWrapper>
   );
 });
-
-// ============================================================================
-// Dimension Picker Modal Component
-// ============================================================================
-
-function DimensionPickerModal({ onSelect, onCancel }: { onSelect: (rows: number, cols: number) => void; onCancel: () => void }) {
-  const [rows, setRows] = useState(3);
-  const [cols, setCols] = useState(3);
-
-  const increment = (setter: React.Dispatch<React.SetStateAction<number>>, max: number) => {
-    setter(prev => Math.min(prev + 1, max));
-  };
-
-  const decrement = (setter: React.Dispatch<React.SetStateAction<number>>, min: number) => {
-    setter(prev => Math.max(prev - 1, min));
-  };
-
-  return (
-    <div className="dimension-modal-overlay" onClick={onCancel}>
-      <div className="dimension-modal" onClick={e => e.stopPropagation()}>
-        <div className="dimension-modal-header">
-          <h3>Insert Table</h3>
-          <button className="dimension-modal-close" onClick={onCancel}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="dimension-modal-body">
-          <div className="dimension-input-group">
-            <label>Rows</label>
-            <div className="dimension-stepper">
-              <button onClick={() => decrement(setRows, 1)} disabled={rows <= 1}>−</button>
-              <span>{rows}</span>
-              <button onClick={() => increment(setRows, 20)}>+</button>
-            </div>
-          </div>
-
-          <span className="dimension-separator">×</span>
-
-          <div className="dimension-input-group">
-            <label>Columns</label>
-            <div className="dimension-stepper">
-              <button onClick={() => decrement(setCols, 1)} disabled={cols <= 1}>−</button>
-              <span>{cols}</span>
-              <button onClick={() => increment(setCols, 20)}>+</button>
-            </div>
-          </div>
-        </div>
-
-        <div className="dimension-modal-footer">
-          <button className="dimension-btn-cancel" onClick={onCancel}>Cancel</button>
-          <button className="dimension-btn-create" onClick={() => onSelect(rows, cols)}>
-            Create {rows} × {cols} Table
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// TipTap Node Definition
-// ============================================================================
 
 export const EditableTableNode = Node.create<EditableTableNodeOptions>({
   name: 'editableTable',

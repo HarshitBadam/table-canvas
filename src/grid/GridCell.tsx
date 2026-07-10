@@ -1,7 +1,7 @@
 import { useRef, useEffect, useMemo } from 'react'
 import type { ColumnSchema } from '@/types'
 import { formatNumber } from '@/lib/utils'
-import { useGridContext } from './GridContext'
+import { useGridContext } from './useGridContext'
 import type { GridRow } from './types'
 
 interface GridCellProps {

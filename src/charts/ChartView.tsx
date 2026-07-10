@@ -24,9 +24,12 @@ export function ChartView({ chartId }: ChartViewProps) {
   )
   const sourceVersionHash = sourceTable?.cacheInfo?.currentVersionHash
   
-  const columns = sourceTable?.schema?.columns || []
-  const numericColumns = columns.filter(c => c.type === 'number')
-  const categoricalColumns = columns.filter(c => c.type === 'string' || c.type === 'date')
+  const columns = useMemo(() => sourceTable?.schema?.columns ?? [], [sourceTable?.schema?.columns])
+  const numericColumns = useMemo(() => columns.filter(c => c.type === 'number'), [columns])
+  const categoricalColumns = useMemo(
+    () => columns.filter(c => c.type === 'string' || c.type === 'date'),
+    [columns],
+  )
   
   const columnNames = useMemo(() => {
     const names: Record<string, string> = {}
@@ -34,7 +37,7 @@ export function ChartView({ chartId }: ChartViewProps) {
     return names
   }, [columns])
   
-  const config = chartNode?.plan.config || {}
+  const config = useMemo(() => chartNode?.plan.config ?? {}, [chartNode?.plan.config])
   const { data: chartData, loading, error, refetch } = useChartData(sourceTableId, config, sourceVersionHash, columns)
   
   const [isEditingName, setIsEditingName] = useState(false)

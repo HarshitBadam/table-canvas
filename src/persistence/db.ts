@@ -1,18 +1,6 @@
-/**
- * IndexedDB Persistence Layer
- *
- * Entry point that initializes the database and re-exports all storage operations.
- * Implementation is split across:
- *   - dbCore.ts          — schema, migration, getDB()
- *   - projectStorage.ts  — project CRUD
- *   - fileStorage.ts     — file blob CRUD
- *   - cacheStorage.ts    — computed cache CRUD
- *   - reportStorage.ts   — report CRUD
- *   - exportImport.ts    — project export/import with embedded files
- */
-
 export { getDB } from './dbCore'
-export type { TableCanvasDB, SerializedPatches } from './dbCore'
+export type { TableCanvasDB } from './dbCore'
+export type { SerializedPatches } from './patchSerialization'
 
 export { saveProject, loadProject, listProjects, deleteProject } from './projectStorage'
 export type { StoredProject } from './projectStorage'

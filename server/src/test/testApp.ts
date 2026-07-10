@@ -40,11 +40,3 @@ export function createDefaultMockUser(): MockUser {
     email: `test-${userId.toString().slice(-6)}@example.com`,
   };
 }
-
-export function createSecondMockUser(): MockUser {
-  const userId = new Types.ObjectId();
-  return {
-    userId: userId.toString(),
-    email: `other-${userId.toString().slice(-6)}@example.com`,
-  };
-}

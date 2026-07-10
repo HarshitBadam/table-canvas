@@ -1,46 +1,16 @@
-/**
- * EmbeddedTableNode - TipTap Custom Node for Embedded Tables
- *
- * Renders a live snapshot of a workspace table (source or derived) with
- * configurable column and row selection. Data is read through the shared
- * `useTableSource` hook, which guarantees the underlying table is
- * materialized before it is displayed.
- */
-
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 import { useState, useCallback, useMemo, memo } from 'react';
-import type { ColumnSchema } from '@/types';
 import {
   useTableSource,
   selectRows,
   resolveDisplayColumns,
   toggleColumnSelection,
   DEFAULT_ROW_LIMIT,
-  type RowSelectionMode,
 } from '../tableData';
 import { TablePickerModal } from './TablePickerModal';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface EmbeddedTableNodeAttrs {
-  sourceTableId: string;
-  selectedColumns: string[];
-  rowSelectionMode: RowSelectionMode;
-  rowLimit: number;
-  caption?: string;
-}
-
-interface EmbeddedTableNodeOptions {
-  reportId?: string;
-  onOpenTable?: (tableId: string) => void;
-}
-
-// ============================================================================
-// Shared block chrome
-// ============================================================================
+import { EmbeddedTableConfigPanel } from './EmbeddedTableConfigPanel';
+import type { EmbeddedTableNodeAttrs, EmbeddedTableNodeOptions } from './embeddedTableTypes';
 
 const TableGlyph = ({ className = 'w-6 h-6' }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -89,10 +59,6 @@ function EmptyState({
   );
 }
 
-// ============================================================================
-// Node View
-// ============================================================================
-
 const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
   node,
   updateAttributes,
@@ -128,7 +94,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
 
   const handleSelectTable = useCallback(
     (tableId: string) => {
-      // Reset column selection so the new table shows all of its columns.
       updateAttributes({ sourceTableId: tableId, selectedColumns: [] });
       setShowPicker(false);
     },
@@ -143,7 +108,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
     />
   ) : null;
 
-  // ---- No source selected -------------------------------------------------
   if (status === 'no-source') {
     return (
       <NodeViewWrapper className="editable-table-block">
@@ -158,7 +122,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
     );
   }
 
-  // ---- Source missing -----------------------------------------------------
   if (status === 'missing-table') {
     return (
       <NodeViewWrapper className="editable-table-block">
@@ -173,7 +136,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
     );
   }
 
-  // ---- Loading ------------------------------------------------------------
   if (status === 'loading') {
     return (
       <NodeViewWrapper className="editable-table-block">
@@ -187,7 +149,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
     );
   }
 
-  // ---- Error / no data ----------------------------------------------------
   if (status === 'error' || status === 'empty') {
     return (
       <NodeViewWrapper className="editable-table-block">
@@ -208,11 +169,9 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
     );
   }
 
-  // ---- Ready --------------------------------------------------------------
   return (
     <NodeViewWrapper className="editable-table-block">
       <div className={`embedded-table-window ${selected ? 'is-selected' : ''}`}>
-        {/* Window Header */}
         <div className="embedded-table-header">
           <div className="embedded-table-title">
             <TableGlyph className="w-4 h-4" />
@@ -228,7 +187,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
           </span>
         </div>
 
-        {/* Scrollable Table Content */}
         <div className="embedded-table-scroll">
           <table className="editable-table">
             <thead>
@@ -259,7 +217,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
           </table>
         </div>
 
-        {/* Footer */}
         <div className="embedded-table-footer">
           <span>
             Showing {displayRows.length} of {rowCount} rows
@@ -271,9 +228,8 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
           )}
         </div>
 
-        {/* Config Panel */}
         {showConfig && (
-          <TableConfigPanel
+          <EmbeddedTableConfigPanel
             attrs={attrs}
             columns={columns}
             onUpdate={updateAttributes}
@@ -290,116 +246,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
     </NodeViewWrapper>
   );
 });
-
-// ============================================================================
-// Config Panel
-// ============================================================================
-
-interface TableConfigPanelProps {
-  attrs: EmbeddedTableNodeAttrs;
-  columns: ColumnSchema[];
-  onUpdate: (attrs: Partial<EmbeddedTableNodeAttrs>) => void;
-  onColumnToggle: (columnId: string) => void;
-  onChangeTable: () => void;
-  onClose: () => void;
-}
-
-function TableConfigPanel({
-  attrs,
-  columns,
-  onUpdate,
-  onColumnToggle,
-  onChangeTable,
-  onClose,
-}: TableConfigPanelProps) {
-  const selectionEmpty = !attrs.selectedColumns || attrs.selectedColumns.length === 0;
-
-  return (
-    <div className="block-config-panel">
-      <div className="flex items-center justify-between mb-4">
-        <h4 className="font-medium text-sm">Table Configuration</h4>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Source table */}
-      <div className="block-config-section">
-        <label className="block-config-label">Source</label>
-        <button
-          onClick={onChangeTable}
-          className="input text-sm w-full text-left flex items-center justify-between"
-        >
-          <span>Change table…</span>
-          <svg className="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Columns */}
-      <div className="block-config-section">
-        <label className="block-config-label">Columns</label>
-        <div className="space-y-1 max-h-32 overflow-y-auto">
-          {columns.map((col) => (
-            <label key={col.id} className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={selectionEmpty || attrs.selectedColumns.includes(col.id)}
-                onChange={() => onColumnToggle(col.id)}
-                className="rounded border-gray-300"
-              />
-              {col.name}
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Row Selection */}
-      <div className="block-config-section">
-        <label className="block-config-label">Rows</label>
-        <select
-          value={attrs.rowSelectionMode}
-          onChange={(e) => onUpdate({ rowSelectionMode: e.target.value as RowSelectionMode })}
-          className="input text-sm w-full"
-        >
-          <option value="all">All rows</option>
-          <option value="first_n">First N rows</option>
-          <option value="last_n">Last N rows</option>
-        </select>
-
-        {(attrs.rowSelectionMode === 'first_n' || attrs.rowSelectionMode === 'last_n') && (
-          <input
-            type="number"
-            value={attrs.rowLimit}
-            onChange={(e) => onUpdate({ rowLimit: parseInt(e.target.value, 10) || DEFAULT_ROW_LIMIT })}
-            min={1}
-            max={1000}
-            className="input text-sm w-full mt-2"
-          />
-        )}
-      </div>
-
-      {/* Caption */}
-      <div className="block-config-section">
-        <label className="block-config-label">Caption</label>
-        <input
-          type="text"
-          value={attrs.caption || ''}
-          onChange={(e) => onUpdate({ caption: e.target.value })}
-          placeholder="Table caption..."
-          className="input text-sm w-full"
-        />
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// TipTap Node Definition
-// ============================================================================
 
 export const EmbeddedTableNode = Node.create<EmbeddedTableNodeOptions>({
   name: 'embeddedTable',

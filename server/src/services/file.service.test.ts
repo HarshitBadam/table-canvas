@@ -1,18 +1,7 @@
-/**
- * File Service Unit Tests
- *
- * Tests for GridFS file operations with mocked dependencies.
- */
-
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import mongoose from 'mongoose';
 import { Types } from 'mongoose';
 
-// ============================================================================
-// Mock Setup
-// ============================================================================
-
-// Mock GridFSBucket
 const mockUploadStream = {
   id: new Types.ObjectId(),
   on: vi.fn(),
@@ -30,35 +19,37 @@ const mockGridFSBucket = {
   delete: vi.fn(),
 };
 
-// Mock collection
 const mockCollection = {
   findOne: vi.fn(),
+  find: vi.fn(),
 };
 
-// Mock db
 const mockDb = {
   collection: vi.fn(() => mockCollection),
 };
 
+const originalDbDescriptor = Object.getOwnPropertyDescriptor(mongoose.connection, 'db');
+
 describe('FileService', () => {
   beforeEach(() => {
-    // Reset all mocks
     vi.clearAllMocks();
 
-    // Setup mongoose connection mock
     Object.defineProperty(mongoose.connection, 'db', {
       get: () => mockDb,
       configurable: true,
     });
   });
 
-  // ============================================================================
-  // uploadFile Tests
-  // ============================================================================
+  afterAll(() => {
+    if (originalDbDescriptor) {
+      Object.defineProperty(mongoose.connection, 'db', originalDbDescriptor);
+    } else {
+      delete (mongoose.connection as unknown as { db?: unknown }).db;
+    }
+  });
 
   describe('uploadFile', () => {
     it('should upload file to GridFS and return metadata', async () => {
-      // Mock stream events
       mockUploadStream.on.mockImplementation((event, callback) => {
         if (event === 'finish') {
           setTimeout(() => callback(), 0);
@@ -66,8 +57,6 @@ describe('FileService', () => {
         return mockUploadStream;
       });
 
-      // We can't directly test the function without the actual GridFS setup
-      // This is a structural test showing how to mock
       expect(mockGridFSBucket.openUploadStream).toBeDefined();
     });
 
@@ -78,7 +67,6 @@ describe('FileService', () => {
         projectId: 'project456',
       };
 
-      // Verify metadata structure
       expect(metadata).toHaveProperty('originalName');
       expect(metadata).toHaveProperty('userId');
       expect(metadata).toHaveProperty('projectId');
@@ -92,21 +80,15 @@ describe('FileService', () => {
         return mockUploadStream;
       });
 
-      // Error handling verification
       expect(mockUploadStream.on).toBeDefined();
     });
   });
-
-  // ============================================================================
-  // downloadFile Tests
-  // ============================================================================
 
   describe('downloadFile', () => {
     it('should return file stream for valid ID and user', async () => {
       const fileId = new Types.ObjectId().toString();
       const userId = 'user123';
 
-      // Mock file document
       mockCollection.findOne.mockResolvedValue({
         _id: new Types.ObjectId(fileId),
         filename: 'test.csv',
@@ -115,7 +97,6 @@ describe('FileService', () => {
         metadata: { userId },
       });
 
-      // Verify findOne is callable
       const result = await mockCollection.findOne({
         _id: new Types.ObjectId(fileId),
       });
@@ -147,7 +128,6 @@ describe('FileService', () => {
         _id: new Types.ObjectId(fileId),
       });
 
-      // Should not match the requesting user
       expect(result.metadata.userId).not.toBe('user123');
     });
 
@@ -170,10 +150,6 @@ describe('FileService', () => {
     });
   });
 
-  // ============================================================================
-  // deleteFile Tests
-  // ============================================================================
-
   describe('deleteFile', () => {
     it('should delete file from GridFS for authorized user', async () => {
       const fileId = new Types.ObjectId().toString();
@@ -186,7 +162,6 @@ describe('FileService', () => {
 
       mockGridFSBucket.delete.mockResolvedValue(undefined);
 
-      // Verify ownership check
       const file = await mockCollection.findOne({
         _id: new Types.ObjectId(fileId),
       });
@@ -216,14 +191,9 @@ describe('FileService', () => {
         _id: new Types.ObjectId(fileId),
       });
 
-      // Should fail ownership check
       expect(file.metadata.userId).not.toBe('user123');
     });
   });
-
-  // ============================================================================
-  // listUserFiles Tests
-  // ============================================================================
 
   describe('listUserFiles', () => {
     it('should return all files for a user', async () => {
@@ -249,7 +219,7 @@ describe('FileService', () => {
         toArray: vi.fn().mockResolvedValue(files),
       };
 
-      mockCollection.find = vi.fn().mockReturnValue(mockCursor);
+      mockCollection.find.mockReturnValue(mockCursor);
 
       const result = await mockCursor.toArray();
 
@@ -263,7 +233,7 @@ describe('FileService', () => {
         toArray: vi.fn().mockResolvedValue([]),
       };
 
-      mockCollection.find = vi.fn().mockReturnValue(mockCursor);
+      mockCollection.find.mockReturnValue(mockCursor);
 
       await mockCursor.sort({ uploadDate: -1 }).toArray();
 
@@ -276,17 +246,13 @@ describe('FileService', () => {
         toArray: vi.fn().mockResolvedValue([]),
       };
 
-      mockCollection.find = vi.fn().mockReturnValue(mockCursor);
+      mockCollection.find.mockReturnValue(mockCursor);
 
       const result = await mockCursor.toArray();
 
       expect(result).toHaveLength(0);
     });
   });
-
-  // ============================================================================
-  // getFileMetadata Tests
-  // ============================================================================
 
   describe('getFileMetadata', () => {
     it('should return file metadata for valid file and user', async () => {
@@ -335,10 +301,6 @@ describe('FileService', () => {
     });
   });
 
-  // ============================================================================
-  // getGridFSBucket Tests
-  // ============================================================================
-
   describe('getGridFSBucket', () => {
     it('should throw error if database not connected', () => {
       Object.defineProperty(mongoose.connection, 'db', {
@@ -346,12 +308,10 @@ describe('FileService', () => {
         configurable: true,
       });
 
-      // This tests the error condition
       expect(mongoose.connection.db).toBeNull();
     });
 
     it('should create bucket with correct name', () => {
-      // Verify bucket configuration
       const bucketConfig = {
         bucketName: 'files',
       };

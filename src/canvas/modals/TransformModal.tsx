@@ -145,8 +145,8 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       ? rightNode.schema?.columns ?? [] : []
   , [rightNode])
 
-  const leftData = tableData[sourceNodeId]?.rows ?? []
-  const rightData = tableData[targetNodeId]?.rows ?? []
+  const leftData = useMemo(() => tableData[sourceNodeId]?.rows ?? [], [tableData, sourceNodeId])
+  const rightData = useMemo(() => tableData[targetNodeId]?.rows ?? [], [tableData, targetNodeId])
 
   const allCols = useMemo(() => [
     ...leftCols.map(c => ({ id: `L:${c.id}`, colId: c.id, name: c.name, type: c.type, side: 'L' as const, table: leftNode?.name })),

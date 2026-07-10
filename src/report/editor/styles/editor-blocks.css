@@ -1,0 +1,195 @@
+.tiptap-block-wrapper {
+  position: relative;
+  margin: 0.75rem 0;
+  border-radius: 8px;
+  transition: all 150ms ease;
+}
+
+.tiptap-block-wrapper:first-child {
+  margin-top: 0;
+}
+
+.tiptap-block-wrapper:hover {
+  background: var(--color-surface-hover, rgba(0, 0, 0, 0.02));
+}
+
+[data-theme="dark"] .tiptap-block-wrapper:hover {
+  background: var(--color-surface-hover, rgba(255, 255, 255, 0.02));
+}
+
+.tiptap-block-wrapper.is-selected {
+  background: rgba(33, 115, 70, 0.05);
+  box-shadow: inset 3px 0 0 var(--color-accent-green);
+}
+
+.tiptap-block-wrapper.is-dragging {
+  opacity: 0.5;
+}
+
+.block-toolbar {
+  position: absolute;
+  top: 0;
+  left: -44px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  z-index: 10;
+}
+
+.tiptap-block-wrapper:hover .block-toolbar,
+.tiptap-block-wrapper.is-selected .block-toolbar {
+  opacity: 1;
+}
+
+.block-toolbar-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  color: var(--color-text-tertiary, #a1a1aa);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 100ms ease;
+}
+
+.block-toolbar-button:hover {
+  background: var(--color-surface-secondary, #f4f4f5);
+  color: var(--color-text-secondary, #71717a);
+}
+
+[data-theme="dark"] .block-toolbar-button:hover {
+  background: var(--color-surface-secondary, #27272a);
+  color: var(--color-text-secondary, #a1a1aa);
+}
+
+.block-toolbar-button.drag-handle {
+  cursor: grab;
+}
+
+.block-toolbar-button.drag-handle:active {
+  cursor: grabbing;
+}
+
+.block-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  border: 1px dashed var(--color-border, #e4e4e7);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  text-align: center;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+[data-theme="dark"] .block-empty-state {
+  border-color: var(--color-border, #3f3f46);
+  background: var(--color-surface, #18181b);
+}
+
+.block-empty-state:hover {
+  border-color: var(--color-accent-green);
+  background: rgba(33, 115, 70, 0.03);
+}
+
+[data-theme="dark"] .block-empty-state:hover {
+  background: rgba(33, 115, 70, 0.08);
+}
+
+.block-empty-state.is-selected {
+  border-color: var(--color-accent-green);
+  border-style: solid;
+  background: rgba(33, 115, 70, 0.03);
+}
+
+[data-theme="dark"] .block-empty-state.is-selected {
+  background: rgba(33, 115, 70, 0.08);
+}
+
+.block-empty-state svg {
+  color: var(--color-accent-green);
+  margin-bottom: 8px;
+}
+
+[data-theme="dark"] .block-empty-state svg {
+  color: var(--color-accent-green);
+}
+
+.block-empty-state-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.6;
+}
+
+.block-empty-state-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #18181b);
+  margin-bottom: 4px;
+}
+
+[data-theme="dark"] .block-empty-state-title {
+  color: var(--color-text-primary, #fafafa);
+}
+
+.block-empty-state-description {
+  font-size: 12px;
+  color: var(--color-text-tertiary, #a1a1aa);
+}
+
+.block-config-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  padding: 1rem;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e4e4e7);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+  animation: slideDown 150ms ease;
+}
+
+[data-theme="dark"] .block-config-panel {
+  background: var(--color-surface, #18181b);
+  border-color: var(--color-border, #3f3f46);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.block-config-section {
+  margin-bottom: 1rem;
+}
+
+.block-config-section:last-child {
+  margin-bottom: 0;
+}
+
+.block-config-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #71717a);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

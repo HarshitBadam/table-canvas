@@ -1,6 +1,9 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb'
-import type { ProjectNode, Edge, Patches } from '@/types'
+import type { ProjectNode, Edge } from '@/types'
 import type { Report } from '@/report/types'
+import type { SerializedPatches } from './patchSerialization'
+
+export type { SerializedPatches } from './patchSerialization'
 
 export interface TableCanvasDB extends DBSchema {
   projects: {
@@ -10,7 +13,7 @@ export interface TableCanvasDB extends DBSchema {
       name: string
       nodes: Record<string, ProjectNode>
       edges: Record<string, Edge>
-      patches: Record<string, Patches>
+      patches: Record<string, SerializedPatches>
       createdAt: string
       updatedAt: string
     }
@@ -41,13 +44,6 @@ export interface TableCanvasDB extends DBSchema {
     value: Report
     indexes: { 'by-updated': string }
   }
-}
-
-export interface SerializedPatches {
-  cellPatches: Record<string, Record<string, unknown>>
-  deletedRows: string[]
-  insertedRows: Array<{ rowId: string; values: Record<string, unknown>; insertedAt: number }>
-  highlightedCells: string[]
 }
 
 const DB_NAME = 'table-canvas'

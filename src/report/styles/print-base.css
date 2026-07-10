@@ -1,0 +1,124 @@
+@media print {
+
+  .print\:hidden,
+  header,
+  nav,
+  aside,
+  button,
+  .btn,
+  [role="navigation"],
+  .no-print,
+  .report-toolbar-v2,
+  .block-toolbar,
+  .block-config-panel,
+  .slash-command-menu,
+  .tiptap-block-wrapper.is-selected::before {
+    display: none !important;
+  }
+
+  .print\:block,
+  .hidden.print\:block {
+    display: block !important;
+  }
+
+  @page {
+    margin: 0.6in;
+    size: letter;
+  }
+
+  @page :first {
+    margin-top: 0.5in;
+  }
+
+  /* Try to minimize browser chrome - note: actual header/footer
+     can only be disabled in browser print settings */
+
+  body {
+    background: white !important;
+    color: #1a1a1a !important;
+    font-size: 11pt !important;
+    line-height: 1.6 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .report-view {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    background: white !important;
+  }
+
+  .report-view > div {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .tiptap-editor h1:first-child,
+  .report-title {
+    font-size: 22pt !important;
+    font-weight: 700 !important;
+    margin-top: 0 !important;
+    margin-bottom: 16pt !important;
+    color: #1a1a1a !important;
+    page-break-after: avoid;
+    border-bottom: 2px solid #217346;
+    padding-bottom: 8pt;
+  }
+
+  h1 {
+    font-size: 18pt !important;
+    font-weight: 700 !important;
+    margin-top: 20pt !important;
+    margin-bottom: 10pt !important;
+    color: #1a1a1a !important;
+    page-break-after: avoid;
+  }
+
+  h2 {
+    font-size: 14pt !important;
+    font-weight: 600 !important;
+    margin-top: 16pt !important;
+    margin-bottom: 8pt !important;
+    color: #1a1a1a !important;
+    page-break-after: avoid;
+  }
+
+  h3 {
+    font-size: 12pt !important;
+    font-weight: 600 !important;
+    margin-top: 14pt !important;
+    margin-bottom: 6pt !important;
+    color: #333 !important;
+    page-break-after: avoid;
+  }
+
+  /* Text blocks - prevent splitting */
+  p {
+    orphans: 4;
+    widows: 4;
+    margin-bottom: 10pt !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Keep short paragraphs together */
+  p:has(~ p) {
+    page-break-after: auto;
+  }
+
+  a {
+    color: #217346 !important;
+    text-decoration: none !important;
+  }
+
+  code {
+    background: #f5f5f5 !important;
+    padding: 2pt 4pt !important;
+    border-radius: 3pt !important;
+    font-size: 9pt !important;
+    font-family: 'SF Mono', Monaco, Consolas, monospace !important;
+  }
+
+}

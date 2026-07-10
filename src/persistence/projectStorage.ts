@@ -1,5 +1,6 @@
 import type { ProjectNode, Edge, Patches } from '@/types'
-import { getDB, type SerializedPatches } from './dbCore'
+import { getDB } from './dbCore'
+import { serializePatches, type SerializedPatches } from './patchSerialization'
 
 export interface StoredProject {
   id: string
@@ -20,22 +21,12 @@ export async function saveProject(
 ): Promise<void> {
   const db = await getDB()
 
-  const serializedPatches: Record<string, SerializedPatches> = {}
-  for (const [tableId, tablePatch] of Object.entries(patches)) {
-    serializedPatches[tableId] = {
-      cellPatches: tablePatch.cellPatches,
-      deletedRows: Array.from(tablePatch.deletedRows),
-      insertedRows: tablePatch.insertedRows,
-      highlightedCells: Array.from(tablePatch.highlightedCells || []),
-    }
-  }
-
   const project = {
     id,
     name,
     nodes,
     edges,
-    patches: serializedPatches,
+    patches: serializePatches(patches),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }

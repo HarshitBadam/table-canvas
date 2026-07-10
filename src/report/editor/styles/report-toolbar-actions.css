@@ -1,0 +1,68 @@
+.report-toolbar-v2-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-toolbar-v2-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 100ms ease;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.report-toolbar-v2-action:hover {
+  border-color: #217346;
+  color: #217346;
+  background: rgba(33, 115, 70, 0.04);
+}
+
+.report-toolbar-v2-action svg {
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .report-toolbar-v2-action {
+  border-color: #333;
+  background: #1f1f1f;
+  color: #d1d5db;
+}
+
+[data-theme="dark"] .report-toolbar-v2-action:hover {
+  border-color: #4ade80;
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.08);
+}
+
+@media print {
+  .tiptap-editor {
+    min-height: auto;
+  }
+
+  .block-toolbar,
+  .block-config-panel,
+  .slash-command-menu {
+    display: none !important;
+  }
+
+  .tiptap-block-wrapper {
+    box-shadow: none !important;
+    background: none !important;
+  }
+
+  .callout-block {
+    break-inside: avoid;
+  }
+
+  .chart-block-container,
+  .table-block-container {
+    break-inside: avoid;
+  }
+}

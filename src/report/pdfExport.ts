@@ -187,7 +187,6 @@ export async function exportReportToPDF(
   
   const selectorsToRemove = [
     '.report-toolbar-v2',
-    '.report-toolbar', 
     '.block-toolbar',
     '.slash-command-menu',
     '.ProseMirror-gapcursor',

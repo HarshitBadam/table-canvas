@@ -2,16 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@duckdb/duckdb-wasm', () => ({}))
 
-// We test the buildFilterClause and escapeLiteral functions indirectly
-// by importing and calling getFilteredSlice with a mocked connection.
-// Since buildFilterClause is a private function, we test via the SQL output.
-
 const mockQuery = vi.fn()
 const mockConn = {
   query: mockQuery,
 } as unknown as import('@duckdb/duckdb-wasm').AsyncDuckDBConnection
 
-// Import functions under test
 import { getFilteredSlice, updateCell, getDistinctValues } from './tableOperations'
 
 describe('getFilteredSlice SQL builder', () => {
@@ -48,7 +43,6 @@ describe('getFilteredSlice SQL builder', () => {
     )
 
     const dataSql = mockQuery.mock.calls[1][0] as string
-    // The value should be properly escaped (quotes doubled)
     expect(dataSql).toContain("''; drop table users; --'")
     expect(dataSql).not.toContain("'; DROP TABLE")
   })
@@ -111,7 +105,6 @@ describe('getFilteredSlice SQL builder', () => {
       undefined, undefined, 'hello', 0, 50
     )
 
-    // DESCRIBE should have been called to get columns for search
     const describeCalled = mockQuery.mock.calls.some(
       (call) => (call[0] as string).includes('DESCRIBE')
     )

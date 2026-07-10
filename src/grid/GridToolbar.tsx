@@ -1,7 +1,7 @@
 import type { ViewFilterConfig } from '@/types'
 import { hasActiveFilters, countActiveFilters } from './filterUtils'
 import { formatNumber } from '@/lib/utils'
-import { useGridContext } from './GridContext'
+import { useGridContext } from './useGridContext'
 
 interface GridToolbarProps {
   totalRows: number

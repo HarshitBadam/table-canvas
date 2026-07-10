@@ -6,24 +6,10 @@
  * (d) Materialization trigger for embedded nodes
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import type { SourceTableNode, DerivedTableNode } from '@/types'
 import { generateReportHtml, collectEmbeddedTableIds, buildEmbeddedDataMap } from '@/persistence/reportHtmlGenerator'
 import type { Report } from '@/report/types'
-
-// ---- Mocks ----
-
-const mockProjectStore = {
-  nodes: {} as Record<string, SourceTableNode | DerivedTableNode>,
-  getState: vi.fn(),
-}
-mockProjectStore.getState.mockReturnValue(mockProjectStore)
-
-vi.mock('@/state/projectStore', () => ({
-  useProjectStore: {
-    getState: () => mockProjectStore,
-  },
-}))
 
 // ---- Helpers ----
 
@@ -64,12 +50,6 @@ function createDerivedTable(id: string, name: string): DerivedTableNode {
     updatedAt: new Date().toISOString(),
   }
 }
-
-beforeEach(() => {
-  vi.clearAllMocks()
-  mockProjectStore.nodes = {}
-})
-
 
 // ---------- (a) Node filter ----------
 
@@ -148,7 +128,7 @@ describe('Column checkbox toggle semantics', () => {
 
 describe('Report HTML export for embedded tables', () => {
   it('renders embeddedTable nodes as HTML <table> elements', () => {
-    mockProjectStore.nodes = { t1: createSourceTable('t1', 'Sales') }
+    const nodes = { t1: createSourceTable('t1', 'Sales') }
 
     const report: Report = {
       id: 'r1',
@@ -178,7 +158,7 @@ describe('Report HTML export for embedded tables', () => {
         { __rowId: 'r1', col_a: 'Alice', col_b: 30, col_c: 'NYC' },
         { __rowId: 'r2', col_a: 'Bob', col_b: 25, col_c: 'LA' },
       ],
-    }])
+    }], nodes)
 
     const html = generateReportHtml(report, dataMap)
 
@@ -191,7 +171,7 @@ describe('Report HTML export for embedded tables', () => {
   })
 
   it('respects selectedColumns filter in export', () => {
-    mockProjectStore.nodes = { t1: createSourceTable('t1', 'Sales') }
+    const nodes = { t1: createSourceTable('t1', 'Sales') }
 
     const report: Report = {
       id: 'r1',
@@ -219,7 +199,7 @@ describe('Report HTML export for embedded tables', () => {
       rows: [
         { __rowId: 'r1', col_a: 'Alice', col_b: 30, col_c: 'NYC' },
       ],
-    }])
+    }], nodes)
 
     const html = generateReportHtml(report, dataMap)
 
@@ -230,7 +210,7 @@ describe('Report HTML export for embedded tables', () => {
   })
 
   it('renders chartBlock with source info', () => {
-    mockProjectStore.nodes = { t1: createSourceTable('t1', 'Sales') }
+    const nodes = { t1: createSourceTable('t1', 'Sales') }
 
     const report: Report = {
       id: 'r1',
@@ -255,7 +235,7 @@ describe('Report HTML export for embedded tables', () => {
     const dataMap = buildEmbeddedDataMap([{
       tableId: 't1',
       rows: [{ __rowId: 'r1', col_a: 'x', col_b: 1, col_c: 'y' }],
-    }])
+    }], nodes)
 
     const html = generateReportHtml(report, dataMap)
 

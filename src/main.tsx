@@ -5,7 +5,7 @@ import { enableMapSet } from 'immer'
 import './styles/index.css'
 import App from './layout/App'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { ThemeProvider } from './components/ThemeToggle'
+import { ThemeProvider } from './components/ThemeProvider'
 import { AppProvider } from './state/AppContext'
 
 // Enable Immer's MapSet plugin for Set/Map support in stores

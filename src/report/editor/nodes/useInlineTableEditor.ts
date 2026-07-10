@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import type { NodeViewProps } from '@tiptap/react';
 import type { ContextMenuState } from './TableContextMenu';
@@ -18,8 +18,8 @@ export function useInlineTableEditor(
   updateAttributes: NodeViewProps['updateAttributes'],
 ) {
   const attrs = node.attrs as InlineTableNodeAttrs;
-  const headers = attrs.headers || [];
-  const rows = attrs.rows || [];
+  const headers = useMemo(() => attrs.headers ?? [], [attrs.headers]);
+  const rows = useMemo(() => attrs.rows ?? [], [attrs.rows]);
 
   const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -93,7 +93,7 @@ export function useInlineTableEditor(
     } else if (e.key === 'Escape') {
       setEditingCell(null);
     }
-  }, [handleCellBlur, editingCell, rows, headers, updateAttributes]);
+  }, [handleCellBlur, editingCell, editValue, rows, headers, updateAttributes]);
 
   const handleHeaderClick = useCallback((colIndex: number) => {
     setEditValue(headers[colIndex] || '');

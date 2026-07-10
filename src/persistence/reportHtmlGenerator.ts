@@ -1,12 +1,12 @@
 import type { Report } from '@/report/types'
 import type { JSONContent } from '@tiptap/core'
 import type { TableRow } from '@/state/dataStore'
-import { useProjectStore } from '@/state/projectStore'
-import type { TableNode } from '@/types'
+import type { ProjectNode, TableNode } from '@/types'
 
 export interface EmbeddedTableData {
   tableName: string
   headers: string[]
+  columnNames?: Record<string, string>
   rows: Record<string, unknown>[]
 }
 
@@ -46,15 +46,6 @@ function renderEmbeddedTable(
     displayRows = displayRows.slice(-rowLimit)
   }
 
-  const projectNodes = useProjectStore.getState().nodes
-  const tableNode = projectNodes[tableId] as TableNode | undefined
-  const colNameMap: Record<string, string> = {}
-  if (tableNode?.schema?.columns) {
-    for (const col of tableNode.schema.columns) {
-      colNameMap[col.id] = col.name
-    }
-  }
-
   let html = ''
   if (caption) {
     html += `<p><em>${escapeHtml(caption)}</em></p>\n`
@@ -62,7 +53,7 @@ function renderEmbeddedTable(
   html += '<table border="1" style="border-collapse: collapse; width: 100%;">\n'
   html += '<thead><tr>'
   for (const colId of displayHeaders) {
-    const name = colNameMap[colId] || colId
+    const name = entry.columnNames?.[colId] || colId
     html += `<th style="padding: 8px; text-align: left;">${escapeHtml(name)}</th>`
   }
   html += '</tr></thead>\n<tbody>'
@@ -217,21 +208,20 @@ export function collectEmbeddedTableIds(content: JSONContent): Array<{ tableId: 
   return results
 }
 
-/**
- * Build an EmbeddedDataMap from pre-fetched rows.
- */
 export function buildEmbeddedDataMap(
   entries: Array<{ tableId: string; rows: TableRow[] }>,
+  nodes: Record<string, ProjectNode>,
 ): EmbeddedDataMap {
-  const projectNodes = useProjectStore.getState().nodes
   const map: EmbeddedDataMap = {}
 
   for (const { tableId, rows } of entries) {
-    const tableNode = projectNodes[tableId] as TableNode | undefined
-    const colIds = tableNode?.schema?.columns.map(c => c.id) || []
+    const tableNode = nodes[tableId] as TableNode | undefined
+    const columns = tableNode?.schema?.columns ?? []
+    const colIds = columns.map(column => column.id)
     map[tableId] = {
       tableName: tableNode?.name || tableId,
       headers: colIds.length > 0 ? colIds : (rows.length > 0 ? Object.keys(rows[0]).filter(k => k !== '__rowId') : []),
+      columnNames: Object.fromEntries(columns.map(column => [column.id, column.name])),
       rows,
     }
   }

@@ -13,7 +13,7 @@ interface TableContextMenuProps {
   menu: ContextMenuState | null
   menuRef: React.RefObject<HTMLDivElement>
   headers: string[]
-  rows: (string | number | null)[][]
+  rows: unknown[][]
   onAddRow: (atIndex?: number) => void
   onAddColumn: (atIndex?: number) => void
   onDeleteRow: (index: number) => void

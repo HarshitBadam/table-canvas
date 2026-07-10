@@ -220,53 +220,6 @@ export function evaluateFormula(
   }
 }
 
-export function evaluateFormulaForRows(
-  formula: string,
-  rows: Array<Record<string, FormulaValue>>,
-  columns: Array<{ id: string; name: string; type: string }>
-): Array<FormulaResult> {
-  const parseResult = parseFormula(formula)
-  
-  if (!parseResult.success || !parseResult.ast) {
-    return rows.map(() => ({
-      success: false,
-      error: parseResult.error,
-    }))
-  }
-
-  return rows.map(row => {
-    try {
-      const context: EvaluationContext = { row, columns, allRows: rows }
-      const evaluator = new FormulaEvaluator(context)
-      const value = evaluator.evaluate(parseResult.ast!)
-
-      let inferredType: UserColumnType | undefined
-      if (typeof value === 'number') {
-        inferredType = 'number'
-      } else if (typeof value === 'boolean') {
-        inferredType = 'boolean'
-      } else if (typeof value === 'string') {
-        inferredType = 'string'
-      } else if (value instanceof Date) {
-        inferredType = 'date'
-      }
-
-      return {
-        success: true,
-        value,
-        inferredType,
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: {
-          message: error instanceof Error ? error.message : String(error),
-        },
-      }
-    }
-  })
-}
-
 export function inferFormulaType(
   formula: string,
   columns: Array<{ id: string; name: string; type: string }>

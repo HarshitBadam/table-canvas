@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useWindowedRows } from './useWindowedRows'
 import type { ColumnSchema } from '@/types'
+import type { GridRow } from '../types'
 
 const mockGetSlice = vi.fn()
 const mockGetFilteredSlice = vi.fn()
@@ -76,7 +77,11 @@ describe('useWindowedRows', () => {
       await new Promise(r => setTimeout(r, 50))
     })
 
-    const row = result.current.getRowAtIndex(999)
+    let row: GridRow | null = null
+    await act(async () => {
+      row = result.current.getRowAtIndex(999)
+      await new Promise(resolve => setTimeout(resolve, 50))
+    })
     expect(row).toBeNull()
   })
 
@@ -134,10 +139,8 @@ describe('useWindowedRows', () => {
       await new Promise(r => setTimeout(r, 50))
     })
 
-    // After initial load, totalRows should be 500000 (from default mock)
     expect(result.current.totalRows).toBe(500000)
 
-    // Now set up a new response and invalidate
     mockGetSlice.mockResolvedValueOnce({
       tableId: 'test_table', offset: 0, limit: 100,
       rows: [{ __rowId: 'row_new', Name: 'Fresh', Age: 1 }],
@@ -149,7 +152,6 @@ describe('useWindowedRows', () => {
       await new Promise(r => setTimeout(r, 50))
     })
 
-    // Should have the new totalRows
     expect(result.current.totalRows).toBe(42)
   })
 
@@ -162,10 +164,9 @@ describe('useWindowedRows', () => {
       await new Promise(r => setTimeout(r, 50))
     })
 
-    // The engine was called with bounded limit, not 500000
     const calls = mockGetSlice.mock.calls
     for (const call of calls) {
-      expect(call[2]).toBeLessThanOrEqual(100) // limit is bounded
+      expect(call[2]).toBeLessThanOrEqual(100)
     }
   })
 })
