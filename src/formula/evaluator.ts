@@ -9,7 +9,7 @@ import type { UserColumnType } from '@/types'
 import { parseFormula, extractColumnReferences } from './parser'
 import { builtInFunctions, executeFunction } from './functions'
 
-export class FormulaEvaluator {
+class FormulaEvaluator {
   private context: EvaluationContext
 
   constructor(context: EvaluationContext) {

@@ -1,4 +1,4 @@
-export type { DependencyGraph } from './dependencyGraphTypes'
+
 export { buildDependencyGraph } from './dependencyGraphConstruction'
 export { detectCycles, wouldCreateCycle } from './dependencyGraphCycle'
 export { getComputationOrder, getTopologicalOrder } from './dependencyGraphOrder'

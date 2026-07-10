@@ -14,7 +14,7 @@ import {
   saveProject as saveProjectLocal,
 } from './db'
 import { deserializePatches, serializePatches } from './patchSerialization'
-import { isNetworkOnline, updateSyncStatus } from './syncState'
+import { isNetworkOnline } from './syncState'
 
 export interface ProjectWithSync {
   id: string
@@ -108,16 +108,10 @@ async function saveToBackend(
   patches: Record<string, Patches>,
 ): Promise<void> {
   if (!isNetworkOnline() || projectId.startsWith('local_')) return
-  updateSyncStatus({ isSyncing: true, error: null })
   try {
     await updateProject(projectId, { name, nodes, edges, patches: serializePatches(patches) })
-    updateSyncStatus({ isSyncing: false, lastSyncedAt: new Date(), error: null })
   } catch (error) {
     console.error('[Sync] Failed to save to backend:', error)
-    updateSyncStatus({
-      isSyncing: false,
-      error: error instanceof Error ? error.message : 'Sync failed',
-    })
   }
 }
 

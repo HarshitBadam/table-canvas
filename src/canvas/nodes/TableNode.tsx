@@ -20,21 +20,12 @@ interface TableNodeData {
     deletedRows?: Set<string>
   }
   viewFilters?: ViewFilterConfig
-  onToggleExpanded?: (nodeId: string) => void
-  onCycleViewMode?: (nodeId: string) => void
-  onSetViewMode?: (nodeId: string, mode: NodeViewMode) => void
+  onSetViewMode: (nodeId: string, mode: NodeViewMode) => void
 }
 
 
 function getViewMode(ui: NodeUI | undefined): NodeViewMode {
-  if (ui?.viewMode) {
-    // Handle legacy 'stats' mode - map to 'collapsed'
-    if ((ui.viewMode as string) === 'stats') return 'collapsed'
-    return ui.viewMode
-  }
-  // Legacy support: expanded boolean maps to data
-  if (ui?.expanded) return 'data'
-  return 'collapsed'
+  return ui?.viewMode ?? 'collapsed'
 }
 
 const VIEW_MODE_CONFIG: Record<NodeViewMode, { label: string; icon: JSX.Element }> = {
@@ -154,14 +145,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
   const hasFilters = data.viewFilters && data.viewFilters.conditions.length > 0
 
   const handleSetViewMode = useCallback((mode: NodeViewMode) => {
-    // Use new callback if available, fallback to legacy toggle
-    if (data.onSetViewMode) {
-      data.onSetViewMode(data.id, mode)
-    } else if (data.onCycleViewMode) {
-      data.onCycleViewMode(data.id)
-    } else if (data.onToggleExpanded) {
-      data.onToggleExpanded(data.id)
-    }
+    data.onSetViewMode(data.id, mode)
   }, [data])
 
   return (

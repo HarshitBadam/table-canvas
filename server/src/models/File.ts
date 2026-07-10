@@ -19,7 +19,7 @@ export interface IFileDocument extends Document {
   isDeleted(): boolean;
 }
 
-export interface IFilePublic {
+interface IFilePublic {
   id: string;
   filename: string;
   originalName: string;

@@ -106,5 +106,5 @@ client-side routing.
 - **Backend reachability** is checked with a 3s timeout on startup. If the backend is slow to
   come up, the frontend may fall back to local mode. Reload once it's ready.
 - **CORS errors** usually mean `FRONTEND_URL` doesn't match the actual frontend origin (including port).
-- **Reset local data**: `indexedDB.deleteDatabase('table-canvas')` in the browser console, or
+- **Reset local data**: `indexedDB.deleteDatabase('table-canvas-v2')` in the browser console, or
   clear site data.

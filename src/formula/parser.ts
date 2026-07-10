@@ -7,7 +7,7 @@ export interface ParseResult {
   error?: FormulaError
 }
 
-export class FormulaParser {
+class FormulaParser {
   private tokens: Token[] = []
   private position: number = 0
   private formula: string = ''

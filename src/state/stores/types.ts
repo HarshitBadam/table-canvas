@@ -19,7 +19,7 @@ export interface HistoryEntry {
   description: string
 }
 
-export interface HistoryState {
+interface HistoryState {
   past: HistoryEntry[]
   future: HistoryEntry[]
 }
@@ -31,7 +31,7 @@ export interface NodesSliceState {
   updateNode: (id: string, updates: Partial<ProjectNode>) => void
   deleteNode: (id: string) => void
   updateNodePosition: (id: string, position: Position) => void
-  updateNodeUI: (id: string, updates: { expanded?: boolean; collapsed?: boolean; viewMode?: NodeViewMode }) => void
+  updateNodeUI: (id: string, updates: { viewMode?: NodeViewMode }) => void
   addNewTable: () => void
   addSourceTable: (params: {
     name: string

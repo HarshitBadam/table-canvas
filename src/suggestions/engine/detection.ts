@@ -176,7 +176,7 @@ export function hasConsistentDelimiter(values: Array<{ value: unknown }>): strin
 /**
  * Levenshtein distance for typo detection
  */
-export function levenshteinDistance(a: string, b: string): number {
+function levenshteinDistance(a: string, b: string): number {
   const matrix: number[][] = [];
   for (let i = 0; i <= b.length; i++) matrix[i] = [i];
   for (let j = 0; j <= a.length; j++) matrix[0][j] = j;

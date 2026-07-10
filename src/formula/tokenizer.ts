@@ -16,7 +16,7 @@ const FUNCTIONS = new Set([
 const OPERATORS = new Set(['+', '-', '*', '/', '%', '^'])
 const LOGICAL_OPERATORS = new Set(['AND', 'OR', 'NOT'])
 
-export class FormulaTokenizer {
+class FormulaTokenizer {
   private input: string
   private position: number = 0
   private tokens: Token[] = []

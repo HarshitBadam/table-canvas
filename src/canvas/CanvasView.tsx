@@ -14,7 +14,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 
 import { useProjectStore } from '@/state/projectStore'
-import { useProfilingStore, loadProfileForTable } from '@/lib/profiling'
+import { useProfilingStore } from '@/lib/profiling'
 import type { ProjectNode, Edge as ProjectEdge } from '@/types'
 import { useCanvasKeyboard } from './useCanvasKeyboard'
 import { useCanvasViewMode } from './useCanvasViewMode'
@@ -25,9 +25,9 @@ import { computeSmartEdges, SmartEdge } from './edgeRouter'
 import { CustomConnectionLine } from './ConnectionLine'
 import { getLayoutedNodes, LayoutDirection } from './autoLayout'
 import { CanvasAutoArrangePanel, CanvasEmptyState, CycleWarningToast } from './CanvasViewPanels'
+import { NewTableModal } from './modals/NewTableModal'
 
 const TransformModal = lazy(() => import('./modals/TransformModal').then(m => ({ default: m.TransformModal })))
-const NewTableModal = lazy(() => import('./modals/NewTableModal').then(m => ({ default: m.NewTableModal })))
 
 const nodeTypes: NodeTypes = {
   tableNode: TableNodeComponent,
@@ -44,7 +44,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const projectEdges = useProjectStore((state) => state.edges)
   const patches = useProjectStore((state) => state.patches)
   const updateNodePosition = useProjectStore((state) => state.updateNodePosition)
-  const updateNodeUI = useProjectStore((state) => state.updateNodeUI)
   const selectNode = useProjectStore((state) => state.selectNode)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
   
@@ -64,19 +63,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const lastDragUpdate = useRef(0)
   const DRAG_THROTTLE_MS = 16 // ~60fps
 
-  const { handleSetViewMode, handleCycleViewMode } = useCanvasViewMode()
-
-  const handleToggleExpanded = useCallback((nodeId: string) => {
-    const node = projectNodes[nodeId]
-    if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-      const willExpand = !node.ui.expanded
-      updateNodeUI(nodeId, { expanded: willExpand })
-      
-      if (willExpand) {
-        loadProfileForTable(nodeId)
-      }
-    }
-  }, [projectNodes, updateNodeUI])
+  const { handleSetViewMode } = useCanvasViewMode()
 
   const initialNodes: Node[] = useMemo(() => {
     return (Object.values(projectNodes) as ProjectNode[]).map((node) => ({
@@ -95,13 +82,11 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         patches: (node.kind === 'source_table' || node.kind === 'derived_table')
           ? patches[node.id]
           : undefined,
-        onToggleExpanded: handleToggleExpanded,
-        onCycleViewMode: handleCycleViewMode,
         onSetViewMode: handleSetViewMode,
       },
       selected: node.id === selectedNodeId,
     }))
-  }, [projectNodes, selectedNodeId, profiles, profilesLoading, patches, handleToggleExpanded, handleCycleViewMode, handleSetViewMode])
+  }, [projectNodes, selectedNodeId, profiles, profilesLoading, patches, handleSetViewMode])
 
   const baseEdges: Edge[] = useMemo(() => {
     return (Object.values(projectEdges) as ProjectEdge[]).map((edge) => ({
@@ -313,12 +298,10 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
       )}
       
       {newTableModalOpen && (
-        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center"><div className="bg-surface rounded-lg p-8 animate-pulse">Loading...</div></div>}>
-          <NewTableModal
-            isOpen={newTableModalOpen}
-            onClose={() => setNewTableModalOpen(false)}
-          />
-        </Suspense>
+        <NewTableModal
+          isOpen={newTableModalOpen}
+          onClose={() => setNewTableModalOpen(false)}
+        />
       )}
       
       <CycleWarningToast warning={cycleWarning} onClose={() => setCycleWarning(null)} />

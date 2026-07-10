@@ -56,5 +56,3 @@ export const ChartNode = Node.create<ChartNodeOptions>({
     };
   },
 });
-
-export default ChartNode;

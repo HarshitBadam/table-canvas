@@ -3,7 +3,6 @@ export type {
   Position,
   Patches,
   InsertedRow,
-  PatchOp,
 } from './common.types'
 
 export type {

@@ -41,36 +41,3 @@ export function requireAuth(
     next(error);
   }
 }
-
-
-export function optionalAuth(
-  req: AuthenticatedRequest,
-  _res: Response,
-  next: NextFunction
-): void {
-  try {
-    let token = getAccessTokenFromCookie(req.cookies || {});
-
-    if (!token) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        token = authHeader.slice(7);
-      }
-    }
-
-    if (token) {
-      const payload = verifyAccessToken(token);
-      if (payload) {
-        req.user = {
-          userId: payload.userId,
-          email: payload.email,
-        };
-      }
-    }
-
-    next();
-  } catch {
-    // Ignore errors for optional auth
-    next();
-  }
-}

@@ -1,9 +1,8 @@
-
-export type TransformType = 
-  | 'join' 
-  | 'filter' 
-  | 'select' 
-  | 'calculated_column' 
+type TransformType =
+  | 'join'
+  | 'filter'
+  | 'select'
+  | 'calculated_column'
   | 'group_summarize'
   | 'union'
 
@@ -25,7 +24,7 @@ export type TransformDef =
 
 export type JoinType = 'left' | 'inner' | 'right' | 'full'
 
-export interface JoinTransformDef {
+interface JoinTransformDef {
   type: 'join'
   leftTableId: string
   rightTableId: string
@@ -40,10 +39,6 @@ export interface JoinTransformDef {
   columnPrefix?: 'table_name' | 'left_right' | 'none'
   leftTableName?: string
   rightTableName?: string
-  /** @deprecated Legacy option - use leftColumns instead */
-  keepLeftColumns?: string[]
-  /** @deprecated Legacy option - use rightColumns instead */
-  keepRightColumns?: string[]
 }
 
 
@@ -70,7 +65,7 @@ export interface FilterCondition {
   value2?: string | number
 }
 
-export interface FilterTransformDef {
+interface FilterTransformDef {
   type: 'filter'
   sourceTableId: string
   conditions: FilterCondition[]
@@ -78,21 +73,21 @@ export interface FilterTransformDef {
 }
 
 
-export interface SelectColumn {
+interface SelectColumn {
   sourceColumnId: string
   newName?: string
   include: boolean
 }
 
 /** Select transform definition (column projection/renaming) */
-export interface SelectTransformDef {
+interface SelectTransformDef {
   type: 'select'
   sourceTableId: string
   columns: SelectColumn[]
 }
 
 
-export interface CalculatedColumnDef {
+interface CalculatedColumnDef {
   type: 'calculated_column'
   sourceTableId: string
   newColumnName: string
@@ -102,13 +97,13 @@ export interface CalculatedColumnDef {
 
 export type AggregationType = 'sum' | 'avg' | 'min' | 'max' | 'count' | 'count_distinct'
 
-export interface Aggregation {
+interface Aggregation {
   columnId: string
   operation: AggregationType
   alias: string
 }
 
-export interface GroupSummarizeDef {
+interface GroupSummarizeDef {
   type: 'group_summarize'
   sourceTableId: string
   groupByColumns: string[]
@@ -116,7 +111,7 @@ export interface GroupSummarizeDef {
 }
 
 
-export interface UnionTransformDef {
+interface UnionTransformDef {
   type: 'union'
   sourceTableIds: string[]
 }

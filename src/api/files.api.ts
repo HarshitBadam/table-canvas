@@ -28,7 +28,7 @@ export async function uploadFile(
   return uploadedFile;
 }
 
-export async function downloadFile(fileId: string): Promise<Blob> {
+async function downloadFile(fileId: string): Promise<Blob> {
   return api.download(`/files/${fileId}`);
 }
 

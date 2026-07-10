@@ -6,11 +6,11 @@
 
 import { type Tier, getLimits } from './limits.js';
 
-export interface LimitOk {
+interface LimitOk {
   ok: true;
 }
 
-export interface LimitExceeded {
+interface LimitExceeded {
   ok: false;
   reason: string;
   limit: number;

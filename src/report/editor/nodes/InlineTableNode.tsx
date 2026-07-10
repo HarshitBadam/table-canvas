@@ -181,5 +181,3 @@ export const InlineTableNode = Node.create<InlineTableNodeOptions>({
     return ReactNodeViewRenderer(InlineTableNodeView);
   },
 });
-
-export default InlineTableNode;

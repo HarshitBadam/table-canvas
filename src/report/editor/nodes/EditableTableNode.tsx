@@ -386,5 +386,3 @@ export const EditableTableNode = Node.create<EditableTableNodeOptions>({
     return ReactNodeViewRenderer(EditableTableNodeView);
   },
 });
-
-export default EditableTableNode;
