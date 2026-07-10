@@ -176,6 +176,18 @@ describe('classifyColumn', () => {
     expect(classifyColumn(col, profile, 100)).toBe('temporal')
   })
 
+  it('classifies boolean columns as boolean', () => {
+    const col: ColumnSchema = { id: 'enabled', name: 'enabled', type: 'boolean', nullable: false }
+    const profile: ColumnProfile = {
+      columnId: 'enabled',
+      distinctCount: 2,
+      missingCount: 0,
+      missingPercent: 0,
+      completeness: 100,
+    }
+    expect(classifyColumn(col, profile, 100)).toBe('boolean')
+  })
+
   it('classifies high-uniqueness string (names) as text', () => {
     const col: ColumnSchema = { id: 'name', name: 'customer_name', type: 'string', nullable: false }
     const profile: ColumnProfile = { 
@@ -212,17 +224,17 @@ describe('classifyColumn', () => {
 })
 
 describe('isUniqueIdentifier', () => {
-  it('returns true for column with isKeyCandidate flag', () => {
-    const col: ColumnSchema = { id: 'pk', name: 'record_num', type: 'number', nullable: false }
+  it('does not treat uniqueness alone as proof that a numeric metric is an identifier', () => {
+    const col: ColumnSchema = { id: 'revenue', name: 'Revenue', type: 'number', nullable: false }
     const profile: ColumnProfile = { 
-      columnId: 'pk',
+      columnId: 'revenue',
       distinctCount: 100,
       missingCount: 0,
       missingPercent: 0,
       completeness: 100,
       isKeyCandidate: true
     }
-    expect(isUniqueIdentifier(col, profile, 100)).toBe(true)
+    expect(isUniqueIdentifier(col, profile, 100)).toBe(false)
   })
 
   it('returns false for regular numeric column', () => {

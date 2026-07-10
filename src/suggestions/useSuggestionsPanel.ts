@@ -19,6 +19,11 @@ interface SuggestionsPanelHookResult {
   setActiveCategory: (tab: SuggestionCategory | 'all') => void
   categoryCounts: { all: number; cleaning: number; analysis: number; recipe: number }
   isPhase2Loading: boolean
+  error: string | null
+  retry: () => void
+  dismissedCount: number
+  dismissSuggestion: (suggestionId: string) => void
+  restoreDismissed: () => void
   setEffectiveCleaningCount: (count: number | null) => void
 }
 
@@ -40,11 +45,17 @@ export function useSuggestionsPanel(
   const suggestionsCache = useSuggestionsStore((state) => state.suggestionsCache)
   const setLoading = useSuggestionsStore((state) => state.setLoading)
   const isLoading = useSuggestionsStore((state) => state.isLoading)
+  const error = useSuggestionsStore((state) => state.error)
+  const setError = useSuggestionsStore((state) => state.setError)
   const setCurrentRequestId = useSuggestionsStore((state) => state.setCurrentRequestId)
   const shouldCancelRequest = useSuggestionsStore((state) => state.shouldCancelRequest)
   const consumed = useSuggestionsStore((state) => state.consumed)
+  const dismissed = useSuggestionsStore((state) => state.dismissed)
+  const dismissSuggestion = useSuggestionsStore((state) => state.dismissSuggestion)
+  const undismissSuggestion = useSuggestionsStore((state) => state.undismissSuggestion)
 
   const [effectiveCleaningCount, setEffectiveCleaningCount] = useState<number | null>(null)
+  const [retryNonce, setRetryNonce] = useState(0)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastContextKeyRef = useRef<string | null>(null)
@@ -63,10 +74,10 @@ export function useSuggestionsPanel(
   }, [tableId, node, profile, selectedColumnId])
 
   useEffect(() => {
-    if (isOpen && tableId) {
+    if (isOpen && tableId && !profileLoading) {
       loadProfile()
     }
-  }, [isOpen, tableId, loadProfile])
+  }, [isOpen, tableId, profileLoading, loadProfile])
 
   const hasPhase2Stats = useMemo(() => {
     if (!profile?.columns) return false
@@ -88,7 +99,7 @@ export function useSuggestionsPanel(
     const hadPhase2Before = lastPhase2StatsSeenRef.current
     const hasPhase2Now = hasPhase2Stats
 
-    if (cached && cached.length > 0 && !hadPhase2Before && hasPhase2Now) {
+    if (cached !== undefined && !hadPhase2Before && hasPhase2Now) {
       clearCache(tableId)
       lastPhase2StatsSeenRef.current = true
     } else if (hasPhase2Now) {
@@ -135,58 +146,71 @@ export function useSuggestionsPanel(
     const requestId = `${Date.now()}-${Math.random()}`
     setCurrentRequestId(requestId)
     setLoading(true)
+    setError(null)
 
     debounceRef.current = setTimeout(() => {
       if (shouldCancelRequest(requestId)) {
         return
       }
 
-      const existingDerivedTables = Object.values(nodes)
-        .filter(
-          (n): n is Extract<typeof n, { kind: 'derived_table' }> =>
-            n.kind === 'derived_table' &&
-            'plan' in n &&
-            n.plan?.upstreamNodeIds?.includes(tableId),
-        )
-        .map((n) => ({
-          id: n.id,
-          name: n.name,
-          transformType: n.plan.transformDef.type,
-          groupByColumns:
-            'groupByColumns' in n.plan.transformDef
-              ? (n.plan.transformDef as { groupByColumns?: string[] }).groupByColumns
-              : undefined,
-        }))
+      try {
+        const existingDerivedTables = Object.values(nodes)
+          .filter(
+            (n): n is Extract<typeof n, { kind: 'derived_table' }> =>
+              n.kind === 'derived_table' &&
+              'plan' in n &&
+              n.plan?.upstreamNodeIds?.includes(tableId),
+          )
+          .map((n) => ({
+            id: n.id,
+            name: n.name,
+            transformType: n.plan.transformDef.type,
+            groupByColumns:
+              'groupByColumns' in n.plan.transformDef
+                ? (n.plan.transformDef as { groupByColumns?: string[] }).groupByColumns
+                : undefined,
+          }))
 
-      const context = {
-        tableId,
-        tableName: node.name,
-        schema: node.schema!,
-        profile: profile
-          ? {
-              columns: profile.columns,
-              rowCount: profile.rowCount,
-            }
-          : undefined,
-        selectedColumnId,
-        tableVersionHash: contextKey.split(':')[0],
-        existingDerivedTables,
-      }
+        const context = {
+          tableId,
+          tableName: node.name,
+          schema: node.schema!,
+          profile: profile
+            ? {
+                columns: profile.columns,
+                rowCount: profile.rowCount,
+              }
+            : undefined,
+          selectedColumnId,
+          tableVersionHash: contextKey.split(':')[0],
+          existingDerivedTables,
+        }
 
-      const newSuggestions = selectedColumnId
-        ? getColumnSuggestions(context)
-        : generateSuggestions(context)
+        const newSuggestions = selectedColumnId
+          ? getColumnSuggestions(context)
+          : generateSuggestions(context)
 
-      if (!shouldCancelRequest(requestId)) {
-        setSuggestions(contextKey, newSuggestions)
-        lastContextKeyRef.current = contextKey
-        lastPhase2StatsSeenRef.current = hasPhase2Stats
+        if (!shouldCancelRequest(requestId)) {
+          setSuggestions(contextKey, newSuggestions)
+          lastContextKeyRef.current = contextKey
+          lastPhase2StatsSeenRef.current = hasPhase2Stats
+        }
+      } catch (cause) {
+        if (!shouldCancelRequest(requestId)) {
+          const message = cause instanceof Error ? cause.message : 'Suggestion analysis failed'
+          setError(message)
+        }
       }
     }, 100)
 
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current)
+      }
+      const state = useSuggestionsStore.getState()
+      if (state.currentRequestId === requestId) {
+        state.setCurrentRequestId(null)
+        state.setLoading(false)
       }
     }
   }, [
@@ -204,6 +228,8 @@ export function useSuggestionsPanel(
     shouldCancelRequest,
     tableId,
     hasPhase2Stats,
+    retryNonce,
+    setError,
   ])
 
   const cachedSuggestions = useMemo(() => {
@@ -215,29 +241,35 @@ export function useSuggestionsPanel(
     let suggestions = cachedSuggestions
 
     suggestions = suggestions.filter((s) => !consumed.has(s.id))
+    const dismissedForContext = contextKey ? dismissed.get(contextKey) : undefined
+    suggestions = suggestions.filter((s) => !dismissedForContext?.has(s.id))
 
     if (activeCategory !== 'all') {
       suggestions = suggestions.filter((s) => s.category === activeCategory)
     }
 
     return suggestions
-  }, [cachedSuggestions, activeCategory, consumed])
+  }, [cachedSuggestions, activeCategory, consumed, contextKey, dismissed])
+
+  const dismissedIds = useMemo(
+    () => contextKey ? dismissed.get(contextKey) ?? new Set<string>() : new Set<string>(),
+    [contextKey, dismissed],
+  )
 
   const isPhase2Loading = useMemo(() => {
     if (!profile || profileLoading) return false
     if (profile.phase === 1) {
-      const hasNumericColumns = profile.columns.some(
-        (col) => col.min !== undefined || col.max !== undefined,
-      )
-      const hasPhase2 = profile.columns.some(
-        (col) => col.q1 !== undefined || col.q3 !== undefined || col.iqr !== undefined,
-      )
-      return hasNumericColumns && !hasPhase2
+      return node?.schema?.columns.some((column) => column.type === 'number') ?? false
     }
     return false
-  }, [profile, profileLoading])
+  }, [profile, profileLoading, node])
 
-  const categoryCounts = useCategoryCounts(cachedSuggestions, tableId, effectiveCleaningCount)
+  const categoryCounts = useCategoryCounts(
+    cachedSuggestions,
+    tableId,
+    effectiveCleaningCount,
+    dismissedIds,
+  )
 
   const showLoading = isLoading || profileLoading
 
@@ -250,6 +282,21 @@ export function useSuggestionsPanel(
     setActiveCategory,
     categoryCounts,
     isPhase2Loading,
+    error,
+    retry: () => {
+      if (contextKey) clearCache(tableId)
+      setRetryNonce((value) => value + 1)
+    },
+    dismissedCount: dismissedIds.size,
+    dismissSuggestion: (suggestionId) => {
+      if (contextKey) dismissSuggestion(contextKey, suggestionId)
+    },
+    restoreDismissed: () => {
+      if (!contextKey) return
+      for (const suggestionId of dismissedIds) {
+        undismissSuggestion(contextKey, suggestionId)
+      }
+    },
     setEffectiveCleaningCount,
   }
 }

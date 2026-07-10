@@ -92,6 +92,10 @@ describe('generateSuggestions - Cleaning', () => {
     )
     expect(placeholderSuggestion).toBeDefined()
     expect(placeholderSuggestion?.title).toContain('placeholder')
+    expect(placeholderSuggestion?.context.cleaningOperation).toMatchObject({
+      type: 'nullify_placeholders',
+      placeholders: expect.arrayContaining(['N/A', 'TBD', 'null']),
+    })
   })
 
   it('does NOT generate case normalization for ID-like columns', () => {
@@ -196,6 +200,37 @@ describe('generateSuggestions - Cleaning', () => {
       s => s.context.cleaningOperation?.type === 'nullify_placeholders'
     )
     expect(placeholderSuggestion).toBeDefined()
+  })
+
+  it('does not surface unsupported split or one-argument date conversions', () => {
+    const columns: ColumnSchema[] = [
+      { id: 'parts', name: 'parts', type: 'string', nullable: true },
+      { id: 'date_text', name: 'date_text', type: 'string', nullable: true },
+    ]
+    const profiles: ColumnProfile[] = [
+      {
+        columnId: 'parts',
+        distinctCount: 3,
+        topValues: [
+          { value: 'a,b', count: 3 },
+          { value: 'c,d', count: 2 },
+          { value: 'e,f', count: 1 },
+        ],
+      } as ColumnProfile,
+      {
+        columnId: 'date_text',
+        distinctCount: 3,
+        topValues: [
+          { value: '2026-01-01', count: 3 },
+          { value: '2026-01-02', count: 2 },
+          { value: '2026-01-03', count: 1 },
+        ],
+      } as ColumnProfile,
+    ]
+
+    const suggestions = generateSuggestions(createContext(columns, profiles))
+    expect(suggestions.some((suggestion) => suggestion.id.includes('split_column'))).toBe(false)
+    expect(suggestions.some((suggestion) => suggestion.id.includes('convert_to_date'))).toBe(false)
   })
 })
 

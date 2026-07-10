@@ -18,6 +18,10 @@ export function classifyColumn(
   if (col.type === 'number') {
     return classifyNumericColumn(col, profile, rowCount);
   }
+
+  if (col.type === 'boolean') {
+    return 'boolean';
+  }
   
   if (col.type === 'string') {
     return classifyStringColumn(col, profile, rowCount);
@@ -58,22 +62,9 @@ export function isUniqueIdentifier(
   if (col.semanticHints?.includes('id')) return true;
   
   if (profile) {
-    // Key candidate from profiler (>95% unique, <1% null)
-    if (profile.isKeyCandidate) return true;
-    
     const uniquenessRatio = profile.distinctCount / Math.max(rowCount, 1);
     if (uniquenessRatio > 0.95) {
-      if (col.type === 'number' && profile.stdDev !== undefined && profile.min !== undefined && profile.max !== undefined) {
-        const range = profile.max - profile.min;
-        if (range > 0) {
-          // For a uniform/sequential distribution, stdDev ≈ range / sqrt(12)
-          const expectedStdDev = range / Math.sqrt(12);
-          // Allow 50% tolerance for "close to sequential"
-          const isSequential = expectedStdDev > 0 && 
-            Math.abs((profile.stdDev - expectedStdDev) / expectedStdDev) < 0.5;
-          if (isSequential) return true;
-        }
-        
+      if (col.type === 'number' && profile.min !== undefined && profile.max !== undefined) {
         // Check if min starts at 0 or 1 and max = rowCount (classic auto-increment)
         if ((profile.min === 0 || profile.min === 1) && 
             Math.abs(profile.max - (profile.min + rowCount - 1)) <= rowCount * 0.1) {
@@ -137,6 +128,10 @@ export function classifyStringColumn(
   if (!profile) return 'low_cardinality_cat'; // Conservative default
   
   const distinctRatio = profile.distinctCount / Math.max(rowCount, 1);
+
+  if (profile.distinctCount < 2) {
+    return 'text';
+  }
   
   if (col.semanticHints?.includes('category')) {
     return profile.distinctCount <= 20 ? 'low_cardinality_cat' : 'high_cardinality_cat';
@@ -164,8 +159,9 @@ export function isAnalyzableNumeric(col: ColumnSchema, profile?: ColumnProfile):
   if (col.type !== 'number') return false;
   if (!profile) return true; // Assume analyzable without profile
   
-  if (profile.isKeyCandidate) return false;
+  if (isUniqueIdentifier(col, profile, Math.max(profile.distinctCount, 1))) return false;
   if (col.semanticHints?.includes('id')) return false;
+  if (profile.distinctCount < 1 || profile.completeness <= 0) return false;
   
   if (profile.stdDev !== undefined && profile.stdDev === 0) return false;
   

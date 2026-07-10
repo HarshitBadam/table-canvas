@@ -8,6 +8,7 @@ import type { SuggestionCommand, CommandResult } from './types'
 import { CreateDerivedTableCommand, ApplyPatchCommand } from './tableCommands'
 import { CreateChartCommand } from './chartCommand'
 import { HighlightCellsCommand, LaunchRecipeCommand } from './utilityCommands'
+import { useSuggestionsStore } from '../suggestionsStore'
 
 function createCommand(suggestion: Suggestion): SuggestionCommand | null {
   const action = suggestion.action
@@ -34,6 +35,14 @@ function createCommand(suggestion: Suggestion): SuggestionCommand | null {
 }
 
 export async function applySuggestion(suggestion: Suggestion): Promise<CommandResult> {
+  if (suggestion.category === 'cleaning' && suggestion.context.cleaningOperation) {
+    return {
+      success: false,
+      message: 'Review this fix in the table Cleaning tab before applying it.',
+      error: 'Cleaning review required',
+    }
+  }
+
   const command = createCommand(suggestion)
 
   if (!command) {
@@ -44,5 +53,9 @@ export async function applySuggestion(suggestion: Suggestion): Promise<CommandRe
     }
   }
 
-  return command.execute()
+  const result = await command.execute()
+  if (result.success && suggestion.action.kind !== 'launchRecipe') {
+    useSuggestionsStore.getState().consumeSuggestion(suggestion.id)
+  }
+  return result
 }

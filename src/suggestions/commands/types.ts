@@ -24,7 +24,7 @@ export interface ToastNotification {
 
 let toastHandler: ((toast: ToastNotification) => void) | null = null
 
-export function setToastHandler(handler: (toast: ToastNotification) => void): void {
+export function setToastHandler(handler: ((toast: ToastNotification) => void) | null): void {
   toastHandler = handler
 }
 

@@ -136,4 +136,83 @@ describe('analysis suggestions use classification', () => {
     const analysisSuggestions = suggestions.filter(s => s.category === 'analysis')
     expect(analysisSuggestions.length).toBe(0)
   })
+
+  it('suggests a count pie chart for a boolean column', () => {
+    const columns: ColumnSchema[] = [
+      { id: 'active', name: 'active', type: 'boolean', nullable: false },
+    ]
+    const profiles: ColumnProfile[] = [
+      {
+        columnId: 'active',
+        distinctCount: 2,
+        missingCount: 0,
+        missingPercent: 0,
+        completeness: 100,
+        topValues: [
+          { value: true, count: 70 },
+          { value: false, count: 30 },
+        ],
+      },
+    ]
+
+    const suggestion = generateSuggestions(createContext(columns, profiles)).find(
+      (item) => item.id.includes('boolean_breakdown'),
+    )
+
+    expect(suggestion?.action.kind).toBe('createChart')
+    if (suggestion?.action.kind === 'createChart') {
+      expect(suggestion.action.chart.chartType).toBe('pie')
+      expect(suggestion.action.chart.config.aggregation).toBe('count')
+    }
+  })
+
+  it('does not create a time-series chart using an ID as the metric', () => {
+    const columns: ColumnSchema[] = [
+      { id: 'date', name: 'date', type: 'date', nullable: false },
+      { id: 'id', name: 'id', type: 'number', nullable: false },
+    ]
+    const profiles: ColumnProfile[] = [
+      {
+        columnId: 'date',
+        distinctCount: 30,
+        missingCount: 0,
+        missingPercent: 0,
+        completeness: 100,
+      },
+      {
+        columnId: 'id',
+        distinctCount: 100,
+        missingCount: 0,
+        missingPercent: 0,
+        completeness: 100,
+        isKeyCandidate: true,
+        min: 1,
+        max: 100,
+        stdDev: 28.87,
+      },
+    ]
+
+    const trend = generateSuggestions(createContext(columns, profiles)).find(
+      (suggestion) => suggestion.id.includes('trend_chart'),
+    )
+    expect(trend).toBeUndefined()
+  })
+
+  it('does not suggest analysis for rows containing only null values', () => {
+    const columns: ColumnSchema[] = [
+      { id: 'name', name: 'name', type: 'string', nullable: true },
+      { id: 'value', name: 'value', type: 'number', nullable: true },
+    ]
+    const profiles: ColumnProfile[] = columns.map((column) => ({
+      columnId: column.id,
+      distinctCount: 0,
+      missingCount: 5,
+      missingPercent: 100,
+      completeness: 0,
+      topValues: [],
+    }))
+
+    const suggestions = generateSuggestions(createContext(columns, profiles, 5))
+    expect(suggestions.filter((suggestion) => suggestion.category === 'analysis')).toEqual([])
+  })
 })

@@ -20,8 +20,8 @@ registerRule({
       id: createSuggestionId('variance_analysis', ctx.tableId, actualCol.id, budgetCol.id),
       category: 'recipe',
       scope: 'table',
-      title: 'Variance Analysis',
-      description: `Compare ${actualCol.name} vs ${budgetCol.name} with variance calculations.`,
+      title: 'Create variance column',
+      description: `Calculate the absolute difference between ${actualCol.name} and ${budgetCol.name}.`,
       confidence: 'high',
       context: { tableId: ctx.tableId, tableVersionHash: getVersionHash(ctx) },
       why: [
@@ -29,7 +29,7 @@ registerRule({
         'Common in financial analysis',
         'Track performance vs targets',
       ],
-      impact: { kind: 'recipe', summary: 'Creates variance table with absolute and % variance' },
+      impact: { kind: 'recipe', summary: 'Creates a derived table with an absolute variance column' },
       action: {
         kind: 'launchRecipe',
         recipeId: 'variance_analysis',
@@ -44,14 +44,9 @@ registerRule({
   id: 'period_over_period',
   category: 'recipe',
   scope: 'table',
-  when: (_ctx, meta) =>
-    meta.schema.columns.some((column) => column.type === 'date' || column.type === 'datetime') &&
-    meta.schema.columns.some((column) =>
-      isAnalyzableNumeric(
-        column,
-        meta.profile?.columns.find((profile) => profile.columnId === column.id),
-      ),
-    ),
+  // Disabled until the transform engine supports period bucketing and lag
+  // calculations. The previous recipe only grouped by the raw date value.
+  when: () => false,
   build: (ctx, meta) => {
     const dateCol = meta.schema.columns.find(
       (column) => column.type === 'date' || column.type === 'datetime',

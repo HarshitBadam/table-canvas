@@ -100,7 +100,7 @@ export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
       
       const newCache = new Map(state.suggestionsCache)
       for (const key of newCache.keys()) {
-        if (key.includes(tableId)) {
+        if (key.startsWith(`${tableId}-`)) {
           newCache.delete(key)
         }
       }
@@ -111,7 +111,7 @@ export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
   dismissSuggestion: (contextKey, suggestionId) => {
     set((state) => {
       const newDismissed = new Map(state.dismissed)
-      const dismissedSet = newDismissed.get(contextKey) ?? new Set()
+      const dismissedSet = new Set(newDismissed.get(contextKey) ?? [])
       dismissedSet.add(suggestionId)
       newDismissed.set(contextKey, dismissedSet)
       return { dismissed: newDismissed }
@@ -121,7 +121,7 @@ export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
   undismissSuggestion: (contextKey, suggestionId) => {
     set((state) => {
       const newDismissed = new Map(state.dismissed)
-      const dismissedSet = newDismissed.get(contextKey)
+      const dismissedSet = new Set(newDismissed.get(contextKey) ?? [])
       if (dismissedSet) {
         dismissedSet.delete(suggestionId)
         newDismissed.set(contextKey, dismissedSet)

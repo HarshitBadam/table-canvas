@@ -254,8 +254,6 @@ export class ApplyPatchCommand implements SuggestionCommand {
           }
         }
 
-        store.saveSnapshot(`Clean: ${this.suggestion.title}`)
-
         const nodeId = store.addDerivedTable({
           name: tableName,
           transformDef,

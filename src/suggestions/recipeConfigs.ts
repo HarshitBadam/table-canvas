@@ -28,20 +28,13 @@ export interface RecipeField {
 export const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
   trend_summary: {
     id: 'trend_summary',
-    title: 'Trend Analysis',
-    description: 'Analyze how values change over time with aggregated summaries.',
+    title: 'Date Summary',
+    description: 'Summarize values for each distinct date in the source table.',
     fields: [
       { id: 'dateColumnId', label: 'Date Column', type: 'column', columnType: 'date', required: true, hint: 'The time dimension for grouping' },
       { id: 'valueColumnId', label: 'Value Column', type: 'column', columnType: 'number', required: true, hint: 'The metric to analyze' },
-      { id: 'period', label: 'Group By', type: 'select', required: true, options: [
-        { value: 'day', label: 'Day' },
-        { value: 'week', label: 'Week' },
-        { value: 'month', label: 'Month' },
-        { value: 'quarter', label: 'Quarter' },
-        { value: 'year', label: 'Year' },
-      ]},
     ],
-    outputs: ['Summary table with period totals', 'Line chart showing trend'],
+    outputs: ['Summary table with totals, averages, and record counts by date'],
     buildTransform: (bindings, tableId, columns) => {
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const valueName = valueCol?.name || 'Value'
@@ -72,7 +65,7 @@ export const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
       { id: 'categoryColumnId', label: 'Category Column', type: 'column', columnType: 'string', required: true, hint: 'The dimension to group by' },
       { id: 'valueColumnId', label: 'Value Column', type: 'column', columnType: 'number', required: true, hint: 'The metric to sum' },
     ],
-    outputs: ['Summary table ranked by contribution', 'Bar chart showing breakdown', 'Cumulative percentage'],
+    outputs: ['Summary table with totals and record counts by category'],
     buildTransform: (bindings, tableId, columns) => {
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const valueName = valueCol?.name || 'Value'
@@ -98,14 +91,13 @@ export const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
   },
   variance_analysis: {
     id: 'variance_analysis',
-    title: 'Variance Analysis',
-    description: 'Compare actual vs planned/budgeted values with variance calculations.',
+    title: 'Variance Column',
+    description: 'Create an absolute difference column for actual and planned values.',
     fields: [
       { id: 'actualColumnId', label: 'Actual Column', type: 'column', columnType: 'number', required: true, hint: 'The actual/real values' },
       { id: 'budgetColumnId', label: 'Budget/Plan Column', type: 'column', columnType: 'number', required: true, hint: 'The target/expected values' },
-      { id: 'groupByColumnId', label: 'Group By (optional)', type: 'column', columnType: 'string', required: false, hint: 'Optional dimension for grouping' },
     ],
-    outputs: ['Variance table (absolute & percentage)', 'Variance chart'],
+    outputs: ['Derived table with an absolute variance column'],
     buildTransform: (bindings, tableId, columns) => {
       const actualCol = columns?.find(c => c.id === bindings.actualColumnId)
       const budgetCol = columns?.find(c => c.id === bindings.budgetColumnId)
@@ -138,7 +130,7 @@ export const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
       { id: 'leftKeyColumn', label: 'Left Key Column', type: 'column', required: true, hint: 'The matching key from left table', sourceTableField: 'leftTableId' },
       { id: 'rightKeyColumn', label: 'Right Key Column', type: 'column', required: true, hint: 'The matching key from right table', sourceTableField: 'rightTableId' },
     ],
-    outputs: ['Matched records', 'Unmatched from left', 'Unmatched from right'],
+    outputs: ['Full joined table containing matched and unmatched records'],
     buildTransform: (bindings) => ({
       type: 'join',
       leftTableId: bindings.leftTableId,
@@ -151,20 +143,13 @@ export const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
   },
   period_over_period: {
     id: 'period_over_period',
-    title: 'Period-over-Period Analysis',
-    description: 'Calculate changes between time periods to track growth and trends.',
+    title: 'Date Summary',
+    description: 'Summarize values for each distinct date.',
     fields: [
       { id: 'dateColumnId', label: 'Date Column', type: 'column', columnType: 'date', required: true, hint: 'The time dimension for comparison' },
       { id: 'valueColumnId', label: 'Value Column', type: 'column', columnType: 'number', required: true, hint: 'The metric to compare across periods' },
-      { id: 'period', label: 'Period', type: 'select', required: true, options: [
-        { value: 'day', label: 'Day' },
-        { value: 'week', label: 'Week' },
-        { value: 'month', label: 'Month' },
-        { value: 'quarter', label: 'Quarter' },
-        { value: 'year', label: 'Year' },
-      ]},
     ],
-    outputs: ['Table with period comparisons', 'Growth rate calculations'],
+    outputs: ['Summary table with totals, averages, and record counts by date'],
     buildTransform: (bindings, tableId, columns) => {
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const valueName = valueCol?.name || 'Value'
@@ -184,8 +169,7 @@ export const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
     getTableName: (_tableName, bindings, columns) => {
       const valueCol = columns?.find(c => c.id === bindings.valueColumnId)
       const valueName = valueCol?.name || 'Value'
-      const period = bindings.period || 'period'
-      return `${valueName} by ${period.charAt(0).toUpperCase() + period.slice(1)}`
+      return `${valueName} by Date`
     },
   },
 }

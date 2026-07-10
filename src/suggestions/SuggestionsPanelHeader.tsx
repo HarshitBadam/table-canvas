@@ -1,26 +1,33 @@
+import * as Dialog from '@radix-ui/react-dialog'
+
 interface SuggestionsPanelHeaderProps {
-  selectedColumnId?: string
+  tableName: string
+  selectedColumnName?: string
   onClose: () => void
 }
 
-export function SuggestionsPanelHeader({ selectedColumnId, onClose }: SuggestionsPanelHeaderProps) {
+export function SuggestionsPanelHeader({ tableName, selectedColumnName, onClose }: SuggestionsPanelHeaderProps) {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-      <div>
-        <h2 className="text-lg font-semibold text-text-primary">Suggestions</h2>
-        <p className="text-xs text-text-tertiary">
-          {selectedColumnId ? 'For selected column' : 'For this table'}
+      <div className="min-w-0">
+        <Dialog.Title className="text-lg font-semibold text-text-primary">Suggestions</Dialog.Title>
+        <p className="truncate text-xs text-text-tertiary">
+          {selectedColumnName ? `${tableName} · ${selectedColumnName}` : tableName}
         </p>
       </div>
-      <button
+      <Dialog.Close
+        asChild
+      >
+        <button
         onClick={onClose}
         className="p-2 rounded-lg hover:bg-surface-secondary transition-colors"
         aria-label="Close suggestions panel"
-      >
-        <svg className="w-5 h-5 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+        >
+          <svg aria-hidden="true" className="w-5 h-5 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </Dialog.Close>
     </div>
   )
 }

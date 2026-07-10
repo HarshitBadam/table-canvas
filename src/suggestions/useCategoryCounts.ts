@@ -14,6 +14,7 @@ export function useCategoryCounts(
   cachedSuggestions: Suggestion[],
   tableId: string,
   effectiveCleaningCount: number | null,
+  dismissedIds: Set<string> = new Set(),
 ): CategoryCounts {
   const tableData = useDataStore((state) => state.tableData[tableId])
   const consumed = useSuggestionsStore((state) => state.consumed)
@@ -27,7 +28,7 @@ export function useCategoryCounts(
     // supplied by CleaningPanel via `effectiveCleaningCount` once it's mounted.
     if (tableData?.rows && tableData.rows.length > 0) {
       const cleaningSuggestions = cachedSuggestions.filter(
-        (s) => s.category === 'cleaning' && s.context.cleaningOperation,
+        (s) => s.category === 'cleaning' && s.context.cleaningOperation && !dismissedIds.has(s.id),
       )
 
       for (const suggestion of cleaningSuggestions) {
@@ -83,11 +84,15 @@ export function useCategoryCounts(
         }
       }
     } else {
-      cleaningCount = cachedSuggestions.filter((s) => s.category === 'cleaning').length
+      cleaningCount = cachedSuggestions.filter(
+        (s) => s.category === 'cleaning' && !dismissedIds.has(s.id),
+      ).length
     }
 
     const finalCleaningCount = effectiveCleaningCount ?? cleaningCount
-    const nonConsumed = cachedSuggestions.filter((s) => !consumed.has(s.id))
+    const nonConsumed = cachedSuggestions.filter(
+      (s) => !consumed.has(s.id) && !dismissedIds.has(s.id),
+    )
 
     return {
       all: nonConsumed.length,
@@ -95,5 +100,5 @@ export function useCategoryCounts(
       analysis: nonConsumed.filter((s: Suggestion) => (s.category as SuggestionCategory) === 'analysis').length,
       recipe: nonConsumed.filter((s: Suggestion) => (s.category as SuggestionCategory) === 'recipe').length,
     }
-  }, [cachedSuggestions, tableData?.rows, effectiveCleaningCount, consumed])
+  }, [cachedSuggestions, tableData?.rows, effectiveCleaningCount, consumed, dismissedIds])
 }
