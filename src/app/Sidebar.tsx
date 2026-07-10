@@ -118,10 +118,17 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
           <ul className="space-y-1">
             {tableNodes.map((node) => (
               <li key={node.id} className="group relative">
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleTableClick(node.id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all ${
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleTableClick(node.id)
+                    }
+                  }}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all cursor-pointer ${
                     selectedNodeId === node.id
                       ? 'bg-accent-green/10 text-accent-green'
                       : 'hover:bg-surface-secondary text-text-primary'
@@ -132,6 +139,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
                     <span className="truncate flex-1 font-medium">{node.name}</span>
                     {/* Delete button - visible on hover */}
                     <button
+                      type="button"
                       onClick={(e) => handleDeleteTable(node.id, e)}
                       className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-text-tertiary hover:text-red-500 transition-all"
                       title="Delete table"
@@ -146,7 +154,7 @@ export function Sidebar({ onOpenTable, onOpenChart, onOpenCanvas, onOpenDashboar
                       {node.schema.rowCount || 0} rows · {node.schema.columns.length} cols
                     </div>
                   )}
-                </button>
+                </div>
               </li>
             ))}
           </ul>
