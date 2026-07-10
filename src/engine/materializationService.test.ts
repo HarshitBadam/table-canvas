@@ -42,6 +42,8 @@ vi.mock('papaparse', () => ({
 vi.mock('xlsx', () => ({ read: vi.fn(), utils: { sheet_to_json: vi.fn() } }))
 
 import { ensureTableMaterialized, getTableData } from './materializationService'
+import { computeDerivedTable } from './derivedTableComputation'
+import { computeDerivedVersionHash, computeSourceVersionHash } from './cacheUtils'
 
 const schema: TableSchema = {
   columns: [
@@ -161,6 +163,22 @@ describe('source table materialization', () => {
     }))
   })
 
+  it('reloads a source table when the engine row count is incomplete', async () => {
+    const node = sourceNode('table_1', {
+      currentVersionHash: computeSourceVersionHash('table_1', 'file_table_1', 'none'),
+      lastRowCount: 2,
+    })
+    projectStore.nodes.table_1 = node
+    loadFile.mockResolvedValue(csv('ID,Value\n1,100\n2,200'))
+    engine.getSlice
+      .mockResolvedValueOnce({ rows: [{ ID: '1' }], totalRows: 1 })
+      .mockResolvedValueOnce({ rows: [], totalRows: 2 })
+    const result = await ensureTableMaterialized('table_1')
+    expect(engine.loadTable).toHaveBeenCalled()
+    expect(result.status).toBe('computed')
+    expect(result.rowCount).toBe(2)
+  })
+
   it('rehydrates an in-app table from durable initial rows', async () => {
     const node = sourceNode('manual', {
       isDirty: true,
@@ -253,6 +271,26 @@ describe('derived table materialization', () => {
     loadFile.mockResolvedValue(csv())
     await ensureTableMaterialized('table_b')
     expect(engine.init).toHaveBeenCalled()
+  })
+
+  it('recomputes a derived table when its cached engine row count is incomplete', async () => {
+    const node = derivedNode(
+      'table_b',
+      ['table_a'],
+      { isDirty: false, lastUpstreamHash: 'hash_a', lastRowCount: 10 },
+      { columns: [], rowCount: 10 },
+    )
+    node.cacheInfo!.currentVersionHash = computeDerivedVersionHash(
+      'table_b', JSON.stringify(node.plan.transformDef), ['hash_a'],
+    )
+    projectStore.nodes = {
+      table_a: sourceNode('table_a', { currentVersionHash: 'hash_a' }),
+      table_b: node,
+    }
+    engine.getSlice.mockResolvedValue({ rows: [{ id: 1 }], totalRows: 1 })
+    const result = await computeDerivedTable('table_b')
+    expect(engine.executeTransform).toHaveBeenCalled()
+    expect(result.status).toBe('computed')
   })
 
   it('propagates upstream errors', async () => {

@@ -68,8 +68,9 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
 
     const engineRowCount = await getEngineTableRowCount(tableId)
     const existsInEngine = engineRowCount >= 0
-    const expectedRows = node.cacheInfo?.lastRowCount ?? 0
-    const engineHasExpectedData = expectedRows === 0 || engineRowCount > 0
+    const expectedRows = node.cacheInfo?.lastRowCount
+    const engineHasExpectedData =
+      expectedRows !== undefined && engineRowCount === expectedRows
 
     if (
       existsInEngine &&

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
-import { parseCsvBuffer, parseWorkbookSheet } from './fileParsers'
+import { parseCsvBuffer, parseFileData, parseWorkbookSheet } from './fileParsers'
 
 function csvBuffer(csv: string): ArrayBuffer {
   return new TextEncoder().encode(csv).buffer as ArrayBuffer
@@ -76,5 +76,19 @@ describe('file parsers', () => {
     })
 
     expect(result.rows).toEqual([{ __rowId: 'row_0', amount_id: 12 }])
+  })
+
+  it('surfaces workbook parse failures instead of treating them as empty data', async () => {
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([['Value'], [1]]),
+      'Data',
+    )
+    const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+
+    await expect(parseFileData(buffer, 'xlsx', 'Missing')).rejects.toThrow(
+      'Worksheet "Missing" was not found',
+    )
   })
 })

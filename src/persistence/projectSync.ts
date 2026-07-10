@@ -40,10 +40,43 @@ function fromRemote(project: Awaited<ReturnType<typeof getProject>>): ProjectWit
   }
 }
 
+function toTimestamp(value: Date | string | undefined): number {
+  if (!value) return 0
+  const timestamp = new Date(value).getTime()
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
 export async function fetchProjects(): Promise<ProjectSummary[]> {
   if (isNetworkOnline()) {
     try {
-      return await listProjects()
+      const [remoteProjects, localProjects] = await Promise.all([
+        listProjects(),
+        listProjectsLocal(),
+      ])
+      const localById = new Map(localProjects.map(project => [project.id, project]))
+      const merged = remoteProjects.map((remote) => {
+        const local = localById.get(remote.id)
+        if (!local || toTimestamp(local.updatedAt) <= toTimestamp(remote.updatedAt)) {
+          return remote
+        }
+        return {
+          ...remote,
+          name: local.name,
+          updatedAt: new Date(local.updatedAt),
+        }
+      })
+      for (const local of localProjects) {
+        if (!local.id.startsWith('local_')) continue
+        merged.push({
+          id: local.id,
+          name: local.name,
+          updatedAt: new Date(local.updatedAt),
+          createdAt: new Date(local.updatedAt),
+        })
+      }
+      return merged.sort(
+        (a, b) => toTimestamp(b.updatedAt) - toTimestamp(a.updatedAt),
+      )
     } catch (error) {
       console.error('[syncService] Failed to fetch projects from backend:', error)
     }
@@ -57,31 +90,91 @@ export async function fetchProjects(): Promise<ProjectSummary[]> {
 }
 
 export async function loadProjectWithSync(projectId: string): Promise<ProjectWithSync | null> {
+  const localProject = await loadProjectLocal(projectId)
+  if (projectId.startsWith('local_')) {
+    if (!localProject) return null
+    return {
+      ...localProject,
+      patches: deserializePatches(localProject.patches),
+      isLocalOnly: true,
+      needsSync: true,
+    }
+  }
+
   if (isNetworkOnline()) {
     try {
-      const project = await getProject(projectId)
-      const loaded = fromRemote(project)
-      await saveProjectLocal(loaded.id, loaded.name, loaded.nodes, loaded.edges, loaded.patches)
+      const remoteProject = await getProject(projectId)
+      if (
+        localProject
+        && toTimestamp(localProject.updatedAt) > toTimestamp(remoteProject.updatedAt)
+      ) {
+        const patches = deserializePatches(localProject.patches)
+        try {
+          await updateProject(projectId, {
+            name: localProject.name,
+            nodes: localProject.nodes,
+            edges: localProject.edges,
+            patches: localProject.patches,
+          })
+          return {
+            ...localProject,
+            patches,
+            isLocalOnly: false,
+            needsSync: false,
+          }
+        } catch (error) {
+          console.error('[syncService] Failed to upload newer local project:', error)
+          return {
+            ...localProject,
+            patches,
+            isLocalOnly: false,
+            needsSync: true,
+          }
+        }
+      }
+
+      const loaded = fromRemote(remoteProject)
+      await saveProjectLocal(
+        loaded.id,
+        loaded.name,
+        loaded.nodes,
+        loaded.edges,
+        loaded.patches,
+        {
+          createdAt: remoteProject.createdAt,
+          updatedAt: remoteProject.updatedAt,
+        },
+      )
       return loaded
     } catch (error) {
       console.error('[syncService] Failed to load project from backend:', error)
     }
   }
-  const project = await loadProjectLocal(projectId)
-  if (!project) return null
+  if (!localProject) return null
   return {
-    ...project,
-    patches: deserializePatches(project.patches),
+    ...localProject,
+    patches: deserializePatches(localProject.patches),
     isLocalOnly: !isNetworkOnline(),
-    needsSync: !isNetworkOnline(),
+    needsSync: true,
   }
 }
 
 export async function createProjectWithSync(name = 'Untitled Project'): Promise<ProjectWithSync> {
   if (isNetworkOnline()) {
     try {
-      const project = fromRemote(await createProject({ name }))
-      await saveProjectLocal(project.id, project.name, project.nodes, project.edges, project.patches)
+      const remoteProject = await createProject({ name })
+      const project = fromRemote(remoteProject)
+      await saveProjectLocal(
+        project.id,
+        project.name,
+        project.nodes,
+        project.edges,
+        project.patches,
+        {
+          createdAt: remoteProject.createdAt,
+          updatedAt: remoteProject.updatedAt,
+        },
+      )
       return project
     } catch (error) {
       console.error('[syncService] Failed to create project on backend:', error)

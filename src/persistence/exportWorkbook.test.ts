@@ -16,7 +16,7 @@ const sampleWorkbookPath = resolve(process.cwd(), 'data/sample_workbook.xlsx')
 
 describe('createWorkbook', () => {
   beforeEach(() => {
-    vi.mocked(getTableData).mockResolvedValue({
+    vi.mocked(getTableData).mockReset().mockResolvedValue({
       rows: [{ __rowId: 'row_0', amount: 12 }],
       totalRows: 1,
     })
@@ -60,6 +60,112 @@ describe('createWorkbook', () => {
     })
 
     expect(rows[1]).toEqual([12, 24])
+  })
+
+  it('reads additional pages instead of silently exporting a partial table', async () => {
+    const node: SourceTableNode = {
+      id: 'table',
+      kind: 'source_table',
+      name: 'Table',
+      ui: { position: { x: 0, y: 0 } },
+      plan: {
+        fileRef: '',
+        fileName: '',
+        fileType: 'csv',
+        inferredSchemaVersion: 1,
+      },
+      schema: {
+        columns: [{ id: 'value', name: 'Value', type: 'number', nullable: false }],
+        rowCount: 2,
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    vi.mocked(getTableData)
+      .mockResolvedValueOnce({
+        rows: [{ __rowId: 'row_0', value: 1 }],
+        totalRows: 2,
+      })
+      .mockResolvedValueOnce({
+        rows: [{ __rowId: 'row_1', value: 2 }],
+        totalRows: 2,
+      })
+
+    const buffer = await createWorkbook({ table: node })
+    const workbook = XLSX.read(buffer!, { type: 'array' })
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets.Table, { header: 1 })
+
+    expect(getTableData).toHaveBeenNthCalledWith(1, 'table', 0, 50_000)
+    expect(getTableData).toHaveBeenNthCalledWith(2, 'table', 1, 1)
+    expect(rows).toEqual([['Value'], [1], [2]])
+  })
+
+  it('writes an explicit error instead of an empty sheet when rows cannot be read', async () => {
+    const node: SourceTableNode = {
+      id: 'table',
+      kind: 'source_table',
+      name: 'Table',
+      ui: { position: { x: 0, y: 0 } },
+      plan: {
+        fileRef: '',
+        fileName: '',
+        fileType: 'csv',
+        inferredSchemaVersion: 1,
+      },
+      schema: {
+        columns: [{ id: 'value', name: 'Value', type: 'number', nullable: false }],
+        rowCount: 2,
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    vi.mocked(getTableData).mockResolvedValue({
+      rows: [],
+      totalRows: 2,
+    })
+
+    const buffer = await createWorkbook({ table: node })
+    const workbook = XLSX.read(buffer!, { type: 'array' })
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets.Table, { header: 1 })
+
+    expect(rows[0]).toEqual(['Error exporting table'])
+    expect(String(rows[1]?.[0])).toContain('0 of 2 rows')
+  })
+
+  it('creates valid case-insensitive unique worksheet names', async () => {
+    const names = ['Data', 'data', 'Data (1)', " '[]:*?/\\' "]
+    const nodes = Object.fromEntries(names.map((name, index) => {
+      const id = `table_${index}`
+      const node: SourceTableNode = {
+        id,
+        kind: 'source_table',
+        name,
+        ui: { position: { x: 0, y: 0 } },
+        plan: {
+          fileRef: '',
+          fileName: '',
+          fileType: 'csv',
+          inferredSchemaVersion: 1,
+        },
+        schema: {
+          columns: [{ id: 'amount', name: 'Amount', type: 'number', nullable: false }],
+          rowCount: 1,
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      return [id, node]
+    }))
+
+    const buffer = await createWorkbook(nodes)
+    const workbook = XLSX.read(buffer!, { type: 'array' })
+
+    expect(workbook.SheetNames).toEqual([
+      'Data',
+      'data (1)',
+      'Data (1) (1)',
+      '_______',
+    ])
   })
 
   it.skipIf(!existsSync(sampleWorkbookPath))(

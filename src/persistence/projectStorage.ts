@@ -17,11 +17,17 @@ export async function saveProject(
   name: string,
   nodes: Record<string, ProjectNode>,
   edges: Record<string, Edge>,
-  patches: Record<string, Patches>
+  patches: Record<string, Patches>,
+  sourceTimestamps?: { createdAt?: Date | string; updatedAt?: Date | string },
 ): Promise<void> {
   const db = await getDB()
   const existing = await db.get('projects', id)
   const now = new Date().toISOString()
+  const normalizeTimestamp = (value: Date | string | undefined): string | undefined => {
+    if (!value) return undefined
+    const date = new Date(value)
+    return Number.isFinite(date.getTime()) ? date.toISOString() : undefined
+  }
 
   const project = {
     id,
@@ -29,8 +35,11 @@ export async function saveProject(
     nodes,
     edges,
     patches: serializePatches(patches),
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
+    createdAt:
+      normalizeTimestamp(sourceTimestamps?.createdAt)
+      ?? existing?.createdAt
+      ?? now,
+    updatedAt: normalizeTimestamp(sourceTimestamps?.updatedAt) ?? now,
   }
 
   await db.put('projects', project as unknown as import('./dbCore').TableCanvasDB['projects']['value'])

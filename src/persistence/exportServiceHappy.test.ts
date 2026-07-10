@@ -199,7 +199,7 @@ describe('exportProjectAsZip happy paths', () => {
     expect(materializationService.getTableData).toHaveBeenCalledWith(
       'table_2',
       0,
-      1_000_000,
+      50_000,
     )
     expect((await JSZip.loadAsync(blob)).files['data.xlsx']).toBeDefined()
   })
