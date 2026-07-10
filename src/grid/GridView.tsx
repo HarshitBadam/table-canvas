@@ -1,16 +1,11 @@
-import { useState, useCallback, useRef, useEffect, lazy, Suspense, useMemo } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { useState, useCallback, useEffect, lazy, Suspense, useMemo } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useProjectStore } from '@/state/projectStore'
 import { FilterPanel } from './FilterPanel'
 import { FormulaColumnModal } from './FormulaColumnModal'
-import type { FormulaValue } from '@/formula'
 import { ensureTableMaterialized } from '@/engine/materializationService'
-import { ColumnHeader } from './ColumnHeader'
-import { GridCell } from './GridCell'
 import { GridContextMenu } from './GridContextMenu'
 import { GridToolbar } from './GridToolbar'
-import { ROW_HEIGHT, HEADER_HEIGHT } from './constants'
 import { useColumnResize } from './useColumnResize'
 import { useGridData } from './useGridData'
 import { useGridSelection } from './useGridSelection'
@@ -20,6 +15,7 @@ import { useGridAutofill } from './useGridAutofill'
 import { useGridEditing } from './useGridEditing'
 import { useGridOperations } from './useGridOperations'
 import { GridProvider, type GridContextValue } from './GridContext'
+import { GridViewport } from './GridViewport'
 
 const SuggestionsPanel = lazy(() => import('@/suggestions/SuggestionsPanel').then(m => ({ default: m.SuggestionsPanel })))
 const ChartBuilder = lazy(() => import('@/charts/ChartBuilder').then(m => ({ default: m.ChartBuilder })))
@@ -88,31 +84,12 @@ export function GridView({ tableId }: GridViewProps) {
 
   const { getColumnWidth, handleResizeStart, resizingColumn } = useColumnResize()
 
-  const containerRef = useRef<HTMLDivElement>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [chartBuilderOpen, setChartBuilderOpen] = useState(false)
   const [chartPreselectedColumn, setChartPreselectedColumn] = useState<string | undefined>(undefined)
 
   const totalRows = filteredRows.length
-
-  const rowVirtualizer = useVirtualizer({
-    count: totalRows,
-    getScrollElement: () => containerRef.current,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 15,
-  })
-
-  // Drive the windowed fetcher from the viewport: as the user scrolls, make sure the
-  // rows that are about to become visible get loaded from the engine.
-  const virtualItems = rowVirtualizer.getVirtualItems()
-  const firstVisibleIndex = virtualItems[0]?.index ?? 0
-  const lastVisibleIndex = virtualItems[virtualItems.length - 1]?.index ?? 0
-  useEffect(() => {
-    if (windowed.totalRows > 0) {
-      windowed.ensureRange(firstVisibleIndex, lastVisibleIndex)
-    }
-  }, [firstVisibleIndex, lastVisibleIndex, windowed.totalRows, windowed.ensureRange])
 
   useEffect(() => {
     if (!contextMenu) return
@@ -270,93 +247,7 @@ export function GridView({ tableId }: GridViewProps) {
           </div>
         )}
 
-        {(totalRows > 0 || windowed.isLoading) && (
-          <div ref={containerRef} className="flex-1 overflow-auto select-none">
-            <div style={{
-              height: rowVirtualizer.getTotalSize() + HEADER_HEIGHT,
-              position: 'relative',
-              minWidth: 50 + columns.reduce((sum, col) => sum + getColumnWidth(col.id), 0) + (isEditable ? 40 : 0),
-            }}>
-              <div className="sticky top-0 z-20 flex border-b border-border table-header-bg" style={{ height: HEADER_HEIGHT }}>
-                <div
-                  onClick={handleCornerClick} onContextMenu={(e) => handleContextMenu(e, 'corner')}
-                  className={`sticky left-0 z-30 flex items-center justify-center px-3 text-xs font-medium border-r border-border cursor-pointer table-header-bg ${
-                    isCornerSelected ? 'bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 ring-2 ring-inset ring-green-500' : 'text-text-tertiary hover:bg-surface-tertiary'
-                  }`}
-                  style={{ width: 50, minWidth: 50 }} title="Click to insert row/column at beginning"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </div>
-                {columns.map((col) => <ColumnHeader key={col.id} column={col} />)}
-                {isEditable && (
-                  <div onClick={() => openNewColumnModal(columns.length)}
-                    className="flex items-center justify-center px-2 text-xs cursor-pointer border-l border-border text-text-tertiary hover:bg-green-50 dark:hover:bg-green-900/30 hover:text-green-600 dark:hover:text-green-400"
-                    style={{ width: 40, minWidth: 40 }} title="Add column"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ position: 'relative', height: rowVirtualizer.getTotalSize() }}>
-                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const actualIndex = virtualRow.index
-                  const row = filteredRows[actualIndex]
-                  if (!row) {
-                    return (
-                      <div
-                        key={`skeleton-${actualIndex}`}
-                        className="flex border-b border-border-subtle bg-surface animate-pulse"
-                        style={{
-                          position: 'absolute',
-                          top: virtualRow.start,
-                          height: ROW_HEIGHT,
-                          width: '100%',
-                        }}
-                      >
-                        <div className="sticky left-0 z-10 flex items-center justify-center px-3 text-xs border-r border-border-subtle text-text-tertiary bg-surface" style={{ width: 50, minWidth: 50 }}>
-                          {actualIndex + 1}
-                        </div>
-                        {columns.map((col) => (
-                          <div key={col.id} className="flex items-center px-3" style={{ width: getColumnWidth(col.id) }}>
-                            <div className="h-4 bg-surface-secondary rounded w-3/4" />
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  }
-
-                  const isRowSelected = selection?.type === 'row' && selection.rowIndex === actualIndex
-                  return (
-                    <div
-                      key={row.__rowId}
-                      className={`flex border-b border-border-subtle ${actualIndex % 2 === 0 ? 'bg-surface' : 'bg-surface-secondary/50'} ${isRowSelected || isIndexColumnSelected ? 'bg-accent-green/10' : ''}`}
-                      style={{
-                        position: 'absolute',
-                        top: virtualRow.start,
-                        height: ROW_HEIGHT,
-                        width: '100%',
-                      }}
-                    >
-                      <div onClick={() => handleRowClick(actualIndex)} onContextMenu={(e) => handleContextMenu(e, 'row', actualIndex)}
-                        className={`sticky left-0 z-10 flex items-center justify-center px-3 text-xs border-r border-border-subtle cursor-pointer ${
-                          isRowSelected ? 'text-accent-green font-medium !bg-accent-green/15 ring-2 ring-inset ring-accent-green'
-                            : isIndexColumnSelected ? 'text-accent-green !bg-accent-green/10' : 'text-text-tertiary hover:bg-surface-secondary'
-                        } ${actualIndex % 2 !== 0 ? 'bg-surface-secondary' : 'bg-surface'}`}
-                        style={{ width: 50, minWidth: 50 }} title={`Row ${actualIndex + 1}`}
-                      >{actualIndex + 1}</div>
-                      {columns.map((col) => <GridCell key={col.id} column={col} row={row} rowIndex={actualIndex} />)}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )}
+        <GridViewport totalRows={totalRows} windowed={windowed} onAddColumn={handleAddColumn} />
 
         <GridContextMenu />
 
@@ -371,12 +262,7 @@ export function GridView({ tableId }: GridViewProps) {
           matchingRowCount={totalRows} totalRowCount={unfilteredTotalRows}
         />
 
-        <FormulaColumnModal isOpen={newColumnModal.isOpen} insertIndex={newColumnModal.insertIndex} columns={columns}
-          rows={rows.map(row => {
-            const rowData: Record<string, FormulaValue> = {}
-            columns.forEach(col => { rowData[col.id] = getDisplayValue(row.__rowId, col.id, row[col.id], row) as FormulaValue })
-            return rowData
-          })}
+        <FormulaColumnModal isOpen={newColumnModal.isOpen} columns={columns}
           onConfirm={(name, type, formula) => { doInsertColumn(newColumnModal.insertIndex, name, type, formula); setNewColumnModal({ isOpen: false, insertIndex: 0 }) }}
           onCancel={() => setNewColumnModal({ isOpen: false, insertIndex: 0 })}
         />

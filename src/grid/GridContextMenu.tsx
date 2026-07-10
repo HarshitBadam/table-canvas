@@ -1,5 +1,5 @@
 export type { ContextMenuState } from './types'
-import { useGridContext } from './GridContext'
+import { useGridContext } from './useGridContext'
 
 export function GridContextMenu() {
   const {

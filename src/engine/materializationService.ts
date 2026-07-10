@@ -1,20 +1,5 @@
-/**
- * Materialization Service
- *
- * Orchestrates the computation of derived tables by:
- * 1. Checking if a table needs recomputation (dirty state)
- * 2. Ensuring all upstream dependencies are materialized
- * 3. Executing transforms and caching results
- * 4. Managing computation state and errors
- */
-
 import { getEngine } from './EngineAdapter'
 import { getComputationOrder } from './dependencyGraph'
-// Accessed via .getState() (Zustand's non-hook static API) — not called as React hooks.
-// Injecting these as parameters would require changing the signatures of all public
-// functions (ensureTableMaterialized, needsMaterialization, …) and updating 8+ call
-// sites across the codebase; the coupling is intentional and acceptable in a service
-// module as long as the hook form (useProjectStore()) is never invoked here.
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
 import { loadFileWithSync } from '@/persistence/syncService'
@@ -174,14 +159,6 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
 }
 
 
-/**
- * Ensure a table is materialized and ready for viewing.
- *
- * For source tables: Loads from IndexedDB and applies patches
- * For derived tables: Recursively materializes upstreams, then executes transform
- *
- * Handles deduplication of concurrent requests and sequential execution.
- */
 export async function ensureTableMaterialized(tableId: string): Promise<MaterializationResult> {
   const existingPromise = inProgressMaterializations.get(tableId)
   if (existingPromise) {
@@ -279,51 +256,6 @@ async function materializeTableInternal(tableId: string): Promise<Materializatio
   }
 }
 
-
-export function needsMaterialization(tableId: string): boolean {
-  const projectStore = useProjectStore.getState()
-  const node = projectStore.getTableNode(tableId)
-
-  if (!node) return false
-  if (node.cacheInfo?.isDirty) return true
-  if (!node.cacheInfo?.currentVersionHash) return true
-
-  return false
-}
-
-export async function forceMaterialize(tableId: string): Promise<MaterializationResult> {
-  const projectStore = useProjectStore.getState()
-  projectStore.markNodeAndDescendantsDirty(tableId)
-  return ensureTableMaterialized(tableId)
-}
-
-export function getMaterializationStatus(tableId: string): {
-  needsComputation: boolean
-  isComputing: boolean
-  hasError: boolean
-  error?: string
-  lastComputedAt?: string
-} {
-  const projectStore = useProjectStore.getState()
-  const node = projectStore.getTableNode(tableId)
-
-  if (!node) {
-    return {
-      needsComputation: false,
-      isComputing: false,
-      hasError: true,
-      error: 'Table not found',
-    }
-  }
-
-  return {
-    needsComputation: node.cacheInfo?.isDirty ?? true,
-    isComputing: node.cacheInfo?.isComputing ?? false,
-    hasError: !!node.cacheInfo?.error,
-    error: node.cacheInfo?.error,
-    lastComputedAt: node.cacheInfo?.lastComputedAt,
-  }
-}
 
 export async function getTableData(
   tableId: string,

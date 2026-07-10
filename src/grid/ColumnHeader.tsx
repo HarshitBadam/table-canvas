@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react'
 import type { ColumnSchema } from '@/types'
 import { HEADER_HEIGHT } from './constants'
-import { useGridContext } from './GridContext'
+import { useGridContext } from './useGridContext'
 
 interface ColumnHeaderProps {
   column: ColumnSchema

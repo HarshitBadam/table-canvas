@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { CellValue, ChartConfig, ColumnSchema } from '@/types'
 import { getEngine } from '@/engine/EngineAdapter'
 import { ensureTableMaterialized } from '@/engine/materializationService'
@@ -27,13 +27,13 @@ export function useChartData(
   const [error, setError] = useState<string | null>(null)
   const [refetchTrigger, setRefetchTrigger] = useState(0)
 
-  const refetch = () => setRefetchTrigger(prev => prev + 1)
+  const refetch = useCallback(() => setRefetchTrigger(prev => prev + 1), [])
 
   // DuckDB columns are always created from the column's display `name` (see
   // EngineAdapter.loadTable / derivedTableComputation), so queries must reference
   // `col.name` — NOT `duckDbName`, which is stale (= the id) for source tables and
   // would produce "column not found" Binder errors.
-  const getColumnForDuckDB = (columnRef: string): { duckDbName: string; name: string } | null => {
+  const getColumnForDuckDB = useCallback((columnRef: string): { duckDbName: string; name: string } | null => {
     if (!columns || columns.length === 0) {
       // If no columns schema, assume columnRef is what we need
       return { duckDbName: columnRef, name: columnRef }
@@ -57,7 +57,7 @@ export function useChartData(
     }
     
     return null
-  }
+  }, [columns])
 
   useEffect(() => {
     let cancelled = false
@@ -174,7 +174,8 @@ export function useChartData(
     config.aggregation,
     sourceVersionHash, // Re-fetch when source data changes
     refetchTrigger,
-    columns, // Re-fetch if columns change
+    columns,
+    getColumnForDuckDB,
   ])
 
   return { data, loading, error, refetch }

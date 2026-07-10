@@ -1,0 +1,29 @@
+.print-preview {
+  background: white;
+  color: #1a1a1a;
+  padding: 0.75in;
+  max-width: 8.5in;
+  margin: 0 auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.print-preview h1:first-child {
+  font-size: 22pt;
+  font-weight: 700;
+  margin-bottom: 16pt;
+  border-bottom: 2px solid #217346;
+  padding-bottom: 8pt;
+}
+
+.print-preview h2 {
+  font-size: 14pt;
+  font-weight: 600;
+  margin-top: 16pt;
+  margin-bottom: 8pt;
+}
+
+.print-preview p {
+  margin-bottom: 10pt;
+  line-height: 1.6;
+}

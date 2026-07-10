@@ -43,19 +43,6 @@ export interface TableQualityMetrics {
   typeBreakdown: ColumnTypeBreakdown
 }
 
-export interface Insight {
-  id: string
-  type: 'high_missing' | 'key_candidate' | 'date_range' | 'category_distribution' | 'outliers' | 'completeness_warning'
-  title: string
-  description: string
-  tableId: string
-  tableName: string
-  columnId?: string
-  columnName?: string
-  severity: 'info' | 'warning' | 'success'
-  data?: Record<string, unknown>
-}
-
 export interface ProjectHealthMetrics {
   overallCompleteness: number
   totalIssues: number

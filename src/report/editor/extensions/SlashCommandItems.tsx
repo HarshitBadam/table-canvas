@@ -1,120 +1,94 @@
-import type { SuggestionOptions } from '@tiptap/suggestion';
-import type { Editor } from '@tiptap/react';
-import type { Range } from '@tiptap/core';
+import { useProjectStore } from '@/state/projectStore';
+import type { TableNode } from '@/types';
 import {
-  TextIcon,
+  BulletIcon,
+  CalloutIcon,
+  ChartIcon,
+  CodeIcon,
+  DividerIcon,
+  EmbedIcon,
   H1Icon,
   H2Icon,
   H3Icon,
-  BulletIcon,
   NumberIcon,
   QuoteIcon,
-  DividerIcon,
-  CodeIcon,
-  ToggleIcon,
-  CalloutIcon,
-  ChartIcon,
   TableIcon,
-  EmbedIcon,
+  TextIcon,
+  ToggleIcon,
 } from './SlashCommandIcons';
+import type { SlashCommandItem } from './slashCommandTypes';
 
-export interface SlashCommandItem {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  command: (props: { editor: Editor; range: Range }) => void;
-  category: string;
-}
+export type { SlashCommandItem, SlashCommandsOptions } from './slashCommandTypes';
 
-export interface SlashCommandsOptions {
-  reportId?: string;
-  suggestion?: Partial<SuggestionOptions>;
-}
+export function getSlashCommandItems(): SlashCommandItem[] {
+  const tables = Object.values(useProjectStore.getState().nodes).filter(
+    (node): node is TableNode => node.kind === 'source_table' || node.kind === 'derived_table'
+  );
 
-export function getCommands(_options: SlashCommandsOptions): SlashCommandItem[] {
   return [
     {
       title: 'Text',
       description: 'Plain text paragraph',
       icon: <TextIcon />,
       category: 'Basic',
-      command: ({ editor, range }) => {
-        editor.chain().focus().deleteRange(range).setNode('paragraph').run();
-      },
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setNode('paragraph').run(),
     },
     {
       title: 'Heading 1',
       description: 'Large section heading',
       icon: <H1Icon />,
       category: 'Basic',
-      command: ({ editor, range }) => {
-        editor.chain().focus().deleteRange(range).setNode('heading', { level: 1 }).run();
-      },
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setNode('heading', { level: 1 }).run(),
     },
     {
       title: 'Heading 2',
       description: 'Medium section heading',
       icon: <H2Icon />,
       category: 'Basic',
-      command: ({ editor, range }) => {
-        editor.chain().focus().deleteRange(range).setNode('heading', { level: 2 }).run();
-      },
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setNode('heading', { level: 2 }).run(),
     },
     {
       title: 'Heading 3',
       description: 'Small section heading',
       icon: <H3Icon />,
       category: 'Basic',
-      command: ({ editor, range }) => {
-        editor.chain().focus().deleteRange(range).setNode('heading', { level: 3 }).run();
-      },
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setNode('heading', { level: 3 }).run(),
     },
     {
       title: 'Bullet List',
       description: 'Create a bullet list',
       icon: <BulletIcon />,
       category: 'Basic',
-      command: ({ editor, range }) => {
-        editor.chain().focus().deleteRange(range).toggleBulletList().run();
-      },
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleBulletList().run(),
     },
     {
       title: 'Numbered List',
       description: 'Create a numbered list',
       icon: <NumberIcon />,
       category: 'Basic',
-      command: ({ editor, range }) => {
-        editor.chain().focus().deleteRange(range).toggleOrderedList().run();
-      },
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleOrderedList().run(),
     },
     {
       title: 'Quote',
       description: 'Add a blockquote',
       icon: <QuoteIcon />,
       category: 'Basic',
-      command: ({ editor, range }) => {
-        editor.chain().focus().deleteRange(range).toggleBlockquote().run();
-      },
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleBlockquote().run(),
     },
     {
       title: 'Divider',
       description: 'Visual separator',
       icon: <DividerIcon />,
       category: 'Basic',
-      command: ({ editor, range }) => {
-        editor.chain().focus().deleteRange(range).setHorizontalRule().run();
-      },
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
     },
     {
       title: 'Code Block',
       description: 'Code snippet with syntax',
       icon: <CodeIcon />,
       category: 'Basic',
-      command: ({ editor, range }) => {
-        editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
-      },
+      command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run(),
     },
-
     {
       title: 'Toggle',
       description: 'Collapsible section',
@@ -141,7 +115,6 @@ export function getCommands(_options: SlashCommandsOptions): SlashCommandItem[] 
         }).run();
       },
     },
-
     {
       title: 'Chart',
       description: 'Visualize data from a table',
@@ -151,7 +124,7 @@ export function getCommands(_options: SlashCommandsOptions): SlashCommandItem[] 
         editor.chain().focus().deleteRange(range).insertContent({
           type: 'chartBlock',
           attrs: {
-            sourceTableId: '',
+            sourceTableId: tables[0]?.id || '',
             chartType: 'bar',
             config: { showLegend: true, showGrid: true },
           },
@@ -167,7 +140,7 @@ export function getCommands(_options: SlashCommandsOptions): SlashCommandItem[] 
         editor.chain().focus().deleteRange(range).insertContent({
           type: 'embeddedTable',
           attrs: {
-            sourceTableId: '',
+            sourceTableId: tables[0]?.id || '',
             selectedColumns: [],
             rowSelectionMode: 'first_n',
             rowLimit: 10,

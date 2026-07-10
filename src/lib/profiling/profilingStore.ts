@@ -77,15 +77,18 @@ export const useProfilingStore = create<ProfilingState>((set, get) => ({
   
   clearProfile: (tableId) => {
     set((state) => {
-      const { [tableId]: _, ...profiles } = state.profiles
-      const { [tableId]: __, ...loading } = state.loading
+      const profiles = { ...state.profiles }
+      const loading = { ...state.loading }
+      delete profiles[tableId]
+      delete loading[tableId]
       return { profiles, loading }
     })
   },
   
   clearAndStartLoading: (tableId) => {
     set((state) => {
-      const { [tableId]: _, ...profiles } = state.profiles
+      const profiles = { ...state.profiles }
+      delete profiles[tableId]
       return { 
         profiles, 
         loading: { ...state.loading, [tableId]: true }

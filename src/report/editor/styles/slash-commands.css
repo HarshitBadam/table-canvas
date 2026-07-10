@@ -1,0 +1,118 @@
+.slash-command-menu {
+  min-width: 280px;
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e4e4e7);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 50;
+  animation: fadeIn 100ms ease;
+}
+
+[data-theme="dark"] .slash-command-menu {
+  background: var(--color-surface, #18181b);
+  border-color: var(--color-border, #3f3f46);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slash-command-group {
+  padding: 0.5rem 0;
+}
+
+.slash-command-group:not(:last-child) {
+  border-bottom: 1px solid var(--color-border, #e4e4e7);
+}
+
+[data-theme="dark"] .slash-command-group:not(:last-child) {
+  border-bottom-color: var(--color-border, #3f3f46);
+}
+
+.slash-command-group-title {
+  padding: 0.5rem 0.75rem;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-tertiary, #a1a1aa);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.slash-command-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+
+.slash-command-item:hover,
+.slash-command-item.is-active {
+  background: var(--color-surface-secondary, #f4f4f5);
+}
+
+[data-theme="dark"] .slash-command-item:hover,
+[data-theme="dark"] .slash-command-item.is-active {
+  background: var(--color-surface-secondary, #27272a);
+}
+
+.slash-command-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-secondary, #f4f4f5);
+  border-radius: 6px;
+  color: var(--color-text-secondary, #71717a);
+}
+
+[data-theme="dark"] .slash-command-icon {
+  background: var(--color-surface-tertiary, #3f3f46);
+  color: var(--color-text-secondary, #a1a1aa);
+}
+
+.slash-command-text {
+  flex: 1;
+}
+
+.slash-command-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary, #18181b);
+}
+
+[data-theme="dark"] .slash-command-title {
+  color: var(--color-text-primary, #fafafa);
+}
+
+.slash-command-description {
+  font-size: 12px;
+  color: var(--color-text-tertiary, #a1a1aa);
+}
+
+.tippy-box[data-theme~='slash-command'] {
+  background: transparent;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.tippy-box[data-theme~='slash-command'] .tippy-content {
+  padding: 0;
+}
+
+.tippy-box[data-theme~='slash-command'] .tippy-arrow {
+  display: none;
+}

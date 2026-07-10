@@ -1,0 +1,136 @@
+@media print {
+
+  hr {
+    border: none !important;
+    border-top: 1px solid #e0e0e0 !important;
+    margin: 16pt 0 !important;
+    page-break-after: avoid;
+  }
+
+  blockquote {
+    border-left: 3px solid #217346 !important;
+    padding-left: 12pt !important;
+    margin: 12pt 0 !important;
+    color: #444 !important;
+    font-style: italic;
+    page-break-inside: avoid;
+  }
+
+  /* Lists - keep together when possible */
+  ul, ol {
+    margin: 10pt 0 !important;
+    padding-left: 20pt !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  li {
+    margin-bottom: 4pt !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Allow long lists to break but keep items together */
+  ul:has(li:nth-child(8)), ol:has(li:nth-child(8)) {
+    page-break-inside: auto !important;
+  }
+
+  .callout-block {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    border: 1px solid #e5e5e5 !important;
+    border-radius: 6pt !important;
+    padding: 12pt !important;
+    margin: 12pt 0 !important;
+    background: #fafafa !important;
+  }
+
+  .tiptap-block-wrapper {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    background: none !important;
+  }
+
+  .tiptap-block-wrapper.is-selected {
+    box-shadow: none !important;
+    background: none !important;
+  }
+
+  .tiptap-editor-content {
+    padding: 0 !important;
+  }
+
+  /* Toggle blocks - show content expanded */
+  .toggle-block {
+    page-break-inside: avoid;
+    border: 1px solid #e5e5e5 !important;
+    border-radius: 4pt !important;
+    padding: 8pt !important;
+    margin: 8pt 0 !important;
+  }
+
+  .toggle-block-content {
+    display: block !important;
+    padding-top: 8pt !important;
+  }
+
+  .toggle-block-trigger {
+    font-weight: 600 !important;
+  }
+
+  .toggle-block-trigger svg {
+    display: none !important;
+  }
+
+  /* Prevent awkward breaks */
+  h1, h2, h3, h4 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Keep headings with following content */
+  h1 + *, h2 + *, h3 + *, h4 + * {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  img, svg, figure {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  .page-break-avoid-after {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* TipTap content blocks - keep together */
+  .tiptap-block-wrapper {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Keep content sections together */
+  section, article, .content-block {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

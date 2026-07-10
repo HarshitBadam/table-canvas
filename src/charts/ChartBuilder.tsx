@@ -3,6 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import type { AggregationType, ChartType, TableNode, ProjectNode } from '@/types'
 import { isLikelyIdColumn, computeChartPosition, buildChartNodeSpec } from './chartBuilderUtils'
+import { ChartTypeIcon } from './ChartTypeIcon'
 
 interface ChartBuilderProps {
   isOpen: boolean
@@ -32,12 +33,15 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
     return tables.find(t => t.id === tableId)
   }, [tables, sourceTableId, selectedTableId])
 
-  const columns = selectedTable?.schema?.columns || []
+  const columns = useMemo(() => selectedTable?.schema?.columns ?? [], [selectedTable?.schema?.columns])
   const numericColumns = useMemo(() => 
     columns.filter(c => c.type === 'number' && !isLikelyIdColumn(c.name)),
     [columns]
   )
-  const categoricalColumns = columns.filter(c => c.type === 'string' || c.type === 'date')
+  const categoricalColumns = useMemo(
+    () => columns.filter(c => c.type === 'string' || c.type === 'date'),
+    [columns],
+  )
 
   useEffect(() => {
     if (isOpen) {
@@ -147,10 +151,10 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
               </label>
               <div className="grid grid-cols-4 gap-3">
                 {[
-                  { type: 'bar' as ChartType, label: 'Bar', icon: <BarIcon /> },
-                  { type: 'line' as ChartType, label: 'Line', icon: <LineIcon /> },
-                  { type: 'pie' as ChartType, label: 'Pie', icon: <PieIcon /> },
-                  { type: 'scatter' as ChartType, label: 'Scatter', icon: <ScatterIcon /> },
+                  { type: 'bar' as ChartType, label: 'Bar' },
+                  { type: 'line' as ChartType, label: 'Line' },
+                  { type: 'pie' as ChartType, label: 'Pie' },
+                  { type: 'scatter' as ChartType, label: 'Scatter' },
                 ].map((ct) => (
                   <button
                     key={ct.type}
@@ -168,7 +172,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                         ? 'bg-accent-green text-white' 
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
                     }`}>
-                      {ct.icon}
+                      <ChartTypeIcon type={ct.type} className="w-4 h-4" />
                     </div>
                     <span className={`text-xs font-medium ${
                       chartType === ct.type ? 'text-accent-green' : 'text-gray-600 dark:text-gray-400'
@@ -306,40 +310,5 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
-  )
-}
-
-function BarIcon() {
-  return (
-    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z" />
-    </svg>
-  )
-}
-
-function LineIcon() {
-  return (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 4 4 6-6" />
-    </svg>
-  )
-}
-
-function PieIcon() {
-  return (
-    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M11 2v20c-5.07-.5-9-4.79-9-10s3.93-9.5 9-10zm2.03 0v8.99H22c-.47-4.74-4.24-8.52-8.97-8.99zm0 11.01V22c4.74-.47 8.5-4.25 8.97-8.99h-8.97z" />
-    </svg>
-  )
-}
-
-function ScatterIcon() {
-  return (
-    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-      <circle cx="7" cy="14" r="2" />
-      <circle cx="11" cy="10" r="2" />
-      <circle cx="15" cy="16" r="2" />
-      <circle cx="17" cy="8" r="2" />
-    </svg>
   )
 }
