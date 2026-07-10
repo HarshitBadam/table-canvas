@@ -5,14 +5,14 @@ import { Types } from 'mongoose';
 /**
  * Base interface for soft-deletable entities
  */
-export interface SoftDeletable {
+interface SoftDeletable {
   deletedAt: Date | null;
 }
 
 /**
  * Base interface for timestamped entities
  */
-export interface Timestamped {
+interface Timestamped {
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,7 +36,7 @@ export interface IUser {
   updatedAt: Date;
 }
 
-export interface IUserPublic {
+interface IUserPublic {
   id: string;
   email: string;
   name: string;
@@ -46,20 +46,16 @@ export interface IUserPublic {
 }
 
 
-export type NodeKind = 'source_table' | 'derived_table' | 'chart' | 'dashboard';
+type NodeKind = 'source_table' | 'derived_table' | 'chart';
 
-export interface Position {
+interface Position {
   x: number;
   y: number;
 }
 
-export interface NodeUI {
+interface NodeUI {
   position: Position;
-  collapsed?: boolean;
-  expanded?: boolean;
-  viewMode?: 'collapsed' | 'stats' | 'data';
-  width?: number;
-  height?: number;
+  viewMode?: 'collapsed' | 'data';
 }
 
 export interface ProjectNode {
@@ -104,28 +100,6 @@ export interface IProjectPublic {
   patches: Record<string, SerializedPatches>;
   createdAt: Date;
   updatedAt: Date;
-}
-
-
-export interface IFile extends SoftDeletable, Timestamped {
-  _id: Types.ObjectId;
-  gridFsId: Types.ObjectId;
-  userId: Types.ObjectId;
-  projectId?: Types.ObjectId;
-  filename: string;
-  originalName: string;
-  contentType: string;
-  size: number;
-}
-
-export interface IFilePublic {
-  id: string;
-  filename: string;
-  originalName: string;
-  contentType: string;
-  size: number;
-  projectId?: string;
-  createdAt: Date;
 }
 
 export interface FileMetadata {

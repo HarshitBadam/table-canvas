@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import dagre from 'dagre'
-import type { LineageNode, LineageEdge } from '../useDashboardData'
+import type { LineageNode, LineageEdge } from '../dashboardHelpers'
 
 interface LineageMiniMapProps {
   nodes: LineageNode[]

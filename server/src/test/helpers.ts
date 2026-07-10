@@ -69,7 +69,6 @@ export function createSampleNode(
     name: `Node ${id}`,
     ui: {
       position: { x: 100, y: 100 },
-      collapsed: false,
     },
     plan: {},
     createdAt: new Date().toISOString(),

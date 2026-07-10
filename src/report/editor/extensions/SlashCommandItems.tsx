@@ -18,7 +18,7 @@ import {
 } from './SlashCommandIcons';
 import type { SlashCommandItem } from './slashCommandTypes';
 
-export type { SlashCommandItem, SlashCommandsOptions } from './slashCommandTypes';
+export type { SlashCommandItem,  } from './slashCommandTypes';
 
 export function getSlashCommandItems(): SlashCommandItem[] {
   const tables = Object.values(useProjectStore.getState().nodes).filter(

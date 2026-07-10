@@ -187,6 +187,9 @@ jobs:
       - name: Test backend
         run: npm --prefix server run test
 
+      - name: Check for dead code
+        run: npm run check:dead-code
+
   ci-success:
     name: ✅ CI Success
     needs: [lint, typecheck, unit-tests, e2e-tests, build, backend]

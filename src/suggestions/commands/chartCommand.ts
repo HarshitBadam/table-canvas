@@ -47,8 +47,6 @@ export class CreateChartCommand implements SuggestionCommand {
         name: chartTitle,
         ui: {
           position: this.calculatePosition(sourceTable.ui.position),
-          width: 400,
-          height: 300,
         },
         plan: {
           chartType: this.action.chart.chartType === 'histogram' ? 'bar' : this.action.chart.chartType,

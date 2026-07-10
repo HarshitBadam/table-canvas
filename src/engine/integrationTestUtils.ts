@@ -1,7 +1,7 @@
 import { useProjectStore } from '@/state/projectStore'
 import type { DerivedTableNode, SourceTableNode, TableSchema } from '@/types'
 
-export const sampleSchema: TableSchema = {
+const sampleSchema: TableSchema = {
   columns: [
     { id: 'col1', name: 'ID', type: 'string', nullable: false },
     { id: 'col2', name: 'Value', type: 'number', nullable: true },

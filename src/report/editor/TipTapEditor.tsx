@@ -177,5 +177,3 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
     );
   }
 );
-
-export default TipTapEditor;

@@ -1,4 +1,4 @@
-export type { QuickDateFilter, QuickDateOption } from './dateFilterUtils'
+export type { QuickDateFilter,  } from './dateFilterUtils'
 export { quickDateOptions } from './dateFilterUtils'
 export type { FilterColumnType } from './filterOperators'
 export {

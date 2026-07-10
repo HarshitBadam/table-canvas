@@ -5,7 +5,7 @@
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 
-export interface ApiResponse<T = unknown> {
+interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -30,7 +30,7 @@ export class ApiError extends Error {
   }
 }
 
-export class AuthError extends ApiError {
+class AuthError extends ApiError {
   constructor(message = 'Authentication required') {
     super(message, 401);
     this.name = 'AuthError';

@@ -119,7 +119,7 @@ export function useSelectableTables(): TableNodeType[] {
   );
 }
 
-export type TableSourceStatus =
+type TableSourceStatus =
   | 'no-source'
   | 'missing-table'
   | 'loading'

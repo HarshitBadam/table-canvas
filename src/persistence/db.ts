@@ -7,8 +7,6 @@ export type { StoredProject } from './projectStorage'
 
 export { saveFile, loadFile, loadFileRecord, deleteFile } from './fileStorage'
 
-export { saveCache, loadCache, clearTableCache } from './cacheStorage'
-
 export { saveReport, loadReport, loadAllReports, listReports, deleteReport, saveAllReports } from './reportStorage'
 
 export {

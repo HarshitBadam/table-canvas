@@ -1,12 +1,7 @@
 import * as XLSX from 'xlsx'
 import { getTableData } from '@/engine/materializationService'
 import type { ProjectNode, TableNode } from '@/types'
-
-export function getTableNodes(nodes: Record<string, ProjectNode>): TableNode[] {
-  return Object.values(nodes)
-    .filter((node): node is TableNode => node.kind === 'source_table' || node.kind === 'derived_table')
-    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-}
+import { getTableNodes } from '@/lib/utils'
 
 function sanitizeSheetName(name: string): string {
   return name.replace(/[[\]:*?/\\]/g, '_').substring(0, 31).trim() || 'Sheet'

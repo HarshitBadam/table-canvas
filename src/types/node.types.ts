@@ -6,19 +6,14 @@ import type { Position } from './common.types'
 export type ChartType = 'bar' | 'line' | 'pie' | 'scatter'
 
 /** Types of nodes in the project graph */
-export type NodeKind = 'source_table' | 'derived_table' | 'chart' | 'dashboard'
+type NodeKind = 'source_table' | 'derived_table' | 'chart'
 
 export type NodeViewMode = 'collapsed' | 'data'
 
 export interface NodeUI {
   position: Position
-  collapsed?: boolean
-  /** @deprecated Use viewMode instead */
-  expanded?: boolean
-  /** Three-state view: collapsed, stats (profile), or data preview */
+  /** Table display state on the canvas. */
   viewMode?: NodeViewMode
-  width?: number
-  height?: number
 }
 
 
@@ -53,7 +48,7 @@ export interface CacheInfo {
 }
 
 
-export interface SourceTablePlan {
+interface SourceTablePlan {
   /** Reference to stored file in IndexedDB */
   fileRef: string
   fileName: string
@@ -71,7 +66,7 @@ export interface SourceTableNode extends BaseNode {
 }
 
 
-export interface DerivedTablePlan {
+interface DerivedTablePlan {
   transformDef: TransformDef
   upstreamNodeIds: string[]
 }

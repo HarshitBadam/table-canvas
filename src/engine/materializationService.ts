@@ -13,7 +13,7 @@ import type {
 } from '@/types'
 
 
-export type MaterializationStatus =
+type MaterializationStatus =
   | 'cached'
   | 'computed'
   | 'loading'

@@ -11,7 +11,7 @@ export interface CommandResult {
   error?: string
 }
 
-export type ToastType = 'success' | 'error' | 'info'
+type ToastType = 'success' | 'error' | 'info'
 
 export interface ToastNotification {
   type: ToastType

@@ -112,5 +112,3 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
     </div>
   );
 }
-
-export default ReportView;

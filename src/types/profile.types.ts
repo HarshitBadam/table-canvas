@@ -2,7 +2,7 @@ import type { SemanticHint } from './schema.types'
 import type { CellValue } from './common.types'
 
 
-export type CardinalityClass = 'unique' | 'high' | 'low'
+type CardinalityClass = 'unique' | 'high' | 'low'
 
 /**
  * Column classification for intelligent suggestion generation

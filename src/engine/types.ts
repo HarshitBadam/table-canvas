@@ -7,7 +7,7 @@ import {
 } from '@/types'
 
 
-export type WorkerRequestType = 
+type WorkerRequestType =
   | 'init'
   | 'loadTable'
   | 'executeTransform'
@@ -112,31 +112,5 @@ export interface FilterConditionDef {
 export interface SortDef {
   column: string
   direction: 'asc' | 'desc'
-}
-
-export interface UpdateCellRequest {
-  tableId: string
-  rowIndex: number
-  column: string
-  value: CellValue
-  columnType?: string
-}
-
-export interface InsertRowRequest {
-  tableId: string
-  values: Record<string, CellValue>
-  columns: string[]
-  types: string[]
-}
-
-export interface DeleteRowRequest {
-  tableId: string
-  rowIndex: number
-}
-
-export interface DistinctValuesRequest {
-  tableId: string
-  column: string
-  limit?: number
 }
 

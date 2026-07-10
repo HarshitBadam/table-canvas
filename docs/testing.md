@@ -4,8 +4,9 @@ Two layers: Vitest for unit/integration, Playwright for end-to-end.
 
 | Layer | Framework | Location |
 |-------|-----------|----------|
-| Unit / integration | Vitest | `src/**/*.test.ts`, `server/src/**/*.test.ts` (14 files) |
-| E2E | Playwright | `e2e/*.spec.ts` (1 file) |
+| Frontend unit / integration | Vitest | `src/**/*.test.ts` |
+| Backend unit / integration | Vitest | `server/src/**/*.test.ts` |
+| E2E | Playwright | `e2e/*.spec.ts` (3 files) |
 
 ## Running
 
@@ -27,40 +28,36 @@ npm run test:e2e:ui     # Playwright UI
 
 npm run test:all        # unit + E2E
 npm run test:ci         # JUnit output → ./test-results/junit.xml
+npm run check:dead-code # unused files, exports, types, and dependencies
 ```
 
 Run a single file: `npm run test:run src/engine/dependencyGraph.test.ts`.
 
 ## What's covered
 
-**Frontend** (`src/`)
+**Frontend** (`src/`) tests cover engine graph and materialization behavior, formula evaluation,
+filtering, persistence/export/sync, suggestions, state lifecycle, and report embedding. Larger
+suites are split by behavior:
 
-| File | Area |
+| Area | Test files |
 |------|------|
-| `engine/dependencyGraph.test.ts` | DAG ops, cycle detection, topological sort |
-| `engine/integration.test.ts` | Dirty propagation, computation order, cache |
-| `engine/materializationService.test.ts` | Materialization, version hashing |
-| `formula/evaluator.test.ts` | Formula parsing, evaluation, type inference |
-| `persistence/db.test.ts` | IndexedDB operations |
-| `persistence/syncService.test.ts` | Server sync logic |
-| `persistence/exportService.test.ts` | ZIP export, file embedding |
-| `grid/filterUtils.test.ts` | Filter condition evaluation |
-| `suggestions/suggestionEngine.test.ts` | Rule matching, scoring |
+| Engine | `engine/dependencyGraph*.test.ts`, `engine/integration*.test.ts`, `engine/materializationService.test.ts`, `engine/worker/tableOperations.test.ts` |
+| Formula | `formula/evaluator{Core,Functions,Validation}.test.ts` |
+| Persistence | `persistence/db*.test.ts`, `persistence/exportService*.test.ts`, `persistence/sync*.test.ts` |
+| Grid | `grid/filter{Evaluation,Metadata}.test.ts`, `grid/hooks/useWindowedRows.test.ts` |
+| Suggestions | `suggestions/suggestionEngine.{analysis,classification,cleaning,detection}.test.ts` |
 
-**Backend** (`server/src/`)
+**Backend** (`server/src/`) tests cover models, project/file routes, Google integration, file
+service behavior, and limit enforcement.
 
-| File | Area |
+| Area | Test files |
 |------|------|
-| `routes/projects.test.ts` | Project CRUD endpoints |
-| `routes/files.test.ts` | File upload/download endpoints |
-| `models/Project.test.ts` | Project model |
-| `models/File.test.ts` | File model |
-| `services/file.service.test.ts` | File service logic |
+| Project routes | `routes/projects{CreateRead,UpdateDelete,Limits}.test.ts` |
+| File routes | `routes/files.test.ts` |
+| Models and services | `models/*.test.ts`, `services/*.test.ts`, `config/enforce.test.ts` |
 
-**E2E**: `e2e/derived-tables.spec.ts` runs Playwright smoke tests over the canvas UI — view
-rendering, sidebar buttons (Import Data / New Table), file-input presence, view navigation, the
-export menu, theme toggle, responsive layout, performance, and node status-indicator presence.
-Several tests skip automatically when the canvas isn't reachable without authentication.
+**E2E**: `e2e/derived-tables.{canvas,interactions,layout}.spec.ts` covers canvas rendering,
+interactions, and responsive layout. Shared setup is in `e2e/derived-tables.support.ts`.
 
 The well-covered core is the engine (DAG, materialization), the formula parser, filtering,
 persistence, and the backend routes. React components are only lightly covered; canvas
@@ -70,8 +67,8 @@ interactions are exercised via E2E.
 
 - **Frontend**: the `jsdom` environment is set in `vitest.config.ts`. `src/test/setup.ts` imports
   `@testing-library/jest-dom` and enables Immer's MapSet plugin. Persistence tests import
-  `fake-indexeddb/auto` directly (e.g. `db.test.ts`, `exportService.test.ts`) to run against an
-  in-memory IndexedDB.
+  `fake-indexeddb/auto` directly (for example, `dbProjectFile.test.ts` and
+  `exportServiceHappy.test.ts`) to run against an in-memory IndexedDB.
 - **Backend** (`server/src/test/setup.ts`): in-memory MongoDB via `mongodb-memory-server`, exposed
   as `setupMongoTestDB()` which test files import and call directly.
 
@@ -83,7 +80,8 @@ the store.
 GitHub Actions workflows live in `.github/workflows/`:
 
 - **`ci.yml`**: runs on push/PR to `main` and `develop`. Jobs: lint, typecheck (`tsc --noEmit`),
-  unit tests (with coverage), E2E, and build. A final gate job fails if any of them fail.
+  unit tests (with coverage), E2E, build, backend checks, and dead-code analysis. A final gate
+  job fails if any of them fail.
 - **`test-suites.yml`**: manual (`workflow_dispatch`); run a single suite (engine, formula,
   persistence, suggestions, or e2e) on demand.
 - **`release.yml`**: runs on `v*` tags to validate and build a release.

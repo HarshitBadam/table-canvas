@@ -24,5 +24,3 @@ export const SlashCommands = Extension.create<SlashCommandsOptions>({
     ];
   },
 });
-
-export default SlashCommands;

@@ -1,10 +1,3 @@
-export interface SyncStatus {
-  isSyncing: boolean
-  lastSyncedAt: Date | null
-  error: string | null
-}
-
-let status: SyncStatus = { isSyncing: false, lastSyncedAt: null, error: null }
 let online = typeof navigator === 'undefined' || navigator.onLine
 
 if (typeof window !== 'undefined') {
@@ -14,12 +7,4 @@ if (typeof window !== 'undefined') {
 
 export function isNetworkOnline(): boolean {
   return online
-}
-
-export function getSyncStatus(): SyncStatus {
-  return { ...status }
-}
-
-export function updateSyncStatus(next: Partial<SyncStatus>): void {
-  status = { ...status, ...next }
 }

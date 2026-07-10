@@ -19,7 +19,7 @@ export interface TierLimits {
   maxServerStorageBytes?: number;
 }
 
-export const LIMITS: Record<Tier, TierLimits> = {
+const LIMITS: Record<Tier, TierLimits> = {
   guest: {
     maxFileSizeBytes: 2 * 1024 * 1024,
     maxRowsPerTable: 25_000,

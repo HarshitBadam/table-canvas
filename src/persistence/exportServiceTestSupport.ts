@@ -1,17 +1,6 @@
 import JSZip from 'jszip'
 import type { StoredProject } from './db'
 
-if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
-  Blob.prototype.text = function() {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = reject
-      reader.readAsText(this)
-    })
-  }
-}
-
 export { JSZip }
 export type { StoredProject }
 

@@ -285,5 +285,3 @@ export const EmbeddedTableNode = Node.create<EmbeddedTableNodeOptions>({
     return ReactNodeViewRenderer(EmbeddedTableNodeView);
   },
 });
-
-export default EmbeddedTableNode;

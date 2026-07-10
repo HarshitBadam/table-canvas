@@ -34,7 +34,6 @@ vi.mock('./db', () => ({
 import {
   createProjectWithSync,
   deleteFileWithSync,
-  getSyncStatus,
   isNetworkOnline,
   loadFileWithSync,
   saveProjectWithSync,
@@ -129,13 +128,6 @@ describe('deleteFileWithSync', () => {
 })
 
 describe('sync status', () => {
-  it('returns initial sync status', () => {
-    const status = getSyncStatus()
-    expect(status).toHaveProperty('isSyncing')
-    expect(status).toHaveProperty('lastSyncedAt')
-    expect(status).toHaveProperty('error')
-  })
-
   it('returns a boolean indicating online status', () => {
     expect(typeof isNetworkOnline()).toBe('boolean')
   })

@@ -129,11 +129,6 @@ export function computeTypeBreakdown(schema: TableSchema | undefined): ColumnTyp
   return breakdown
 }
 
-/** @deprecated Use `formatNumber(value, { compact: true })` from `@/lib/utils` instead. */
-export function formatStatValue(value: number): string {
-  return formatNumber(value, { compact: true })
-}
-
 export function computeTableCompleteness(profile: ProfileResult | undefined, rowCount: number): number {
   if (!profile?.columns || profile.columns.length === 0) return 100
 
@@ -201,7 +196,7 @@ export function extractIssuesFromProfile(
           issues.push({
             type: 'outlier',
             severity: 'low',
-            description: `Extreme low value: ${formatStatValue(colProfile.min!)}`,
+            description: `Extreme low value: ${formatNumber(colProfile.min!, { compact: true })}`,
             columnId: colProfile.columnId,
             columnName,
           })
@@ -214,7 +209,7 @@ export function extractIssuesFromProfile(
           issues.push({
             type: 'outlier',
             severity: 'low',
-            description: `Extreme high value: ${formatStatValue(colProfile.max!)}`,
+            description: `Extreme high value: ${formatNumber(colProfile.max!, { compact: true })}`,
             columnId: colProfile.columnId,
             columnName,
           })

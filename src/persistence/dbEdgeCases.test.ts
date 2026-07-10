@@ -39,19 +39,4 @@ describe('Database edge cases', () => {
     expect(await db.loadProject('concurrent')).not.toBeNull()
   })
 
-  it('handles complex nested data structures', async () => {
-    const db = await getDB()
-    const complexData = {
-      deeply: {
-        nested: {
-          object: {
-            with: { array: [1, 2, { inner: 'value' }] },
-          },
-        },
-      },
-    }
-    await db.saveCache('complex', 'profile', complexData)
-    const loaded = await db.loadCache('complex', 'profile') as typeof complexData
-    expect(loaded.deeply.nested.object.with.array[2]).toEqual({ inner: 'value' })
-  })
 })

@@ -1,6 +1,6 @@
 import { type Tier, getLimits } from './limits'
 
-export interface LimitOk {
+interface LimitOk {
   ok: true
 }
 

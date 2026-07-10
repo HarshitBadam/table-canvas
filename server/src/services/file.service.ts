@@ -1,17 +1,16 @@
-import { GridFSBucket, ObjectId } from 'mongodb';
 import { Readable } from 'stream';
-import mongoose from 'mongoose';
+import mongoose, { mongo } from 'mongoose';
 import { FileMetadata, UploadedFile } from '../types/index.js';
 
-let bucket: GridFSBucket | null = null;
+let bucket: mongo.GridFSBucket | null = null;
 
-export function getGridFSBucket(): GridFSBucket {
+function getGridFSBucket(): mongo.GridFSBucket {
   if (!bucket) {
     const db = mongoose.connection.db;
     if (!db) {
       throw new Error('Database connection not established');
     }
-    bucket = new GridFSBucket(db, {
+    bucket = new mongo.GridFSBucket(db, {
       bucketName: 'files',
     });
   }
@@ -68,7 +67,7 @@ export async function downloadFile(
   }
 
   const fileDoc = await db.collection('files.files').findOne({
-    _id: new ObjectId(fileId),
+    _id: new mongo.ObjectId(fileId),
   });
 
   if (!fileDoc) {
@@ -79,7 +78,7 @@ export async function downloadFile(
     return null;
   }
 
-  const downloadStream = gridFS.openDownloadStream(new ObjectId(fileId));
+  const downloadStream = gridFS.openDownloadStream(new mongo.ObjectId(fileId));
 
   return {
     stream: downloadStream,
@@ -101,7 +100,7 @@ export async function deleteFile(
   }
 
   const fileDoc = await db.collection('files.files').findOne({
-    _id: new ObjectId(fileId),
+    _id: new mongo.ObjectId(fileId),
   });
 
   if (!fileDoc) {
@@ -112,7 +111,7 @@ export async function deleteFile(
     return false;
   }
 
-  await gridFS.delete(new ObjectId(fileId));
+  await gridFS.delete(new mongo.ObjectId(fileId));
   return true;
 }
 
@@ -150,7 +149,7 @@ export async function getFileMetadata(
   }
 
   const fileDoc = await db.collection('files.files').findOne({
-    _id: new ObjectId(fileId),
+    _id: new mongo.ObjectId(fileId),
     'metadata.userId': userId,
   });
 

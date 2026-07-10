@@ -5,7 +5,6 @@ import './dateFunctions'
 
 export {
   builtInFunctions,
-  registerFunction,
   executeFunction,
   getFunctionsByCategory,
 } from './registry'

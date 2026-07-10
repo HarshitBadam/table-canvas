@@ -1,6 +1,6 @@
 import type { JSONContent } from '@tiptap/react';
 
-export function parseInlineFormatting(text: string): JSONContent[] {
+function parseInlineFormatting(text: string): JSONContent[] {
   const nodes: JSONContent[] = [];
   let remaining = text;
 
@@ -183,7 +183,7 @@ export function isMarkdownContent(text: string): boolean {
          /^\|.+\|$/m.test(text);
 }
 
-export function isMarkdownTable(lines: string[], startIndex: number): boolean {
+function isMarkdownTable(lines: string[], startIndex: number): boolean {
   if (startIndex >= lines.length) return false;
   const line = lines[startIndex].trim();
 
@@ -211,7 +211,7 @@ export function isMarkdownTable(lines: string[], startIndex: number): boolean {
   return false;
 }
 
-export function parseMarkdownTable(lines: string[], startIndex: number): { rows: string[][]; endIndex: number } {
+function parseMarkdownTable(lines: string[], startIndex: number): { rows: string[][]; endIndex: number } {
   const rows: string[][] = [];
   let i = startIndex;
   let maxCols = 0;
