@@ -5,14 +5,9 @@ registerRule({
   id: 'smart_comparison',
   category: 'recipe',
   scope: 'table',
-  when: (ctx, meta) => {
-    const best = detectComparisonOpportunities(meta.schema, meta.profile?.columns)[0]
-    return Boolean(
-      best &&
-        best.similarity > 0.3 &&
-        !ctx.existingDerivedTables?.some((table) => table.transformType === 'calculated_column'),
-    )
-  },
+  // Disabled until comparison candidates are supported by correlation or
+  // semantic evidence. Similar numeric ranges alone produce noisy pairings.
+  when: () => false,
   build: (ctx, meta) => {
     const best = detectComparisonOpportunities(meta.schema, meta.profile?.columns)[0]
     const col1Ref = best.column1.name || best.column1.id

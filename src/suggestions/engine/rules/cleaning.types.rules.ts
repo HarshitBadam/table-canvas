@@ -1,7 +1,6 @@
 import { registerRule, createSuggestionId, getVersionHash } from '../registry';
 import {
   looksLikeNumber,
-  looksLikeDate,
   detectDateFormats,
   looksLikeTimestamp,
 } from '../detection';
@@ -11,16 +10,9 @@ registerRule({
   id: 'convert_to_date',
   category: 'cleaning',
   scope: 'column',
-  when: (_ctx, meta) => {
-    if (!meta.column || meta.column.type !== 'string') return false;
-    if (!meta.columnProfile?.topValues) return false;
-    
-    const dateLikeCount = meta.columnProfile.topValues.filter(v => 
-      looksLikeDate(v.value)
-    ).length;
-    
-    return dateLikeCount >= meta.columnProfile.topValues.length * 0.7;
-  },
+  // Disabled until calculated-column transforms expose a safe one-argument
+  // string-to-date coercion. DATE() requires year, month and day.
+  when: () => false,
   build: (ctx, meta) => ({
     id: createSuggestionId('convert_to_date', ctx.tableId, meta.column?.id),
     category: 'cleaning',
@@ -64,7 +56,7 @@ registerRule({
   scope: 'column',
   when: (_ctx, meta) => {
     if (!meta.column || meta.column.type !== 'string') return false;
-    if (!meta.columnProfile?.topValues) return false;
+    if (!meta.columnProfile?.topValues?.length) return false;
     
     const numericCount = meta.columnProfile.topValues.filter(v => 
       v.value === null || looksLikeNumber(v.value)

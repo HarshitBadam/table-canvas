@@ -97,10 +97,14 @@ export function getColumnSuggestions(context: SuggestionEngineContext): Suggesti
   };
   
   for (const rule of getColumnRules()) {
-    if (rule.when(context, meta)) {
-      const suggestion = rule.build(context, meta);
-      const score = rule.score(context, meta);
-      scored.push({ suggestion, score });
+    try {
+      if (rule.when(context, meta)) {
+        const suggestion = rule.build(context, meta);
+        const score = rule.score(context, meta);
+        scored.push({ suggestion, score });
+      }
+    } catch (error) {
+      console.error('[SuggestionEngine] Column-scoped rule evaluation failed:', error);
     }
   }
   
@@ -111,31 +115,35 @@ export function getColumnSuggestions(context: SuggestionEngineContext): Suggesti
   };
   
   for (const rule of getTableRules()) {
-    if (rule.when(context, tableMeta)) {
-      const suggestion = rule.build(context, tableMeta);
-      
-      const action = suggestion.action;
-      let involvesColumn = false;
-      
-      if (action.kind === 'createChart') {
-        const config = action.chart.config;
-        involvesColumn = config.xAxis === context.selectedColumnId || 
-                         config.yAxis === context.selectedColumnId ||
-                         config.groupBy === context.selectedColumnId;
-      } else if (action.kind === 'createDerivedTable') {
-        const transform = action.transform as TransformDef;
-        if (transform.type === 'group_summarize') {
-          involvesColumn = transform.groupByColumns.includes(context.selectedColumnId!) ||
-                           transform.aggregations.some(a => a.columnId === context.selectedColumnId);
-        } else if (transform.type === 'calculated_column') {
-          involvesColumn = transform.expression.includes(context.selectedColumnId!);
+    try {
+      if (rule.when(context, tableMeta)) {
+        const suggestion = rule.build(context, tableMeta);
+
+        const action = suggestion.action;
+        let involvesColumn = false;
+
+        if (action.kind === 'createChart') {
+          const config = action.chart.config;
+          involvesColumn = config.xAxis === context.selectedColumnId ||
+                           config.yAxis === context.selectedColumnId ||
+                           config.groupBy === context.selectedColumnId;
+        } else if (action.kind === 'createDerivedTable') {
+          const transform = action.transform as TransformDef;
+          if (transform.type === 'group_summarize') {
+            involvesColumn = transform.groupByColumns.includes(context.selectedColumnId!) ||
+                             transform.aggregations.some(a => a.columnId === context.selectedColumnId);
+          } else if (transform.type === 'calculated_column') {
+            involvesColumn = transform.expression.includes(context.selectedColumnId!);
+          }
+        }
+
+        if (involvesColumn) {
+          const score = rule.score(context, tableMeta);
+          scored.push({ suggestion, score });
         }
       }
-      
-      if (involvesColumn) {
-        const score = rule.score(context, tableMeta);
-        scored.push({ suggestion, score });
-      }
+    } catch (error) {
+      console.error('[SuggestionEngine] Table-scoped rule evaluation failed:', error);
     }
   }
   

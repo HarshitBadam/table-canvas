@@ -11,7 +11,8 @@ registerRule({
   category: 'cleaning',
   scope: 'column',
   when: (_ctx, meta) => {
-    if (!meta.columnProfile) return false;
+    if (!meta.columnProfile || !meta.column) return false;
+    if (meta.column.type !== 'number' && meta.column.type !== 'string') return false;
     return meta.columnProfile.missingPercent > 5 && meta.columnProfile.missingPercent < 100;
   },
   build: (ctx, meta) => {
@@ -62,12 +63,9 @@ registerRule({
   id: 'find_duplicates',
   category: 'cleaning',
   scope: 'column',
-  when: (ctx, meta) => {
-    if (!meta.column?.semanticHints?.includes('id')) return false;
-    if (!meta.columnProfile || !ctx.profile) return false;
-    
-    return meta.columnProfile.distinctCount < ctx.profile.rowCount;
-  },
+  // Disabled: grouping and aggregating is not a safe deduplication strategy.
+  // Re-enable with a review-first duplicate-row workflow and key selection.
+  when: () => false,
   build: (ctx, meta) => {
     const dupCount = ctx.profile!.rowCount - meta.columnProfile!.distinctCount;
     const dupRate = (dupCount / ctx.profile!.rowCount * 100).toFixed(1);
@@ -145,7 +143,7 @@ registerRule({
         tableId: ctx.tableId,
         columnId: meta.column!.id,
         tableVersionHash: getVersionHash(ctx),
-        cleaningOperation: { type: 'nullify_placeholders', placeholders: [] },
+        cleaningOperation: { type: 'nullify_placeholders', placeholders },
       },
       why: [
         `Found ${placeholders.length} placeholder type(s)`,

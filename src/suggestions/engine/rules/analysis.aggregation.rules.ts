@@ -38,9 +38,8 @@ registerRule({
       return classification === 'continuous_numeric' || classification === 'discrete_numeric';
     })!;
     
-    // Use column name (what DuckDB expects) for derived tables
-    const catColRef = catCol.name || catCol.id;
-    const numericColRef = numericCol.name || numericCol.id;
+    const catColRef = catCol.id;
+    const numericColRef = numericCol.id;
     
     return {
       id: createSuggestionId('category_breakdown', ctx.tableId, catCol.id),
@@ -87,14 +86,9 @@ registerRule({
   id: 'top_n_analysis',
   category: 'analysis',
   scope: 'table',
-  when: (_ctx, meta) => {
-    const hasCategorical = meta.schema.columns.some(c => 
-      c.type === 'string' && 
-      (meta.profile?.columns.find(p => p.columnId === c.id)?.distinctCount ?? 100) < 50
-    );
-    const hasNumeric = meta.schema.columns.some(c => c.type === 'number');
-    return hasCategorical && hasNumeric;
-  },
+  // Disabled until transforms support sorting and limiting. The previous
+  // implementation created an unordered summary while claiming Top-N/Pareto.
+  when: () => false,
   build: (ctx, meta) => {
     const catCol = meta.schema.columns.find(c => 
       c.type === 'string' && 

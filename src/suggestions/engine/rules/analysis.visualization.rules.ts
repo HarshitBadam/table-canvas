@@ -61,6 +61,49 @@ registerRule({
   score: (_ctx, _meta) => 70,
 });
 
+registerRule({
+  id: 'boolean_breakdown',
+  category: 'analysis',
+  scope: 'column',
+  when: (_ctx, meta) =>
+    meta.column?.type === 'boolean' && (meta.columnProfile?.distinctCount ?? 0) > 0,
+  build: (ctx, meta) => ({
+    id: createSuggestionId('boolean_breakdown', ctx.tableId, meta.column!.id),
+    category: 'analysis',
+    scope: 'column',
+    title: `${meta.column!.name} breakdown`,
+    description: 'Compare true and false record counts.',
+    confidence: 'high',
+    context: {
+      tableId: ctx.tableId,
+      columnId: meta.column!.id,
+      tableVersionHash: getVersionHash(ctx),
+    },
+    why: [
+      'Boolean values are naturally categorical',
+      'A count breakdown makes imbalance easy to see',
+    ],
+    impact: {
+      kind: 'chart',
+      summary: 'Creates a two-category pie chart',
+    },
+    action: {
+      kind: 'createChart',
+      chart: {
+        chartType: 'pie',
+        sourceTableId: ctx.tableId,
+        title: `${meta.column!.name} breakdown`,
+        config: {
+          xAxis: meta.column!.id,
+          aggregation: 'count',
+        },
+      },
+      addToDashboard: false,
+    },
+  }),
+  score: () => 76,
+});
+
 
 registerRule({
   id: 'bar_chart_fallback',
@@ -150,21 +193,9 @@ registerRule({
   id: 'detect_type_issues_fallback',
   category: 'cleaning',
   scope: 'table',
-  when: (_ctx, meta) => {
-    return meta.schema.columns.some(c => {
-      const name = c.name.toLowerCase();
-      if ((name.includes('date') || name.includes('time') || name.includes('created') || 
-           name.includes('updated') || name.includes('at')) && 
-          c.type !== 'date' && c.type !== 'datetime') {
-        return true;
-      }
-      if ((name.includes('id') || name.includes('code') || name.includes('key')) && 
-          c.type === 'number') {
-        return true;
-      }
-      return false;
-    });
-  },
+  // Disabled: this was a manual-review message wired to an empty patch action,
+  // which created a meaningless table copy when applied.
+  when: () => false,
   build: (ctx, meta) => {
     const suspectCols = meta.schema.columns.filter(c => {
       const name = c.name.toLowerCase();

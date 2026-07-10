@@ -66,7 +66,7 @@ export class HighlightCellsCommand implements SuggestionCommand {
 
 let recipeWizardCallback: ((suggestion: Suggestion) => void) | null = null
 
-export function setRecipeWizardCallback(callback: (suggestion: Suggestion) => void): void {
+export function setRecipeWizardCallback(callback: ((suggestion: Suggestion) => void) | null): void {
   recipeWizardCallback = callback
 }
 
@@ -115,12 +115,18 @@ export async function executeRecipeTransform(
   const store = useProjectStore.getState()
 
   try {
-    store.saveSnapshot(`Create ${tableName}`)
+    const upstreamNodeIds = 'leftTableId' in transform
+      ? [transform.leftTableId, transform.rightTableId]
+      : 'sourceTableIds' in transform
+        ? transform.sourceTableIds
+        : 'sourceTableId' in transform
+          ? [transform.sourceTableId]
+          : [sourceTableId]
 
     const nodeId = store.addDerivedTable({
       name: tableName,
       transformDef: transform,
-      upstreamNodeIds: [sourceTableId],
+      upstreamNodeIds: [...new Set(upstreamNodeIds)],
     })
 
     showToast({
