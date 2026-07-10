@@ -19,8 +19,8 @@ registerRule({
   build: (ctx, meta) => {
     const best = detectAggregationOpportunities(meta.schema, meta.profile?.columns)[0]
     const groupCol = best.groupColumns[0].column
-    const groupColRef = groupCol.name || groupCol.id
-    const valueColRef = best.valueColumn.name || best.valueColumn.id
+    const groupColRef = groupCol.id
+    const valueColRef = best.valueColumn.id
 
     return {
       id: createSuggestionId('smart_aggregation', ctx.tableId, best.valueColumn.id),

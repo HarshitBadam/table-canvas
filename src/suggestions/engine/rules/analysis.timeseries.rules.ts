@@ -1,4 +1,5 @@
 import { registerRule, createSuggestionId, getVersionHash } from '../registry';
+import { isAnalyzableNumeric } from '../classification';
 
 
 registerRule({
@@ -7,12 +8,16 @@ registerRule({
   scope: 'table',
   when: (_ctx, meta) => {
     const hasDate = meta.schema.columns.some(c => c.type === 'date' || c.type === 'datetime');
-    const hasNumeric = meta.schema.columns.some(c => c.type === 'number');
+    const hasNumeric = meta.schema.columns.some(c =>
+      isAnalyzableNumeric(c, meta.profile?.columns.find(profile => profile.columnId === c.id)),
+    );
     return hasDate && hasNumeric;
   },
   build: (ctx, meta) => {
     const dateCol = meta.schema.columns.find(c => c.type === 'date' || c.type === 'datetime')!;
-    const numericCol = meta.schema.columns.find(c => c.type === 'number')!;
+    const numericCol = meta.schema.columns.find(c =>
+      isAnalyzableNumeric(c, meta.profile?.columns.find(profile => profile.columnId === c.id)),
+    )!;
     // Use column ID (what DuckDB uses internally) for derived tables
     const dateColRef = dateCol.id;
     const numericColRef = numericCol.id;

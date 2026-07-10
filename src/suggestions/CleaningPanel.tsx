@@ -13,6 +13,8 @@ interface CleaningPanelProps {
   onCountChange?: (count: number) => void
 }
 
+const MAX_IN_MEMORY_CLEANING_ROWS = 100_000
+
 export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, onCountChange }: CleaningPanelProps) {
   const node = useProjectStore((state) => state.getTableNode(tableId))
   const patches = useProjectStore((state) => state.patches[tableId])
@@ -24,16 +26,26 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
   // table because cleaning must scan and affect every row, not just a preview window.
   const [rows, setRows] = useState<TableRow[]>([])
   const [rowsLoaded, setRowsLoaded] = useState(false)
+  const [rowsError, setRowsError] = useState<string | null>(null)
+  const [retryNonce, setRetryNonce] = useState(0)
   // node.updatedAt bumps after an apply, which re-triggers the fetch with cleaned data.
   const refreshKey = node?.updatedAt
 
   useEffect(() => {
     let cancelled = false
     setRowsLoaded(false)
+    setRowsError(null)
     const SCAN_PAGE = 10000
     getTableData(tableId, 0, SCAN_PAGE)
       .then(async ({ rows: firstRows, totalRows }) => {
         if (cancelled) return
+        if (totalRows > MAX_IN_MEMORY_CLEANING_ROWS) {
+          setRows([])
+          setRowsError(
+            `This table has ${totalRows.toLocaleString()} rows. In-place cleaning is limited to ${MAX_IN_MEMORY_CLEANING_ROWS.toLocaleString()} rows to protect browser memory.`,
+          )
+          return
+        }
         let allRows = firstRows
         if (totalRows > firstRows.length) {
           const { rows: fullRows } = await getTableData(tableId, 0, totalRows)
@@ -42,8 +54,11 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         }
         setRows(allRows as TableRow[])
       })
-      .catch(() => {
-        if (!cancelled) setRows([])
+      .catch((cause) => {
+        if (!cancelled) {
+          setRows([])
+          setRowsError(cause instanceof Error ? cause.message : 'Could not load table rows for cleaning.')
+        }
       })
       .finally(() => {
         if (!cancelled) setRowsLoaded(true)
@@ -51,7 +66,7 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
     return () => {
       cancelled = true
     }
-  }, [tableId, refreshKey])
+  }, [tableId, refreshKey, retryNonce])
 
   const existingHighlights = useMemo(() => {
     return patches?.highlightedCells || new Set<string>()
@@ -71,12 +86,22 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       return true
     })
 
-    // Calculate mean for numeric columns (needed for fill_missing_numeric)
-    const getMeanValue = (columnId: string): number | undefined => {
+    const getNumericFillValue = (
+      columnId: string,
+      strategy: 'mean' | 'median' | 'zero',
+    ): number | undefined => {
+      if (strategy === 'zero') return 0
       const values = rows
         .map(r => r[columnId])
         .filter((v): v is number => typeof v === 'number' && !isNaN(v))
       if (values.length === 0) return undefined
+      if (strategy === 'median') {
+        values.sort((a, b) => a - b)
+        const middle = Math.floor(values.length / 2)
+        return values.length % 2 === 0
+          ? (values[middle - 1] + values[middle]) / 2
+          : values[middle]
+      }
       return values.reduce((a, b) => a + b, 0) / values.length
     }
 
@@ -84,8 +109,12 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       .filter(s => s.category === 'cleaning' && s.context.cleaningOperation)
       .map(suggestion => {
         const columnId = suggestion.context.columnId
-        const meanValue = columnId ? getMeanValue(columnId) : undefined
-        const effect = computeSuggestionEffect(suggestion, rows, meanValue)
+        const operation = suggestion.context.cleaningOperation
+        const numericFillValue =
+          columnId && operation?.type === 'fill_missing_numeric'
+            ? getNumericFillValue(columnId, operation.strategy)
+            : undefined
+        const effect = computeSuggestionEffect(suggestion, rows, numericFillValue)
         return { suggestion, ...effect }
       })
       .filter(s => {
@@ -101,9 +130,9 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
 
   useEffect(() => {
     // Don't report a (premature) zero while rows are still loading.
-    if (!rowsLoaded) return
+    if (!rowsLoaded || rowsError) return
     onCountChange?.(suggestionsWithEffects.length)
-  }, [rowsLoaded, suggestionsWithEffects.length, onCountChange])
+  }, [rowsLoaded, rowsError, suggestionsWithEffects.length, onCountChange])
 
   const toggleSelection = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -162,6 +191,21 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
     )
   }
 
+  if (rowsError) {
+    return (
+      <div className="p-5 text-center" role="alert">
+        <p className="text-sm font-medium text-text-primary">Cleaning preview unavailable</p>
+        <p className="mt-1 text-xs text-text-secondary">{rowsError}</p>
+        <button
+          onClick={() => setRetryNonce((value) => value + 1)}
+          className="btn btn-secondary mt-4 text-xs"
+        >
+          Try again
+        </button>
+      </div>
+    )
+  }
+
   if (suggestionsWithEffects.length === 0) {
     return (
       <div className="p-4 text-center">
@@ -207,15 +251,20 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
           const Icon = operationType === 'review' ? ReviewIcon : FixIcon
           
           return (
-            <div
+            <label
               key={suggestion.id}
-              onClick={() => toggleSelection(suggestion.id)}
-              className={`p-3 border-b border-border cursor-pointer transition-colors ${
+              className={`block p-3 border-b border-border cursor-pointer transition-colors ${
                 isSelected ? 'bg-accent-green/10' : 'hover:bg-surface-secondary'
               }`}
             >
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => toggleSelection(suggestion.id)}
+                className="sr-only"
+              />
               <div className="flex items-start gap-3">
-                <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                <div aria-hidden="true" className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
                   isSelected 
                     ? 'bg-accent-green text-white' 
                     : 'bg-surface-tertiary text-text-tertiary'
@@ -240,7 +289,7 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
                   )}
                 </div>
               </div>
-            </div>
+            </label>
           )
         })}
       </div>

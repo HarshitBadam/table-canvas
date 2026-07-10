@@ -9,6 +9,10 @@ interface QuickActionsSectionProps {
 
 function getActionLabel(suggestion: Suggestion): string {
   const action = suggestion.action
+
+  if (suggestion.category === 'cleaning' || action.kind === 'launchRecipe') {
+    return 'Review in Table'
+  }
   
   if (action.kind === 'createChart') {
     return 'Create Chart'
@@ -16,10 +20,6 @@ function getActionLabel(suggestion: Suggestion): string {
   if (action.kind === 'createDerivedTable') {
     return 'Create Table'
   }
-  if (action.kind === 'applyPatch') {
-    return 'Fix Data'
-  }
-  
   return 'Apply'
 }
 
@@ -147,7 +147,13 @@ export function QuickActionsSection({
             </p>
 
             <button
-              onClick={() => onApply(suggestion)}
+              onClick={() => {
+                if (suggestion.category === 'cleaning' || suggestion.action.kind === 'launchRecipe') {
+                  openTable(suggestion.context.tableId)
+                } else {
+                  onApply(suggestion)
+                }
+              }}
               className="w-full px-4 py-2.5 text-sm font-medium bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"
             >
               {getActionLabel(suggestion)}

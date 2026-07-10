@@ -4,6 +4,7 @@ import { useDataStore, TableRow } from '@/state/dataStore'
 import { useSuggestionsStore } from './suggestionsStore'
 import { isPlaceholder } from './cleaningConstants'
 import { loadProfileForTable, useProfilingStore } from '@/lib/profiling'
+import { showToast } from './commands/types'
 import type { CellValue } from '@/types'
 
 interface CellChange {
@@ -110,9 +111,16 @@ export function useCleaningApply({
       if (allChanges.length > 0) {
         saveSnapshot('Apply cleaning operations')
 
+        const changesByRow = new Map<string, CellChange[]>()
+        for (const change of allChanges) {
+          const rowChanges = changesByRow.get(change.rowId) ?? []
+          rowChanges.push(change)
+          changesByRow.set(change.rowId, rowChanges)
+        }
+
         const updatedRows = mergedRows.map((row) => {
-          const rowChanges = allChanges.filter((c) => c.rowId === row.__rowId)
-          if (rowChanges.length === 0) return row
+          const rowChanges = changesByRow.get(row.__rowId)
+          if (!rowChanges) return row
 
           const updatedRow = { ...row }
           for (const change of rowChanges) {
@@ -159,13 +167,23 @@ export function useCleaningApply({
       }
 
       if (allHighlights.length > 0) {
+        if (allChanges.length === 0) saveSnapshot('Highlight cells for review')
         setHighlights(tableId, allHighlights)
       }
 
       setSelectedIds(() => new Set())
+      showToast({
+        type: 'success',
+        message: allChanges.length > 0
+          ? `Applied ${allChanges.length.toLocaleString()} cell change${allChanges.length === 1 ? '' : 's'}`
+          : `Highlighted ${allHighlights.length.toLocaleString()} cell${allHighlights.length === 1 ? '' : 's'} for review`,
+      })
     } catch (error) {
       console.error('[CleaningPanel] handleApply ERROR:', error)
-      throw error
+      showToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Could not apply cleaning operations',
+      })
     } finally {
       setIsApplying(false)
     }

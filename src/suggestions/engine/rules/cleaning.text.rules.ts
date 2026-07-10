@@ -110,12 +110,9 @@ registerRule({
   id: 'split_delimiter',
   category: 'cleaning',
   scope: 'column',
-  when: (_ctx, meta) => {
-    if (!meta.column || meta.column.type !== 'string') return false;
-    if (!meta.columnProfile?.topValues) return false;
-    
-    return hasConsistentDelimiter(meta.columnProfile.topValues) !== null;
-  },
+  // Disabled until the transform model can create multiple typed columns.
+  // The previous SPLIT() calculated-column expression was not executable.
+  when: () => false,
   build: (ctx, meta) => {
     const delimiter = hasConsistentDelimiter(meta.columnProfile!.topValues!)!;
     

@@ -28,6 +28,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
   
   const [bindings, setBindings] = useState<Record<string, string>>(initialBindings)
   const [isExecuting, setIsExecuting] = useState(false)
+  const [executionError, setExecutionError] = useState<string | null>(null)
   
   // Reset bindings whenever the wizard opens for a different suggestion. Seed defaults
   // for option-backed selects (e.g. the period dropdown) so required-field validation
@@ -43,6 +44,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
     })
     const initial = (suggestion.action.initialBindings as Record<string, string> | undefined) ?? {}
     setBindings({ ...seeded, ...initial })
+    setExecutionError(null)
   }, [suggestion])
   
   const columns = schema?.columns ?? []
@@ -87,6 +89,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
     if (!recipeConfig || !currentTableId || !isValid || !currentNode) return
     
     setIsExecuting(true)
+    setExecutionError(null)
     try {
       const transform = recipeConfig.buildTransform(bindings, currentTableId, columns)
       const tableName = recipeConfig.getTableName(currentNode.name, bindings, columns)
@@ -94,6 +97,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
       onClose()
     } catch (error) {
       console.error('Recipe execution failed:', error)
+      setExecutionError(error instanceof Error ? error.message : 'Could not create recipe output')
     } finally {
       setIsExecuting(false)
     }
@@ -106,8 +110,8 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fade-in z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-surface rounded-2xl shadow-2xl border border-border animate-scale-in z-50 overflow-hidden">
+        <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fade-in z-[60]" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-md bg-surface rounded-2xl shadow-2xl border border-border animate-scale-in z-[60] overflow-hidden">
           <div className="px-6 pt-5 pb-4">
             <div className="flex items-center justify-between">
               <Dialog.Title className="text-lg font-semibold text-text-primary">
@@ -116,6 +120,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-lg hover:bg-surface-secondary transition-colors"
+                aria-label="Close recipe"
               >
                 <svg className="w-5 h-5 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -128,6 +133,11 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
           </div>
           
           <div className="px-6 pb-4 space-y-4">
+            {executionError && (
+              <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert">
+                {executionError}
+              </div>
+            )}
             {recipeConfig.fields.map((field) => (
               <div key={field.id}>
                 <label className="block text-sm font-medium text-text-primary mb-1.5">
@@ -205,6 +215,12 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
                 )}
               </div>
             ))}
+            <div>
+              <p className="text-sm font-medium text-text-primary mb-1.5">Creates</p>
+              <ul className="list-disc pl-5 text-xs text-text-secondary space-y-1">
+                {recipeConfig.outputs.map((output) => <li key={output}>{output}</li>)}
+              </ul>
+            </div>
           </div>
           
           <div className="px-6 py-4 bg-surface-secondary/50 border-t border-border">

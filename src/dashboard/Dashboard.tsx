@@ -31,6 +31,7 @@ export function Dashboard() {
       setToast(notification)
       setTimeout(() => setToast(null), 4000)
     })
+    return () => setToastHandler(null)
   }, [])
 
   const handleNodeClick = useCallback((nodeId: string) => {
@@ -45,7 +46,10 @@ export function Dashboard() {
   }, [nodes, openTable, openChart])
 
   const handleApplySuggestion = useCallback(async (suggestion: Suggestion) => {
-    await applySuggestion(suggestion)
+    const result = await applySuggestion(suggestion)
+    if (!result.success) {
+      setToast({ type: 'error', message: result.error || result.message })
+    }
   }, [])
 
   const hasData = tableMetrics.length > 0

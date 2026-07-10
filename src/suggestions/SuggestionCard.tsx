@@ -40,6 +40,66 @@ const categoryIcons: Record<SuggestionCategory, JSX.Element> = {
   ),
 }
 
+function getActionLabel(suggestion: Suggestion): string {
+  switch (suggestion.action.kind) {
+    case 'createChart':
+      return 'Create chart'
+    case 'createDerivedTable':
+      return 'Create table'
+    case 'launchRecipe':
+      return 'Configure'
+    case 'highlightCells':
+      return 'Review in grid'
+    case 'applyPatch':
+      return 'Review fix'
+  }
+}
+
+function SuggestionPreview({ suggestion }: { suggestion: Suggestion }) {
+  const preview = suggestion.preview
+  if (!preview || preview.status === 'not_loaded') return null
+  if (preview.status === 'loading') {
+    return <p className="mb-3 text-xs text-text-secondary" role="status">Loading preview…</p>
+  }
+  if (preview.status === 'error') {
+    return <p className="mb-3 text-xs text-red-600 dark:text-red-400" role="alert">{preview.error || 'Preview unavailable'}</p>
+  }
+  if (!preview.data) return null
+
+  const data = preview.data
+  return (
+    <div className="mb-3 rounded-lg bg-surface-secondary p-3 text-xs text-text-secondary">
+      <p className="mb-2 font-medium text-text-primary">Preview</p>
+      {data.kind === 'beforeAfter' && (
+        <div className="space-y-1">
+          {data.rows.slice(0, 3).map((row, index) => (
+            <p key={index}>
+              <code>{String(row.before)}</code> <span aria-hidden="true">→</span> <code>{String(row.after)}</code>
+            </p>
+          ))}
+        </div>
+      )}
+      {(data.kind === 'tableSample' || data.kind === 'aggregateSample') && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead><tr>{data.columns.map((column) => <th key={column} className="pr-3 font-medium">{column}</th>)}</tr></thead>
+            <tbody>
+              {data.rows.slice(0, 3).map((row, index) => (
+                <tr key={index}>{row.map((value, cellIndex) => <td key={cellIndex} className="pr-3">{String(value ?? '')}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {data.kind === 'recipeOutputs' && (
+        <ul className="list-disc pl-4">
+          {data.outputs.map((output) => <li key={`${output.type}:${output.name}`}>{output.name} ({output.type})</li>)}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 export function SuggestionCard({
   suggestion,
   isExpanded,
@@ -47,6 +107,7 @@ export function SuggestionCard({
   animationDelay,
   onToggle,
   onApply,
+  onDismiss,
 }: {
   suggestion: Suggestion
   isExpanded: boolean
@@ -54,10 +115,12 @@ export function SuggestionCard({
   animationDelay: number
   onToggle: () => void
   onApply: () => void
+  onDismiss: () => void
 }) {
   const [showWhy, setShowWhy] = useState(false)
 
-  const actionLabel = suggestion.category === 'recipe' ? 'Open Recipe' : 'Apply'
+  const actionLabel = getActionLabel(suggestion)
+  const detailsId = `suggestion-details-${suggestion.id}`
 
   return (
     <div 
@@ -66,6 +129,8 @@ export function SuggestionCard({
     >
       <button
         onClick={onToggle}
+        aria-expanded={isExpanded}
+        aria-controls={detailsId}
         className="w-full flex items-start gap-3 p-4 text-left hover:bg-surface-secondary/30 transition-colors"
       >
         <div className={`p-2 rounded-lg shrink-0 ${categoryColors[suggestion.category]}`}>
@@ -103,7 +168,7 @@ export function SuggestionCard({
       </button>
 
       {isExpanded && (
-        <div className="px-4 pb-4 border-t border-border pt-3 animate-expand-down">
+        <div id={detailsId} className="px-4 pb-4 border-t border-border pt-3 animate-expand-down">
           {suggestion.why && suggestion.why.length > 0 && (
             <div className="mb-3">
               <button 
@@ -128,12 +193,7 @@ export function SuggestionCard({
             </div>
           )}
 
-          {suggestion.preview?.status === 'ready' && suggestion.preview.data && (
-            <div className="mb-3 p-3 bg-surface-secondary rounded-lg text-xs text-text-secondary">
-              <span className="font-medium">Preview:</span>
-              <span className="ml-1">Preview data available</span>
-            </div>
-          )}
+          <SuggestionPreview suggestion={suggestion} />
 
           <div className="flex gap-2">
             <button
@@ -149,6 +209,13 @@ export function SuggestionCard({
               ) : (
                 actionLabel
               )}
+            </button>
+            <button
+              onClick={onDismiss}
+              disabled={isApplying}
+              className="btn btn-ghost text-xs py-2"
+            >
+              Dismiss
             </button>
           </div>
         </div>
