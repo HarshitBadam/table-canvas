@@ -3,6 +3,7 @@ import type { TransformResult } from '../types'
 import type { TransformDef, CellValue } from '@/types'
 import { sanitizeTableName, formatValue, mapDuckDBTypeToApp, getCleanColumnName } from './sqlHelpers'
 import { getTableSchema } from './tableOperations'
+import { INTERNAL_ROW_ID_COLUMN } from '../internalColumns'
 
 async function buildJoinColumnSelection(
   conn: duckdb.AsyncDuckDBConnection,
@@ -23,7 +24,6 @@ async function buildJoinColumnSelection(
     ? leftColumns
     : leftSchema.map(c => c.columnId)
 
-  // Exclude the join key from right table (it's redundant)
   const rightColIds = rightColumns && rightColumns.length > 0
     ? rightColumns.filter(c => c !== rightKey)
     : rightSchema.map(c => c.columnId).filter(c => c !== rightKey)
@@ -95,6 +95,7 @@ export async function executeTransform(
 ): Promise<TransformResult> {
   const { outputTableId, columnIdToName = {} } = transformDef
   const outputTableName = sanitizeTableName(outputTableId)
+  const dataColumns = `* EXCLUDE ("${INTERNAL_ROW_ID_COLUMN}")`
 
   const toColName = (colId: string): string => {
     return columnIdToName[colId] || colId
@@ -157,7 +158,7 @@ export async function executeTransform(
       })
       const whereClause = conditions.join(transformDef.logic === 'and' ? ' AND ' : ' OR ')
 
-      sql = `CREATE TABLE "${outputTableName}" AS SELECT * FROM "${sourceTable}" WHERE ${whereClause}`
+      sql = `CREATE TABLE "${outputTableName}" AS SELECT ${dataColumns} FROM "${sourceTable}" WHERE ${whereClause}`
       break
     }
 
@@ -174,13 +175,12 @@ export async function executeTransform(
         })
         .join(', ')
 
-      sql = `CREATE TABLE "${outputTableName}" AS SELECT ${selectedCols || '*'} FROM "${sourceTable}"`
+      sql = `CREATE TABLE "${outputTableName}" AS SELECT ${selectedCols || dataColumns} FROM "${sourceTable}"`
       break
     }
 
     case 'calculated_column': {
       const sourceTable = sanitizeTableName(transformDef.sourceTableId)
-      // Replace quoted column IDs like "col_3_actual" with their display names like "Actual"
       let expression = transformDef.expression
       for (const [colId, colName] of Object.entries(columnIdToName)) {
         const quotedIdPattern = new RegExp(`"${colId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`, 'g')
@@ -188,7 +188,7 @@ export async function executeTransform(
       }
       sql = `
         CREATE TABLE "${outputTableName}" AS
-        SELECT *, (${expression}) AS "${transformDef.newColumnName}"
+        SELECT ${dataColumns}, (${expression}) AS "${transformDef.newColumnName}"
         FROM "${sourceTable}"
       `
       break
@@ -217,7 +217,7 @@ export async function executeTransform(
 
     case 'union': {
       const tables = transformDef.sourceTableIds.map(id =>
-        `SELECT * FROM "${sanitizeTableName(id)}"`
+        `SELECT ${dataColumns} FROM "${sanitizeTableName(id)}"`
       ).join(' UNION ALL ')
 
       sql = `CREATE TABLE "${outputTableName}" AS ${tables}`
@@ -230,9 +230,18 @@ export async function executeTransform(
 
   await conn.query(`DROP TABLE IF EXISTS "${outputTableName}"`)
   await conn.query(sql)
+  await conn.query(
+    `ALTER TABLE "${outputTableName}" ADD COLUMN "${INTERNAL_ROW_ID_COLUMN}" VARCHAR`
+  )
+  await conn.query(
+    `UPDATE "${outputTableName}"
+     SET "${INTERNAL_ROW_ID_COLUMN}" = 'row_' || CAST(rowid AS VARCHAR)`
+  )
 
   const schemaResult = await conn.query(`DESCRIBE "${outputTableName}"`)
-  const schemaData = schemaResult.toArray()
+  const schemaData = schemaResult.toArray().filter(
+    (col: { column_name: string }) => col.column_name !== INTERNAL_ROW_ID_COLUMN,
+  )
 
   const countResult = await conn.query(`SELECT COUNT(*) as cnt FROM "${outputTableName}"`)
   const rowCount = Number(countResult.toArray()[0]?.cnt ?? 0)
@@ -241,7 +250,7 @@ export async function executeTransform(
   const preview = previewResult.toArray().map(row => {
     const obj: Record<string, CellValue> = {}
     for (const key of Object.keys(row)) {
-      obj[key] = row[key] as CellValue
+      if (key !== INTERNAL_ROW_ID_COLUMN) obj[key] = row[key] as CellValue
     }
     return obj
   })

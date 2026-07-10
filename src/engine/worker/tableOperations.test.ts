@@ -145,24 +145,24 @@ describe('updateCell', () => {
   })
 
   it('executes UPDATE with correct SQL', async () => {
-    await updateCell(mockConn, 'test_table', 5, 'Name', 'NewValue', 'string')
+    await updateCell(mockConn, 'test_table', 'row_5', 'Name', 'NewValue', 'string')
 
     const sql = mockQuery.mock.calls[0][0] as string
     expect(sql).toContain('UPDATE "test_table"')
     expect(sql).toContain('SET "Name" =')
     expect(sql).toContain("'NewValue'")
-    expect(sql).toContain('OFFSET 5')
+    expect(sql).toContain('"__tablecanvas_internal_row_id_7f3a__" = \'row_5\'')
   })
 
   it('handles numeric values', async () => {
-    await updateCell(mockConn, 'test_table', 3, 'Age', 42, 'number')
+    await updateCell(mockConn, 'test_table', 'row_3', 'Age', 42, 'number')
 
     const sql = mockQuery.mock.calls[0][0] as string
     expect(sql).toContain('SET "Age" = 42')
   })
 
   it('handles null values', async () => {
-    await updateCell(mockConn, 'test_table', 3, 'Name', null, 'string')
+    await updateCell(mockConn, 'test_table', 'row_3', 'Name', null, 'string')
 
     const sql = mockQuery.mock.calls[0][0] as string
     expect(sql).toContain('SET "Name" = NULL')

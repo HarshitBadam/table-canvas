@@ -2,6 +2,8 @@ import * as XLSX from 'xlsx'
 import { getTableData } from '@/engine/materializationService'
 import type { ProjectNode, TableNode } from '@/types'
 import { getTableNodes } from '@/lib/utils'
+import { computeDisplayValue } from '@/grid/displayUtils'
+import type { TableRow } from '@/state/dataStore'
 
 function sanitizeSheetName(name: string): string {
   return name.replace(/[[\]:*?/\\]/g, '_').substring(0, 31).trim() || 'Sheet'
@@ -33,10 +35,21 @@ function createWorksheet(table: TableNode, rows: Record<string, unknown>[]): XLS
     ? columns.map(column => column.name)
     : Object.keys(rows[0] ?? {}).filter(key => !key.startsWith('__'))
   const keys = columns.length > 0 ? columns.map(column => column.id) : headers
+  const columnsById = new Map(columns.map((column) => [column.id, column]))
   const data: unknown[][] = [
     headers,
-    ...rows.map(row => keys.map(key => {
-      const value = row[key]
+    ...rows.map((row, rowIndex) => keys.map((key) => {
+      const column = columnsById.get(key)
+      const rowId = typeof row.__rowId === 'string' ? row.__rowId : `row_${rowIndex}`
+      const value = column?.isComputed
+        ? computeDisplayValue(
+            rowId,
+            key,
+            null,
+            row as unknown as TableRow,
+            columns,
+          )
+        : row[key]
       return value == null ? '' : typeof value === 'object' ? JSON.stringify(value) : value
     })),
   ]

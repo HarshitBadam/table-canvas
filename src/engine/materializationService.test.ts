@@ -160,6 +160,68 @@ describe('source table materialization', () => {
       isComputing: false,
     }))
   })
+
+  it('rehydrates an in-app table from durable initial rows', async () => {
+    const node = sourceNode('manual', {
+      isDirty: true,
+      currentVersionHash: undefined,
+      lastRowCount: 2,
+    })
+    node.plan.fileRef = ''
+    node.plan.fileName = ''
+    node.plan.initialRows = [
+      { __rowId: 'row_0', col_1: 'A', col_2: 10 },
+      { __rowId: 'row_1', col_1: 'B', col_2: 20 },
+    ]
+    projectStore.nodes.manual = node
+    engine.getSlice
+      .mockRejectedValueOnce(new Error('Not in engine'))
+      .mockResolvedValue({ rows: [], totalRows: 2 })
+
+    const result = await ensureTableMaterialized('manual')
+
+    expect(engine.loadTable).toHaveBeenCalledWith(
+      'manual',
+      schema,
+      node.plan.initialRows,
+      undefined,
+    )
+    expect(result.rowCount).toBe(2)
+  })
+
+  it('reconstructs legacy manual row IDs so persisted patches remain usable', async () => {
+    const node = sourceNode('legacy', {
+      isDirty: true,
+      currentVersionHash: undefined,
+      lastRowCount: 10,
+    })
+    node.plan.fileRef = ''
+    node.plan.fileName = ''
+    projectStore.nodes.legacy = node
+    projectStore.patches.legacy = {
+      cellPatches: { col_1: { row_4: 'Recovered' } },
+      insertedRows: [],
+      deletedRows: new Set<string>(),
+      highlightedCells: new Set<string>(),
+    }
+    engine.getSlice
+      .mockRejectedValueOnce(new Error('Not in engine'))
+      .mockResolvedValue({ rows: [], totalRows: 10 })
+
+    const result = await ensureTableMaterialized('legacy')
+
+    expect(engine.loadTable).toHaveBeenCalledWith(
+      'legacy',
+      schema,
+      expect.arrayContaining([
+        { __rowId: 'row_0' },
+        { __rowId: 'row_4' },
+        { __rowId: 'row_9' },
+      ]),
+      projectStore.patches.legacy,
+    )
+    expect(result.rowCount).toBe(10)
+  })
 })
 
 describe('derived table materialization', () => {

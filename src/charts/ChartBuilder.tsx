@@ -82,7 +82,11 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
     const node = buildChartNodeSpec({ chartName, chartType, tableId, position, xAxis, yAxis, aggregation })
 
     addNode(node)
-    useProjectStore.getState().addEdge({ fromNodeId: tableId, toNodeId: node.id, transformType: 'select' })
+    useProjectStore.getState().addEdge({
+      fromNodeId: tableId,
+      toNodeId: node.id,
+      transformType: 'reference',
+    })
     onClose()
   }
 
@@ -125,7 +129,9 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                   </Dialog.Title>
                   {selectedTable && (
                     <p className="text-xs mt-0.5" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                      {selectedTable.name} • {selectedTable.schema?.rowCount?.toLocaleString()} rows
+                      {selectedTable.name} • {(selectedTable.cacheInfo?.lastRowCount
+                        ?? selectedTable.schema?.rowCount
+                        ?? 0).toLocaleString()} rows
                     </p>
                   )}
                 </div>
@@ -256,6 +262,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                         { value: 'sum', label: 'Sum' },
                         { value: 'avg', label: 'Average' },
                         { value: 'count', label: 'Count' },
+                        { value: 'count_distinct', label: 'Distinct' },
                         { value: 'min', label: 'Min' },
                         { value: 'max', label: 'Max' },
                       ].map((agg) => (

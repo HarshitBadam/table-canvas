@@ -2,6 +2,7 @@ import type * as duckdb from '@duckdb/duckdb-wasm'
 import type { AggregationDef, AggregationResult, TableSlice } from '../types'
 import type { CellValue } from '@/types'
 import { quoteIdentifier, sanitizeTableName } from './sqlHelpers'
+import { INTERNAL_ROW_ID_COLUMN } from '../internalColumns'
 
 function mapRows(result: Awaited<ReturnType<duckdb.AsyncDuckDBConnection['query']>>): Record<string, CellValue>[] {
   return result.toArray().map(row => {
@@ -18,10 +19,12 @@ export async function getTableSchema(
   tableName: string
 ): Promise<{ columnId: string; columnType: string }[]> {
   const schemaResult = await conn.query(`DESCRIBE ${quoteIdentifier(tableName)}`)
-  return schemaResult.toArray().map((col: { column_name: string; column_type: string }) => ({
-    columnId: col.column_name,
-    columnType: col.column_type,
-  }))
+  return schemaResult.toArray()
+    .filter((col: { column_name: string }) => col.column_name !== INTERNAL_ROW_ID_COLUMN)
+    .map((col: { column_name: string; column_type: string }) => ({
+      columnId: col.column_name,
+      columnType: col.column_type,
+    }))
 }
 
 export async function getSlice(

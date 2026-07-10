@@ -8,6 +8,7 @@ import { ColumnType, ColumnSchema, TableSchema, CellValue } from '@/types'
 import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
+import { loadTableIntoEngine } from '@/persistence/importParsers'
 
 interface NewTableModalProps {
   isOpen: boolean
@@ -101,6 +102,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   ])
   const [upgradeViolation, setUpgradeViolation] = useState<LimitExceeded | null>(null)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
 
   const addColumn = () => {
     setColumns([
@@ -119,7 +121,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
     setColumns(columns.map(c => c.id === id ? { ...c, ...updates } : c))
   }
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const tier: Tier = user?.tier ?? 'guest'
     const currentTableCount = Object.values(nodes).filter(
       (n) => n.kind === 'source_table' || n.kind === 'derived_table',
@@ -157,9 +159,13 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
       fileName: '',
       fileType: 'csv',
       schema,
+      initialRows: rows,
     })
 
     setTableData(tableId, rows)
+    setIsCreating(true)
+    await loadTableIntoEngine(tableId, schema, rows)
+    setIsCreating(false)
     resetForm()
     onClose()
   }
@@ -288,11 +294,11 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                 </button>
               </Dialog.Close>
               <button 
-                onClick={handleCreate} 
-                disabled={!tableName.trim() || columns.length === 0}
+                onClick={() => void handleCreate()}
+                disabled={isCreating || !tableName.trim() || columns.length === 0}
                 className="px-4 py-2 text-sm font-medium text-white bg-accent-green hover:bg-accent-green/90 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Create Table
+                {isCreating ? 'Creating...' : 'Create Table'}
               </button>
             </div>
           </div>

@@ -15,6 +15,7 @@ import {
   importSheetAndPersist,
   loadTableIntoEngine,
 } from '@/persistence/importParsers'
+import { parseWorkbookSheet } from '@/engine/fileParsers'
 
 function getTableCount(nodes: Record<string, { kind: string }>): number {
   return Object.values(nodes).filter(
@@ -34,6 +35,7 @@ export function ImportButton() {
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
   const [excelBuffer, setExcelBuffer] = useState<ArrayBuffer | null>(null)
   const [fileName, setFileName] = useState('')
+  const [importError, setImportError] = useState<string | null>(null)
 
   const [upgradeViolation, setUpgradeViolation] = useState<LimitExceeded | null>(null)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
@@ -59,6 +61,7 @@ export function ImportButton() {
     }
 
     setIsImporting(true)
+    setImportError(null)
     setFileName(file.name)
 
     try {
@@ -123,12 +126,12 @@ export function ImportButton() {
           setSheetModalOpen(true)
         }
       } else {
-        alert('Unsupported file type. Please use CSV or Excel files.')
+        setImportError('Unsupported file type. Please use CSV or Excel files.')
       }
     } catch (error: unknown) {
       console.error('Import error:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
-      alert(`Failed to import file: ${message}`)
+      setImportError(`Failed to import file: ${message}`)
     } finally {
       setIsImporting(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -138,43 +141,57 @@ export function ImportButton() {
   const handleImportSelectedSheets = async () => {
     if (!workbook) return
 
-    const selectedSheets = sheets.filter((s) => s.selected)
-    const nodes = useProjectStore.getState().nodes
-    const currentTableCount = getTableCount(nodes)
+    setIsImporting(true)
+    setImportError(null)
+    try {
+      const selectedSheets = sheets.filter((s) => s.selected)
+      const nodes = useProjectStore.getState().nodes
+      const currentTableCount = getTableCount(nodes)
 
-    const tableCheck = checkTableCount(currentTableCount + selectedSheets.length - 1, tier)
-    if (!tableCheck.ok) {
-      showViolation(tableCheck)
-      return
-    }
-
-    for (const sheet of selectedSheets) {
-      const { tableData, fileRef } = await importSheetAndPersist(
-        workbook, sheet.name, fileName, excelBuffer || undefined
-      )
-
-      const rowCheck = checkRowCount(tableData.schema.rowCount ?? tableData.rows.length, tier)
-      if (!rowCheck.ok) {
-        showViolation(rowCheck)
+      const tableCheck = checkTableCount(currentTableCount + selectedSheets.length - 1, tier)
+      if (!tableCheck.ok) {
+        showViolation(tableCheck)
         return
       }
 
-      const tableId = addSourceTable({
-        name: sheet.name,
-        fileRef,
-        fileName,
-        fileType: 'xlsx',
-        sheetName: sheet.name,
-        schema: tableData.schema,
-      })
-      setTableData(tableId, tableData.rows)
-      await loadTableIntoEngine(tableId, tableData.schema, tableData.rows)
-    }
+      for (const sheet of selectedSheets) {
+        const tableData = parseWorkbookSheet(workbook, sheet.name)
+        const rowCheck = checkRowCount(tableData.schema.rowCount ?? tableData.rows.length, tier)
+        if (!rowCheck.ok) {
+          showViolation(rowCheck)
+          return
+        }
+      }
 
-    setSheetModalOpen(false)
-    setWorkbook(null)
-    setExcelBuffer(null)
-    setSheets([])
+      for (const sheet of selectedSheets) {
+        const { tableData, fileRef } = await importSheetAndPersist(
+          workbook, sheet.name, fileName, excelBuffer || undefined
+        )
+
+        const tableId = addSourceTable({
+          name: sheet.name,
+          fileRef,
+          fileName,
+          fileType: 'xlsx',
+          sheetName: sheet.name,
+          schema: tableData.schema,
+        })
+        setTableData(tableId, tableData.rows)
+        await loadTableIntoEngine(tableId, tableData.schema, tableData.rows)
+      }
+
+      setSheetModalOpen(false)
+      setWorkbook(null)
+      setExcelBuffer(null)
+      setSheets([])
+    } catch (error) {
+      console.error('Workbook import error:', error)
+      setImportError(
+        error instanceof Error ? error.message : 'Failed to import workbook',
+      )
+    } finally {
+      setIsImporting(false)
+    }
   }
 
   const toggleSheet = (index: number) => {
@@ -214,6 +231,11 @@ export function ImportButton() {
           </>
         )}
       </button>
+      {importError && (
+        <p className="mt-2 text-xs text-red-600" role="alert">
+          {importError}
+        </p>
+      )}
 
       <Dialog.Root open={sheetModalOpen} onOpenChange={setSheetModalOpen}>
         <Dialog.Portal>

@@ -139,7 +139,7 @@ function ViewModeDropdown({
 export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeData>) => {
   const isSource = data.kind === 'source_table'
   const schema = data.schema
-  const rowCount = schema?.rowCount ?? 0
+  const rowCount = data.cacheInfo?.lastRowCount ?? schema?.rowCount ?? 0
   const colCount = schema?.columns.length ?? 0
   const viewMode = getViewMode(data.ui)
   const hasFilters = data.viewFilters && data.viewFilters.conditions.length > 0
@@ -258,8 +258,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
         )}
       </div>
 
-      {/* Connection handles - larger hit areas for easier connections */}
-      
       <Handle
         type="target"
         position={Position.Left}

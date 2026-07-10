@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useApp } from '@/state/AppContext'
 import { parseImportFile, saveAllReports } from '@/persistence/db'
-import { importProjectWithSync } from '@/persistence/syncService'
+import { importProjectWithSync, saveProjectWithSync } from '@/persistence/syncService'
 import { exportAndDownloadProject } from '@/persistence/exportService'
 import { useReportStore } from '@/report/reportStore'
 
@@ -62,6 +62,14 @@ export function useProjectExport(onImportComplete: () => void): ProjectExportSta
     setExportProgress('Starting export...')
 
     try {
+      const project = useProjectStore.getState()
+      await saveProjectWithSync(
+        projectId,
+        project.projectName,
+        project.nodes,
+        project.edges,
+        project.patches,
+      )
       await useReportStore.getState().flushSaves()
       await exportAndDownloadProject(projectId, projectName || 'project', {
         includeExcel: true,

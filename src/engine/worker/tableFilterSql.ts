@@ -2,6 +2,7 @@ import type * as duckdb from '@duckdb/duckdb-wasm'
 import type { FilterConditionDef, SortDef, TableSlice } from '../types'
 import type { CellValue } from '@/types'
 import { escapeLiteral, quoteIdentifier, sanitizeTableName } from './sqlHelpers'
+import { INTERNAL_ROW_ID_COLUMN } from '../internalColumns'
 
 function buildFilterClause(filter: FilterConditionDef): string | null {
   const column = quoteIdentifier(filter.column)
@@ -73,9 +74,11 @@ export async function getFilteredSlice(
   if (search?.trim()) {
     const schema = await conn.query(`DESCRIBE ${tableName}`)
     const term = escapeLiteral(search.trim().toLowerCase())
-    const searchClauses = schema.toArray().map((column: { column_name: string }) =>
-      `LOWER(CAST(${quoteIdentifier(column.column_name)} AS VARCHAR)) LIKE '%' || ${term} || '%'`
-    )
+    const searchClauses = schema.toArray()
+      .filter((column: { column_name: string }) => column.column_name !== INTERNAL_ROW_ID_COLUMN)
+      .map((column: { column_name: string }) =>
+        `LOWER(CAST(${quoteIdentifier(column.column_name)} AS VARCHAR)) LIKE '%' || ${term} || '%'`
+      )
     if (searchClauses.length) clauses.push(`(${searchClauses.join(' OR ')})`)
   }
 

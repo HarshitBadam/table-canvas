@@ -18,7 +18,9 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
   const sourceTable = useProjectStore((state) => 
     state.nodes[sourceTableId] as TableNode | undefined
   )
-  const sourceVersionHash = sourceTable?.cacheInfo?.currentVersionHash
+  const sourceVersionHash = `${sourceTable?.cacheInfo?.currentVersionHash ?? ''}:${
+    sourceTable?.cacheInfo?.dataRevision ?? 0
+  }`
   
   const columnNames = useMemo(() => {
     const names: Record<string, string> = {}
@@ -146,11 +148,6 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-2 !h-2 !border-2 !border-surface !rounded-full !bg-accent-green"
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
         className="!w-2 !h-2 !border-2 !border-surface !rounded-full !bg-accent-green"
       />
     </div>

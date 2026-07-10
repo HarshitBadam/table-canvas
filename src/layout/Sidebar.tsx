@@ -6,10 +6,12 @@ import { NewTableModal } from '@/canvas/modals/NewTableModal'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { useNavigation } from './NavigationContext'
 import type { ProjectNode, TableNode, ChartNode } from '@/types'
+import { getDependentNodeIds } from '@/engine/workflowGraph'
 
 export function Sidebar() {
   const { openTable, openChart, openCanvas, openDashboard, openReport } = useNavigation()
   const nodes = useProjectStore((state) => state.nodes)
+  const edges = useProjectStore((state) => state.edges)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
   const { deleteNodeWithSync } = useApp()
   
@@ -24,6 +26,9 @@ export function Sidebar() {
   const chartNodes = allNodes.filter(
     (node): node is ChartNode => node.kind === 'chart'
   )
+  const dependentDeleteCount = deleteConfirmId
+    ? getDependentNodeIds(nodes, edges, deleteConfirmId).size
+    : 0
 
   const handleNewTable = useCallback(() => {
     setNewTableModalOpen(true)
@@ -102,11 +107,11 @@ export function Sidebar() {
         ) : (
           <ul className="space-y-1">
             {tableNodes.map((node) => (
-              <li key={node.id} className="group relative">
+              <li key={node.id} className="group flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => handleTableClick(node.id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all ${
+                  className={`min-w-0 flex-1 text-left px-3 py-2.5 rounded-lg text-sm transition-all ${
                     selectedNodeId === node.id
                       ? 'bg-accent-green/10 text-accent-green'
                       : 'hover:bg-surface-secondary text-text-primary'
@@ -115,21 +120,23 @@ export function Sidebar() {
                   <div className="flex items-center gap-2.5">
                     <TableIcon kind={node.kind} />
                     <span className="truncate flex-1 font-medium">{node.name}</span>
-          <button
-                      onClick={(e) => handleDeleteTable(node.id, e)}
-                      className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-text-tertiary hover:text-red-500 transition-all"
-                      title="Delete table"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
                   </div>
                   {node.schema && (
                     <div className="text-[11px] text-text-tertiary mt-1 ml-7">
-                      {node.schema.rowCount || 0} rows · {node.schema.columns.length} cols
+                      {node.cacheInfo?.lastRowCount ?? node.schema.rowCount ?? 0} rows · {node.schema.columns.length} cols
                     </div>
                   )}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleDeleteTable(node.id, e)}
+                  className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-text-tertiary hover:text-red-500 transition-all"
+                  title="Delete table"
+                  aria-label={`Delete ${node.name}`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
                 </button>
               </li>
             ))}
@@ -148,11 +155,11 @@ export function Sidebar() {
             </div>
             <ul className="space-y-1">
               {chartNodes.map((node) => (
-                <li key={node.id} className="group relative">
+                <li key={node.id} className="group flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => handleChartClick(node.id)}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
+                    className={`min-w-0 flex-1 text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
                       selectedNodeId === node.id
                         ? 'bg-accent-green/10 text-accent-green'
                         : 'hover:bg-surface-secondary text-text-primary'
@@ -166,6 +173,17 @@ export function Sidebar() {
                       </div>
                       <span className="truncate flex-1 font-medium">{node.name}</span>
                     </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteTable(node.id, e)}
+                    className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-text-tertiary hover:text-red-500 transition-all"
+                    title="Delete chart"
+                    aria-label={`Delete ${node.name}`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
                   </button>
                 </li>
               ))}
@@ -233,14 +251,16 @@ export function Sidebar() {
                 </svg>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-text-primary">Delete Table</h3>
+                <h3 className="text-sm font-semibold text-text-primary">Delete Node</h3>
                 <p className="text-xs text-text-secondary mt-0.5">
                   "{nodes[deleteConfirmId]?.name}"
                 </p>
               </div>
             </div>
             <p className="text-xs text-text-secondary mb-4">
-              Are you sure? This action cannot be undone.
+              {dependentDeleteCount > 0
+                ? `This will also delete ${dependentDeleteCount} dependent node${dependentDeleteCount === 1 ? '' : 's'} so the workflow remains valid.`
+                : 'Are you sure you want to delete this node?'}
             </p>
             <div className="flex justify-end gap-2">
               <button 

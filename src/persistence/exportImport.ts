@@ -1,9 +1,14 @@
 import type { ProjectNode, Edge, Patches } from '@/types'
 import type { Report } from '@/report/types'
 import type { SerializedPatches } from './dbCore'
+import JSZip from 'jszip'
 import { loadProject } from './projectStorage'
-import { saveFile, loadFileRecord } from './fileStorage'
+import { loadFileRecord } from './fileStorage'
 import { loadReportsForProject } from './reportStorage'
+import { generateId, readFileAsArrayBuffer } from '@/lib/utils'
+import { detectCycles } from '@/engine/dependencyGraph'
+import { getTransformSourceTableIds } from '@/engine/workflowGraph'
+import { uploadFileWithSync } from './fileSync'
 
 const EXPORT_VERSION = '2.0.0'
 const EXPORT_FORMAT_TYPE = 'tablecanvas-full'
@@ -12,7 +17,7 @@ interface ExportedFile {
   id: string
   name: string
   type: string
-  data: string  // base64 encoded
+  data: string
   createdAt: string
 }
 
@@ -49,6 +54,26 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer
 }
 
+async function readImportText(file: File): Promise<string> {
+  if (file.name.toLowerCase().endsWith('.zip') || file.type === 'application/zip') {
+    let zip: JSZip
+    try {
+      zip = await JSZip.loadAsync(await readFileAsArrayBuffer(file))
+    } catch {
+      throw new Error('Invalid project archive: unable to open ZIP file')
+    }
+    const projectFile = zip.file('project.tablecanvas.json')
+      ?? Object.values(zip.files).find(
+        (entry) => !entry.dir && /\.tablecanvas\.json$/i.test(entry.name),
+      )
+    if (!projectFile) {
+      throw new Error('Invalid project archive: project.tablecanvas.json is missing')
+    }
+    return projectFile.async('string')
+  }
+  return file.text()
+}
+
 export async function exportProjectFile(projectId: string): Promise<Blob> {
   const project = await loadProject(projectId)
   if (!project) throw new Error('Project not found')
@@ -77,6 +102,13 @@ export async function exportProjectFile(projectId: string): Promise<Blob> {
       missingFiles.push(fileId)
       console.warn(`[Export] File not found: ${fileId}`)
     }
+  }
+  if (missingFiles.length > 0) {
+    throw new Error(
+      `Cannot export this project because ${missingFiles.length} source file${
+        missingFiles.length === 1 ? ' is' : 's are'
+      } unavailable. Re-import the affected table data and try again.`,
+    )
   }
 
   const reports = await loadReportsForProject(projectId)
@@ -117,11 +149,6 @@ export interface ParsedImportData {
   reports: Report[]
 }
 
-/**
- * Validates the export format and version, restores embedded files to IndexedDB
- * with new IDs, remaps all fileRef references, and optionally restores reports.
- * Does NOT save the project — caller must do that.
- */
 export async function parseImportFile(
   file: File,
   options?: {
@@ -130,7 +157,7 @@ export async function parseImportFile(
 ): Promise<ParsedImportData> {
   const importReports = options?.importReports ?? true
 
-  const text = await file.text()
+  const text = await readImportText(file)
   let data: TableCanvasExport
 
   try {
@@ -140,8 +167,17 @@ export async function parseImportFile(
     throw new Error('Invalid file: Unable to parse JSON')
   }
 
-  if (!data.version || !data.project) {
+  if (
+    !data.version
+    || !data.project
+    || !data.project.nodes
+    || !data.project.edges
+    || !data.project.patches
+  ) {
     throw new Error('Invalid project file format: missing version or project data')
+  }
+  if (data.formatType && data.formatType !== EXPORT_FORMAT_TYPE) {
+    throw new Error(`Unsupported project format: ${data.formatType}`)
   }
 
   const majorVersion = parseInt(data.version.split('.')[0], 10)
@@ -152,24 +188,27 @@ export async function parseImportFile(
   const project = data.project
   const exportedFiles = data.files || {}
   const exportedReports = data.reports || {}
+  const missingFileNames = Object.values(project.nodes)
+    .filter((node) => node.kind === 'source_table' && Boolean(node.plan.fileRef))
+    .filter((node) => !exportedFiles[node.kind === 'source_table' ? node.plan.fileRef : ''])
+    .map((node) => node.name)
+  if (missingFileNames.length > 0) {
+    throw new Error(
+      `Project archive is incomplete. Missing source data for: ${missingFileNames.join(', ')}`,
+    )
+  }
 
   const fileIdMap = new Map<string, string>()
 
   for (const [oldFileId, exportedFile] of Object.entries(exportedFiles)) {
-    const newFileId = `file_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-    fileIdMap.set(oldFileId, newFileId)
-
     try {
       const fileData = base64ToArrayBuffer(exportedFile.data)
-
-      await saveFile(
-        newFileId,
-        exportedFile.name,
-        exportedFile.type,
-        fileData
+      const restored = await uploadFileWithSync(
+        new File([fileData], exportedFile.name, { type: exportedFile.type }),
       )
+      fileIdMap.set(oldFileId, restored.id)
 
-      console.log(`[Import] Restored file: ${exportedFile.name} (${oldFileId} -> ${newFileId})`)
+      console.log(`[Import] Restored file: ${exportedFile.name} (${oldFileId} -> ${restored.id})`)
     } catch (err) {
       console.error(`[Import] Failed to restore file ${exportedFile.name}:`, err)
       throw new Error(`Failed to restore file "${exportedFile.name}": ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -188,12 +227,46 @@ export async function parseImportFile(
       if (newFileRef) {
         clonedNode.plan.fileRef = newFileRef
         console.log(`[Import] Remapped fileRef: ${oldFileRef} -> ${newFileRef}`)
-      } else {
-        console.warn(`[Import] No mapping for fileRef: ${oldFileRef} (file was not in export)`)
       }
     }
 
     remappedNodes[nodeId] = clonedNode
+  }
+
+  const normalizedEdges: Record<string, Edge> = {}
+  for (const node of Object.values(remappedNodes)) {
+    if (node.kind === 'derived_table') {
+      const upstreamNodeIds = getTransformSourceTableIds(node.plan.transformDef)
+      const missingUpstream = upstreamNodeIds.find((id) => !remappedNodes[id])
+      if (missingUpstream) {
+        throw new Error(`Invalid workflow: "${node.name}" references a missing upstream table`)
+      }
+      node.plan.upstreamNodeIds = upstreamNodeIds
+      for (const sourceId of upstreamNodeIds) {
+        const edgeId = generateId()
+        normalizedEdges[edgeId] = {
+          id: edgeId,
+          fromNodeId: sourceId,
+          toNodeId: node.id,
+          transformType: node.plan.transformDef.type,
+        }
+      }
+    } else if (node.kind === 'chart') {
+      const source = remappedNodes[node.plan.sourceTableId]
+      if (!source || source.kind === 'chart') {
+        throw new Error(`Invalid workflow: chart "${node.name}" references a missing table`)
+      }
+      const edgeId = generateId()
+      normalizedEdges[edgeId] = {
+        id: edgeId,
+        fromNodeId: source.id,
+        toNodeId: node.id,
+        transformType: 'reference',
+      }
+    }
+  }
+  if (detectCycles(remappedNodes, normalizedEdges).length > 0) {
+    throw new Error('Invalid workflow: the imported graph contains a circular dependency')
   }
 
   const patches: Record<string, Patches> = {}
@@ -235,7 +308,7 @@ export async function parseImportFile(
   return {
     name: project.name,
     nodes: remappedNodes,
-    edges: project.edges,
+    edges: normalizedEdges,
     patches,
     filesRestored: fileIdMap.size,
     reportsRestored,

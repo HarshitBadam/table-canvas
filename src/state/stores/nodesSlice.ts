@@ -8,7 +8,7 @@ import type {
   Position,
 } from '@/types'
 import { generateId } from '@/lib/utils'
-import { getAllDescendants } from '@/engine/dependencyGraph'
+import { getDependentNodeIds } from '@/engine/workflowGraph'
 import { createInitialPatches } from './patchesSlice'
 import { createColumnOps } from './nodesColumnOps'
 
@@ -38,20 +38,22 @@ export const createNodesSlice: StateCreator<
   deleteNode: (id) => {
     const state = get()
     state.saveSnapshot(`Delete node ${state.nodes[id]?.name || id}`)
+    const nodeIds = new Set([id, ...getDependentNodeIds(state.nodes, state.edges, id)])
 
     set((state) => {
-      delete state.nodes[id]
+      for (const nodeId of nodeIds) {
+        delete state.nodes[nodeId]
+        delete state.patches[nodeId]
+      }
 
       Object.keys(state.edges).forEach((edgeId) => {
         const edge = state.edges[edgeId]
-        if (edge.fromNodeId === id || edge.toNodeId === id) {
+        if (nodeIds.has(edge.fromNodeId) || nodeIds.has(edge.toNodeId)) {
           delete state.edges[edgeId]
         }
       })
 
-      delete state.patches[id]
-
-      if (state.selectedNodeId === id) {
+      if (state.selectedNodeId && nodeIds.has(state.selectedNodeId)) {
         state.selectedNodeId = null
       }
     })
@@ -116,7 +118,16 @@ export const createNodesSlice: StateCreator<
     })
   },
 
-  addSourceTable: ({ name, fileRef, fileName, fileType, sheetName, schema, position }) => {
+  addSourceTable: ({
+    name,
+    fileRef,
+    fileName,
+    fileType,
+    sheetName,
+    schema,
+    position,
+    initialRows,
+  }) => {
     const state = get()
     state.saveSnapshot(`Import table ${name}`)
 
@@ -145,6 +156,7 @@ export const createNodesSlice: StateCreator<
         fileType,
         sheetName,
         inferredSchemaVersion: 1,
+        initialRows,
       },
       cacheInfo: {},
       createdAt: now,
@@ -285,6 +297,7 @@ export const createNodesSlice: StateCreator<
         }
         tableNode.cacheInfo.isDirty = true
         tableNode.cacheInfo.error = undefined
+        tableNode.cacheInfo.dataRevision = (tableNode.cacheInfo.dataRevision ?? 0) + 1
         tableNode.updatedAt = new Date().toISOString()
       }
     })
@@ -295,7 +308,7 @@ export const createNodesSlice: StateCreator<
 
     state.markNodeDirty(nodeId)
 
-    const descendants = getAllDescendants(nodeId, state.edges)
+    const descendants = getDependentNodeIds(state.nodes, state.edges, nodeId)
 
     set((draft) => {
       for (const descendantId of descendants) {
@@ -307,6 +320,7 @@ export const createNodesSlice: StateCreator<
           }
           tableNode.cacheInfo.isDirty = true
           tableNode.cacheInfo.error = undefined
+          tableNode.cacheInfo.dataRevision = (tableNode.cacheInfo.dataRevision ?? 0) + 1
           tableNode.updatedAt = new Date().toISOString()
         }
       }

@@ -72,11 +72,9 @@ export function useGridData(tableId: string) {
   }, [patches, columns])
 
   const rows: GridRow[] = useMemo(() => {
-    // Loaded rows live in refs; the version is the snapshot invalidation signal.
     void windowedVersion
     const total = windowedTotalRows
     const baseRows: GridRow[] = []
-    // Absolute indices must remain stable while unloaded entries stay sparse for skeleton rows.
     baseRows.length = total
 
     const loaded = getLoadedRows()
@@ -84,28 +82,12 @@ export function useGridData(tableId: string) {
       if (idx >= 0 && idx < total) baseRows[idx] = row
     })
 
-    const insertedRows = patches?.insertedRows ?? []
-    insertedRows.forEach((inserted, i) => {
-      const row: GridRow = { __rowId: inserted.rowId }
-      Object.entries(inserted.values).forEach(([colId, value]) => {
-        row[colId] = value
-      })
-      columns.forEach((col) => {
-        if (row[col.id] === undefined) {
-          row[col.id] = ''
-        }
-      })
-      baseRows[total + i] = row
-    })
-
     return baseRows
-  }, [columns, getLoadedRows, patches, windowedTotalRows, windowedVersion])
+  }, [getLoadedRows, windowedTotalRows, windowedVersion])
 
   const filteredRows = rows
 
-  const totalRowCount = windowedTotalRows + (patches?.insertedRows?.length ?? 0)
-  const deletedCount = patches?.deletedRows?.size ?? 0
-  const unfilteredTotalRows = totalRowCount - deletedCount
+  const unfilteredTotalRows = windowedTotalRows
 
   useEffect(() => {
     if (!node) return

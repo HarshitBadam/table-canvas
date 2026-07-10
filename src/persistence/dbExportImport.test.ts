@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import JSZip from 'jszip'
 import {
   createMockReport,
   createMockSourceTableNode,
@@ -73,10 +74,10 @@ describe('Export/Import Operations', () => {
     expect(parsed.filesRestored).toBe(1)
     const tableNode = parsed.nodes.table_1 as { plan: { fileRef: string } }
     expect(tableNode.plan.fileRef).not.toBe('old_file_id')
-    expect(tableNode.plan.fileRef).toMatch(/^file_/)
+    expect(tableNode.plan.fileRef).toMatch(/^(?:local_)?file_/)
   })
 
-  it('handles import with missing files gracefully', async () => {
+  it('rejects an incomplete archive instead of creating broken tables', async () => {
     const db = await getDB()
     const exportData = {
       version: '2.0.0',
@@ -104,11 +105,36 @@ describe('Export/Import Operations', () => {
     const file = new File([JSON.stringify(exportData)], 'project.json', {
       type: 'application/json',
     })
+    await expect(db.parseImportFile(file)).rejects.toThrow(
+      'Project archive is incomplete',
+    )
+  })
+
+  it('imports the ZIP format produced by project export', async () => {
+    const db = await getDB()
+    const exportData = {
+      version: '2.0.0',
+      formatType: 'tablecanvas-full',
+      exportedAt: new Date().toISOString(),
+      project: {
+        id: 'zip-project',
+        name: 'ZIP Project',
+        nodes: {},
+        edges: {},
+        patches: {},
+      },
+      files: {},
+    }
+    const zip = new JSZip()
+    zip.file('project.tablecanvas.json', JSON.stringify(exportData))
+    const archive = await zip.generateAsync({ type: 'uint8array' })
+    const file = new File([archive], 'project.tablecanvas.zip', {
+      type: 'application/zip',
+    })
+
     const parsed = await db.parseImportFile(file)
 
-    expect(parsed.filesRestored).toBe(0)
-    const tableNode = parsed.nodes.table_1 as { plan: { fileRef: string } }
-    expect(tableNode.plan.fileRef).toBe('missing_file')
+    expect(parsed.name).toBe('ZIP Project')
   })
 
   it('rejects invalid export format', async () => {

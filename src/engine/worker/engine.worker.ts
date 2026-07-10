@@ -1,8 +1,3 @@
-/**
- * Web Worker entry point for DuckDB-WASM engine.
- * All heavy data operations run here, off the main thread.
- */
-
 import * as duckdb from '@duckdb/duckdb-wasm'
 import type {
   WorkerRequest,
@@ -20,9 +15,6 @@ let conn: duckdb.AsyncDuckDBConnection | null = null
 async function initDuckDB(): Promise<void> {
   if (db) return
 
-  // Serve WASM + worker assets from the app's own origin so first load works
-  // offline and is compatible with COEP. Assets are placed under /duckdb/ by the
-  // Vite duckdbLocalBundlePlugin (dev server middleware + build-time emit).
   const LOCAL_BUNDLES: duckdb.DuckDBBundles = {
     mvp: {
       mainModule: '/duckdb/duckdb-mvp.wasm',
@@ -98,10 +90,10 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       }
 
       case 'updateCell': {
-        const { tableId, rowIndex, column, value, columnType } = payload as {
-          tableId: string; rowIndex: number; column: string; value: import('@/types').CellValue; columnType?: string
+        const { tableId, rowId, column, value, columnType } = payload as {
+          tableId: string; rowId: string; column: string; value: import('@/types').CellValue; columnType?: string
         }
-        await updateCell(requireConn(), tableId, rowIndex, column, value, columnType)
+        await updateCell(requireConn(), tableId, rowId, column, value, columnType)
         result = { success: true }
         break
       }

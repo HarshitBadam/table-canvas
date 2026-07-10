@@ -3,6 +3,15 @@ import { ensureTableMaterialized } from '@/engine/materializationService'
 import { createProjectWithSync, fetchProjects, loadProjectWithSync } from '@/persistence/syncService'
 import type { ProjectNode } from '@/types'
 import { useProjectStore } from './projectStore'
+import { useDataStore } from './dataStore'
+
+export async function clearProjectRuntime(nodes: Record<string, ProjectNode>): Promise<void> {
+  useDataStore.setState({ tableData: {} })
+  const tableIds = Object.values(nodes)
+    .filter((node) => node.kind === 'source_table' || node.kind === 'derived_table')
+    .map((node) => node.id)
+  await Promise.allSettled(tableIds.map((tableId) => getEngine().dropTable(tableId)))
+}
 
 export async function materializeProjectTables(nodes: Record<string, ProjectNode>): Promise<void> {
   const entries = Object.entries(nodes)
@@ -29,6 +38,7 @@ export async function loadOrCreateProject() {
     ? await loadProjectWithSync(projects[0].id)
     : await createProjectWithSync('Untitled Project')
   const resolvedProject = project ?? await createProjectWithSync('Untitled Project')
+  await clearProjectRuntime(useProjectStore.getState().nodes)
   useProjectStore.setState({
     projectId: resolvedProject.id,
     projectName: resolvedProject.name,

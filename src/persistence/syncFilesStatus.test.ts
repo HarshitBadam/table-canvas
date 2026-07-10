@@ -26,6 +26,9 @@ vi.mock('@/api/files.api', () => ({
 
 vi.mock('./db', () => ({
   saveProject: (...args: unknown[]) => mocks.saveProjectLocal(...args),
+}))
+
+vi.mock('./fileStorage', () => ({
   saveFile: (...args: unknown[]) => mocks.saveFileLocal(...args),
   loadFile: (id: string) => mocks.loadFileLocal(id),
   deleteFile: (id: string) => mocks.deleteFileLocal(id),

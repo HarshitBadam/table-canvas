@@ -1,18 +1,16 @@
 import type { TableSchema } from './schema.types'
 import type { TransformDef, AggregationType, ViewFilterConfig } from './transform.types'
-import type { Position } from './common.types'
+import type { CellValue, Position } from './common.types'
 
 
 export type ChartType = 'bar' | 'line' | 'pie' | 'scatter'
 
-/** Types of nodes in the project graph */
 type NodeKind = 'source_table' | 'derived_table' | 'chart'
 
 export type NodeViewMode = 'collapsed' | 'data'
 
 export interface NodeUI {
   position: Position
-  /** Table display state on the canvas. */
   viewMode?: NodeViewMode
 }
 
@@ -30,31 +28,24 @@ interface BaseNode {
 export interface CacheInfo {
   isDirty?: boolean
   lastComputedAt?: string
-  /** Hash of the transform definition (for derived tables) */
   lastPlanHash?: string
-  /** Combined hash of upstream table versions (for derived tables) */
   lastUpstreamHash?: string
-  /**
-   * This node's current computed version hash
-   * For source tables: hash of fileRef + patches
-   * For derived tables: hash of lastPlanHash + lastUpstreamHash
-   */
   currentVersionHash?: string
   lastRowCount?: number
-  /** Warnings (e.g., "many-to-many join detected") */
   warnings?: string[]
   error?: string
   isComputing?: boolean
+  dataRevision?: number
 }
 
 
 interface SourceTablePlan {
-  /** Reference to stored file in IndexedDB */
   fileRef: string
   fileName: string
   fileType: 'csv' | 'xlsx'
   sheetName?: string
   inferredSchemaVersion: number
+  initialRows?: Array<Record<string, CellValue>>
 }
 
 export interface SourceTableNode extends BaseNode {

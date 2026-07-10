@@ -61,7 +61,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const [cycleWarning, setCycleWarning] = useState<string | null>(null)
   
   const lastDragUpdate = useRef(0)
-  const DRAG_THROTTLE_MS = 16 // ~60fps
+  const DRAG_THROTTLE_MS = 16
 
   const { handleSetViewMode } = useCanvasViewMode()
 
@@ -97,7 +97,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
       animated: false,
       label: edge.transformType,
       pathOptions: {
-        offset: 25, // Smaller offset for tighter, cleaner paths
+        offset: 25,
         borderRadius: 10,
       },
       zIndex: 0,
@@ -191,6 +191,15 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
 
   const onConnect = useCallback((connection: Connection) => {
     if (connection.source && connection.target) {
+      const sourceNode = projectNodes[connection.source]
+      const targetNode = projectNodes[connection.target]
+      const sourceIsTable = sourceNode?.kind === 'source_table' || sourceNode?.kind === 'derived_table'
+      const targetIsTable = targetNode?.kind === 'source_table' || targetNode?.kind === 'derived_table'
+      if (!sourceIsTable || !targetIsTable) {
+        setCycleWarning('Charts are read-only outputs. Connect two tables to create a transformation.')
+        setTimeout(() => setCycleWarning(null), 4000)
+        return
+      }
       if (wouldCreateCycle(projectEdges, connection.source, connection.target)) {
         const sourceName = projectNodes[connection.source]?.name || 'Source'
         const targetName = projectNodes[connection.target]?.name || 'Target'

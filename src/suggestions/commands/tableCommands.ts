@@ -9,19 +9,7 @@ import type {
 import { PLACEHOLDER_VALUES } from '../cleaningConstants'
 import type { SuggestionCommand, CommandResult } from './types'
 import { showToast } from './types'
-
-function getSourceTableId(transform: { sourceTableId?: string; leftTableId?: string; sourceTableIds?: string[] }): string | null {
-  if ('sourceTableId' in transform && transform.sourceTableId) {
-    return transform.sourceTableId
-  }
-  if ('leftTableId' in transform && transform.leftTableId) {
-    return transform.leftTableId
-  }
-  if ('sourceTableIds' in transform && transform.sourceTableIds && transform.sourceTableIds.length > 0) {
-    return transform.sourceTableIds[0]
-  }
-  return null
-}
+import { getTransformSourceTableIds } from '@/engine/workflowGraph'
 
 export class CreateDerivedTableCommand implements SuggestionCommand {
   private suggestion: Suggestion
@@ -37,7 +25,8 @@ export class CreateDerivedTableCommand implements SuggestionCommand {
 
   async execute(): Promise<CommandResult> {
     const store = useProjectStore.getState()
-    const sourceTableId = getSourceTableId(this.action.transform as { sourceTableId?: string; leftTableId?: string; sourceTableIds?: string[] })
+    const upstreamNodeIds = getTransformSourceTableIds(this.action.transform)
+    const sourceTableId = upstreamNodeIds[0]
 
     if (!sourceTableId) {
       return {
@@ -63,7 +52,7 @@ export class CreateDerivedTableCommand implements SuggestionCommand {
       const nodeId = store.addDerivedTable({
         name: tableName,
         transformDef: this.action.transform,
-        upstreamNodeIds: [sourceTableId],
+        upstreamNodeIds,
         position: this.calculatePosition(sourceTable.ui.position),
       })
 

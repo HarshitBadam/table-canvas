@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import { useDataStore } from '@/state/dataStore'
 import { generateSuggestions } from '@/suggestions/engine'
 import { generateTableVersionHash, useSuggestionsStore } from '@/suggestions/suggestionsStore'
 import type { DerivedTableNode, Suggestion } from '@/types'
@@ -11,7 +10,6 @@ export function useTopSuggestions(limit: number = 5): {
 } {
   const tableNodes = useTableNodes()
   const { profiles, isLoading } = useAllProfiles()
-  const tableData = useDataStore((state) => state.tableData)
   const consumed = useSuggestionsStore((state) => state.consumed)
 
   const suggestions = useMemo(() => {
@@ -19,11 +17,13 @@ export function useTopSuggestions(limit: number = 5): {
 
     for (const table of tableNodes) {
       const profile = profiles[table.id]
-      const data = tableData[table.id]
 
       if (!table.schema || !profile) continue
 
-      const rowCount = data?.rows?.length || table.schema?.rowCount || profile?.rowCount || 0
+      const rowCount = table.cacheInfo?.lastRowCount
+        ?? profile.rowCount
+        ?? table.schema.rowCount
+        ?? 0
       const versionHash = generateTableVersionHash(
         table.id,
         rowCount,
@@ -80,7 +80,7 @@ export function useTopSuggestions(limit: number = 5): {
         return categoryOrder[a.category] - categoryOrder[b.category]
       })
       .slice(0, limit)
-  }, [tableNodes, profiles, tableData, consumed, limit])
+  }, [tableNodes, profiles, consumed, limit])
 
   return { suggestions, isLoading }
 }

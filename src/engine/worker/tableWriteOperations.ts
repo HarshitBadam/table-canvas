@@ -8,6 +8,7 @@ import {
   quoteIdentifier,
   sanitizeTableName,
 } from './sqlHelpers'
+import { INTERNAL_ROW_ID_COLUMN } from '../internalColumns'
 
 export async function loadTable(conn: duckdb.AsyncDuckDBConnection, request: LoadTableRequest): Promise<void> {
   const { tableId, data } = request
@@ -36,7 +37,7 @@ export async function dropTable(conn: duckdb.AsyncDuckDBConnection, tableId: str
 export async function updateCell(
   conn: duckdb.AsyncDuckDBConnection,
   tableId: string,
-  rowIndex: number,
+  rowId: string,
   column: string,
   value: CellValue,
   columnType?: string
@@ -44,9 +45,9 @@ export async function updateCell(
   const tableName = quoteIdentifier(sanitizeTableName(tableId))
   const formattedValue = columnType ? formatValueWithType(value, columnType) : formatValue(value)
   await conn.query(
-    `UPDATE ${tableName} SET ${quoteIdentifier(column)} = ${formattedValue} WHERE rowid = (
-      SELECT rowid FROM ${tableName} LIMIT 1 OFFSET ${rowIndex}
-    )`
+    `UPDATE ${tableName}
+     SET ${quoteIdentifier(column)} = ${formattedValue}
+     WHERE ${quoteIdentifier(INTERNAL_ROW_ID_COLUMN)} = ${formatValue(rowId)}`
   )
 }
 

@@ -41,6 +41,7 @@ export interface NodesSliceState {
     sheetName?: string
     schema: TableSchema
     position?: Position
+    initialRows?: Array<Record<string, CellValue>>
   }) => string
   addDerivedTable: (params: {
     name: string

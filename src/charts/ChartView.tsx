@@ -13,16 +13,25 @@ interface ChartViewProps {
 
 export function ChartView({ chartId }: ChartViewProps) {
   const { openTable } = useNavigation()
+  const nodes = useProjectStore((state) => state.nodes)
   const chartNode = useProjectStore((state) => state.nodes[chartId]) as ChartNode | undefined
   const updateNode = useProjectStore((state) => state.updateNode)
   const updateChartConfig = useProjectStore((state) => state.updateChartConfig)
   const updateChartName = useProjectStore((state) => state.updateChartName)
+  const tables = useMemo(
+    () => Object.values(nodes).filter(
+      (node): node is TableNode => node.kind === 'source_table' || node.kind === 'derived_table',
+    ),
+    [nodes],
+  )
   
   const sourceTableId = chartNode?.plan.sourceTableId || ''
   const sourceTable = useProjectStore((state) => 
     sourceTableId ? state.nodes[sourceTableId] as TableNode | undefined : undefined
   )
-  const sourceVersionHash = sourceTable?.cacheInfo?.currentVersionHash
+  const sourceVersionHash = `${sourceTable?.cacheInfo?.currentVersionHash ?? ''}:${
+    sourceTable?.cacheInfo?.dataRevision ?? 0
+  }`
   
   const columns = useMemo(() => sourceTable?.schema?.columns ?? [], [sourceTable?.schema?.columns])
   const numericColumns = useMemo(() => columns.filter(c => c.type === 'number'), [columns])
@@ -55,6 +64,45 @@ export function ChartView({ chartId }: ChartViewProps) {
       updatedAt: new Date().toISOString(),
     } as Partial<ChartNode>)
   }, [chartId, chartNode, updateNode])
+
+  const handleSourceChange = useCallback((newSourceTableId: string) => {
+    if (!chartNode || newSourceTableId === chartNode.plan.sourceTableId) return
+    const nextTable = nodes[newSourceTableId] as TableNode | undefined
+    if (!nextTable) return
+    const nextColumns = nextTable.schema?.columns ?? []
+    const available = new Set(nextColumns.map((column) => column.id))
+    const firstNumeric = nextColumns.find((column) => column.type === 'number')?.id
+    const firstCategory = nextColumns.find(
+      (column) => column.type === 'string' || column.type === 'date',
+    )?.id ?? nextColumns[0]?.id
+    const nextConfig: ChartConfig = {
+      ...chartNode.plan.config,
+      xAxis: chartNode.plan.config.xAxis && available.has(chartNode.plan.config.xAxis)
+        ? chartNode.plan.config.xAxis
+        : firstCategory,
+      yAxis: chartNode.plan.config.yAxis && available.has(chartNode.plan.config.yAxis)
+        ? chartNode.plan.config.yAxis
+        : firstNumeric,
+    }
+
+    const store = useProjectStore.getState()
+    store.saveSnapshot('Change chart source')
+    for (const edge of Object.values(store.edges)) {
+      if (edge.toNodeId === chartId) store.deleteEdge(edge.id)
+    }
+    store.addEdge({
+      fromNodeId: newSourceTableId,
+      toNodeId: chartId,
+      transformType: 'reference',
+    })
+    updateNode(chartId, {
+      plan: {
+        ...chartNode.plan,
+        sourceTableId: newSourceTableId,
+        config: nextConfig,
+      },
+    } as Partial<ChartNode>)
+  }, [chartId, chartNode, nodes, updateNode])
   
   const handleNameSave = useCallback(() => {
     if (editName.trim()) updateChartName(chartId, editName.trim())
@@ -105,6 +153,16 @@ export function ChartView({ chartId }: ChartViewProps) {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <select
+                value={sourceTableId}
+                onChange={(event) => handleSourceChange(event.target.value)}
+                aria-label="Chart source table"
+                className="px-2 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md"
+              >
+                {tables.map((table) => (
+                  <option key={table.id} value={table.id}>{table.name}</option>
+                ))}
+              </select>
               <button
                 onClick={() => openTable(sourceTableId)}
                 className="px-3 py-1.5 text-sm font-medium text-accent-green bg-accent-green/10 hover:bg-accent-green/20 rounded-md transition-colors"
@@ -259,11 +317,14 @@ export function ChartView({ chartId }: ChartViewProps) {
                 <div className="flex items-center gap-3 mb-3">
                   <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Aggregation</span>
                   <span className="px-2.5 py-1 text-xs font-medium text-accent-green bg-accent-green/10 rounded-md">
-                    {(config.aggregation || 'sum').charAt(0).toUpperCase() + (config.aggregation || 'sum').slice(1)}
+                    {config.aggregation === 'count_distinct'
+                      ? 'Distinct'
+                      : (config.aggregation || 'sum').charAt(0).toUpperCase()
+                        + (config.aggregation || 'sum').slice(1)}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {['sum', 'avg', 'count', 'min', 'max'].map((agg) => (
+                  {['sum', 'avg', 'count', 'count_distinct', 'min', 'max'].map((agg) => (
                     <button
                       key={agg}
                       onClick={() => handleConfigChange({ aggregation: agg as AggregationType })}
@@ -273,7 +334,9 @@ export function ChartView({ chartId }: ChartViewProps) {
                           : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
                       }`}
                     >
-                      {agg.charAt(0).toUpperCase() + agg.slice(1)}
+                      {agg === 'count_distinct'
+                        ? 'Distinct'
+                        : agg.charAt(0).toUpperCase() + agg.slice(1)}
                     </button>
                   ))}
                 </div>

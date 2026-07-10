@@ -3,6 +3,7 @@ import type { JSONContent } from '@tiptap/core'
 import type { TableRow } from '@/state/dataStore'
 import type { ProjectNode, TableNode } from '@/types'
 import { escapeHtml, renderInlineTable, safeLink } from './reportHtmlUtils'
+import { renderReportChart } from './reportHtmlChart'
 
 interface EmbeddedTableData {
   tableName: string
@@ -157,7 +158,7 @@ function nodeToHtml(node: JSONContent, dataMap: EmbeddedDataMap): string {
       const chartType = node.attrs?.chartType as string || 'chart'
       const chartEntry = chartTableId ? dataMap[chartTableId] : undefined
       if (chartEntry) {
-        return `<div class="block-placeholder">[Chart: ${escapeHtml(chartType)} — source: ${escapeHtml(chartEntry.tableName)}, ${chartEntry.rows.length} rows]</div>\n`
+        return renderReportChart(node.attrs || {}, chartEntry)
       }
       return `<div class="block-placeholder">[Chart: ${escapeHtml(chartType)}]</div>\n`
     }
@@ -198,10 +199,6 @@ function tiptapToHtml(content: JSONContent, dataMap: EmbeddedDataMap): string {
   return html
 }
 
-/**
- * Collect all embedded table/chart source table IDs from TipTap content,
- * so callers can pre-fetch data.
- */
 export function collectEmbeddedTableIds(content: JSONContent): Array<{ tableId: string; rowLimit: number }> {
   const results: Array<{ tableId: string; rowLimit: number }> = []
 
@@ -211,7 +208,8 @@ export function collectEmbeddedTableIds(content: JSONContent): Array<{ tableId: 
     if (node.type === 'embeddedTable' || node.type === 'chartBlock') {
       const tableId = node.attrs?.sourceTableId as string
       if (tableId) {
-        const rowLimit = (node.attrs?.rowLimit as number) || 1000
+        const rowLimit = (node.attrs?.rowLimit as number)
+          || (node.type === 'chartBlock' ? 5_000 : 1_000)
         results.push({ tableId, rowLimit })
       }
     }
@@ -349,14 +347,15 @@ export function generateReportHtml(report: Report, dataMap: EmbeddedDataMap = {}
     summary { font-weight: 600; }
     mark { background: #d1fae5; padding: 0 0.1em; }
     a { color: #17653a; }
-    .block-placeholder {
-      background: #f0f0f0;
-      border: 1px dashed #ccc;
-      padding: 1em;
-      text-align: center;
-      color: #666;
-      margin: 1em 0;
-    }
+    .block-placeholder { background: #f0f0f0; border: 1px dashed #ccc; padding: 1em; text-align: center; color: #666; margin: 1em 0; }
+    .report-chart { margin: 1.5em 0; padding: 1em; border: 1px solid #ddd; break-inside: avoid; }
+    .report-chart h3 { margin: 0; }
+    .report-chart svg { display: block; width: 100%; height: auto; }
+    .report-chart svg text { fill: #6b7280; font-size: 10px; }
+    .chart-subtitle, .report-chart figcaption { color: #666; font-size: 0.85em; }
+    .chart-legend { display: flex; flex-wrap: wrap; gap: 0.5em 1em; }
+    .chart-legend-item { display: inline-flex; align-items: center; gap: 0.35em; font-size: 0.8em; }
+    .chart-legend-item i { width: 0.75em; height: 0.75em; display: inline-block; }
     .report-meta {
       color: #666;
       font-size: 0.9em;

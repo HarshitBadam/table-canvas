@@ -48,7 +48,12 @@ function sourceNode(
   }
 }
 
-function embeddedReport(tableId: string, sheetName: string): Report {
+function embeddedReport(
+  tableId: string,
+  sheetName: string,
+  xAxis: string,
+  yAxis: string,
+): Report {
   const now = new Date().toISOString()
   return {
     id: `report-${tableId}`,
@@ -73,7 +78,16 @@ function embeddedReport(tableId: string, sheetName: string): Report {
         },
         {
           type: 'chartBlock',
-          attrs: { sourceTableId: tableId, chartType: 'bar', config: {} },
+          attrs: {
+            sourceTableId: tableId,
+            chartType: 'bar',
+            config: {
+              xAxis,
+              yAxis,
+              aggregation: 'sum',
+              title: `${sheetName} summary`,
+            },
+          },
         },
       ],
     },
@@ -130,7 +144,7 @@ describe.skipIf(!workbookExists)('sample workbook report audit', () => {
         expect(chartRows.every(row => Number.isFinite(Number(row[yAxis!.id])))).toBe(true)
       }
 
-      const report = embeddedReport(tableId, sheetName)
+      const report = embeddedReport(tableId, sheetName, xAxis!.id, yAxis!.id)
       const references = collectEmbeddedTableIds(report.tiptapContent!)
       expect(references.map(reference => reference.tableId)).toEqual([tableId, tableId])
 
@@ -138,7 +152,8 @@ describe.skipIf(!workbookExists)('sample workbook report audit', () => {
       const html = generateReportHtml(report, dataMap)
       expect(html, `${sheetName}: HTML document`).toContain('<!DOCTYPE html>')
       expect(html, `${sheetName}: embedded table`).toContain('<table')
-      expect(html, `${sheetName}: chart source`).toContain(`source: ${sheetName}`)
+      expect(html, `${sheetName}: rendered chart`).toContain('class="report-chart"')
+      expect(html, `${sheetName}: chart source`).toContain(`Source: ${sheetName}`)
       expect(html, `${sheetName}: first column`).toContain(schema.columns[0].name)
     }
   })

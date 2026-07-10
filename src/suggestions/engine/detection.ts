@@ -1,7 +1,6 @@
 import { ColumnSchema, ColumnProfile } from '@/types';
 import { isPlaceholder } from '../cleaningConstants';
 import { EPOCH_MS_MIN, EPOCH_MS_MAX } from '@/charts/chartShared';
-export { looksLikeDate } from '@/lib/utils';
 
 
 export function hasLeadingTrailingWhitespace(value: unknown): boolean {
@@ -38,9 +37,6 @@ export function looksLikeIdColumn(col: ColumnSchema, profile?: ColumnProfile): b
   return false;
 }
 
-/**
- * Check if values follow a sequential pattern like PROD001, PROD002, etc.
- */
 export function hasSequentialPattern(values: string[]): boolean {
   const numericSuffixes = values.map(v => {
     const match = v.match(/(\d+)$/);
@@ -52,10 +48,8 @@ export function hasSequentialPattern(values: string[]): boolean {
   const sorted = [...numericSuffixes].sort((a, b) => a - b);
   let sequential = 0;
   for (let i = 1; i < sorted.length; i++) {
-    // Consider sequential if difference is small (1-3)
     if (sorted[i] - sorted[i-1] <= 3) sequential++;
   }
-  // At least 70% of pairs should be sequential
   return sequential >= (sorted.length - 1) * 0.7;
 }
 
@@ -77,9 +71,6 @@ export function hasMixedCase(values: Array<{ value: unknown; count?: number }>):
   return Array.from(normalizedValues.values()).some(variants => variants.size > 1);
 }
 
-/**
- * Get case variants for normalization (returns mapping of variant -> canonical)
- */
 export function getMixedCaseVariants(values: Array<{ value: unknown; count: number }>): Record<string, string> {
   const normalizedValues = new Map<string, Array<{ value: string; count: number }>>();
   
@@ -99,7 +90,6 @@ export function getMixedCaseVariants(values: Array<{ value: unknown; count: numb
   
   for (const [, variants] of normalizedValues) {
     if (variants.length > 1) {
-      // Sort by count descending - the most common is canonical
       variants.sort((a, b) => b.count - a.count);
       const canonical = variants[0].value;
       for (let i = 1; i < variants.length; i++) {
@@ -173,9 +163,6 @@ export function hasConsistentDelimiter(values: Array<{ value: unknown }>): strin
 }
 
 
-/**
- * Levenshtein distance for typo detection
- */
 function levenshteinDistance(a: string, b: string): number {
   const matrix: number[][] = [];
   for (let i = 0; i <= b.length; i++) matrix[i] = [i];
@@ -216,7 +203,6 @@ export function findTypos(topValues: Array<{ value: unknown; count: number }>): 
       const threshold = Math.max(1, Math.floor(Math.min(a.length, b.length) * 0.25));
       
       if (distance > 0 && distance <= threshold) {
-        // The one with higher count is likely correct
         if (strings[i].count >= strings[j].count) {
           results.push({
             from: strings[j].str,
@@ -260,7 +246,6 @@ export interface OutlierResult {
   upperBound: number;
 }
 
-/** Uses the IQR method: outliers are values outside [Q1 - 1.5·IQR, Q3 + 1.5·IQR]. */
 export function detectOutliers(profile: { min?: number; max?: number; q1?: number; q3?: number; iqr?: number }): OutlierResult | null {
   const { min, max, q1, q3, iqr } = profile;
   if (q1 === undefined || q3 === undefined || iqr === undefined || iqr === 0) {

@@ -11,11 +11,6 @@ export interface ChartDataResult {
   refetch: () => void
 }
 
-/**
- * @param config - Chart configuration (xAxis, yAxis, aggregation, groupBy) — uses column IDs
- * @param sourceVersionHash - Optional version hash for reactivity (triggers re-fetch when changed)
- * @param columns - Optional column schema for converting IDs to names for DuckDB queries
- */
 export function useChartData(
   sourceTableId: string,
   config: ChartConfig,
@@ -29,13 +24,8 @@ export function useChartData(
 
   const refetch = useCallback(() => setRefetchTrigger(prev => prev + 1), [])
 
-  // DuckDB columns are always created from the column's display `name` (see
-  // EngineAdapter.loadTable / derivedTableComputation), so queries must reference
-  // `col.name` — NOT `duckDbName`, which is stale (= the id) for source tables and
-  // would produce "column not found" Binder errors.
   const getColumnForDuckDB = useCallback((columnRef: string): { duckDbName: string; name: string } | null => {
     if (!columns || columns.length === 0) {
-      // If no columns schema, assume columnRef is what we need
       return { duckDbName: columnRef, name: columnRef }
     }
     
@@ -44,13 +34,11 @@ export function useChartData(
       return { duckDbName: colById.name, name: colById.name }
     }
     
-    // Fallback: check if columnRef is a column name
     const colByName = columns.find(c => c.name === columnRef)
     if (colByName) {
       return { duckDbName: colByName.name, name: colByName.name }
     }
     
-    // Fallback: case-insensitive name match
     const colByNameLower = columns.find(c => c.name.toLowerCase() === columnRef.toLowerCase())
     if (colByNameLower) {
       return { duckDbName: colByNameLower.name, name: colByNameLower.name }
@@ -63,16 +51,13 @@ export function useChartData(
     let cancelled = false
 
     async function fetchData() {
-      // Count charts (histograms) only need an x-axis; all other charts need both axes.
       const isCountAggregation = config.aggregation === 'count'
       if (!sourceTableId || !config.xAxis || (!config.yAxis && !isCountAggregation)) {
         setLoading(false)
         return
       }
 
-      // Wait for columns to be loaded before attempting query
       if (!columns || columns.length === 0) {
-        // Columns not loaded yet, don't show error, just keep loading
         setLoading(true)
         return
       }
@@ -100,21 +85,19 @@ export function useChartData(
           throw new Error(`Group-by column "${config.groupBy}" not found. Available columns: ${columns?.map(c => `${c.name} (${c.id})`).join(', ')}`)
         }
 
-        // DuckDB columns are keyed by display name (see getColumnForDuckDB).
         const xAxisDuckDb = xAxisCol.duckDbName
         const yAxisDuckDb = yAxisCol?.duckDbName
         const groupByDuckDb = groupByCol?.duckDbName
 
         if (groupByDuckDb || config.aggregation) {
-          // Count charts with no explicit y-axis count the grouped column itself.
           const aggColumn = yAxisDuckDb ?? xAxisDuckDb
           const valueKey = config.yAxis ?? COUNT_VALUE_KEY
           const aggResult = await engine.getAggregation(sourceTableId, {
             groupBy: groupByDuckDb ? [groupByDuckDb] : [xAxisDuckDb],
             aggregations: [{
               column: aggColumn,
-              operation: (config.aggregation as 'sum' | 'avg' | 'count' | 'min' | 'max') || 'sum',
-              alias: valueKey, // Keep original config key (or count sentinel) as alias
+              operation: config.aggregation || 'sum',
+              alias: valueKey,
             }],
           })
 
@@ -122,7 +105,6 @@ export function useChartData(
             const chartData = aggResult.rows.map(row => {
               const obj: Record<string, CellValue> = {}
               aggResult.columns.forEach((col, i) => {
-                // Map the groupBy column back to xAxis config key for chart rendering
                 const key = col === xAxisDuckDb ? config.xAxis! : col
                 obj[key] = row[i]
               })
@@ -131,9 +113,6 @@ export function useChartData(
             setData(chartData)
           }
         } else {
-          // Get raw slice data (limited to 100 rows for charts).
-          // Pass columns so rows come back keyed by column id (matching config.xAxis/yAxis),
-          // consistent with the aggregation path above.
           const slice = await engine.getSlice(sourceTableId, 0, 100, columns)
           if (!cancelled) {
             setData(slice.rows)
@@ -172,7 +151,7 @@ export function useChartData(
     config.yAxis,
     config.groupBy,
     config.aggregation,
-    sourceVersionHash, // Re-fetch when source data changes
+    sourceVersionHash,
     refetchTrigger,
     columns,
     getColumnForDuckDB,

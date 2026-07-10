@@ -1,9 +1,9 @@
 import type { WorkBook } from 'xlsx'
 import type { TableSchema } from '@/types'
 import type { TableRow } from '@/state/dataStore'
-import { generateId, readFileAsArrayBuffer } from '@/lib/utils'
+import { readFileAsArrayBuffer } from '@/lib/utils'
 import { getEngine } from '@/engine'
-import { computeSourceVersionHash } from '@/engine/cacheUtils'
+import { computePatchesVersion, computeSourceVersionHash } from '@/engine/cacheUtils'
 import {
   parseCsvBuffer,
   parseWorkbookSheet,
@@ -11,7 +11,7 @@ import {
   type ParsedTableData,
 } from '@/engine/fileParsers'
 import { useProjectStore } from '@/state/projectStore'
-import { saveFile } from '@/persistence/db'
+import { uploadFileWithSync } from '@/persistence/syncService'
 
 const EXCEL_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -48,13 +48,16 @@ export async function loadTableIntoEngine(
   try {
     const engine = getEngine()
     await engine.init()
-    await engine.loadTable(tableId, schema, rows)
 
     const node = useProjectStore.getState().getTableNode(tableId)
+    const patches = useProjectStore.getState().patches[tableId]
+    await engine.loadTable(tableId, schema, rows, patches)
     const fileRef = node?.kind === 'source_table' ? node.plan.fileRef : undefined
-    const currentVersionHash = fileRef
-      ? computeSourceVersionHash(tableId, fileRef, '0-0-0')
-      : undefined
+    const currentVersionHash = computeSourceVersionHash(
+      tableId,
+      fileRef ?? '',
+      computePatchesVersion(patches),
+    )
 
     useProjectStore.getState().updateCacheInfo(tableId, {
       isDirty: false,
@@ -78,9 +81,8 @@ export async function loadTableIntoEngine(
 export async function parseCSVFile(file: File): Promise<CSVParseResult> {
   const buffer = await readFileAsArrayBuffer(file)
   const tableData = await parseCsvBuffer(buffer)
-  const fileRef = generateId()
-  await saveFile(fileRef, file.name, file.type || 'text/csv', buffer)
-  return { ...tableData, fileRef }
+  const uploaded = await uploadFileWithSync(file, useProjectStore.getState().projectId)
+  return { ...tableData, fileRef: uploaded.id }
 }
 
 export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
@@ -89,9 +91,8 @@ export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
 
   if (workbook.SheetNames.length === 1) {
     const tableData = parseWorkbookSheet(workbook, workbook.SheetNames[0])
-    const fileRef = generateId()
-    await saveFile(fileRef, file.name, EXCEL_MIME_TYPE, buffer)
-    return { kind: 'single', tableData, fileRef }
+    const uploaded = await uploadFileWithSync(file, useProjectStore.getState().projectId)
+    return { kind: 'single', tableData, fileRef: uploaded.id }
   }
 
   const sheets = workbook.SheetNames.map((name) => {
@@ -113,9 +114,8 @@ export async function importSheetAndPersist(
   fileBuffer?: ArrayBuffer,
 ): Promise<{ tableData: ParsedTableData; fileRef: string }> {
   const tableData = parseWorkbookSheet(workbook, sheetName)
-  const fileRef = generateId()
-  if (fileBuffer) {
-    await saveFile(fileRef, fileName, EXCEL_MIME_TYPE, fileBuffer)
-  }
-  return { tableData, fileRef }
+  if (!fileBuffer) throw new Error('The workbook data is unavailable')
+  const file = new File([fileBuffer], fileName, { type: EXCEL_MIME_TYPE })
+  const uploaded = await uploadFileWithSync(file, useProjectStore.getState().projectId)
+  return { tableData, fileRef: uploaded.id }
 }
