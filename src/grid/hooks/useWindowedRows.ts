@@ -12,6 +12,12 @@ const JUMP_CACHE_MAX = 500
 export interface WindowedRowsState {
   totalRows: number
   getRowAtIndex: (index: number) => GridRow | null
+  /** Snapshot of all currently-loaded rows keyed by absolute index (window + jump cache). */
+  getLoadedRows: () => Map<number, GridRow>
+  /** Ensure the rows spanning [startIndex, endIndex] get fetched (no-op if already loaded). */
+  ensureRange: (startIndex: number, endIndex: number) => void
+  /** Increments whenever loaded data changes; use as a memo dependency. */
+  version: number
   isLoading: boolean
   error: string | null
   invalidate: () => void
@@ -39,7 +45,12 @@ export function useWindowedRows(
   const jumpCacheRef = useRef<Map<number, GridRow>>(new Map())
   const generationRef = useRef(0)
   const fetchInFlightRef = useRef(false)
-  const [, forceRender] = useState(0)
+  // A window requested while a fetch is in flight (e.g. invalidate() after materialization).
+  // Without this, that request would be silently dropped and the grid could stay empty.
+  const pendingFetchRef = useRef<{ offset: number; limit: number } | null>(null)
+  // Bumped whenever loaded window data changes so consumers (the grid bridge array)
+  // recompute and newly fetched rows actually appear as the user scrolls.
+  const [version, setVersion] = useState(0)
 
   const fingerprintRef = useRef('')
 
@@ -78,7 +89,11 @@ export function useWindowedRows(
   }, [filters, columns])
 
   const fetchWindow = useCallback(async (offset: number, limit: number) => {
-    if (fetchInFlightRef.current) return
+    if (fetchInFlightRef.current) {
+      // Remember the most recent request so it runs once the current fetch settles.
+      pendingFetchRef.current = { offset, limit }
+      return
+    }
     fetchInFlightRef.current = true
     setIsLoading(true)
 
@@ -99,9 +114,10 @@ export function useWindowedRows(
           search,
           offset,
           limit,
+          columns,
         })
       } else {
-        slice = await engine.getSlice(tableId, offset, limit)
+        slice = await engine.getSlice(tableId, offset, limit, columns)
       }
 
       if (gen !== generationRef.current) return
@@ -118,15 +134,21 @@ export function useWindowedRows(
       windowRef.current = { start: offset, end: offset + slice.rows.length, rows: newRows }
       setTotalRows(slice.totalRows)
       setError(null)
-      forceRender(v => v + 1)
+      setVersion(v => v + 1)
     } catch (e) {
       if (gen !== generationRef.current) return
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       fetchInFlightRef.current = false
       setIsLoading(false)
+      // Service the latest request that arrived while this fetch was running.
+      const pending = pendingFetchRef.current
+      if (pending) {
+        pendingFetchRef.current = null
+        void fetchWindow(pending.offset, pending.limit)
+      }
     }
-  }, [tableId, buildFilterDefs, sorts, search])
+  }, [tableId, buildFilterDefs, sorts, search, columns])
 
   const getRowAtIndex = useCallback((index: number): GridRow | null => {
     const win = windowRef.current
@@ -149,6 +171,20 @@ export function useWindowedRows(
     return null
   }, [fetchWindow])
 
+  const getLoadedRows = useCallback((): Map<number, GridRow> => {
+    const merged = new Map<number, GridRow>()
+    jumpCacheRef.current.forEach((row, idx) => merged.set(idx, row))
+    windowRef.current.rows.forEach((row, idx) => merged.set(idx, row))
+    return merged
+  }, [])
+
+  const ensureRange = useCallback((startIndex: number, endIndex: number) => {
+    // getRowAtIndex carries the window-advance/prefetch logic; probing the visible
+    // range's edges is enough to keep the loaded window aligned with the viewport.
+    getRowAtIndex(Math.max(0, startIndex))
+    getRowAtIndex(Math.max(0, endIndex))
+  }, [getRowAtIndex])
+
   const invalidate = useCallback(() => {
     generationRef.current++
     windowRef.current = { start: 0, end: 0, rows: new Map() }
@@ -164,9 +200,9 @@ export function useWindowedRows(
 
       let slice: TableSlice
       if (filterDefs || sorts?.length || search) {
-        slice = await engine.getFilteredSlice({ tableId, filters: filterDefs, sorts, search, offset, limit })
+        slice = await engine.getFilteredSlice({ tableId, filters: filterDefs, sorts, search, offset, limit, columns })
       } else {
-        slice = await engine.getSlice(tableId, offset, limit)
+        slice = await engine.getSlice(tableId, offset, limit, columns)
       }
 
       slice.rows.forEach((row, idx) => {
@@ -185,15 +221,15 @@ export function useWindowedRows(
       })
 
       setTotalRows(slice.totalRows)
-      forceRender(v => v + 1)
+      setVersion(v => v + 1)
     } catch (e) {
       console.error('[useWindowedRows] fetchRange error:', e)
     }
-  }, [tableId, buildFilterDefs, sorts, search])
+  }, [tableId, buildFilterDefs, sorts, search, columns])
 
   useEffect(() => {
     fetchWindow(0, WINDOW_SIZE)
   }, [])
 
-  return { totalRows, getRowAtIndex, isLoading, error, invalidate, fetchRange }
+  return { totalRows, getRowAtIndex, getLoadedRows, ensureRange, version, isLoading, error, invalidate, fetchRange }
 }

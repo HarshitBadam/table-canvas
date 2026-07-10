@@ -18,7 +18,7 @@ import { getComputationOrder } from './dependencyGraph'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
 import { loadFileWithSync } from '@/persistence/syncService'
-import { computeSourceVersionHash, tableExistsInEngine } from './cacheUtils'
+import { computeSourceVersionHash, getEngineTableRowCount } from './cacheUtils'
 import { parseFileData } from './fileParsers'
 import { computeDerivedTable } from './derivedTableComputation'
 import type {
@@ -81,10 +81,16 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
       patchVersion
     )
 
-    const existsInEngine = await tableExistsInEngine(tableId)
+    const engineRowCount = await getEngineTableRowCount(tableId)
+    const existsInEngine = engineRowCount >= 0
+    const expectedRows = node.cacheInfo?.lastRowCount ?? 0
+    // Guard against a stale empty shell: if we expect rows but the engine table is
+    // empty, fall through and reload rather than serving a blank "cached" table.
+    const engineHasExpectedData = expectedRows === 0 || engineRowCount > 0
 
     if (
       existsInEngine &&
+      engineHasExpectedData &&
       node.cacheInfo?.currentVersionHash === currentVersionHash &&
       !node.cacheInfo?.isDirty
     ) {
@@ -336,7 +342,8 @@ export async function getTableData(
 
   try {
     const engine = getEngine()
-    const slice = await engine.getSlice(tableId, offset, limit)
+    const node = useProjectStore.getState().getTableNode(tableId)
+    const slice = await engine.getSlice(tableId, offset, limit, node?.schema?.columns)
 
     const rows: TableRow[] = slice.rows.map((row, idx) => ({
       ...row,

@@ -6,14 +6,43 @@ import { useDataStore } from '@/state/dataStore'
 import { useProjectStore } from '@/state/projectStore'
 import { detectSemanticHints } from './semanticHints'
 
+/**
+ * The engine profiles the DuckDB table, whose columns are created from each column's
+ * display `name` (see EngineAdapter.loadTable), so ColumnProfile.columnId comes back as a
+ * NAME. The rest of the app keys profiles by the stable column `id` — e.g. every rule does
+ * `profile.columns.find(p => p.columnId === col.id)` — so without this remap the lookup
+ * misses and all profile-driven rules (cleaning, outliers, quality metrics) silently fail.
+ */
+function remapProfileColumnIds(profile: ProfileResult, tableId: string): ProfileResult {
+  const node = useProjectStore.getState().getTableNode(tableId)
+  const columns = node?.schema?.columns
+  if (!columns || columns.length === 0) return profile
+
+  const nameToId = new Map<string, string>()
+  for (const col of columns) {
+    nameToId.set(col.name, col.id)
+    if (col.duckDbName) nameToId.set(col.duckDbName, col.id)
+  }
+
+  return {
+    ...profile,
+    columns: profile.columns.map((col) => ({
+      ...col,
+      columnId: nameToId.get(col.columnId) ?? col.columnId,
+    })),
+  }
+}
+
 export async function runPhase1Profiling(tableId: string): Promise<ProfileResult> {
   const engine = getEngine()
-  return engine.getProfile(tableId, 1)
+  const profile = await engine.getProfile(tableId, 1)
+  return remapProfileColumnIds(profile, tableId)
 }
 
 export async function runPhase2Profiling(tableId: string): Promise<ProfileResult> {
   const engine = getEngine()
-  return engine.getProfile(tableId, 2)
+  const profile = await engine.getProfile(tableId, 2)
+  return remapProfileColumnIds(profile, tableId)
 }
 
 export interface ProfilingState {

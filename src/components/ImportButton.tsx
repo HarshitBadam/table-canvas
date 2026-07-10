@@ -88,7 +88,7 @@ export function ImportButton() {
           schema,
         })
         setTableData(tableId, rows)
-        loadTableIntoEngine(tableId, schema, rows)
+        await loadTableIntoEngine(tableId, schema, rows)
       } else if (extension === 'xlsx' || extension === 'xls') {
         const result = await parseExcelFile(file)
         if (result.kind === 'single') {

@@ -241,6 +241,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             maxHeight={240}
             patches={data.patches}
             viewFilters={data.viewFilters}
+            versionHash={data.cacheInfo?.currentVersionHash}
           />
         )}
 
