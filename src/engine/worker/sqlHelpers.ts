@@ -4,6 +4,14 @@ export function sanitizeTableName(tableId: string): string {
   return tableId.replace(/[^a-zA-Z0-9_]/g, '_')
 }
 
+export function quoteIdentifier(identifier: string): string {
+  return `"${identifier.replace(/"/g, '""')}"`
+}
+
+export function escapeLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`
+}
+
 export function mapTypeToDuckDB(type: string): string {
   switch (type.toLowerCase()) {
     case 'number': return 'DOUBLE'
@@ -30,13 +38,9 @@ export function formatValue(value: CellValue): string {
   if (value === null || value === undefined) return 'NULL'
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
   if (typeof value === 'number') return String(value)
-  return `'${String(value).replace(/'/g, "''")}'`
+  return escapeLiteral(String(value))
 }
 
-/**
- * Format a value with knowledge of the expected column type.
- * This handles cases where empty strings need to be converted to NULL for numeric types.
- */
 export function formatValueWithType(value: CellValue, columnType: string): string {
   if (value === null || value === undefined) return 'NULL'
 
@@ -68,27 +72,26 @@ export function formatValueWithType(value: CellValue, columnType: string): strin
       const dateValue = value as unknown as Date
       if (isNaN(dateValue.getTime())) return 'NULL'
       if (columnType === 'datetime') {
-        return `'${dateValue.toISOString()}'`
+        return escapeLiteral(dateValue.toISOString())
       }
-      return `'${dateValue.toISOString().split('T')[0]}'`
+      return escapeLiteral(dateValue.toISOString().split('T')[0])
     }
 
     const dateStr = String(value)
     const parsed = new Date(dateStr)
     if (!isNaN(parsed.getTime())) {
       if (columnType === 'datetime') {
-        return `'${parsed.toISOString()}'`
+        return escapeLiteral(parsed.toISOString())
       }
-      return `'${parsed.toISOString().split('T')[0]}'`
+      return escapeLiteral(parsed.toISOString().split('T')[0])
     }
 
     return 'NULL'
   }
 
-  return `'${String(value).replace(/'/g, "''")}'`
+  return escapeLiteral(String(value))
 }
 
-/** Converts "col_0_product_id" -> "Product ID", "col_3_order_date" -> "Order Date" */
 export function getCleanColumnName(colId: string): string {
   let name = colId.replace(/^col_\d+_/, '')
   name = name.replace(/^formula_\d+_/, '')

@@ -1,8 +1,13 @@
 import { api } from './client';
-import type { ProjectNode, Edge, Patches } from '@/types';
-import type { SerializedPatches } from '@/persistence/db';
+import type { ProjectNode, Edge } from '@/types';
+import {
+  deserializePatches,
+  serializePatches,
+  type SerializedPatches,
+} from '@/persistence/patchSerialization';
 
 export type { SerializedPatches };
+export { deserializePatches, serializePatches };
 
 export interface ProjectSummary {
   id: string;
@@ -33,41 +38,6 @@ interface UpdateProjectData {
   nodes?: Record<string, ProjectNode>;
   edges?: Record<string, Edge>;
   patches?: Record<string, SerializedPatches>;
-}
-
-
-export function serializePatches(
-  patches: Record<string, Patches>
-): Record<string, SerializedPatches> {
-  const serialized: Record<string, SerializedPatches> = {};
-  
-  for (const [tableId, patch] of Object.entries(patches)) {
-    serialized[tableId] = {
-      cellPatches: patch.cellPatches,
-      deletedRows: Array.from(patch.deletedRows),
-      insertedRows: patch.insertedRows,
-      highlightedCells: Array.from(patch.highlightedCells || []),
-    };
-  }
-  
-  return serialized;
-}
-
-export function deserializePatches(
-  serialized: Record<string, SerializedPatches>
-): Record<string, Patches> {
-  const patches: Record<string, Patches> = {};
-  
-  for (const [tableId, patch] of Object.entries(serialized)) {
-    patches[tableId] = {
-      cellPatches: patch.cellPatches as Record<string, Record<string, import('@/types').CellValue>>,
-      deletedRows: new Set(patch.deletedRows),
-      insertedRows: patch.insertedRows as import('@/types').InsertedRow[],
-      highlightedCells: new Set(patch.highlightedCells || []),
-    };
-  }
-  
-  return patches;
 }
 
 

@@ -5,15 +5,12 @@ import {
   inferFormulaType,
   validateFormulaWithColumns,
   FormulaSuggestion,
-  FormulaValue,
   getFunctionsByCategory,
 } from '@/formula'
 
 interface FormulaColumnModalProps {
   isOpen: boolean
-  insertIndex: number
   columns: ColumnSchema[]
-  rows: Array<Record<string, FormulaValue>>
   onConfirm: (
     name: string,
     type: UserColumnType,
@@ -24,9 +21,7 @@ interface FormulaColumnModalProps {
 
 export function FormulaColumnModal({
   isOpen,
-  insertIndex: _insertIndex,
   columns,
-  rows: _rows,
   onConfirm,
   onCancel,
 }: FormulaColumnModalProps) {

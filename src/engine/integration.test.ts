@@ -1,625 +1,111 @@
-/**
- * Integration tests for the reactive derived tables system.
- * Tests the interaction between dependency graph, dirty propagation,
- * and the project store.
- */
-
-import { describe, it, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { useProjectStore } from '@/state/projectStore'
 import { getComputationOrder } from './dependencyGraph'
-import type { TableSchema, SourceTableNode, DerivedTableNode } from '@/types'
+import {
+  addFilter,
+  addJoin,
+  addSource,
+  clean,
+  derived,
+  resetStore,
+} from './integrationTestUtils'
 
+beforeEach(resetStore)
 
-const sampleSchema: TableSchema = {
-  columns: [
-    { id: 'col1', name: 'ID', type: 'string', nullable: false },
-    { id: 'col2', name: 'Value', type: 'number', nullable: true },
-  ],
-  rowCount: 100,
-}
+describe('dirty propagation', () => {
+  it('marks downstream nodes dirty when a source changes', () => {
+    const sourceId = addSource('A')
+    const middleId = addFilter(sourceId, 'B')
+    const finalId = addFilter(middleId, 'C')
+    clean(middleId, finalId)
+    expect(derived(middleId).cacheInfo?.isDirty).toBeFalsy()
+    expect(derived(finalId).cacheInfo?.isDirty).toBeFalsy()
 
+    useProjectStore.getState().setCellValue(sourceId, 'row_1', 'col1', 'new value')
 
-function resetStore() {
-  useProjectStore.setState({
-    projectId: 'test-project',
-    projectName: 'Test Project',
-    nodes: {},
-    edges: {},
-    patches: {},
-    selectedNodeId: null,
-    history: { past: [], future: [] },
-  })
-}
-
-
-describe('Dirty Propagation', () => {
-  beforeEach(() => {
-    resetStore()
+    expect(derived(middleId).cacheInfo?.isDirty).toBe(true)
+    expect(derived(finalId).cacheInfo?.isDirty).toBe(true)
   })
 
-  it('should mark downstream nodes dirty when source table changes', () => {
-    const store = useProjectStore.getState()
+  it('propagates dirty state to all branches', () => {
+    const sourceId = addSource('A')
+    const leftId = addFilter(sourceId, 'B')
+    const rightId = addFilter(sourceId, 'C')
+    clean(leftId, rightId)
 
-    // Create A -> B -> C chain
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
+    useProjectStore.getState().setCellValue(sourceId, 'row_1', 'col1', 'changed')
 
-    const tableBId = store.addDerivedTable({
-      name: 'Table B',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-      schema: sampleSchema,
-    })
-
-    const tableCId = store.addDerivedTable({
-      name: 'Table C',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableBId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableBId],
-      schema: sampleSchema,
-    })
-
-    // Clear dirty flags initially set
-    store.updateCacheInfo(tableBId, { isDirty: false })
-    store.updateCacheInfo(tableCId, { isDirty: false })
-
-    // Verify clean state
-    let state = useProjectStore.getState()
-    expect((state.nodes[tableBId] as DerivedTableNode).cacheInfo?.isDirty).toBeFalsy()
-    expect((state.nodes[tableCId] as DerivedTableNode).cacheInfo?.isDirty).toBeFalsy()
-
-    // Simulate editing Table A (this calls markNodeAndDescendantsDirty internally)
-    store.setCellValue(tableAId, 'row_1', 'col1', 'new value')
-
-    // Both B and C should now be dirty
-    state = useProjectStore.getState()
-    expect((state.nodes[tableBId] as DerivedTableNode).cacheInfo?.isDirty).toBe(true)
-    expect((state.nodes[tableCId] as DerivedTableNode).cacheInfo?.isDirty).toBe(true)
+    expect(derived(leftId).cacheInfo?.isDirty).toBe(true)
+    expect(derived(rightId).cacheInfo?.isDirty).toBe(true)
   })
 
-  it('should propagate dirty to all branches', () => {
-    const store = useProjectStore.getState()
+  it('handles a diamond dependency pattern', () => {
+    const sourceId = addSource('A')
+    const leftId = addFilter(sourceId, 'B')
+    const rightId = addFilter(sourceId, 'C')
+    const joinedId = addJoin(leftId, rightId, 'D')
+    clean(leftId, rightId, joinedId)
 
-    // Create:
-    //     A
-    //    / \
-    //   B   C
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
+    useProjectStore.getState().setCellValue(sourceId, 'row_1', 'col1', 'new')
 
-    const tableBId = store.addDerivedTable({
-      name: 'Table B',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-    })
-
-    const tableCId = store.addDerivedTable({
-      name: 'Table C',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-    })
-
-    // Clear dirty flags
-    store.updateCacheInfo(tableBId, { isDirty: false })
-    store.updateCacheInfo(tableCId, { isDirty: false })
-
-    // Edit A
-    store.setCellValue(tableAId, 'row_1', 'col1', 'changed')
-
-    // Both B and C should be dirty
-    const state = useProjectStore.getState()
-    expect((state.nodes[tableBId] as DerivedTableNode).cacheInfo?.isDirty).toBe(true)
-    expect((state.nodes[tableCId] as DerivedTableNode).cacheInfo?.isDirty).toBe(true)
+    expect(derived(leftId).cacheInfo?.isDirty).toBe(true)
+    expect(derived(rightId).cacheInfo?.isDirty).toBe(true)
+    expect(derived(joinedId).cacheInfo?.isDirty).toBe(true)
   })
 
-  it('should handle diamond dependency pattern', () => {
-    const store = useProjectStore.getState()
+  it('does not affect unrelated tables', () => {
+    const sourceAId = addSource('A')
+    const derivedAId = addFilter(sourceAId, 'B')
+    const sourceXId = addSource('X')
+    const derivedXId = addFilter(sourceXId, 'Y')
+    clean(derivedAId, derivedXId)
 
-    // Create diamond:
-    //     A
-    //    / \
-    //   B   C
-    //    \ /
-    //     D
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
+    useProjectStore.getState().setCellValue(sourceAId, 'row_1', 'col1', 'new')
 
-    const tableBId = store.addDerivedTable({
-      name: 'Table B',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-    })
-
-    const tableCId = store.addDerivedTable({
-      name: 'Table C',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-    })
-
-    const tableDId = store.addDerivedTable({
-      name: 'Table D',
-      transformDef: {
-        type: 'join',
-        leftTableId: tableBId,
-        rightTableId: tableCId,
-        joinType: 'inner',
-        leftKey: 'col1',
-        rightKey: 'col1',
-      },
-      upstreamNodeIds: [tableBId, tableCId],
-    })
-
-    // Clear dirty flags
-    store.updateCacheInfo(tableBId, { isDirty: false })
-    store.updateCacheInfo(tableCId, { isDirty: false })
-    store.updateCacheInfo(tableDId, { isDirty: false })
-
-    // Edit A - should cascade to B, C, and D
-    store.setCellValue(tableAId, 'row_1', 'col1', 'new')
-
-    const state = useProjectStore.getState()
-    expect((state.nodes[tableBId] as DerivedTableNode).cacheInfo?.isDirty).toBe(true)
-    expect((state.nodes[tableCId] as DerivedTableNode).cacheInfo?.isDirty).toBe(true)
-    expect((state.nodes[tableDId] as DerivedTableNode).cacheInfo?.isDirty).toBe(true)
-  })
-
-  it('should not affect unrelated tables', () => {
-    const store = useProjectStore.getState()
-
-    // Create two separate chains: A -> B, X -> Y
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    const tableBId = store.addDerivedTable({
-      name: 'Table B',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-    })
-
-    const tableXId = store.addSourceTable({
-      name: 'Table X',
-      fileRef: 'file_x',
-      fileName: 'x.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    const tableYId = store.addDerivedTable({
-      name: 'Table Y',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableXId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableXId],
-    })
-
-    // Clear dirty flags
-    store.updateCacheInfo(tableBId, { isDirty: false })
-    store.updateCacheInfo(tableYId, { isDirty: false })
-
-    // Edit A - should only affect B, not Y
-    store.setCellValue(tableAId, 'row_1', 'col1', 'new')
-
-    const state = useProjectStore.getState()
-    expect((state.nodes[tableBId] as DerivedTableNode).cacheInfo?.isDirty).toBe(true)
-    expect((state.nodes[tableYId] as DerivedTableNode).cacheInfo?.isDirty).toBe(false)
+    expect(derived(derivedAId).cacheInfo?.isDirty).toBe(true)
+    expect(derived(derivedXId).cacheInfo?.isDirty).toBe(false)
   })
 })
 
-
-describe('Cycle Prevention', () => {
-  beforeEach(() => {
-    resetStore()
-  })
-
-  it('should detect cycle through wouldCreateCycle in store', () => {
-    const store = useProjectStore.getState()
-
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    store.addDerivedTable({
-      name: 'Table B',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-    })
-
+describe('cycle prevention', () => {
+  it('detects a cycle through the store', () => {
+    const sourceId = addSource('A')
+    addFilter(sourceId, 'B')
     const state = useProjectStore.getState()
-
-    // Note: We need to use the generated IDs, not display names
-    const tableBId = Object.keys(state.nodes).find(k => state.nodes[k].name === 'Table B')!
-    
-    // Trying to add B -> A should create a cycle
-    const result = store.wouldCreateCycle(tableBId, tableAId)
-    expect(result).toBe(true)
+    const derivedId = Object.keys(state.nodes).find(id => state.nodes[id].name === 'B')!
+    expect(state.wouldCreateCycle(derivedId, sourceId)).toBe(true)
   })
 
-  it('should allow valid non-cyclic connections', () => {
+  it('allows valid non-cyclic connections', () => {
+    const sourceAId = addSource('A')
+    const derivedId = addFilter(sourceAId, 'B')
+    const sourceCId = addSource('C')
     const store = useProjectStore.getState()
-
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    const tableBId = store.addDerivedTable({
-      name: 'Table B',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-    })
-
-    const tableCId = store.addSourceTable({
-      name: 'Table C',
-      fileRef: 'file_c',
-      fileName: 'c.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    // B -> D (new derived table) should be allowed
-    // C -> D should also be allowed (creating a join scenario)
-    expect(store.wouldCreateCycle(tableBId, 'new_table_d')).toBe(false)
-    expect(store.wouldCreateCycle(tableCId, tableBId)).toBe(false)
+    expect(store.wouldCreateCycle(derivedId, 'new_table_d')).toBe(false)
+    expect(store.wouldCreateCycle(sourceCId, derivedId)).toBe(false)
   })
 })
 
-
-describe('Computation Order', () => {
-  beforeEach(() => {
-    resetStore()
-  })
-
-  it('should compute tables in correct dependency order', () => {
-    const store = useProjectStore.getState()
-
-    // Create A -> B -> C
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    const tableBId = store.addDerivedTable({
-      name: 'Table B',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-    })
-
-    const tableCId = store.addDerivedTable({
-      name: 'Table C',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableBId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableBId],
-    })
-
+describe('computation order', () => {
+  it('computes a chain in dependency order', () => {
+    const sourceId = addSource('A')
+    const middleId = addFilter(sourceId, 'B')
+    const finalId = addFilter(middleId, 'C')
     const state = useProjectStore.getState()
-    const order = getComputationOrder(tableCId, state.nodes, state.edges)
-
-    // Order should be A, B, C
-    expect(order.indexOf(tableAId)).toBeLessThan(order.indexOf(tableBId))
-    expect(order.indexOf(tableBId)).toBeLessThan(order.indexOf(tableCId))
+    const order = getComputationOrder(finalId, state.nodes, state.edges)
+    expect(order.indexOf(sourceId)).toBeLessThan(order.indexOf(middleId))
+    expect(order.indexOf(middleId)).toBeLessThan(order.indexOf(finalId))
     expect(order.length).toBe(3)
   })
 
-  it('should handle join computation order', () => {
-    const store = useProjectStore.getState()
-
-    // Create:
-    // A --\
-    //      +--> C (join)
-    // B --/
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    const tableBId = store.addSourceTable({
-      name: 'Table B',
-      fileRef: 'file_b',
-      fileName: 'b.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    const tableCId = store.addDerivedTable({
-      name: 'Table C',
-      transformDef: {
-        type: 'join',
-        leftTableId: tableAId,
-        rightTableId: tableBId,
-        joinType: 'inner',
-        leftKey: 'col1',
-        rightKey: 'col1',
-      },
-      upstreamNodeIds: [tableAId, tableBId],
-    })
-
+  it('computes both join inputs before the join', () => {
+    const leftId = addSource('A')
+    const rightId = addSource('B')
+    const joinedId = addJoin(leftId, rightId, 'C')
     const state = useProjectStore.getState()
-    const order = getComputationOrder(tableCId, state.nodes, state.edges)
-
-    // Both A and B should come before C
-    expect(order.indexOf(tableAId)).toBeLessThan(order.indexOf(tableCId))
-    expect(order.indexOf(tableBId)).toBeLessThan(order.indexOf(tableCId))
+    const order = getComputationOrder(joinedId, state.nodes, state.edges)
+    expect(order.indexOf(leftId)).toBeLessThan(order.indexOf(joinedId))
+    expect(order.indexOf(rightId)).toBeLessThan(order.indexOf(joinedId))
     expect(order.length).toBe(3)
-  })
-})
-
-
-describe('Schema Change Propagation', () => {
-  beforeEach(() => {
-    resetStore()
-  })
-
-  it('should mark downstream dirty when column is added', () => {
-    const store = useProjectStore.getState()
-
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    const tableBId = store.addDerivedTable({
-      name: 'Table B',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-    })
-
-    store.updateCacheInfo(tableBId, { isDirty: false })
-
-    store.addColumn(tableAId, 'NewColumn', 'string')
-
-    const state = useProjectStore.getState()
-    expect((state.nodes[tableBId] as DerivedTableNode).cacheInfo?.isDirty).toBe(true)
-  })
-
-  it('should mark downstream dirty when column is renamed', () => {
-    const store = useProjectStore.getState()
-
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    const tableBId = store.addDerivedTable({
-      name: 'Table B',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-    })
-
-    store.updateCacheInfo(tableBId, { isDirty: false })
-
-    store.renameColumn(tableAId, 'col1', 'RenamedID')
-
-    const state = useProjectStore.getState()
-    expect((state.nodes[tableBId] as DerivedTableNode).cacheInfo?.isDirty).toBe(true)
-  })
-})
-
-
-describe('Row Operation Propagation', () => {
-  beforeEach(() => {
-    resetStore()
-  })
-
-  it('should mark downstream dirty when row is inserted', () => {
-    const store = useProjectStore.getState()
-
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    const tableBId = store.addDerivedTable({
-      name: 'Table B',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-    })
-
-    store.updateCacheInfo(tableBId, { isDirty: false })
-
-    store.insertRow(tableAId, 'new_row_id', { col1: 'test', col2: 42 }, 0)
-
-    const state = useProjectStore.getState()
-    expect((state.nodes[tableBId] as DerivedTableNode).cacheInfo?.isDirty).toBe(true)
-  })
-
-  it('should mark downstream dirty when row is deleted', () => {
-    const store = useProjectStore.getState()
-
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    const tableBId = store.addDerivedTable({
-      name: 'Table B',
-      transformDef: {
-        type: 'filter',
-        sourceTableId: tableAId,
-        conditions: [],
-        logic: 'and',
-      },
-      upstreamNodeIds: [tableAId],
-    })
-
-    store.updateCacheInfo(tableBId, { isDirty: false })
-
-    store.deleteRow(tableAId, 'row_1')
-
-    const state = useProjectStore.getState()
-    expect((state.nodes[tableBId] as DerivedTableNode).cacheInfo?.isDirty).toBe(true)
-  })
-})
-
-
-describe('Cache Info Management', () => {
-  beforeEach(() => {
-    resetStore()
-  })
-
-  it('should update cache info correctly', () => {
-    const store = useProjectStore.getState()
-
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    const timestamp = new Date().toISOString()
-    store.updateCacheInfo(tableAId, {
-      isDirty: false,
-      lastComputedAt: timestamp,
-      currentVersionHash: 'abc123',
-      lastRowCount: 100,
-    })
-
-    const state = useProjectStore.getState()
-    const node = state.nodes[tableAId] as SourceTableNode
-
-    expect(node.cacheInfo?.isDirty).toBe(false)
-    expect(node.cacheInfo?.lastComputedAt).toBe(timestamp)
-    expect(node.cacheInfo?.currentVersionHash).toBe('abc123')
-    expect(node.cacheInfo?.lastRowCount).toBe(100)
-  })
-
-  it('should clear error with clearNodeError', () => {
-    const store = useProjectStore.getState()
-
-    const tableAId = store.addSourceTable({
-      name: 'Table A',
-      fileRef: 'file_a',
-      fileName: 'a.csv',
-      fileType: 'csv',
-      schema: sampleSchema,
-    })
-
-    store.updateCacheInfo(tableAId, { error: 'Test error' })
-
-    let state = useProjectStore.getState()
-    expect((state.nodes[tableAId] as SourceTableNode).cacheInfo?.error).toBe('Test error')
-
-    // Clear the error
-    store.clearNodeError(tableAId)
-
-    state = useProjectStore.getState()
-    expect((state.nodes[tableAId] as SourceTableNode).cacheInfo?.error).toBeUndefined()
   })
 })

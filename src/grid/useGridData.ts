@@ -7,7 +7,6 @@ import { hasActiveFilters, createEmptyFilterConfig } from './filterUtils'
 import { computeDisplayValue } from './displayUtils'
 import { useWindowedRows } from './hooks/useWindowedRows'
 import type { GridRow } from './types'
-import type { SortDef } from '@/engine/types'
 
 export function useGridData(tableId: string) {
   const node = useProjectStore((state) => state.getTableNode(tableId))
@@ -40,7 +39,7 @@ export function useGridData(tableId: string) {
   const computationError = cacheInfo?.error
 
   const schema = node?.schema
-  const columns: ColumnSchema[] = schema?.columns ?? []
+  const columns: ColumnSchema[] = useMemo(() => schema?.columns ?? [], [schema])
   const isEditable = node?.kind === 'source_table'
 
   const filters: ViewFilterConfig = useMemo(() => {
@@ -51,42 +50,36 @@ export function useGridData(tableId: string) {
     setTableFilters(tableId, newFilters.conditions.length > 0 ? newFilters : null)
   }, [tableId, setTableFilters])
 
-  // Windowed rows from DuckDB
   const windowed = useWindowedRows(
     tableId,
     columns,
     hasActiveFilters(filters) ? filters : null,
-    undefined as SortDef[] | undefined,
+    undefined,
     undefined,
   )
+  const { getLoadedRows, invalidate, totalRows: windowedTotalRows, version: windowedVersion } = windowed
 
-  // Invalidate window when patches change (e.g., after incremental edit)
   const prevPatchVersion = useRef(patchVersion)
   useEffect(() => {
     if (prevPatchVersion.current !== patchVersion && prevPatchVersion.current !== '0-0-0-0') {
-      windowed.invalidate()
+      invalidate()
     }
     prevPatchVersion.current = patchVersion
-  }, [patchVersion, windowed.invalidate])
+  }, [invalidate, patchVersion])
 
   const getDisplayValue = useCallback((rowId: string, columnId: string, baseValue: CellValue, row?: GridRow): CellValue => {
     return computeDisplayValue(rowId, columnId, baseValue, row, columns, patches?.cellPatches)
   }, [patches, columns])
 
-  // Build an index-aligned bridge array from the windowed state. Many grid hooks and
-  // components address rows by absolute index (rows[i], filteredRows[i]) and use
-  // rows.length as the row count, so this MUST be index-aligned, not compacted.
-  //
-  // The array is sparse: loaded indices hold real rows; not-yet-fetched indices are
-  // holes that render as skeletons. `windowed.version` forces a rebuild as the window
-  // scrolls so freshly fetched rows appear. Inserted rows (patches) are appended after
-  // the engine-backed rows.
   const rows: GridRow[] = useMemo(() => {
-    const total = windowed.totalRows
+    // Loaded rows live in refs; the version is the snapshot invalidation signal.
+    void windowedVersion
+    const total = windowedTotalRows
     const baseRows: GridRow[] = []
-    baseRows.length = total // sparse: correct length without allocating every element
+    // Absolute indices must remain stable while unloaded entries stay sparse for skeleton rows.
+    baseRows.length = total
 
-    const loaded = windowed.getLoadedRows()
+    const loaded = getLoadedRows()
     loaded.forEach((row, idx) => {
       if (idx >= 0 && idx < total) baseRows[idx] = row
     })
@@ -106,27 +99,21 @@ export function useGridData(tableId: string) {
     })
 
     return baseRows
-    // windowed.version bumps whenever loaded data changes; patchVersion captures patch edits.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [windowed.totalRows, windowed.version, windowed.getLoadedRows, patches, columns, patchVersion])
+  }, [columns, getLoadedRows, patches, windowedTotalRows, windowedVersion])
 
-  // Deleted rows are removed by the engine on re-materialization, so the bridge is
-  // already index-aligned and filtered === full. Compacting here would break both
-  // index alignment and the virtualizer's row count.
   const filteredRows = rows
 
-  const totalRowCount = windowed.totalRows + (patches?.insertedRows?.length ?? 0)
+  const totalRowCount = windowedTotalRows + (patches?.insertedRows?.length ?? 0)
   const deletedCount = patches?.deletedRows?.size ?? 0
   const unfilteredTotalRows = totalRowCount - deletedCount
 
-  // Materialization trigger (same as before, for initial load)
   useEffect(() => {
     if (!node) return
     if (isComputing || isMaterializing) return
 
     const hasBeenComputed = cacheInfo?.lastComputedAt && !cacheInfo?.error
-    const needsMat = isDirty || (!tableData && !windowed.totalRows) ||
-      (windowed.totalRows === 0 && !hasBeenComputed && !tableData?.rows?.length)
+    const needsMat = isDirty || (!tableData && !windowedTotalRows) ||
+      (windowedTotalRows === 0 && !hasBeenComputed && !tableData?.rows?.length)
 
     if (needsMat && (node.kind === 'source_table' || node.kind === 'derived_table')) {
       setIsMaterializing(true)
@@ -138,7 +125,7 @@ export function useGridData(tableId: string) {
             setMaterializationError(result.error || 'Unknown error')
           } else {
             setMaterializationError(null)
-            windowed.invalidate()
+            invalidate()
           }
         })
         .catch((error) => {
@@ -148,7 +135,7 @@ export function useGridData(tableId: string) {
           setIsMaterializing(false)
         })
     }
-  }, [tableId, node, isDirty, isComputing, isMaterializing, tableData, cacheInfo])
+  }, [cacheInfo, invalidate, isComputing, isDirty, isMaterializing, node, tableData, tableId, windowedTotalRows])
 
   return {
     node,
@@ -169,7 +156,6 @@ export function useGridData(tableId: string) {
     getDisplayValue,
     filters,
     handleFiltersChange,
-    // Windowed model (new)
     windowed,
   }
 }

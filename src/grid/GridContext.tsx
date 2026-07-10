@@ -1,7 +1,7 @@
-import { createContext, useContext } from 'react'
 import type { CellValue, ColumnSchema } from '@/types'
 import type { GridRow, SelectionType, ContextMenuState } from './types'
 import type { CellRangeSelection } from './useGridSelection'
+import { gridContext } from './gridContextStore'
 
 export interface GridContextValue {
   tableId: string
@@ -80,14 +80,6 @@ export interface GridContextValue {
   handleCellDoubleClick: (rowIndex: number, columnId: string, currentValue: CellValue) => void
 }
 
-const GridContext = createContext<GridContextValue | null>(null)
-
 export function GridProvider({ children, value }: { children: React.ReactNode; value: GridContextValue }) {
-  return <GridContext.Provider value={value}>{children}</GridContext.Provider>
-}
-
-export function useGridContext() {
-  const ctx = useContext(GridContext)
-  if (!ctx) throw new Error('useGridContext must be used within GridProvider')
-  return ctx
+  return <gridContext.Provider value={value}>{children}</gridContext.Provider>
 }

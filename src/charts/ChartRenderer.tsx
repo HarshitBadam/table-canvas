@@ -1,6 +1,6 @@
 import { useMemo, memo } from 'react'
 import type { ChartConfig, ChartType, CellValue } from '@/types'
-import { useTheme } from '@/components/ThemeToggle'
+import { useTheme } from '@/components/themeContext'
 import { DEFAULT_COLORS, CHART_THEME, detectTimestamps, COUNT_VALUE_KEY } from './chartShared'
 import type { ChartTypeProps } from './chartShared'
 import { BarChartRenderer } from './BarChartRenderer'

@@ -203,6 +203,7 @@ export function useSuggestionsPanel(
     setCurrentRequestId,
     shouldCancelRequest,
     tableId,
+    hasPhase2Stats,
   ])
 
   const cachedSuggestions = useMemo(() => {

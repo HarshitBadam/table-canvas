@@ -1,13 +1,3 @@
-# =============================================================================
-# Table Canvas - Release Workflow
-# =============================================================================
-# Triggered on version tags (v*) to create releases and deploy artifacts.
-#
-# Prerequisites:
-#   - All CI checks must pass
-#   - Tag must follow semantic versioning (e.g., v1.0.0, v1.2.3-beta.1)
-# =============================================================================
-
 name: Release
 
 on:
@@ -19,9 +9,6 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  # ===========================================================================
-  # Validate Release
-  # ===========================================================================
   validate:
     name: 🔍 Validate
     runs-on: ubuntu-latest
@@ -45,9 +32,6 @@ jobs:
             exit 1
           fi
 
-  # ===========================================================================
-  # Run Full Test Suite
-  # ===========================================================================
   test:
     name: 🧪 Test
     needs: validate
@@ -70,9 +54,6 @@ jobs:
         env:
           CI: true
 
-  # ===========================================================================
-  # Build Production Assets
-  # ===========================================================================
   build:
     name: 🏗️ Build
     needs: [validate, test]
@@ -107,9 +88,6 @@ jobs:
           path: table-canvas-${{ needs.validate.outputs.version }}.zip
           retention-days: 30
 
-  # ===========================================================================
-  # Create GitHub Release
-  # ===========================================================================
   release:
     name: 📦 Release
     needs: [validate, build]
