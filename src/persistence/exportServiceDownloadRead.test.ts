@@ -163,7 +163,7 @@ describe('Canonical table reads', () => {
     expect(materializationService.getTableData).toHaveBeenCalledWith(
       'table_2',
       0,
-      1_000_000,
+      50_000,
     )
     expect(blob).toBeInstanceOf(Blob)
   })

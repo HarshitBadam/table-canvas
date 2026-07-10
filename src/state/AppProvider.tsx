@@ -12,6 +12,7 @@ import {
   fetchProjects,
   loadProjectWithSync,
   saveProjectWithSync,
+  syncLocalProjectsToBackend,
 } from '@/persistence/syncService'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
 import { useReportStore } from '@/report/reportStore'
@@ -145,6 +146,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setPhase('ready')
           return
         }
+        if (authResult.user.tier !== 'guest') {
+          await syncLocalProjectsToBackend()
+        }
 
         setPhase('loading_project')
         const { project, projectList } = await loadOrCreateProject()
@@ -195,8 +199,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveLatestProject,
   ])
 
-  const postLoginSetup = useCallback(async () => {
+  const postLoginSetup = useCallback(async (tier: Tier) => {
     setPhase('loading_project')
+    if (tier !== 'guest') {
+      await syncLocalProjectsToBackend()
+    }
     const { project, projectList } = await loadOrCreateProject()
     setState(previous => ({
       ...previous,
@@ -220,13 +227,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [setPhase])
 
   const login = useCallback(async (credentials: LoginCredentials) => {
-    await performLogin(credentials)
-    await postLoginSetup()
+    const loggedInUser = await performLogin(credentials)
+    await postLoginSetup(loggedInUser.tier)
   }, [performLogin, postLoginSetup])
 
   const googleLogin = useCallback(async (credential: string) => {
-    await performGoogleLogin(credential)
-    await postLoginSetup()
+    const loggedInUser = await performGoogleLogin(credential)
+    await postLoginSetup(loggedInUser.tier)
   }, [performGoogleLogin, postLoginSetup])
 
   const logout = useCallback(async () => {

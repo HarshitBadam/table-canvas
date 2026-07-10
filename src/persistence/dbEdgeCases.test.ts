@@ -49,4 +49,23 @@ describe('Database edge cases', () => {
     expect((await db.loadProject('timestamps'))?.createdAt).toBe(createdAt)
   })
 
+  it('preserves server timestamps when caching a remote project', async () => {
+    const db = await getDB()
+    const createdAt = '2025-01-01T00:00:00.000Z'
+    const updatedAt = '2025-02-01T00:00:00.000Z'
+
+    await db.saveProject(
+      'remote-timestamps',
+      'Remote',
+      {},
+      {},
+      {},
+      { createdAt, updatedAt },
+    )
+
+    const loaded = await db.loadProject('remote-timestamps')
+    expect(loaded?.createdAt).toBe(createdAt)
+    expect(loaded?.updatedAt).toBe(updatedAt)
+  })
+
 })
