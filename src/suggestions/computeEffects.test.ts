@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeSuggestionEffect } from './computeEffects'
+import { computeCombinedSuggestionEffect, computeSuggestionEffect } from './computeEffects'
 import type { CleaningOperation, Suggestion } from '@/types'
 import type { TableRow } from '@/state/dataStore'
 
@@ -86,5 +86,55 @@ describe('computeSuggestionEffect', () => {
     )
 
     expect(effect.changes[0]?.newValue).toBe('2026-01-01')
+  })
+
+  it('composes multiple fixes that target the same cell', () => {
+    const rows: TableRow[] = [{ __rowId: '1', value: '  MiXeD  ' }]
+
+    const effect = computeCombinedSuggestionEffect([
+      createSuggestion({ type: 'trim' }),
+      createSuggestion({
+        type: 'normalize_case',
+        mappings: { '  MiXeD  ': 'mixed' },
+      }),
+    ], rows)
+
+    expect(effect.changes).toEqual([
+      {
+        rowId: '1',
+        columnId: 'value',
+        oldValue: '  MiXeD  ',
+        newValue: 'mixed',
+      },
+    ])
+    expect(rows[0].value).toBe('  MiXeD  ')
+  })
+
+  it('applies placeholder nullification after other selected fixes', () => {
+    const rows: TableRow[] = [{ __rowId: '1', value: ' N/A ' }]
+
+    const effect = computeCombinedSuggestionEffect([
+      createSuggestion({ type: 'trim' }),
+      createSuggestion({ type: 'nullify_placeholders', placeholders: ['N/A'] }),
+    ], rows)
+
+    expect(effect.changes[0]).toMatchObject({
+      oldValue: ' N/A ',
+      newValue: null,
+    })
+  })
+
+  it('does not refill values removed by a selected outlier fix', () => {
+    const rows: TableRow[] = [{ __rowId: '1', value: 100 }]
+
+    const effect = computeCombinedSuggestionEffect([
+      createSuggestion({ type: 'remove_outliers', lowerBound: 0, upperBound: 10 }),
+      createSuggestion({ type: 'fill_missing_numeric', strategy: 'zero' }),
+    ], rows)
+
+    expect(effect.changes[0]).toMatchObject({
+      oldValue: 100,
+      newValue: null,
+    })
   })
 })

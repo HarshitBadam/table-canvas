@@ -43,6 +43,7 @@
 
 .report-toolbar-v2-selector {
   position: relative;
+  min-width: 0;
 }
 
 .report-toolbar-v2-name {
@@ -57,6 +58,13 @@
   font-size: 14px;
   font-weight: 600;
   color: #111827;
+  max-width: 220px;
+}
+
+.report-toolbar-v2-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .report-toolbar-v2-name:hover {
@@ -175,6 +183,42 @@
   color: #4b5563;
 }
 
+.report-toolbar-v2-list-actions {
+  display: flex;
+  gap: 4px;
+  padding: 2px 2px 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.report-toolbar-v2-list-actions button {
+  flex: 1;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #4b5563;
+  font-size: 12px;
+}
+
+.report-toolbar-v2-list-actions button:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+[data-theme="dark"] .report-toolbar-v2-list-actions {
+  border-color: #333;
+}
+
+[data-theme="dark"] .report-toolbar-v2-list-actions button {
+  color: #d1d5db;
+}
+
+[data-theme="dark"] .report-toolbar-v2-list-actions button:hover {
+  background: #2a2a2a;
+  color: #fff;
+}
+
 .report-toolbar-v2-list-item:hover {
   background: #f3f4f6;
   color: #111827;
@@ -255,4 +299,25 @@
   text-align: center;
   font-size: 12px;
   color: #9ca3af;
+}
+
+@media (max-width: 1200px) {
+  .report-toolbar-v2-badge,
+  .report-toolbar-v2-info {
+    display: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .report-toolbar-v2 {
+    padding: 0 10px;
+  }
+
+  .report-toolbar-v2-left {
+    gap: 8px;
+  }
+
+  .report-toolbar-v2-name {
+    max-width: 150px;
+  }
 }

@@ -1,5 +1,9 @@
 import type { ColumnSchema } from '@/types';
-import { DEFAULT_ROW_LIMIT, type RowSelectionMode } from '../tableData';
+import {
+  DEFAULT_ROW_LIMIT,
+  MAX_EMBEDDED_TABLE_ROWS,
+  type RowSelectionMode,
+} from '../tableData';
 import type { EmbeddedTableNodeAttrs } from './embeddedTableTypes';
 
 interface EmbeddedTableConfigPanelProps {
@@ -65,7 +69,7 @@ export function EmbeddedTableConfigPanel({
           onChange={event => onUpdate({ rowSelectionMode: event.target.value as RowSelectionMode })}
           className="input text-sm w-full"
         >
-          <option value="all">All rows</option>
+          <option value="all">Up to {MAX_EMBEDDED_TABLE_ROWS.toLocaleString()} rows</option>
           <option value="first_n">First N rows</option>
           <option value="last_n">Last N rows</option>
         </select>

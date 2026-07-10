@@ -1,5 +1,5 @@
 import JSZip from 'jszip'
-import { exportProjectFile, loadAllReports, loadProject } from './db'
+import { exportProjectFile, loadReportsForProject, loadProject } from './db'
 import { getTableData } from '@/engine/materializationService'
 import type { ProjectNode } from '@/types'
 import type { Report } from '@/report/types'
@@ -44,12 +44,21 @@ async function buildReportData(
 
 async function addReports(
   zip: JSZip,
-  reports: Awaited<ReturnType<typeof loadAllReports>>,
+  reports: Awaited<ReturnType<typeof loadReportsForProject>>,
   nodes: Record<string, ProjectNode>,
 ): Promise<void> {
   const folder = zip.folder('reports')
+  const usedFilenames = new Set<string>()
   for (const report of Object.values(reports)) {
-    const filename = `${report.name.replace(/[^a-zA-Z0-9-_ ]/g, '_').substring(0, 50)}.html`
+    const baseName = report.name.replace(/[^a-zA-Z0-9-_ ]/g, '_').trim().substring(0, 50)
+      || 'Untitled Report'
+    let filename = `${baseName}.html`
+    let suffix = 2
+    while (usedFilenames.has(filename.toLowerCase())) {
+      filename = `${baseName} (${suffix}).html`
+      suffix += 1
+    }
+    usedFilenames.add(filename.toLowerCase())
     folder?.file(filename, generateReportHtml(report, await buildReportData(report, nodes)))
   }
 }
@@ -75,7 +84,7 @@ export async function exportProjectAsZip(
 
   if (includeReportHtml) {
     onProgress?.('Exporting reports...', 90)
-    await addReports(zip, await loadAllReports(), project!.nodes)
+    await addReports(zip, await loadReportsForProject(projectId), project!.nodes)
   }
 
   onProgress?.('Compressing...', 98)

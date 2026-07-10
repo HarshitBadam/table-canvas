@@ -2,29 +2,13 @@ import { useState, useCallback } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
 import { useSuggestionsStore } from './suggestionsStore'
-import { isPlaceholder } from './cleaningConstants'
+import { computeCombinedSuggestionEffect } from './computeEffects'
 import { loadProfileForTable, useProfilingStore } from '@/lib/profiling'
 import { showToast } from './commands/types'
-import type { CellValue } from '@/types'
-
-interface CellChange {
-  rowId: string
-  columnId: string
-  oldValue: CellValue
-  newValue: CellValue
-}
+import type { Suggestion } from '@/types'
 
 interface SuggestionWithEffect {
-  suggestion: {
-    id: string
-    context: {
-      cleaningOperation?: { type: string; mappings?: Record<string, string> } | null
-      columnId?: string
-    }
-  }
-  changes: CellChange[]
-  highlights: string[]
-  operationType: string
+  suggestion: Suggestion
 }
 
 interface UseCleaningApplyParams {
@@ -32,7 +16,6 @@ interface UseCleaningApplyParams {
   selectedIds: Set<string>
   tableId: string
   setSelectedIds: (updater: (prev: Set<string>) => Set<string>) => void
-  /** Current, fully-patched, id-keyed rows fetched from the engine by CleaningPanel. */
   rows: TableRow[]
 }
 
@@ -62,63 +45,23 @@ export function useCleaningApply({
     setIsApplying(true)
 
     try {
-      const changesMap = new Map<string, CellChange>()
-      const allHighlights: string[] = []
-
-      // Engine rows already reflect all patches (cell edits, deletions, insertions),
-      // so they are used directly with no extra merge.
-      const mergedRows = rows
-
-      // Process nullify_placeholders LAST so it takes precedence over normalize_case
-      const placeholderSuggestions = currentSelectedSuggestions.filter(
-        (s) => s.suggestion.context.cleaningOperation?.type === 'nullify_placeholders',
-      )
-      const otherSuggestions = currentSelectedSuggestions.filter(
-        (s) => s.suggestion.context.cleaningOperation?.type !== 'nullify_placeholders',
-      )
-
-      for (const item of otherSuggestions) {
-        for (const change of item.changes) {
-          const key = `${change.rowId}:${change.columnId}`
-          changesMap.set(key, change)
-        }
-        allHighlights.push(...item.highlights)
-      }
-
-      for (const item of placeholderSuggestions) {
-        const columnId = item.suggestion.context.columnId
-        if (columnId) {
-          for (const row of mergedRows) {
-            const value = row[columnId]
-            if (value === null || value === undefined) continue
-
-            if (isPlaceholder(value)) {
-              const key = `${row.__rowId}:${columnId}`
-              changesMap.set(key, {
-                rowId: row.__rowId,
-                columnId,
-                oldValue: value,
-                newValue: null,
-              })
-            }
-          }
-        }
-        allHighlights.push(...item.highlights)
-      }
-
-      const allChanges = Array.from(changesMap.values())
+      const { changes: allChanges, highlights: allHighlights } =
+        computeCombinedSuggestionEffect(
+          currentSelectedSuggestions.map(item => item.suggestion),
+          rows,
+        )
 
       if (allChanges.length > 0) {
         saveSnapshot('Apply cleaning operations')
 
-        const changesByRow = new Map<string, CellChange[]>()
+        const changesByRow = new Map<string, typeof allChanges>()
         for (const change of allChanges) {
           const rowChanges = changesByRow.get(change.rowId) ?? []
           rowChanges.push(change)
           changesByRow.set(change.rowId, rowChanges)
         }
 
-        const updatedRows = mergedRows.map((row) => {
+        const updatedRows = rows.map((row) => {
           const rowChanges = changesByRow.get(row.__rowId)
           if (!rowChanges) return row
 

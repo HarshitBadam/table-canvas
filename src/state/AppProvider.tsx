@@ -15,7 +15,7 @@ import {
 } from '@/persistence/syncService'
 import { deleteFile } from '@/persistence/db'
 import type { SourceTableNode } from '@/types'
-import { initializeReportStore } from '@/report/reportStore'
+import { useReportStore } from '@/report/reportStore'
 import { checkProjectCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import { useProjectStore } from './projectStore'
@@ -131,11 +131,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 createdAt: new Date(),
               }],
         }))
-        try {
-          await initializeReportStore()
-        } catch (error) {
-          console.error('[AppContext] Failed to initialize reports:', error)
-        }
+        await useReportStore.getState().initializeProject(project.id)
         if (hasTables(project.nodes)) {
           setPhase('materializing')
           await materializeProjectTables(project.nodes)
@@ -194,6 +190,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             createdAt: new Date(),
           }],
     }))
+    await useReportStore.getState().initializeProject(project.id)
     if (hasTables(project.nodes)) {
       setPhase('materializing')
       await materializeProjectTables(project.nodes)
@@ -212,6 +209,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [performGoogleLogin, postLoginSetup])
 
   const logout = useCallback(async () => {
+    try {
+      await useReportStore.getState().flushSaves()
+    } catch (error) {
+      console.error('[AppContext] Failed to flush reports before logout:', error)
+    }
     await performLogout()
     setState(previous => ({
       ...previous,
@@ -228,6 +230,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       selectedNodeId: null,
     })
     useDataStore.setState({ tableData: {} })
+    useReportStore.getState().reset()
   }, [performLogout])
 
   const createNewProject = useCallback(async (name?: string) => {
@@ -245,6 +248,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       edges: project.edges,
       patches: project.patches,
     })
+    await useReportStore.getState().initializeProject(project.id)
     setState(previous => ({
       ...previous,
       projectId: project.id,
@@ -275,6 +279,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         projectId: project.id,
         projectName: project.name,
       }))
+      await useReportStore.getState().initializeProject(project.id)
       if (hasTables(project.nodes)) {
         setPhase('materializing')
         await materializeProjectTables(project.nodes)

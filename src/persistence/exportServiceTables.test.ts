@@ -13,7 +13,7 @@ import {
 vi.mock('./db', () => ({
   exportProjectFile: vi.fn(),
   loadProject: vi.fn(),
-  loadAllReports: vi.fn(),
+  loadReportsForProject: vi.fn(),
   loadFile: vi.fn(),
 }))
 vi.mock('@/engine/materializationService', () => ({
@@ -47,7 +47,7 @@ describe('exportProjectAsZip table edge cases', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
 
     const blob = await exportProjectAsZip('empty-project', { includeExcel: true })
     expect(blob).toBeInstanceOf(Blob)
@@ -68,7 +68,7 @@ describe('exportProjectAsZip table edge cases', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     const zip = await JSZip.loadAsync(await exportProjectAsZip('chart-only', {
       includeExcel: true,
     }))
@@ -90,7 +90,7 @@ describe('exportProjectAsZip table edge cases', () => {
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
     vi.mocked(db.loadFile).mockResolvedValue(null)
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     const blob = await exportProjectAsZip('missing-file', { includeExcel: true })
     expect(blob).toBeInstanceOf(Blob)
     expect((await JSZip.loadAsync(blob)).files['data.xlsx']).toBeDefined()
@@ -117,7 +117,7 @@ describe('exportProjectAsZip table edge cases', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     expect(await exportProjectAsZip('no-fileref', { includeExcel: true })).toBeInstanceOf(Blob)
   })
 
@@ -137,7 +137,7 @@ describe('exportProjectAsZip table edge cases', () => {
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
     vi.mocked(db.loadFile).mockResolvedValue(createCSVContent([{ ID: '1', Value: 100 }]))
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     vi.mocked(materializationService.ensureTableMaterialized).mockResolvedValue({
       status: 'error',
       tableId: 'table_2',

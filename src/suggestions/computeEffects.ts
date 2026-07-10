@@ -2,7 +2,7 @@ import type { Suggestion, CellValue, CleaningOperation } from '@/types'
 import type { TableRow } from '@/state/dataStore'
 import { isPlaceholder } from './cleaningConstants'
 
-interface CellChange {
+export interface CellChange {
   rowId: string
   columnId: string
   oldValue: CellValue
@@ -11,15 +11,14 @@ interface CellChange {
 
 type OperationType = 'fix' | 'review'
 
-interface SuggestionEffect {
+export interface SuggestionEffect {
   changes: CellChange[]
-  highlights: string[] // "rowId:columnId" format
+  highlights: string[]
   operationType: OperationType
 }
 
 function applyCleaningOperation(value: CellValue, operation: CleaningOperation): CellValue {
   if (value === null || value === undefined) {
-    // For fill_missing operations, we handle nulls separately
     return value
   }
 
@@ -41,8 +40,15 @@ function applyCleaningOperation(value: CellValue, operation: CleaningOperation):
       )
     
     case 'replace_typos':
-    case 'normalize_case':
-      return operation.mappings[strValue] ?? value
+    case 'normalize_case': {
+      const exactMatch = operation.mappings[strValue]
+      if (exactMatch !== undefined) return exactMatch
+      const normalizedValue = strValue.trim().toLowerCase()
+      const normalizedMatch = Object.entries(operation.mappings).find(
+        ([candidate]) => candidate.trim().toLowerCase() === normalizedValue,
+      )
+      return normalizedMatch?.[1] ?? value
+    }
     
     case 'nullify_placeholders':
       if (isPlaceholder(value)) {
@@ -69,7 +75,7 @@ function applyCleaningOperation(value: CellValue, operation: CleaningOperation):
 
     case 'fill_missing_string':
     case 'fill_missing_numeric':
-      return value // Missing values are handled in the caller.
+      return value
     
     case 'remove_outliers':
       if (typeof value === 'number') {
@@ -116,7 +122,6 @@ export function computeSuggestionEffect(
   if (operation.type === 'nullify_placeholders' && columnId) {
     for (const row of rows) {
       const oldValue = row[columnId]
-      // Skip actual null/undefined - only convert placeholder STRINGS
       if (oldValue === null || oldValue === undefined) continue
       
       if (isPlaceholder(oldValue)) {
@@ -164,4 +169,74 @@ export function computeSuggestionEffect(
   }
 
   return { changes, highlights, operationType }
+}
+
+function numericFillValue(
+  rows: TableRow[],
+  columnId: string,
+  strategy: 'mean' | 'median' | 'zero',
+): number | undefined {
+  if (strategy === 'zero') return 0
+  const values = rows
+    .map(row => row[columnId])
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+  if (values.length === 0) return undefined
+  if (strategy === 'mean') {
+    return values.reduce((sum, value) => sum + value, 0) / values.length
+  }
+  values.sort((a, b) => a - b)
+  const middle = Math.floor(values.length / 2)
+  return values.length % 2 === 0
+    ? (values[middle - 1] + values[middle]) / 2
+    : values[middle]
+}
+
+export function computeCombinedSuggestionEffect(
+  suggestions: Suggestion[],
+  rows: TableRow[],
+): SuggestionEffect {
+  const workingRows = rows.map(row => ({ ...row }))
+  const rowsById = new Map(workingRows.map(row => [row.__rowId, row]))
+  const changesByCell = new Map<string, CellChange>()
+  const highlights = new Set<string>()
+
+  const fixes = suggestions.filter(
+    suggestion => suggestion.context.cleaningOperation?.type !== 'highlight_outliers'
+      && suggestion.context.cleaningOperation?.type !== 'nullify_placeholders'
+      && suggestion.context.cleaningOperation?.type !== 'remove_outliers',
+  )
+  const terminalFixes = suggestions.filter(
+    suggestion => suggestion.context.cleaningOperation?.type === 'nullify_placeholders'
+      || suggestion.context.cleaningOperation?.type === 'remove_outliers',
+  )
+  const reviews = suggestions.filter(
+    suggestion => suggestion.context.cleaningOperation?.type === 'highlight_outliers',
+  )
+
+  for (const suggestion of [...fixes, ...terminalFixes, ...reviews]) {
+    const operation = suggestion.context.cleaningOperation
+    const columnId = suggestion.context.columnId
+    const fillValue = operation?.type === 'fill_missing_numeric' && columnId
+      ? numericFillValue(workingRows, columnId, operation.strategy)
+      : undefined
+    const effect = computeSuggestionEffect(suggestion, workingRows, fillValue)
+
+    for (const highlight of effect.highlights) highlights.add(highlight)
+    for (const change of effect.changes) {
+      const key = `${change.rowId}:${change.columnId}`
+      const existing = changesByCell.get(key)
+      changesByCell.set(key, {
+        ...change,
+        oldValue: existing?.oldValue ?? change.oldValue,
+      })
+      const row = rowsById.get(change.rowId)
+      if (row) row[change.columnId] = change.newValue
+    }
+  }
+
+  return {
+    changes: [...changesByCell.values()].filter(change => change.oldValue !== change.newValue),
+    highlights: [...highlights],
+    operationType: highlights.size > 0 && changesByCell.size === 0 ? 'review' : 'fix',
+  }
 }

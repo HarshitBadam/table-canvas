@@ -41,6 +41,8 @@ export interface TipTapEditorHandle {
   getJSON: () => JSONContent;
   toggleHighlight: () => void;
   insertTable: () => void;
+  insertEmbeddedTable: () => void;
+  insertChart: () => void;
 }
 
 export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
@@ -99,7 +101,7 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
       editorProps: {
         attributes: {
           class: 'tiptap-editor-content',
-          spellcheck: 'false',
+          spellcheck: 'true',
         },
       },
     });
@@ -145,6 +147,23 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
       insertTable: () => editor?.chain().focus().insertContent({
         type: 'editableTable',
         attrs: { headers: [], rows: [], initialized: false },
+      }).run(),
+      insertEmbeddedTable: () => editor?.chain().focus().insertContent({
+        type: 'embeddedTable',
+        attrs: {
+          sourceTableId: '',
+          selectedColumns: [],
+          rowSelectionMode: 'first_n',
+          rowLimit: 10,
+        },
+      }).run(),
+      insertChart: () => editor?.chain().focus().insertContent({
+        type: 'chartBlock',
+        attrs: {
+          sourceTableId: '',
+          chartType: 'bar',
+          config: { showLegend: true, showGrid: true },
+        },
       }).run(),
     }), [editor]);
 

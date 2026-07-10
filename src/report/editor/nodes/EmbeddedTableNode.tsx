@@ -3,10 +3,10 @@ import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/r
 import { useState, useCallback, useMemo, memo } from 'react';
 import {
   useTableSource,
-  selectRows,
   resolveDisplayColumns,
   toggleColumnSelection,
   DEFAULT_ROW_LIMIT,
+  formatReportCell,
 } from '../tableData';
 import { TablePickerModal } from './TablePickerModal';
 import { EmbeddedTableConfigPanel } from './EmbeddedTableConfigPanel';
@@ -39,6 +39,14 @@ function EmptyState({
     <div
       className={`block-empty-state ${selected ? 'is-selected' : ''}`}
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
       style={{ cursor: onClick ? 'pointer' : 'default' }}
     >
       {spinning ? (
@@ -63,10 +71,24 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
   node,
   updateAttributes,
   selected,
+  extension,
 }: NodeViewProps) {
   const attrs = node.attrs as EmbeddedTableNodeAttrs;
+  const options = extension.options as EmbeddedTableNodeOptions;
 
-  const { tableNode, columns, rows, rowCount, status } = useTableSource(attrs.sourceTableId);
+  const {
+    tableNode,
+    columns,
+    rows: displayRows,
+    rowCount,
+    status,
+    error,
+    isTruncated,
+    retry,
+  } = useTableSource(attrs.sourceTableId, {
+    rowSelectionMode: attrs.rowSelectionMode,
+    rowLimit: attrs.rowLimit,
+  });
 
   const [showConfig, setShowConfig] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
@@ -74,11 +96,6 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
   const displayColumns = useMemo(
     () => resolveDisplayColumns(attrs.selectedColumns, columns),
     [attrs.selectedColumns, columns]
-  );
-
-  const displayRows = useMemo(
-    () => selectRows(rows, attrs.rowSelectionMode || 'first_n', attrs.rowLimit ?? DEFAULT_ROW_LIMIT),
-    [rows, attrs.rowSelectionMode, attrs.rowLimit]
   );
 
   const allColumnIds = useMemo(() => columns.map((c) => c.id), [columns]);
@@ -152,18 +169,40 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
   if (status === 'error' || status === 'empty') {
     return (
       <NodeViewWrapper className="editable-table-block">
-        <EmptyState
-          selected={selected}
-          title={status === 'error' ? 'Could not load data' : 'No Data'}
-          description={
-            tableNode
-              ? status === 'error'
-                ? `"${tableNode.name}" failed to load. Click to pick another table.`
-                : `"${tableNode.name}" has no rows yet.`
-              : 'Table not available'
-          }
-          onClick={() => setShowPicker(true)}
-        />
+        <div className={`block-empty-state ${selected ? 'is-selected' : ''}`}>
+          <TableGlyph />
+          <div className="block-empty-state-title">
+            {status === 'error' ? 'Could not load data' : 'No data'}
+          </div>
+          <div className="block-empty-state-description">
+            {status === 'error'
+              ? error || `"${tableNode?.name || 'Table'}" failed to load.`
+              : `"${tableNode?.name || 'Table'}" has no rows yet.`}
+          </div>
+          <div className="flex items-center gap-2 mt-3">
+            {status === 'error' && (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={retry}>
+                Retry
+              </button>
+            )}
+            {tableNode && options.onOpenTable && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => options.onOpenTable?.(attrs.sourceTableId)}
+              >
+                Open table
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setShowPicker(true)}
+            >
+              Change source
+            </button>
+          </div>
+        </div>
         {picker}
       </NodeViewWrapper>
     );
@@ -206,7 +245,7 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
                     return (
                       <td key={col.id} className="editable-table-cell">
                         <span className="editable-table-cell-text">
-                          {value !== undefined && value !== null ? String(value) : ''}
+                          {formatReportCell(value, col)}
                         </span>
                       </td>
                     );
@@ -219,7 +258,8 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
 
         <div className="embedded-table-footer">
           <span>
-            Showing {displayRows.length} of {rowCount} rows
+            Showing {displayRows.length.toLocaleString()} of {rowCount.toLocaleString()} rows
+            {isTruncated && attrs.rowSelectionMode === 'all' ? ' (report safety limit)' : ''}
           </span>
           {selected && (
             <button onClick={() => setShowConfig((v) => !v)} className="embedded-table-config-btn">

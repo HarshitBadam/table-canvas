@@ -81,8 +81,6 @@ function MainApp() {
 
   const reports = useReportStore((state) => state.reports)
   const selectedReportId = useReportStore((state) => state.selectedReportId)
-  const addReport = useReportStore((state) => state.addReport)
-  const selectReport = useReportStore((state) => state.selectReport)
 
   const reportId = selectedReportId || Object.keys(reports)[0] || null
 
@@ -104,13 +102,8 @@ function MainApp() {
   const handleOpenDashboard = useCallback(() => setViewMode('dashboard'), [])
 
   const handleOpenReport = useCallback(() => {
-    let activeReportId = reportId
-    if (!activeReportId) {
-      activeReportId = addReport('My Report')
-    }
-    selectReport(activeReportId)
     setViewMode('report')
-  }, [reportId, addReport, selectReport])
+  }, [])
 
   const handleOpenTable = useCallback((tableId: string) => {
     selectNode(tableId)
@@ -166,14 +159,14 @@ function MainApp() {
                 <Dashboard />
               </ErrorBoundary>
             )}
-            {viewMode === 'report' && reportId && (
+            {viewMode === 'report' && (
               <ErrorBoundary name="ReportView">
                 <Suspense fallback={
                   <div className="flex items-center justify-center h-full">
                     <LoadingSpinner />
                   </div>
                 }>
-                  <ReportView reportId={reportId} />
+                  <ReportView reportId={reportId} onOpenTable={handleOpenTable} />
                 </Suspense>
               </ErrorBoundary>
             )}

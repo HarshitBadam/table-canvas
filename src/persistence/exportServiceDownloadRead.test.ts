@@ -12,7 +12,7 @@ import {
 vi.mock('./db', () => ({
   exportProjectFile: vi.fn(),
   loadProject: vi.fn(),
-  loadAllReports: vi.fn(),
+  loadReportsForProject: vi.fn(),
   loadFile: vi.fn(),
 }))
 vi.mock('@/engine/materializationService', () => ({
@@ -83,7 +83,7 @@ describe('exportAndDownloadProject', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     const anchor = { href: '', download: '', click: vi.fn() }
     vi.spyOn(document.body, 'appendChild').mockImplementation(() => anchor as unknown as Node)
     vi.spyOn(document.body, 'removeChild').mockImplementation(() => anchor as unknown as Node)
@@ -109,7 +109,7 @@ describe('exportAndDownloadProject', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     const anchor = { href: '', download: '', click: vi.fn() }
     vi.spyOn(document.body, 'appendChild').mockImplementation(() => anchor as unknown as Node)
     vi.spyOn(document.body, 'removeChild').mockImplementation(() => anchor as unknown as Node)
@@ -145,7 +145,7 @@ describe('Canonical table reads', () => {
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
     vi.mocked(db.loadFile).mockResolvedValue(createCSVContent([{ ID: '1', Value: 100 }]))
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     vi.mocked(materializationService.ensureTableMaterialized).mockResolvedValue({
       status: 'computed',
       tableId: 'table_2',
@@ -197,7 +197,7 @@ describe('File Parsing', () => {
     vi.mocked(db.loadFile).mockResolvedValue(
       new TextEncoder().encode('Name,Age,City\nAlice,30,NYC\nBob,25,LA').buffer,
     )
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     const blob = await exportProjectAsZip('csv-test', {
       includeExcel: true,
       includeReportHtml: false,
@@ -230,7 +230,7 @@ describe('File Parsing', () => {
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
     vi.mocked(db.loadFile).mockResolvedValue(null)
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     expect(await exportProjectAsZip('xlsx-test', { includeExcel: true })).toBeInstanceOf(Blob)
   })
 })

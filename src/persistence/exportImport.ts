@@ -1,9 +1,9 @@
 import type { ProjectNode, Edge, Patches } from '@/types'
 import type { Report } from '@/report/types'
-import { getDB, type SerializedPatches } from './dbCore'
+import type { SerializedPatches } from './dbCore'
 import { loadProject } from './projectStorage'
 import { saveFile, loadFileRecord } from './fileStorage'
-import { loadAllReports } from './reportStorage'
+import { loadReportsForProject } from './reportStorage'
 
 const EXPORT_VERSION = '2.0.0'
 const EXPORT_FORMAT_TYPE = 'tablecanvas-full'
@@ -79,7 +79,7 @@ export async function exportProjectFile(projectId: string): Promise<Blob> {
     }
   }
 
-  const reports = await loadAllReports()
+  const reports = await loadReportsForProject(projectId)
 
   const exportData: TableCanvasExport = {
     version: EXPORT_VERSION,
@@ -114,6 +114,7 @@ export interface ParsedImportData {
   patches: Record<string, Patches>
   filesRestored: number
   reportsRestored: number
+  reports: Report[]
 }
 
 /**
@@ -208,23 +209,20 @@ export async function parseImportFile(
   }
 
   let reportsRestored = 0
+  const reports: Report[] = []
   if (importReports && Object.keys(exportedReports).length > 0) {
-    const db = await getDB()
-    const tx = db.transaction('reports', 'readwrite')
-
     for (const report of Object.values(exportedReports)) {
       const newReportId = `report_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
       const importedReport: Report = {
         ...report,
         id: newReportId,
+        projectId: undefined,
         updatedAt: new Date().toISOString(),
       }
-      await tx.store.put(importedReport)
+      reports.push(importedReport)
       console.log(`[Import] Restored report: ${report.name}`)
       reportsRestored++
     }
-
-    await tx.done
   }
 
   console.log(`[Import] Parsed project "${project.name}":`, {
@@ -241,6 +239,7 @@ export async function parseImportFile(
     patches,
     filesRestored: fileIdMap.size,
     reportsRestored,
+    reports,
   }
 }
 

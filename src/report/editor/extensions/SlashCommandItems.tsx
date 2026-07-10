@@ -1,5 +1,3 @@
-import { useProjectStore } from '@/state/projectStore';
-import type { TableNode } from '@/types';
 import {
   BulletIcon,
   CalloutIcon,
@@ -21,10 +19,6 @@ import type { SlashCommandItem } from './slashCommandTypes';
 export type { SlashCommandItem,  } from './slashCommandTypes';
 
 export function getSlashCommandItems(): SlashCommandItem[] {
-  const tables = Object.values(useProjectStore.getState().nodes).filter(
-    (node): node is TableNode => node.kind === 'source_table' || node.kind === 'derived_table'
-  );
-
   return [
     {
       title: 'Text',
@@ -124,7 +118,7 @@ export function getSlashCommandItems(): SlashCommandItem[] {
         editor.chain().focus().deleteRange(range).insertContent({
           type: 'chartBlock',
           attrs: {
-            sourceTableId: tables[0]?.id || '',
+            sourceTableId: '',
             chartType: 'bar',
             config: { showLegend: true, showGrid: true },
           },
@@ -140,7 +134,7 @@ export function getSlashCommandItems(): SlashCommandItem[] {
         editor.chain().focus().deleteRange(range).insertContent({
           type: 'embeddedTable',
           attrs: {
-            sourceTableId: tables[0]?.id || '',
+            sourceTableId: '',
             selectedColumns: [],
             rowSelectionMode: 'first_n',
             rowLimit: 10,

@@ -11,7 +11,7 @@ import {
 vi.mock('./db', () => ({
   exportProjectFile: vi.fn(),
   loadProject: vi.fn(),
-  loadAllReports: vi.fn(),
+  loadReportsForProject: vi.fn(),
   loadFile: vi.fn(),
 }))
 vi.mock('@/engine/materializationService', () => ({
@@ -99,7 +99,7 @@ describe('Report HTML Generation', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({ report })
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({ report })
     vi.mocked(materializationService.getTableData).mockResolvedValue({
       rows: [
         { __rowId: 'row-1', customer: 'Alice', total: 42 },
@@ -150,7 +150,7 @@ describe('Report HTML Generation', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({ report })
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({ report })
     vi.mocked(materializationService.getTableData).mockRejectedValue(
       new Error('materialization failed'),
     )
@@ -173,7 +173,7 @@ describe('Report HTML Generation', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({ r1: report })
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({ r1: report })
     const zip = await JSZip.loadAsync(await exportProjectAsZip('test', {
       includeExcel: false,
       includeReportHtml: true,
@@ -194,7 +194,7 @@ describe('Report HTML Generation', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({ r1: report })
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({ r1: report })
     const zip = await JSZip.loadAsync(await exportProjectAsZip('test', {
       includeExcel: false,
       includeReportHtml: true,
@@ -218,7 +218,7 @@ describe('Report HTML Generation', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({ empty: report })
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({ empty: report })
     const zip = await JSZip.loadAsync(await exportProjectAsZip('test', {
       includeExcel: false,
       includeReportHtml: true,
@@ -243,7 +243,7 @@ describe('Report HTML Generation', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({ special: report })
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({ special: report })
     const zip = await JSZip.loadAsync(await exportProjectAsZip('test', {
       includeExcel: false,
       includeReportHtml: true,
