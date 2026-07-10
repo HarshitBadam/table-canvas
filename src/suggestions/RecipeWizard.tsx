@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
@@ -29,22 +29,41 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
   const [bindings, setBindings] = useState<Record<string, string>>(initialBindings)
   const [isExecuting, setIsExecuting] = useState(false)
   
-  useMemo(() => {
-    if (suggestion?.action.kind === 'launchRecipe') {
-      setBindings((suggestion.action.initialBindings as Record<string, string> | undefined) ?? {})
-    }
+  // Reset bindings whenever the wizard opens for a different suggestion. Seed defaults
+  // for option-backed selects (e.g. the period dropdown) so required-field validation
+  // passes without forcing the user to re-pick a value that's already displayed.
+  useEffect(() => {
+    if (suggestion?.action.kind !== 'launchRecipe') return
+    const config = RECIPE_CONFIGS[suggestion.action.recipeId]
+    const seeded: Record<string, string> = {}
+    config?.fields.forEach((field) => {
+      if (field.type === 'select' && field.options && field.options.length > 0) {
+        seeded[field.id] = field.options[0].value
+      }
+    })
+    const initial = (suggestion.action.initialBindings as Record<string, string> | undefined) ?? {}
+    setBindings({ ...seeded, ...initial })
   }, [suggestion])
   
   const columns = schema?.columns ?? []
   
   const getColumnsForField = (field: RecipeField): ColumnSchema[] => {
     if (field.type !== 'column') return []
-    if (!field.columnType) return columns
-    
-    if (field.columnType === 'date') {
-      return columns.filter(c => c.type === 'date' || c.type === 'datetime')
+
+    // Key-column fields in multi-table recipes (e.g. reconciliation) must offer columns
+    // from the table picked in another field, not the table the wizard was launched from.
+    let sourceColumns = columns
+    if (field.sourceTableField) {
+      const boundTableId = bindings[field.sourceTableField]
+      const boundNode = boundTableId ? nodes[boundTableId] : null
+      sourceColumns = boundNode && 'schema' in boundNode ? (boundNode.schema?.columns ?? []) : []
     }
-    return columns.filter(c => c.type === field.columnType)
+
+    if (!field.columnType) return sourceColumns
+    if (field.columnType === 'date') {
+      return sourceColumns.filter(c => c.type === 'date' || c.type === 'datetime')
+    }
+    return sourceColumns.filter(c => c.type === field.columnType)
   }
   
   const otherTables = useMemo(() => {

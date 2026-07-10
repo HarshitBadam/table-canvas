@@ -50,7 +50,12 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
     setIsLoading(true);
     setLoadError(undefined);
 
-    const limit = attrs.rowSelectionMode === 'all' ? 1000 : effectiveLimit;
+    // last_n slices the tail client-side, so it needs a wide window (like 'all'),
+    // not just `effectiveLimit` rows from the top (which would show the FIRST n).
+    const limit =
+      attrs.rowSelectionMode === 'all' || attrs.rowSelectionMode === 'last_n'
+        ? 1000
+        : effectiveLimit;
 
     getTableData(attrs.sourceTableId, 0, limit)
       .then((result) => {

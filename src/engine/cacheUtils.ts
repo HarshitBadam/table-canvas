@@ -43,3 +43,17 @@ export async function tableExistsInEngine(tableId: string): Promise<boolean> {
     return false
   }
 }
+
+/**
+ * Returns the engine row count for a table, or -1 if the table doesn't exist.
+ * Used to detect a stale empty "shell" table (exists in DuckDB but holds 0 rows)
+ * so we don't treat it as a valid cache hit and leave the grid blank.
+ */
+export async function getEngineTableRowCount(tableId: string): Promise<number> {
+  try {
+    const slice = await getEngine().getSlice(tableId, 0, 1)
+    return slice.totalRows
+  } catch {
+    return -1
+  }
+}

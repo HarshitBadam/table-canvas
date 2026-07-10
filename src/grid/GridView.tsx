@@ -103,6 +103,17 @@ export function GridView({ tableId }: GridViewProps) {
     overscan: 15,
   })
 
+  // Drive the windowed fetcher from the viewport: as the user scrolls, make sure the
+  // rows that are about to become visible get loaded from the engine.
+  const virtualItems = rowVirtualizer.getVirtualItems()
+  const firstVisibleIndex = virtualItems[0]?.index ?? 0
+  const lastVisibleIndex = virtualItems[virtualItems.length - 1]?.index ?? 0
+  useEffect(() => {
+    if (windowed.totalRows > 0) {
+      windowed.ensureRange(firstVisibleIndex, lastVisibleIndex)
+    }
+  }, [firstVisibleIndex, lastVisibleIndex, windowed.totalRows, windowed.ensureRange])
+
   useEffect(() => {
     if (!contextMenu) return
     const handleClickOutside = () => setContextMenu(null)

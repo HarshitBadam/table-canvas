@@ -49,7 +49,7 @@ describe('useWindowedRows', () => {
       await new Promise(r => setTimeout(r, 50))
     })
 
-    expect(mockGetSlice).toHaveBeenCalledWith('test_table', 0, 100)
+    expect(mockGetSlice).toHaveBeenCalledWith('test_table', 0, 100, testColumns)
     expect(result.current.totalRows).toBe(500000)
   })
 

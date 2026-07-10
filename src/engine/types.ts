@@ -2,6 +2,7 @@ import {
   CellValue, 
   TableSchema, 
   ColumnProfile,
+  ColumnSchema,
   AggregationType 
 } from '@/types'
 
@@ -93,6 +94,11 @@ export interface FilteredSliceRequest {
   search?: string
   offset: number
   limit: number
+  /**
+   * Client-side only: column schema used by EngineAdapter to remap returned rows
+   * from DuckDB column names back to stable column ids. Stripped before the worker call.
+   */
+  columns?: ColumnSchema[]
 }
 
 export interface FilterConditionDef {

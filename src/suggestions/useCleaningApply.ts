@@ -31,6 +31,8 @@ interface UseCleaningApplyParams {
   selectedIds: Set<string>
   tableId: string
   setSelectedIds: (updater: (prev: Set<string>) => Set<string>) => void
+  /** Current, fully-patched, id-keyed rows fetched from the engine by CleaningPanel. */
+  rows: TableRow[]
 }
 
 export function useCleaningApply({
@@ -38,12 +40,11 @@ export function useCleaningApply({
   selectedIds,
   tableId,
   setSelectedIds,
+  rows,
 }: UseCleaningApplyParams) {
   const saveSnapshot = useProjectStore((state) => state.saveSnapshot)
   const markNodeDirty = useProjectStore((state) => state.markNodeDirty)
   const setHighlights = useProjectStore((state) => state.setHighlights)
-  const patches = useProjectStore((state) => state.patches[tableId])
-  const tableData = useDataStore((state) => state.tableData[tableId])
   const setTableData = useDataStore((state) => state.setTableData)
   const clearSuggestionsCache = useSuggestionsStore((state) => state.clearCache)
 
@@ -53,7 +54,7 @@ export function useCleaningApply({
     const currentSelectedSuggestions = suggestionsWithEffects.filter((s) => selectedIds.has(s.suggestion.id))
     const currentSelectedCount = currentSelectedSuggestions.length
 
-    if (currentSelectedCount === 0 || !tableData?.rows) {
+    if (currentSelectedCount === 0 || rows.length === 0) {
       return
     }
 
@@ -63,26 +64,9 @@ export function useCleaningApply({
       const changesMap = new Map<string, CellChange>()
       const allHighlights: string[] = []
 
-      const mergedRows = tableData.rows
-        .filter((row) => !patches?.deletedRows?.has(row.__rowId))
-        .map((row) => {
-          const patchedRow = { ...row }
-          if (patches?.cellPatches) {
-            for (const [columnId, columnPatches] of Object.entries(patches.cellPatches)) {
-              if (columnPatches[row.__rowId] !== undefined) {
-                patchedRow[columnId] = columnPatches[row.__rowId]
-              }
-            }
-          }
-          return patchedRow
-        })
-
-      if (patches?.insertedRows) {
-        for (const inserted of patches.insertedRows) {
-          const insertedRow: TableRow = { __rowId: inserted.rowId, ...inserted.values }
-          mergedRows.push(insertedRow)
-        }
-      }
+      // Engine rows already reflect all patches (cell edits, deletions, insertions),
+      // so they are used directly with no extra merge.
+      const mergedRows = rows
 
       // Process nullify_placeholders LAST so it takes precedence over normalize_case
       const placeholderSuggestions = currentSelectedSuggestions.filter(
@@ -188,9 +172,8 @@ export function useCleaningApply({
   }, [
     suggestionsWithEffects,
     selectedIds,
-    tableData?.rows,
+    rows,
     tableId,
-    patches,
     saveSnapshot,
     setTableData,
     markNodeDirty,
