@@ -188,76 +188,6 @@ function tiptapToHtml(content: JSONContent, dataMap: EmbeddedDataMap): string {
   return html
 }
 
-interface LegacyBlock {
-  type: string
-  content?: string
-  level?: number
-  chartType?: string
-  data?: {
-    headers?: string[]
-    rows?: unknown[][]
-  }
-}
-
-function renderTableHtml(headers: string[], rows: unknown[][]): string {
-  let html = '<table border="1" style="border-collapse: collapse; width: 100%;">\n'
-  html += '<thead><tr>'
-  for (const header of headers) {
-    html += `<th style="padding: 8px; text-align: left;">${escapeHtml(header)}</th>`
-  }
-  html += '</tr></thead>\n<tbody>'
-  for (const row of rows) {
-    html += '<tr>'
-    for (const cell of row) {
-      html += `<td style="padding: 8px;">${cell != null ? escapeHtml(String(cell)) : ''}</td>`
-    }
-    html += '</tr>\n'
-  }
-  html += '</tbody></table>\n'
-  return html
-}
-
-function blocksToHtml(blocks: LegacyBlock[]): string {
-  if (!blocks || blocks.length === 0) return ''
-
-  let html = ''
-
-  for (const block of blocks) {
-    switch (block.type) {
-      case 'text':
-        html += `<p>${block.content || ''}</p>\n`
-        break
-      case 'heading': {
-        const level = block.level || 1
-        html += `<h${level}>${block.content || ''}</h${level}>\n`
-        break
-      }
-      case 'divider':
-        html += '<hr>\n'
-        break
-      case 'chart':
-        html += `<div class="block-placeholder">[Chart: ${block.chartType || 'Unknown'}]</div>\n`
-        break
-      case 'table_snippet':
-        html += `<div class="block-placeholder">[Table Snippet]</div>\n`
-        break
-      case 'table_inline':
-      case 'table_blank':
-        if (block.data?.headers && block.data?.rows) {
-          html += renderTableHtml(block.data.headers, block.data.rows)
-        } else {
-          const label = block.type === 'table_inline' ? 'Inline Table' : 'Blank Table'
-          html += `<div class="block-placeholder">[${label}]</div>\n`
-        }
-        break
-      default:
-        html += `<div class="block-placeholder">[${block.type || 'Unknown Block'}]</div>\n`
-    }
-  }
-
-  return html
-}
-
 /**
  * Collect all embedded table/chart source table IDs from TipTap content,
  * so callers can pre-fetch data.
@@ -314,8 +244,6 @@ export function generateReportHtml(report: Report, dataMap: EmbeddedDataMap = {}
 
   if (report.tiptapContent && report.tiptapContent.content && report.tiptapContent.content.length > 0) {
     content = tiptapToHtml(report.tiptapContent, dataMap)
-  } else if (report.blocks && report.blocks.length > 0) {
-    content = blocksToHtml(report.blocks)
   } else {
     content = '<p><em>This report is empty.</em></p>'
   }
@@ -415,11 +343,11 @@ export function generateReportHtml(report: Report, dataMap: EmbeddedDataMap = {}
     Created: ${new Date(report.createdAt).toLocaleDateString()}<br>
     Last updated: ${new Date(report.updatedAt).toLocaleDateString()}
   </div>
-  
+
   <div class="content">
     ${content}
   </div>
-  
+
   <div class="footer">
     Exported from Table Canvas on ${new Date().toLocaleDateString()}
   </div>

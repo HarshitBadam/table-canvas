@@ -16,18 +16,18 @@ export interface TableData {
 
 interface DataStoreState {
   tableData: Record<string, TableData>
-  
+
   setTableData: (tableId: string, rows: TableRow[]) => void
   setLoading: (tableId: string, isLoading: boolean) => void
   setError: (tableId: string, error: string) => void
   clearTableData: (tableId: string) => void
-  
+
   getSlice: (tableId: string, start: number, end: number) => TableRow[]
 }
 
 export const useDataStore = create<DataStoreState>((set, get) => ({
   tableData: {},
-  
+
   setTableData: (tableId, rows) => {
     set((state) => ({
       tableData: {
@@ -42,7 +42,7 @@ export const useDataStore = create<DataStoreState>((set, get) => ({
       },
     }))
   },
-  
+
   setLoading: (tableId, isLoading) => {
     set((state) => ({
       tableData: {
@@ -57,7 +57,7 @@ export const useDataStore = create<DataStoreState>((set, get) => ({
       },
     }))
   },
-  
+
   setError: (tableId, error) => {
     set((state) => ({
       tableData: {
@@ -73,14 +73,15 @@ export const useDataStore = create<DataStoreState>((set, get) => ({
       },
     }))
   },
-  
+
   clearTableData: (tableId) => {
     set((state) => {
-      const { [tableId]: _, ...rest } = state.tableData
+      const rest = { ...state.tableData }
+      delete rest[tableId]
       return { tableData: rest }
     })
   },
-  
+
   getSlice: (tableId, start, end) => {
     const data = get().tableData[tableId]
     if (!data?.rows) return []

@@ -1,10 +1,16 @@
+/**
+ * EditableTableNode - TipTap Custom Node for Editable Tables
+ *
+ * A blank table that users can edit directly.
+ */
+
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
-import { useState, useCallback, memo, useRef, useEffect } from 'react';
-import { TableContextMenu } from './TableContextMenu';
-import type { ContextMenuState } from './TableContextMenu';
-import { DimensionPickerModal } from './DimensionPickerModal';
+import { useState, useCallback, useMemo, memo, useRef, useEffect } from 'react';
 
+// ============================================================================
+// Types
+// ============================================================================
 
 interface EditableTableNodeAttrs {
   headers: string[];
@@ -17,6 +23,18 @@ interface EditableTableNodeOptions {
   reportId?: string;
 }
 
+interface ContextMenuState {
+  show: boolean;
+  x: number;
+  y: number;
+  type: 'row' | 'column' | 'cell';
+  index: number;
+  colIndex?: number;
+}
+
+// ============================================================================
+// React Component
+// ============================================================================
 
 const EditableTableNodeView = memo(function EditableTableNodeView({
   node,
@@ -30,6 +48,7 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
   const [showDimensionPicker, setShowDimensionPicker] = useState(!attrs.initialized);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
+  // Handle dimension selection
   const handleDimensionSelect = useCallback((rows: number, cols: number) => {
     const newHeaders = Array.from({ length: cols }, (_, i) => `Column ${i + 1}`);
     const newRows = Array.from({ length: rows }, () => newHeaders.map(() => ''));
@@ -37,9 +56,17 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
     setShowDimensionPicker(false);
   }, [updateAttributes]);
 
-  const headers = attrs.headers.length > 0 ? attrs.headers : ['Column 1', 'Column 2', 'Column 3'];
-  const rows = attrs.rows.length > 0 ? attrs.rows : [['', '', ''], ['', '', ''], ['', '', '']];
+  // Initialize with default if empty (memoized so callback deps stay stable)
+  const headers = useMemo(
+    () => (attrs.headers.length > 0 ? attrs.headers : ['Column 1', 'Column 2', 'Column 3']),
+    [attrs.headers]
+  );
+  const rows = useMemo(
+    () => (attrs.rows.length > 0 ? attrs.rows : [['', '', ''], ['', '', ''], ['', '', '']]),
+    [attrs.rows]
+  );
 
+  // Close context menu on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as globalThis.Node)) {
@@ -107,7 +134,7 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
     } else if (e.key === 'Escape') {
       setEditingCell(null);
     }
-  }, [handleCellBlur, editingCell, rows, headers, updateAttributes]);
+  }, [handleCellBlur, editingCell, editValue, rows, headers, updateAttributes]);
 
   const handleHeaderClick = useCallback((colIndex: number) => {
     setEditValue(headers[colIndex] || '');
@@ -161,12 +188,14 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
     setContextMenu(null);
   }, [headers, rows, updateAttributes]);
 
+  // Show dimension picker modal for new tables
   if (showDimensionPicker) {
     return (
       <NodeViewWrapper className="editable-table-block">
-        <DimensionPickerModal 
+        <DimensionPickerModal
           onSelect={handleDimensionSelect}
           onCancel={() => {
+            // Use default 3x3
             handleDimensionSelect(3, 3);
           }}
         />
@@ -177,11 +206,13 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
   return (
     <NodeViewWrapper className="editable-table-block">
       <div className={`editable-table-outer ${selected ? 'is-selected' : ''}`}>
+        {/* Caption */}
         {attrs.caption && (
           <div className="editable-table-caption">{attrs.caption}</div>
         )}
 
         <div className="editable-table-layout">
+          {/* Main table */}
           <div className="editable-table-container">
             <table className="editable-table">
               <thead>
@@ -243,9 +274,10 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
             </table>
           </div>
 
+          {/* Add column button - right side */}
           {selected && (
-            <button 
-              onClick={() => addColumn()} 
+            <button
+              onClick={() => addColumn()}
               className="table-add-btn table-add-col-btn"
               title="Add column"
             >
@@ -256,9 +288,10 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
           )}
         </div>
 
+        {/* Add row button - bottom */}
         {selected && (
-          <button 
-            onClick={() => addRow()} 
+          <button
+            onClick={() => addRow()}
             className="table-add-btn table-add-row-btn"
             title="Add row"
           >
@@ -268,30 +301,149 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
           </button>
         )}
 
-        <TableContextMenu
-          menu={contextMenu}
-          menuRef={contextMenuRef}
-          headers={headers}
-          rows={rows}
-          onAddRow={addRow}
-          onAddColumn={addColumn}
-          onDeleteRow={deleteRow}
-          onDeleteColumn={deleteColumn}
-        />
+        {/* Context Menu */}
+        {contextMenu && (
+          <div
+            ref={contextMenuRef}
+            className="table-context-menu"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            {contextMenu.type === 'column' && (
+              <>
+                <button onClick={() => addColumn(contextMenu.index)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  Insert column left
+                </button>
+                <button onClick={() => addColumn(contextMenu.index + 1)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  Insert column right
+                </button>
+                {headers.length > 1 && (
+                  <button onClick={() => deleteColumn(contextMenu.index)} className="danger">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete column
+                  </button>
+                )}
+              </>
+            )}
+            {contextMenu.type === 'cell' && (
+              <>
+                <button onClick={() => addRow(contextMenu.index)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  Insert row above
+                </button>
+                <button onClick={() => addRow(contextMenu.index + 1)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  Insert row below
+                </button>
+                {rows.length > 1 && (
+                  <button onClick={() => deleteRow(contextMenu.index)} className="danger">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete row
+                  </button>
+                )}
+                <div className="context-menu-divider" />
+                {contextMenu.colIndex !== undefined && headers.length > 1 && (
+                  <button onClick={() => deleteColumn(contextMenu.colIndex!)} className="danger">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete column
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </NodeViewWrapper>
   );
 });
 
+// ============================================================================
+// Dimension Picker Modal Component
+// ============================================================================
 
+function DimensionPickerModal({ onSelect, onCancel }: { onSelect: (rows: number, cols: number) => void; onCancel: () => void }) {
+  const [rows, setRows] = useState(3);
+  const [cols, setCols] = useState(3);
+
+  const increment = (setter: React.Dispatch<React.SetStateAction<number>>, max: number) => {
+    setter(prev => Math.min(prev + 1, max));
+  };
+
+  const decrement = (setter: React.Dispatch<React.SetStateAction<number>>, min: number) => {
+    setter(prev => Math.max(prev - 1, min));
+  };
+
+  return (
+    <div className="dimension-modal-overlay" onClick={onCancel}>
+      <div className="dimension-modal" onClick={e => e.stopPropagation()}>
+        <div className="dimension-modal-header">
+          <h3>Insert Table</h3>
+          <button className="dimension-modal-close" onClick={onCancel}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="dimension-modal-body">
+          <div className="dimension-input-group">
+            <label>Rows</label>
+            <div className="dimension-stepper">
+              <button onClick={() => decrement(setRows, 1)} disabled={rows <= 1}>−</button>
+              <span>{rows}</span>
+              <button onClick={() => increment(setRows, 20)}>+</button>
+            </div>
+          </div>
+
+          <span className="dimension-separator">×</span>
+
+          <div className="dimension-input-group">
+            <label>Columns</label>
+            <div className="dimension-stepper">
+              <button onClick={() => decrement(setCols, 1)} disabled={cols <= 1}>−</button>
+              <span>{cols}</span>
+              <button onClick={() => increment(setCols, 20)}>+</button>
+            </div>
+          </div>
+        </div>
+
+        <div className="dimension-modal-footer">
+          <button className="dimension-btn-cancel" onClick={onCancel}>Cancel</button>
+          <button className="dimension-btn-create" onClick={() => onSelect(rows, cols)}>
+            Create {rows} × {cols} Table
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// TipTap Node Definition
+// ============================================================================
 
 export const EditableTableNode = Node.create<EditableTableNodeOptions>({
   name: 'editableTable',
-  
+
   group: 'block',
-  
+
   atom: true,
-  
+
   draggable: true,
 
   addOptions() {
@@ -321,3 +473,5 @@ export const EditableTableNode = Node.create<EditableTableNodeOptions>({
     return ReactNodeViewRenderer(EditableTableNodeView);
   },
 });
+
+export default EditableTableNode;

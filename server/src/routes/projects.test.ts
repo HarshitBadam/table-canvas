@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import { Types } from 'mongoose';
-import { createTestApp, createDefaultMockUser, createSecondMockUser, MockUser } from '../test/testApp.js';
+import { createTestApp, createDefaultMockUser, MockUser } from '../test/testApp.js';
 import { Project } from '../models/Project.js';
 import { User } from '../models/User.js';
 import {
@@ -107,9 +107,9 @@ describe('Projects API', () => {
 
       const p1 = await createTestProject({ userId, name: 'Project 1' });
       await new Promise((r) => setTimeout(r, 10));
-      const p2 = await createTestProject({ userId, name: 'Project 2' });
+      await createTestProject({ userId, name: 'Project 2' });
       await new Promise((r) => setTimeout(r, 10));
-      const p3 = await createTestProject({ userId, name: 'Project 3' });
+      await createTestProject({ userId, name: 'Project 3' });
 
       p1.name = 'Project 1 Updated';
       await p1.save();
