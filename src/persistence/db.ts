@@ -7,7 +7,15 @@ export type { StoredProject } from './projectStorage'
 
 export { saveFile, loadFile, loadFileRecord, deleteFile } from './fileStorage'
 
-export { saveReport, loadReport, loadAllReports, listReports, deleteReport, saveAllReports } from './reportStorage'
+export {
+  saveReport,
+  loadReport,
+  loadAllReports,
+  loadReportsForProject,
+  listReports,
+  deleteReport,
+  saveAllReports,
+} from './reportStorage'
 
 export {
   exportProjectFile,

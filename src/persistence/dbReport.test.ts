@@ -44,6 +44,14 @@ describe('Report Operations', () => {
     expect(reports.r3.name).toBe('Report 3')
   })
 
+  it('loads only reports owned by the requested project', async () => {
+    const db = await getDB()
+    await db.saveReport({ ...createMockReport('p1-report', 'Project 1'), projectId: 'project-1' })
+    await db.saveReport({ ...createMockReport('p2-report', 'Project 2'), projectId: 'project-2' })
+    const reports = await db.loadReportsForProject('project-1')
+    expect(Object.keys(reports)).toEqual(['p1-report'])
+  })
+
   it('bulk saves reports', async () => {
     const db = await getDB()
     await db.saveAllReports({
