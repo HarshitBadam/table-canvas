@@ -2,7 +2,7 @@ import type { Suggestion, CellValue, CleaningOperation } from '@/types'
 import type { TableRow } from '@/state/dataStore'
 import { isPlaceholder } from './cleaningConstants'
 
-export interface CellChange {
+interface CellChange {
   rowId: string
   columnId: string
   oldValue: CellValue

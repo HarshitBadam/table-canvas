@@ -1,16 +1,3 @@
-/**
- * Shared table-source utilities for report editor nodes.
- *
- * Both the embedded-table and chart nodes need to:
- *   1. list the tables a user can reference,
- *   2. read a source table's schema + rows from the data store, and
- *   3. make sure that source table is actually materialized (the data store
- *      is an in-memory cache that starts empty and is filled on demand).
- *
- * Centralizing this here keeps those features consistent and well-defined,
- * and keeps the pure selection helpers unit-testable in isolation.
- */
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TableRow } from '@/state/dataStore';
 import { useProjectStore } from '@/state/projectStore';
@@ -21,13 +8,8 @@ import type {
   ColumnSchema,
 } from '@/types';
 
-// ============================================================================
-// Row selection (pure)
-// ============================================================================
-
 export type RowSelectionMode = 'all' | 'first_n' | 'last_n';
 
-/** Number of rows used when a limit is required but none is configured. */
 export const DEFAULT_ROW_LIMIT = 10;
 export const MAX_EMBEDDED_TABLE_ROWS = 1_000;
 export const MAX_REPORT_CHART_ROWS = 5_000;
@@ -124,10 +106,6 @@ export function aggregateReportChartRows(
   });
 }
 
-/**
- * Select a subset of rows according to the configured mode.
- * Pure and side-effect free so it can be unit tested directly.
- */
 export function selectRows<T>(
   rows: readonly T[],
   mode: RowSelectionMode,
@@ -143,17 +121,6 @@ export function selectRows<T>(
   return rows.slice();
 }
 
-// ============================================================================
-// Column selection (pure)
-// ============================================================================
-
-/**
- * Resolve which columns to display.
- *
- * An empty selection means "all columns". Any selected column ids that no
- * longer exist in the schema are ignored (schemas can change underneath a
- * report). Results always follow the schema's column order for stability.
- */
 export function resolveDisplayColumns(
   selectedColumnIds: readonly string[] | undefined,
   allColumns: readonly ColumnSchema[]
@@ -163,21 +130,9 @@ export function resolveDisplayColumns(
   }
   const selected = new Set(selectedColumnIds);
   const filtered = allColumns.filter((c) => selected.has(c.id));
-  // If the selection references only stale columns, fall back to all columns
-  // rather than rendering an empty table.
   return filtered.length > 0 ? filtered : allColumns.slice();
 }
 
-/**
- * Toggle a single column in a selection, using an empty array to mean
- * "all columns".
- *
- * Rules:
- *   - Starts from the effective selection (empty selection expands to "all").
- *   - Toggling a column adds/removes it.
- *   - The result is normalized to schema order, and collapses back to `[]`
- *     (meaning "all") when every column ends up selected.
- */
 export function toggleColumnSelection(
   selectedColumnIds: readonly string[],
   allColumnIds: readonly string[],
@@ -194,18 +149,9 @@ export function toggleColumnSelection(
 
   const ordered = allColumnIds.filter((id) => next.includes(id));
 
-  // Empty means "all", so collapse a full selection back to [].
   return ordered.length === allColumnIds.length ? [] : ordered;
 }
 
-// ============================================================================
-// Hooks
-// ============================================================================
-
-/**
- * List of tables that can be referenced from a report (source + derived).
- * Insertion order is preserved to match the canvas.
- */
 export function useSelectableTables(): TableNodeType[] {
   const nodes = useProjectStore((state) => state.nodes);
   return useMemo(
@@ -242,14 +188,6 @@ interface TableSourceOptions {
   maxRows?: number;
 }
 
-/**
- * Read a source table's schema and rows, ensuring the table is materialized.
- *
- * The data store is a transient cache: after a reload (or before a table has
- * ever been opened) it can be empty even though the table definition exists.
- * This hook triggers materialization on demand so embedded tables and charts
- * render reliably wherever they appear.
- */
 export function useTableSource(
   sourceTableId: string | undefined,
   options: TableSourceOptions = {},
@@ -263,8 +201,12 @@ export function useTableSource(
     sourceTableId ? (state.nodes[sourceTableId] as TableNodeType | undefined) : undefined
   );
   const columns = tableNode?.schema?.columns ?? [];
-  const expectedRowCount = tableNode?.schema?.rowCount ?? 0;
+  const expectedRowCount = tableNode?.cacheInfo?.lastRowCount
+    ?? tableNode?.schema?.rowCount
+    ?? 0;
   const cacheError = tableNode?.cacheInfo?.error;
+  const sourceVersionHash = tableNode?.cacheInfo?.currentVersionHash;
+  const dataRevision = tableNode?.cacheInfo?.dataRevision ?? 0;
   const isTable = tableNode?.kind === 'source_table' || tableNode?.kind === 'derived_table';
   const safeMaxRows = Math.max(1, Math.min(Math.floor(maxRows) || MAX_EMBEDDED_TABLE_ROWS, MAX_REPORT_CHART_ROWS));
   const safeRowLimit = Math.max(
@@ -334,6 +276,8 @@ export function useTableSource(
     rowSelectionMode,
     retryCount,
     expectedRowCount,
+    sourceVersionHash,
+    dataRevision,
   ]);
 
   let status: TableSourceStatus;

@@ -1,9 +1,5 @@
 import type { ProjectNode, TableNode } from '@/types'
 
-/**
- * Filter nodes to only source and derived tables, sorted by creation time (oldest first).
- * Shared between the persistence export layer and the dashboard UI.
- */
 export function getTableNodes(nodes: Record<string, ProjectNode>): TableNode[] {
   return Object.values(nodes)
     .filter((node): node is TableNode =>
@@ -18,14 +14,6 @@ export function generateId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 9)}`
 }
 
-/**
- * Format a number.
- *
- * Without options: format with locale commas (e.g. 1,234,567).
- * With `compact: true`: abbreviate large values with B/M/K suffixes
- * (e.g. 1.23B, 45.67M, 8.91K), use locale commas for integers below 1 000,
- * and two decimal places for non-integers below 1 000.
- */
 export function formatNumber(num: number, options?: { compact?: boolean }): string {
   if (options?.compact) {
     const abs = Math.abs(num)
@@ -64,23 +52,16 @@ function parseDate(value: unknown): Date | null {
   return null
 }
 
-export function looksLikeDate(value: unknown): boolean {
+function looksLikeDate(value: unknown): boolean {
   if (value === null || value === undefined) return false
   const str = String(value).trim()
-  // ISO 8601 (YYYY-MM-DD, optionally with time)
   if (/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?/.test(str)) return true
-  // MM/DD/YYYY, DD-MM-YYYY, or YYYY/MM/DD variants
   if (/^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(str)) return true
-  // Month DD, YYYY or Month DD YYYY
   if (/^[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4}$/.test(str)) return true
-  // DD Month YYYY
   if (/^\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}$/.test(str)) return true
   return false
 }
 
-/**
- * Check if a string is a pure number (no trailing chars)
- */
 function isStrictNumber(value: string): boolean {
   const trimmed = value.trim().replace(/,/g, '')
   return /^-?\d+(\.\d+)?$/.test(trimmed)

@@ -62,4 +62,19 @@ describe('file parsers', () => {
 
     expect(result.rows).toEqual([{ __rowId: 'row_0', amount_id: 12 }])
   })
+
+  it('rehydrates renamed columns from their original imported header', async () => {
+    const result = await parseCsvBuffer(csvBuffer('Amount\n12'), {
+      columns: [{
+        id: 'amount_id',
+        name: 'Revenue',
+        sourceName: 'Amount',
+        type: 'number',
+        nullable: false,
+      }],
+      rowCount: 1,
+    })
+
+    expect(result.rows).toEqual([{ __rowId: 'row_0', amount_id: 12 }])
+  })
 })

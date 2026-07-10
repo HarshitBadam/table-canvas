@@ -1,8 +1,3 @@
-/**
- * EngineAdapter - Interface for data operations
- * This adapter abstracts the DuckDB-WASM engine, allowing for future swaps
- */
-
 import { WorkerRPC } from './worker/rpc'
 import type {
   LoadTableRequest,
@@ -15,15 +10,10 @@ import type {
 } from './types'
 import type { TransformDef, CellValue, TableSchema, Patches, ColumnSchema } from '@/types'
 import EngineWorker from './worker/engine.worker?worker'
+import { INTERNAL_ROW_ID_COLUMN } from './internalColumns'
 
 let engineInstance: EngineAdapter | null = null
 
-/**
- * DuckDB stores columns under their human-readable display names (so transforms can
- * reference columns by name), but the rest of the app addresses cells by the stable
- * column `id`. Slice reads therefore come back keyed by name and must be remapped to
- * ids before any consumer (grid, report embeds, charts, export) can find their values.
- */
 function remapRowsToColumnIds(
   rows: Record<string, CellValue>[],
   columns: ColumnSchema[],
@@ -37,7 +27,7 @@ function remapRowsToColumnIds(
   return rows.map((row) => {
     const remapped: Record<string, CellValue> = {}
     for (const key in row) {
-      remapped[nameToId.get(key) ?? key] = row[key]
+      remapped[key === INTERNAL_ROW_ID_COLUMN ? '__rowId' : (nameToId.get(key) ?? key)] = row[key]
     }
     return remapped
   })
@@ -75,9 +65,10 @@ class EngineAdapter {
   ): Promise<void> {
     await this.ensureInitialized()
 
-    const columns = schema.columns.map(c => c.name)
-    const columnIds = schema.columns.map(c => c.id)
-    const types = schema.columns.map(c => c.type)
+    const columns = [...schema.columns.map(c => c.name), INTERNAL_ROW_ID_COLUMN]
+    const dataColumnIds = schema.columns.map(c => c.id)
+    const columnIds = [...dataColumnIds, INTERNAL_ROW_ID_COLUMN]
+    const types = [...schema.columns.map(c => c.type), 'string']
     
     const processedRows = rows.map((row, rowIndex) => {
       const rowId = row.__rowId as string || `row_${rowIndex}`
@@ -86,18 +77,22 @@ class EngineAdapter {
         return null
       }
       
-      return columnIds.map(colId => {
+      const values = dataColumnIds.map(colId => {
         if (patches?.cellPatches?.[colId]?.[rowId] !== undefined) {
           return patches.cellPatches[colId][rowId]
         }
         return row[colId] ?? null
       })
+      return [...values, rowId]
     }).filter(row => row !== null) as CellValue[][]
 
     if (patches?.insertedRows) {
       for (const inserted of patches.insertedRows) {
-        const rowValues = columnIds.map(colId => inserted.values[colId] ?? null)
-        processedRows.push(rowValues)
+        if (patches.deletedRows?.has(inserted.rowId)) continue
+        const rowValues = dataColumnIds.map((colId) =>
+          patches.cellPatches?.[colId]?.[inserted.rowId] ?? inserted.values[colId] ?? null
+        )
+        processedRows.push([...rowValues, inserted.rowId])
       }
     }
 
@@ -146,7 +141,6 @@ class EngineAdapter {
   async getFilteredSlice(request: FilteredSliceRequest): Promise<TableSlice> {
     await this.ensureInitialized()
 
-    // `columns` is a client-side hint for name->id remapping and must not be sent to the worker.
     const { columns, ...workerRequest } = request
     const slice = await this.rpc.call<TableSlice>('getFilteredSlice', workerRequest)
     if (columns && columns.length > 0) {
@@ -160,9 +154,9 @@ class EngineAdapter {
     return this.rpc.call<CellValue[]>('getDistinctValues', { tableId, column, limit })
   }
 
-  async updateCell(tableId: string, rowIndex: number, column: string, value: CellValue, columnType?: string): Promise<void> {
+  async updateCell(tableId: string, rowId: string, column: string, value: CellValue, columnType?: string): Promise<void> {
     await this.ensureInitialized()
-    await this.rpc.call('updateCell', { tableId, rowIndex, column, value, columnType })
+    await this.rpc.call('updateCell', { tableId, rowId, column, value, columnType })
   }
 
   async insertRow(tableId: string, values: Record<string, CellValue>, columns: string[], types: string[]): Promise<void> {

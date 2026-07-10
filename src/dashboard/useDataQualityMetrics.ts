@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import { useDataStore } from '@/state/dataStore'
 import {
   useTableNodes,
   useAllProfiles,
@@ -17,13 +16,14 @@ export function useDataQualityMetrics(): {
 } {
   const tableNodes = useTableNodes()
   const { profiles, isLoading: profilesLoading } = useAllProfiles()
-  const tableData = useDataStore((state) => state.tableData)
 
   const tableMetrics = useMemo(() => {
     return tableNodes.map((table): TableQualityMetrics => {
       const profile = profiles[table.id]
-      const data = tableData[table.id]
-      const rowCount = data?.rows?.length || table.schema?.rowCount || profile?.rowCount || 0
+      const rowCount = table.cacheInfo?.lastRowCount
+        ?? profile?.rowCount
+        ?? table.schema?.rowCount
+        ?? 0
       const columnCount = table.schema?.columns?.length || 0
       const isLoading = !profile && profilesLoading
 
@@ -55,7 +55,7 @@ export function useDataQualityMetrics(): {
         typeBreakdown,
       }
     })
-  }, [tableNodes, profiles, tableData, profilesLoading])
+  }, [tableNodes, profiles, profilesLoading])
 
   return { tableMetrics, isLoading: profilesLoading }
 }

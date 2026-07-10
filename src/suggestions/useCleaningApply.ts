@@ -27,7 +27,9 @@ export function useCleaningApply({
   rows,
 }: UseCleaningApplyParams) {
   const saveSnapshot = useProjectStore((state) => state.saveSnapshot)
-  const markNodeDirty = useProjectStore((state) => state.markNodeDirty)
+  const markNodeAndDescendantsDirty = useProjectStore(
+    (state) => state.markNodeAndDescendantsDirty,
+  )
   const setHighlights = useProjectStore((state) => state.setHighlights)
   const setTableData = useDataStore((state) => state.setTableData)
   const clearSuggestionsCache = useSuggestionsStore((state) => state.clearCache)
@@ -105,7 +107,7 @@ export function useCleaningApply({
           }
         })
 
-        markNodeDirty(tableId)
+        markNodeAndDescendantsDirty(tableId)
         await loadProfileForTable(tableId, true)
       }
 
@@ -137,7 +139,7 @@ export function useCleaningApply({
     tableId,
     saveSnapshot,
     setTableData,
-    markNodeDirty,
+    markNodeAndDescendantsDirty,
     setHighlights,
     clearSuggestionsCache,
     setSelectedIds,

@@ -63,7 +63,7 @@ export class CreateChartCommand implements SuggestionCommand {
       store.addEdge({
         fromNodeId: sourceTableId,
         toNodeId: nodeId,
-        transformType: 'select',
+        transformType: 'reference',
       })
 
       showToast({

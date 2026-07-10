@@ -39,4 +39,14 @@ describe('Database edge cases', () => {
     expect(await db.loadProject('concurrent')).not.toBeNull()
   })
 
+  it('preserves the original creation timestamp across saves', async () => {
+    const db = await getDB()
+    await db.saveProject('timestamps', 'First', {}, {}, {})
+    const createdAt = (await db.loadProject('timestamps'))?.createdAt
+
+    await db.saveProject('timestamps', 'Second', {}, {}, {})
+
+    expect((await db.loadProject('timestamps'))?.createdAt).toBe(createdAt)
+  })
+
 })

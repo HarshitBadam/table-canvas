@@ -1,8 +1,7 @@
 import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, PatchesSliceState } from './types'
 import type { Patches } from '@/types'
-import { getEngine } from '@/engine/EngineAdapter'
-import { getAllDescendants } from '@/engine/dependencyGraph'
+import { getDependentNodeIds } from '@/engine/workflowGraph'
 
 export const createInitialPatches = (): Patches => ({
   cellPatches: {},
@@ -32,42 +31,27 @@ export const createPatchesSlice: StateCreator<
       patches.cellPatches[columnId][rowId] = value
 
       const node = state.nodes[tableId]
-      if (node) {
+      if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
+        node.cacheInfo ??= {}
+        node.cacheInfo.dataRevision = (node.cacheInfo.dataRevision ?? 0) + 1
         node.updatedAt = new Date().toISOString()
       }
     })
 
-    // Incremental DuckDB update — extract row index from rowId
-    const rowIndexMatch = rowId.match(/^row_(\d+)$/)
-    if (rowIndexMatch) {
-      const rowIndex = parseInt(rowIndexMatch[1], 10)
-      const node = get().nodes[tableId]
-      if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-        const col = node.schema?.columns.find(c => c.id === columnId)
-        if (col) {
-          try {
-            getEngine().updateCell(tableId, rowIndex, col.name, value, col.type).catch(err => {
-              console.error('[patchesSlice] Incremental updateCell failed:', err)
-            })
-          } catch {
-            // Engine not available (e.g. in test environment without Worker support)
-          }
-        }
-      }
-    }
-
-    // Only mark DESCENDANTS dirty (not self) to avoid full file re-parse
-    const { edges } = get()
-    const descendants = getAllDescendants(tableId, edges)
+    const { nodes, edges } = get()
+    const descendants = getDependentNodeIds(nodes, edges, tableId)
     if (descendants.size > 0) {
       set((draft) => {
         for (const descId of descendants) {
           const dNode = draft.nodes[descId]
           if (dNode && (dNode.kind === 'source_table' || dNode.kind === 'derived_table')) {
-            const tableNode = dNode as { cacheInfo?: { isDirty?: boolean; error?: string } }
+            const tableNode = dNode as {
+              cacheInfo?: { isDirty?: boolean; error?: string; dataRevision?: number }
+            }
             if (!tableNode.cacheInfo) tableNode.cacheInfo = {}
             tableNode.cacheInfo.isDirty = true
             tableNode.cacheInfo.error = undefined
+            tableNode.cacheInfo.dataRevision = (tableNode.cacheInfo.dataRevision ?? 0) + 1
           }
         }
       })

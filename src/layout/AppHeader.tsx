@@ -112,7 +112,10 @@ export function AppHeader({
           <div className="flex-1" />
 
           {exportError && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-600 rounded-md text-sm">
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-600 rounded-md text-sm"
+              role="alert"
+            >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -158,7 +161,7 @@ export function AppHeader({
           <input
             ref={importInputRef}
             type="file"
-            accept=".json,.tablecanvas.json"
+            accept=".zip,.tablecanvas.zip,.json,.tablecanvas.json"
             onChange={handleImportFile}
             className="hidden"
           />
