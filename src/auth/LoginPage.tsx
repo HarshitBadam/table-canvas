@@ -96,6 +96,9 @@ export function LoginPage() {
       client_id: GOOGLE_CLIENT_ID,
       callback: handleGoogleCredential,
     });
+    // Clear any previously rendered button first; otherwise effect re-runs (StrictMode
+    // double-invoke, or a changed callback identity) stack duplicate Google buttons.
+    googleBtnRef.current.innerHTML = '';
     g.accounts.id.renderButton(googleBtnRef.current, {
       type: 'standard',
       theme: 'outline',

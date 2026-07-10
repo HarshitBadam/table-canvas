@@ -1,7 +1,7 @@
 import { getEngine } from './EngineAdapter'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
-import { simpleHash, computeDerivedVersionHash, tableExistsInEngine } from './cacheUtils'
+import { simpleHash, computeDerivedVersionHash, getEngineTableRowCount } from './cacheUtils'
 import type { DerivedTableNode } from '@/types'
 import type { MaterializationResult } from './materializationService'
 
@@ -43,12 +43,17 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
       upstreamHashes
     )
 
-    const existsInEngine = await tableExistsInEngine(tableId)
-    const hasDataInStore = dataStore.tableData[tableId]?.rows?.length > 0
+    // The grid reads from DuckDB, not the data store, so validate the cache against the
+    // engine. The store is intentionally emptied after compute, so checking it here would
+    // force a needless recompute on every view.
+    const engineRowCount = await getEngineTableRowCount(tableId)
+    const existsInEngine = engineRowCount >= 0
+    const expectedRows = node.cacheInfo?.lastRowCount ?? 0
+    const engineHasExpectedData = expectedRows === 0 || engineRowCount > 0
 
     if (
       existsInEngine &&
-      hasDataInStore &&
+      engineHasExpectedData &&
       !node.cacheInfo?.isDirty &&
       node.cacheInfo?.currentVersionHash === currentVersionHash &&
       node.cacheInfo?.lastUpstreamHash === upstreamHashes.join(':')

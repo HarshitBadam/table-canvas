@@ -13,10 +13,35 @@ import type {
   TransformResult,
   FilteredSliceRequest,
 } from './types'
-import type { TransformDef, CellValue, TableSchema, Patches } from '@/types'
+import type { TransformDef, CellValue, TableSchema, Patches, ColumnSchema } from '@/types'
 import EngineWorker from './worker/engine.worker?worker'
 
 let engineInstance: EngineAdapter | null = null
+
+/**
+ * DuckDB stores columns under their human-readable display names (so transforms can
+ * reference columns by name), but the rest of the app addresses cells by the stable
+ * column `id`. Slice reads therefore come back keyed by name and must be remapped to
+ * ids before any consumer (grid, report embeds, charts, export) can find their values.
+ */
+function remapRowsToColumnIds(
+  rows: Record<string, CellValue>[],
+  columns: ColumnSchema[],
+): Record<string, CellValue>[] {
+  const nameToId = new Map<string, string>()
+  for (const col of columns) {
+    nameToId.set(col.name, col.id)
+    if (col.duckDbName) nameToId.set(col.duckDbName, col.id)
+  }
+
+  return rows.map((row) => {
+    const remapped: Record<string, CellValue> = {}
+    for (const key in row) {
+      remapped[nameToId.get(key) ?? key] = row[key]
+    }
+    return remapped
+  })
+}
 
 export class EngineAdapter {
   private rpc: WorkerRPC
@@ -103,15 +128,31 @@ export class EngineAdapter {
     })
   }
 
-  async getSlice(tableId: string, offset: number, limit: number): Promise<TableSlice> {
+  async getSlice(
+    tableId: string,
+    offset: number,
+    limit: number,
+    columns?: ColumnSchema[],
+  ): Promise<TableSlice> {
     await this.ensureInitialized()
-    
-    return this.rpc.call<TableSlice>('getSlice', { tableId, offset, limit })
+
+    const slice = await this.rpc.call<TableSlice>('getSlice', { tableId, offset, limit })
+    if (columns && columns.length > 0) {
+      return { ...slice, rows: remapRowsToColumnIds(slice.rows, columns) }
+    }
+    return slice
   }
 
   async getFilteredSlice(request: FilteredSliceRequest): Promise<TableSlice> {
     await this.ensureInitialized()
-    return this.rpc.call<TableSlice>('getFilteredSlice', request)
+
+    // `columns` is a client-side hint for name->id remapping and must not be sent to the worker.
+    const { columns, ...workerRequest } = request
+    const slice = await this.rpc.call<TableSlice>('getFilteredSlice', workerRequest)
+    if (columns && columns.length > 0) {
+      return { ...slice, rows: remapRowsToColumnIds(slice.rows, columns) }
+    }
+    return slice
   }
 
   async getDistinctValues(tableId: string, column: string, limit?: number): Promise<CellValue[]> {

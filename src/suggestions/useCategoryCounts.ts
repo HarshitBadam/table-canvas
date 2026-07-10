@@ -21,7 +21,11 @@ export function useCategoryCounts(
   return useMemo(() => {
     let cleaningCount = 0
 
-    if (tableData?.rows) {
+    // Post-engine-refactor the data store is emptied after materialization, so for
+    // most tables `tableData.rows` is an empty array. Treat that as "no row data"
+    // and fall back to the suggestion count below; the exact, effect-based count is
+    // supplied by CleaningPanel via `effectiveCleaningCount` once it's mounted.
+    if (tableData?.rows && tableData.rows.length > 0) {
       const cleaningSuggestions = cachedSuggestions.filter(
         (s) => s.category === 'cleaning' && s.context.cleaningOperation,
       )

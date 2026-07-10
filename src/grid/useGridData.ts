@@ -73,46 +73,47 @@ export function useGridData(tableId: string) {
     return computeDisplayValue(rowId, columnId, baseValue, row, columns, patches?.cellPatches)
   }, [patches, columns])
 
-  const isRowDeleted = useCallback((rowId: string): boolean => {
-    return patches?.deletedRows?.has(rowId) ?? false
-  }, [patches])
-
-  // Build rows/filteredRows arrays from the windowed state for backward compat
-  // These are sparse-backed: for hooks that still use rows[i],
-  // we produce a proxy array based on windowed data.
+  // Build an index-aligned bridge array from the windowed state. Many grid hooks and
+  // components address rows by absolute index (rows[i], filteredRows[i]) and use
+  // rows.length as the row count, so this MUST be index-aligned, not compacted.
+  //
+  // The array is sparse: loaded indices hold real rows; not-yet-fetched indices are
+  // holes that render as skeletons. `windowed.version` forces a rebuild as the window
+  // scrolls so freshly fetched rows appear. Inserted rows (patches) are appended after
+  // the engine-backed rows.
   const rows: GridRow[] = useMemo(() => {
+    const total = windowed.totalRows
     const baseRows: GridRow[] = []
-    const win = windowed
-    for (let i = 0; i < win.totalRows; i++) {
-      const row = win.getRowAtIndex(i)
-      if (row) {
-        baseRows.push(row)
-      }
-    }
+    baseRows.length = total // sparse: correct length without allocating every element
+
+    const loaded = windowed.getLoadedRows()
+    loaded.forEach((row, idx) => {
+      if (idx >= 0 && idx < total) baseRows[idx] = row
+    })
 
     const insertedRows = patches?.insertedRows ?? []
-    if (insertedRows.length > 0) {
-      const newRows: GridRow[] = insertedRows.map((inserted) => {
-        const row: GridRow = { __rowId: inserted.rowId }
-        Object.entries(inserted.values).forEach(([colId, value]) => {
-          row[colId] = value
-        })
-        columns.forEach((col) => {
-          if (row[col.id] === undefined) {
-            row[col.id] = ''
-          }
-        })
-        return row
+    insertedRows.forEach((inserted, i) => {
+      const row: GridRow = { __rowId: inserted.rowId }
+      Object.entries(inserted.values).forEach(([colId, value]) => {
+        row[colId] = value
       })
-      return [...baseRows, ...newRows]
-    }
+      columns.forEach((col) => {
+        if (row[col.id] === undefined) {
+          row[col.id] = ''
+        }
+      })
+      baseRows[total + i] = row
+    })
 
     return baseRows
-  }, [windowed.totalRows, windowed.getRowAtIndex, patches, columns, patchVersion])
+    // windowed.version bumps whenever loaded data changes; patchVersion captures patch edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [windowed.totalRows, windowed.version, windowed.getLoadedRows, patches, columns, patchVersion])
 
-  const filteredRows = useMemo(() => {
-    return rows.filter(row => !isRowDeleted(row.__rowId))
-  }, [rows, isRowDeleted])
+  // Deleted rows are removed by the engine on re-materialization, so the bridge is
+  // already index-aligned and filtered === full. Compacting here would break both
+  // index alignment and the virtualizer's row count.
+  const filteredRows = rows
 
   const totalRowCount = windowed.totalRows + (patches?.insertedRows?.length ?? 0)
   const deletedCount = patches?.deletedRows?.size ?? 0

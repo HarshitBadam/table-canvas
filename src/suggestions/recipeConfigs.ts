@@ -18,6 +18,11 @@ export interface RecipeField {
   required: boolean
   hint?: string
   options?: { value: string; label: string }[]
+  /**
+   * For 'column' fields whose options should come from the table selected in another
+   * (table-picker) field rather than the current table — e.g. reconciliation keys.
+   */
+  sourceTableField?: string
 }
 
 export const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
@@ -130,8 +135,8 @@ export const RECIPE_CONFIGS: Record<string, RecipeConfig> = {
     fields: [
       { id: 'leftTableId', label: 'Left Table', type: 'select', required: true },
       { id: 'rightTableId', label: 'Right Table', type: 'select', required: true },
-      { id: 'leftKeyColumn', label: 'Left Key Column', type: 'column', required: true, hint: 'The matching key from left table' },
-      { id: 'rightKeyColumn', label: 'Right Key Column', type: 'column', required: true, hint: 'The matching key from right table' },
+      { id: 'leftKeyColumn', label: 'Left Key Column', type: 'column', required: true, hint: 'The matching key from left table', sourceTableField: 'leftTableId' },
+      { id: 'rightKeyColumn', label: 'Right Key Column', type: 'column', required: true, hint: 'The matching key from right table', sourceTableField: 'rightTableId' },
     ],
     outputs: ['Matched records', 'Unmatched from left', 'Unmatched from right'],
     buildTransform: (bindings) => ({

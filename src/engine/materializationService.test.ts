@@ -524,7 +524,7 @@ describe('getTableData', () => {
 
     await getTableData('table_1', 5, 10)
 
-    expect(mockEngine.getSlice).toHaveBeenCalledWith('table_1', 5, 10)
+    expect(mockEngine.getSlice).toHaveBeenCalledWith('table_1', 5, 10, table.schema?.columns)
   })
 })
 

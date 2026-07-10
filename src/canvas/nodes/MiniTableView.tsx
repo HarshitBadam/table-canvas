@@ -1,10 +1,11 @@
 import { memo, useRef, useState, useCallback, useEffect, useMemo } from 'react'
-import { useDataStore, TableRow } from '@/state/dataStore'
+import { TableRow } from '@/state/dataStore'
 import { ColumnSchema, CellValue, ViewFilterConfig } from '@/types'
 import { formatNumber } from '@/lib/utils'
 import { MINI_ROW_HEIGHT as CELL_HEIGHT, MINI_HEADER_HEIGHT as HEADER_HEIGHT, MINI_BUFFER_ROWS as BUFFER_ROWS, MINI_FOOTER_HEIGHT as FOOTER_HEIGHT } from '@/grid/constants'
 import { computeDisplayValue } from '@/grid/displayUtils'
 import { applyFilters, hasActiveFilters } from '@/grid/filterUtils'
+import { getTableData } from '@/engine/materializationService'
 
 interface MiniTableViewProps {
   tableId: string
@@ -15,10 +16,14 @@ interface MiniTableViewProps {
     deletedRows?: Set<string>
   }
   viewFilters?: ViewFilterConfig
+  /** Current table version hash; changes trigger a preview refetch from the engine. */
+  versionHash?: string
 }
 
 // Column width: minimum width, will expand to fill container
 const MIN_CELL_WIDTH = 65
+// Canvas previews show a bounded sample; the grid view is the full virtualized table.
+const PREVIEW_LIMIT = 1000
 
 
 export const MiniTableView = memo(({ 
@@ -26,19 +31,42 @@ export const MiniTableView = memo(({
   columns,
   maxHeight = 220,
   patches,
-  viewFilters
+  viewFilters,
+  versionHash
 }: MiniTableViewProps) => {
-  const tableData = useDataStore((state) => state.tableData[tableId])
   const containerRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [containerHeight, setContainerHeight] = useState(maxHeight - FOOTER_HEIGHT)
   const [containerWidth, setContainerWidth] = useState(0)
 
-  const rows: TableRow[] = useMemo(() => {
-    if (!tableData?.rows) return []
-    return tableData.rows as TableRow[]
-  }, [tableData])
+  // Data now lives in the engine (DuckDB), not the data store. Fetch a bounded
+  // preview slice (already remapped to column ids by getTableData) for display.
+  const [rows, setRows] = useState<TableRow[]>([])
+  const [engineTotalRows, setEngineTotalRows] = useState(0)
+  const [isLoaded, setIsLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setIsLoaded(false)
+    getTableData(tableId, 0, PREVIEW_LIMIT)
+      .then(({ rows: fetched, totalRows }) => {
+        if (cancelled) return
+        setRows(fetched as TableRow[])
+        setEngineTotalRows(totalRows)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setRows([])
+        setEngineTotalRows(0)
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [tableId, versionHash])
 
   const getDisplayValue = useCallback((rowId: string, columnId: string, baseValue: CellValue, row?: TableRow): CellValue => {
     return computeDisplayValue(rowId, columnId, baseValue, row, columns, patches?.cellPatches)
@@ -108,7 +136,15 @@ export const MiniTableView = memo(({
 
   const totalWidth = Math.max(columns.length * cellWidth, containerWidth)
 
-  if (!tableData || visibleRows.length === 0) {
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center h-[100px] text-[11px] text-text-tertiary">
+        Loading…
+      </div>
+    )
+  }
+
+  if (visibleRows.length === 0) {
     return (
       <div className="flex items-center justify-center h-[100px] text-[11px] text-text-tertiary">
         No data available
@@ -208,12 +244,12 @@ export const MiniTableView = memo(({
           <>
             <span className="text-text-primary font-medium">{formatNumber(totalRows)}</span>
             <span className="mx-1">of</span>
-            <span>{formatNumber(unfilteredRowCount)}</span>
+            <span>{formatNumber(Math.max(unfilteredRowCount, engineTotalRows))}</span>
             <span className="mx-1">rows</span>
             <span className="text-accent-green ml-1">●</span>
           </>
         ) : (
-          <>{formatNumber(totalRows)} rows × {columns.length} cols</>
+          <>{formatNumber(engineTotalRows)} rows × {columns.length} cols</>
         )}
       </div>
     </div>

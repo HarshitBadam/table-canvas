@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
-import { useDataStore, TableRow } from '@/state/dataStore'
+import { TableRow } from '@/state/dataStore'
+import { getTableData } from '@/engine/materializationService'
 import { computeSuggestionEffect } from './computeEffects'
 import { useCleaningApply } from './useCleaningApply'
 import type { Suggestion } from '@/types'
@@ -15,38 +16,53 @@ interface CleaningPanelProps {
 export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, onCountChange }: CleaningPanelProps) {
   const node = useProjectStore((state) => state.getTableNode(tableId))
   const patches = useProjectStore((state) => state.patches[tableId])
-  const tableData = useDataStore((state) => state.tableData[tableId])
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Rows live in the engine now (the data store is emptied after materialization),
+  // so fetch the current, fully-patched, id-keyed rows from there. We pull the whole
+  // table because cleaning must scan and affect every row, not just a preview window.
+  const [rows, setRows] = useState<TableRow[]>([])
+  const [rowsLoaded, setRowsLoaded] = useState(false)
+  // node.updatedAt bumps after an apply, which re-triggers the fetch with cleaned data.
+  const refreshKey = node?.updatedAt
+
+  useEffect(() => {
+    let cancelled = false
+    setRowsLoaded(false)
+    const SCAN_PAGE = 10000
+    getTableData(tableId, 0, SCAN_PAGE)
+      .then(async ({ rows: firstRows, totalRows }) => {
+        if (cancelled) return
+        let allRows = firstRows
+        if (totalRows > firstRows.length) {
+          const { rows: fullRows } = await getTableData(tableId, 0, totalRows)
+          if (cancelled) return
+          allRows = fullRows
+        }
+        setRows(allRows as TableRow[])
+      })
+      .catch(() => {
+        if (!cancelled) setRows([])
+      })
+      .finally(() => {
+        if (!cancelled) setRowsLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [tableId, refreshKey])
 
   const existingHighlights = useMemo(() => {
     return patches?.highlightedCells || new Set<string>()
   }, [patches?.highlightedCells])
 
   const suggestionsWithEffects = useMemo(() => {
-    if (!tableData?.rows) return []
+    if (rows.length === 0) return []
 
-    // Merge tableData.rows with patches to get current actual values
-    const rows = tableData.rows
-      .filter(row => !patches?.deletedRows?.has(row.__rowId))
-      .map(row => {
-        const patchedRow = { ...row }
-        if (patches?.cellPatches) {
-          for (const [columnId, columnPatches] of Object.entries(patches.cellPatches)) {
-            if (columnPatches[row.__rowId] !== undefined) {
-              patchedRow[columnId] = columnPatches[row.__rowId]
-            }
-          }
-        }
-        return patchedRow
-      })
-    
-    if (patches?.insertedRows) {
-      for (const inserted of patches.insertedRows) {
-        const insertedRow: TableRow = { __rowId: inserted.rowId, ...inserted.values }
-        rows.push(insertedRow)
-      }
-    }
+    // `rows` already reflects every patch (cell edits, deletions, insertions) because
+    // EngineAdapter.loadTable bakes them in before materialization, so there is no
+    // manual patch merge to do here.
 
     const seen = new Set<string>()
     const deduplicatedSuggestions = suggestions.filter(s => {
@@ -81,11 +97,13 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       })
     
     return result
-  }, [suggestions, tableData?.rows, patches?.cellPatches, patches?.deletedRows, patches?.insertedRows, existingHighlights])
+  }, [suggestions, rows, existingHighlights])
 
   useEffect(() => {
+    // Don't report a (premature) zero while rows are still loading.
+    if (!rowsLoaded) return
     onCountChange?.(suggestionsWithEffects.length)
-  }, [suggestionsWithEffects.length, onCountChange])
+  }, [rowsLoaded, suggestionsWithEffects.length, onCountChange])
 
   const toggleSelection = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -118,6 +136,7 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
     selectedIds,
     tableId,
     setSelectedIds,
+    rows,
   })
 
   if (node?.kind !== 'source_table') {
@@ -131,6 +150,14 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         <p className="text-sm text-text-secondary">
           Cleaning operations are only available for source tables.
         </p>
+      </div>
+    )
+  }
+
+  if (!rowsLoaded) {
+    return (
+      <div className="p-4 text-center">
+        <p className="text-sm text-text-secondary">Loading table data…</p>
       </div>
     )
   }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { CellValue, ChartConfig, ColumnSchema } from '@/types'
 import { getEngine } from '@/engine/EngineAdapter'
 import { ensureTableMaterialized } from '@/engine/materializationService'
+import { COUNT_VALUE_KEY } from './chartShared'
 
 export interface ChartDataResult {
   data: Record<string, CellValue>[]
@@ -28,6 +29,10 @@ export function useChartData(
 
   const refetch = () => setRefetchTrigger(prev => prev + 1)
 
+  // DuckDB columns are always created from the column's display `name` (see
+  // EngineAdapter.loadTable / derivedTableComputation), so queries must reference
+  // `col.name` — NOT `duckDbName`, which is stale (= the id) for source tables and
+  // would produce "column not found" Binder errors.
   const getColumnForDuckDB = (columnRef: string): { duckDbName: string; name: string } | null => {
     if (!columns || columns.length === 0) {
       // If no columns schema, assume columnRef is what we need
@@ -36,28 +41,19 @@ export function useChartData(
     
     const colById = columns.find(c => c.id === columnRef)
     if (colById) {
-      return { 
-        duckDbName: colById.duckDbName || colById.id, // fallback to id if duckDbName not set
-        name: colById.name 
-      }
+      return { duckDbName: colById.name, name: colById.name }
     }
     
     // Fallback: check if columnRef is a column name
     const colByName = columns.find(c => c.name === columnRef)
     if (colByName) {
-      return { 
-        duckDbName: colByName.duckDbName || colByName.name, // for derived tables, name = duckDbName
-        name: colByName.name 
-      }
+      return { duckDbName: colByName.name, name: colByName.name }
     }
     
     // Fallback: case-insensitive name match
     const colByNameLower = columns.find(c => c.name.toLowerCase() === columnRef.toLowerCase())
     if (colByNameLower) {
-      return { 
-        duckDbName: colByNameLower.duckDbName || colByNameLower.name,
-        name: colByNameLower.name 
-      }
+      return { duckDbName: colByNameLower.name, name: colByNameLower.name }
     }
     
     return null
@@ -67,7 +63,9 @@ export function useChartData(
     let cancelled = false
 
     async function fetchData() {
-      if (!sourceTableId || !config.xAxis || !config.yAxis) {
+      // Count charts (histograms) only need an x-axis; all other charts need both axes.
+      const isCountAggregation = config.aggregation === 'count'
+      if (!sourceTableId || !config.xAxis || (!config.yAxis && !isCountAggregation)) {
         setLoading(false)
         return
       }
@@ -89,31 +87,34 @@ export function useChartData(
         await engine.init()
 
         const xAxisCol = getColumnForDuckDB(config.xAxis)
-        const yAxisCol = getColumnForDuckDB(config.yAxis)
+        const yAxisCol = config.yAxis ? getColumnForDuckDB(config.yAxis) : null
         const groupByCol = config.groupBy ? getColumnForDuckDB(config.groupBy) : undefined
 
         if (!xAxisCol) {
-          throw new Error(`X-axis column "${config.xAxis}" not found. Available columns: ${columns?.map(c => `${c.name} (${c.duckDbName || c.id})`).join(', ')}`)
+          throw new Error(`X-axis column "${config.xAxis}" not found. Available columns: ${columns?.map(c => `${c.name} (${c.id})`).join(', ')}`)
         }
-        if (!yAxisCol) {
-          throw new Error(`Y-axis column "${config.yAxis}" not found. Available columns: ${columns?.map(c => `${c.name} (${c.duckDbName || c.id})`).join(', ')}`)
+        if (config.yAxis && !yAxisCol) {
+          throw new Error(`Y-axis column "${config.yAxis}" not found. Available columns: ${columns?.map(c => `${c.name} (${c.id})`).join(', ')}`)
         }
         if (config.groupBy && !groupByCol) {
-          throw new Error(`Group-by column "${config.groupBy}" not found. Available columns: ${columns?.map(c => `${c.name} (${c.duckDbName || c.id})`).join(', ')}`)
+          throw new Error(`Group-by column "${config.groupBy}" not found. Available columns: ${columns?.map(c => `${c.name} (${c.id})`).join(', ')}`)
         }
 
-        // Use duckDbName (what DuckDB actually expects) for queries
+        // DuckDB columns are keyed by display name (see getColumnForDuckDB).
         const xAxisDuckDb = xAxisCol.duckDbName
-        const yAxisDuckDb = yAxisCol.duckDbName
+        const yAxisDuckDb = yAxisCol?.duckDbName
         const groupByDuckDb = groupByCol?.duckDbName
 
         if (groupByDuckDb || config.aggregation) {
+          // Count charts with no explicit y-axis count the grouped column itself.
+          const aggColumn = yAxisDuckDb ?? xAxisDuckDb
+          const valueKey = config.yAxis ?? COUNT_VALUE_KEY
           const aggResult = await engine.getAggregation(sourceTableId, {
             groupBy: groupByDuckDb ? [groupByDuckDb] : [xAxisDuckDb],
             aggregations: [{
-              column: yAxisDuckDb,
+              column: aggColumn,
               operation: (config.aggregation as 'sum' | 'avg' | 'count' | 'min' | 'max') || 'sum',
-              alias: config.yAxis, // Keep original config key as alias for chart rendering
+              alias: valueKey, // Keep original config key (or count sentinel) as alias
             }],
           })
 
@@ -130,8 +131,10 @@ export function useChartData(
             setData(chartData)
           }
         } else {
-          // Get raw slice data (limited to 100 rows for charts)
-          const slice = await engine.getSlice(sourceTableId, 0, 100)
+          // Get raw slice data (limited to 100 rows for charts).
+          // Pass columns so rows come back keyed by column id (matching config.xAxis/yAxis),
+          // consistent with the aggregation path above.
+          const slice = await engine.getSlice(sourceTableId, 0, 100, columns)
           if (!cancelled) {
             setData(slice.rows)
           }

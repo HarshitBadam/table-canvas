@@ -1,7 +1,7 @@
 import { useMemo, memo } from 'react'
 import type { ChartConfig, ChartType, CellValue } from '@/types'
 import { useTheme } from '@/components/ThemeToggle'
-import { DEFAULT_COLORS, CHART_THEME, detectTimestamps } from './chartShared'
+import { DEFAULT_COLORS, CHART_THEME, detectTimestamps, COUNT_VALUE_KEY } from './chartShared'
 import type { ChartTypeProps } from './chartShared'
 import { BarChartRenderer } from './BarChartRenderer'
 import { LineChartRenderer } from './LineChartRenderer'
@@ -47,20 +47,22 @@ export const ChartRenderer = memo(function ChartRenderer({
   const themeColors = isDark ? CHART_THEME.dark : CHART_THEME.light
   const colors = colorScheme && colorScheme.length > 0 ? colorScheme : DEFAULT_COLORS
 
+  // Count/histogram charts have no y-axis column; their value lives under COUNT_VALUE_KEY.
+  const yAxisKey = config.yAxis || (config.aggregation === 'count' ? COUNT_VALUE_KEY : '')
+
   const chartData = useMemo(() => {
     if (!config.xAxis) return []
 
     return data.map((row, index) => ({
       ...row,
       __index: index,
-      [config.yAxis || '']: Number(row[config.yAxis || '']) || 0,
+      [yAxisKey]: Number(row[yAxisKey]) || 0,
     }))
-  }, [data, config])
+  }, [data, config, yAxisKey])
 
   const xAxisKey = config.xAxis || ''
-  const yAxisKey = config.yAxis || ''
   const xAxisName = columnNames[xAxisKey] || xAxisKey
-  const yAxisName = columnNames[yAxisKey] || yAxisKey
+  const yAxisName = (config.yAxis && columnNames[yAxisKey]) || (yAxisKey === COUNT_VALUE_KEY ? 'Count' : yAxisKey)
 
   const headerHeight = (title ? 28 : 0) + (subtitle ? 20 : 0)
   const chartHeight = height - headerHeight

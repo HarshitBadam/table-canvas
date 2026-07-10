@@ -1,5 +1,11 @@
 import type { CellValue } from '@/types'
 
+/**
+ * Value key used for count/histogram charts that have no explicit y-axis column.
+ * useChartData emits the per-group count under this key and ChartRenderer reads it.
+ */
+export const COUNT_VALUE_KEY = '__count'
+
 export interface ChartTypeProps {
   chartData: Record<string, CellValue>[]
   xAxisKey: string

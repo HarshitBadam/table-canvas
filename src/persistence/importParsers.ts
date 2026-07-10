@@ -4,6 +4,7 @@ import { ColumnSchema, ColumnType, TableSchema, CellValue } from '@/types'
 import { TableRow } from '@/state/dataStore'
 import { generateId, readFileAsText, readFileAsArrayBuffer, inferValueType } from '@/lib/utils'
 import { getEngine } from '@/engine'
+import { computeSourceVersionHash } from '@/engine/cacheUtils'
 import { useProjectStore } from '@/state/projectStore'
 import { saveFile } from '@/persistence/db'
 
@@ -47,11 +48,21 @@ export async function loadTableIntoEngine(
     await engine.init()
     await engine.loadTable(tableId, schema, rows)
 
+    // Stamp the same version hash loadSourceTable computes for a freshly-imported,
+    // un-patched table. Without it the grid's first materialization sees a cache miss
+    // and needlessly re-parses the file (and can race with this very load).
+    const node = useProjectStore.getState().getTableNode(tableId)
+    const fileRef = node?.kind === 'source_table' ? node.plan.fileRef : undefined
+    const currentVersionHash = fileRef
+      ? computeSourceVersionHash(tableId, fileRef, '0-0-0')
+      : undefined
+
     useProjectStore.getState().updateCacheInfo(tableId, {
       isDirty: false,
       isComputing: false,
       lastComputedAt: new Date().toISOString(),
       lastRowCount: rows.length,
+      currentVersionHash,
       error: undefined,
     })
 
