@@ -38,22 +38,3 @@ export async function connectDatabase(): Promise<void> {
     throw error;
   }
 }
-
-export async function disconnectDatabase(): Promise<void> {
-  if (!isConnected) {
-    return;
-  }
-
-  try {
-    await mongoose.disconnect();
-    isConnected = false;
-    console.log('[DB] Disconnected from MongoDB');
-  } catch (error) {
-    console.error('[DB] Error disconnecting from MongoDB:', error);
-    throw error;
-  }
-}
-
-export function getConnection(): mongoose.Connection {
-  return mongoose.connection;
-}

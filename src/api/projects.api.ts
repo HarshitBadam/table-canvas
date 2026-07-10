@@ -1,13 +1,6 @@
 import { api } from './client';
 import type { ProjectNode, Edge } from '@/types';
-import {
-  deserializePatches,
-  serializePatches,
-  type SerializedPatches,
-} from '@/persistence/patchSerialization';
-
-export type { SerializedPatches };
-export { deserializePatches, serializePatches };
+import type { SerializedPatches } from '@/persistence/patchSerialization';
 
 export interface ProjectSummary {
   id: string;

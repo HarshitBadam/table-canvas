@@ -1,6 +1,5 @@
 export const ROW_HEIGHT = 36
 export const HEADER_HEIGHT = 44
-export const BUFFER_ROWS = 10
 
 export const MINI_ROW_HEIGHT = 32
 export const MINI_HEADER_HEIGHT = 36

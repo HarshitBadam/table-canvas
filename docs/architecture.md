@@ -8,8 +8,8 @@ persistence. If the server isn't reachable, the app runs entirely in the browser
 │                          Browser                              │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐    │
 │  │   React UI  │  │   Zustand   │  │      IndexedDB      │    │
-│  │ (Canvas,    │◄─┤   Stores    │◄─┤  (Projects, Files,  │    │
-│  │  Grid, etc.)│  │             │  │   Cache, Reports)   │    │
+│  │ (Canvas,    │◄─┤   Stores    │◄─┤ (Projects, Files,   │    │
+│  │  Grid, etc.)│  │             │  │      Reports)       │    │
 │  └──────┬──────┘  └──────┬──────┘  └─────────────────────┘    │
 │         │                │                                    │
 │         │         ┌──────▼───────┐                            │
@@ -70,14 +70,15 @@ Zustand stores, with Immer for immutable updates. The main ones:
 - **`projectStore`**: the graph itself, composed from slices in `src/state/stores/`:
   `nodesSlice`, `edgesSlice`, `patchesSlice` (cell edits / row ops), `historySlice` (undo/redo),
   `selectionSlice`, plus `nodesColumnOps` for column-level operations.
-- **`dataStore`**: in-memory row data for loaded tables.
+- **`dataStore`**: temporary in-memory rows used while importing and editing. DuckDB is the
+  authoritative runtime source for materialized table rows.
 - **`profilingStore`** (`src/lib/profiling/`): per-column profiles (see below).
 - **`suggestionsStore`**: analysis/cleaning suggestions.
 - **`reportStore`**: report documents.
 
-`AppContext` (`src/state/AppContext.tsx`) ties it together: it boots the engine, checks auth,
-loads or creates a project, materializes tables, and auto-saves (debounced ~1.5s) when the graph
-changes.
+`AppProvider` (`src/state/AppProvider.tsx`, exported through `src/state/AppContext.ts`) ties it
+together: it boots the engine, checks auth, loads or creates a project, materializes tables, and
+auto-saves (debounced ~1.5s) when the graph changes.
 
 ### Dirty propagation
 
@@ -179,6 +180,9 @@ Stacks rows from multiple tables.
 
 ### IndexedDB
 
+Development uses the clean `table-canvas-v2` database with a single schema version. Earlier
+development databases are intentionally not migrated.
+
 ```typescript
 interface TableCanvasDB {
   projects: {
@@ -189,11 +193,6 @@ interface TableCanvasDB {
   files: {
     key: string
     value: { id, name, type, data: ArrayBuffer, createdAt }
-  }
-  cache: {
-    key: [string, string]   // [tableId, type]
-    value: { tableId, type: 'profile'|'slice'|'aggregation', data, computedAt }
-    indexes: { 'by-table': string }
   }
   reports: {
     key: string

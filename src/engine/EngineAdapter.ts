@@ -43,7 +43,7 @@ function remapRowsToColumnIds(
   })
 }
 
-export class EngineAdapter {
+class EngineAdapter {
   private rpc: WorkerRPC
   private initialized = false
 

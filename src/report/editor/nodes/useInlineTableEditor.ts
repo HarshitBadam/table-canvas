@@ -3,7 +3,7 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 import type { NodeViewProps } from '@tiptap/react';
 import type { ContextMenuState } from './TableContextMenu';
 
-export interface InlineTableNodeAttrs {
+interface InlineTableNodeAttrs {
   headers: string[];
   rows: (string | number | boolean | null | undefined)[][];
   caption?: string;

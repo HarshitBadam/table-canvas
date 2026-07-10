@@ -74,5 +74,3 @@ export const TablePickerModal = memo(function TablePickerModal({
     </div>
   );
 });
-
-export default TablePickerModal;

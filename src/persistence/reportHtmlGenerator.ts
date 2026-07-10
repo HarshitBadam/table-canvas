@@ -3,7 +3,7 @@ import type { JSONContent } from '@tiptap/core'
 import type { TableRow } from '@/state/dataStore'
 import type { ProjectNode, TableNode } from '@/types'
 
-export interface EmbeddedTableData {
+interface EmbeddedTableData {
   tableName: string
   headers: string[]
   columnNames?: Record<string, string>

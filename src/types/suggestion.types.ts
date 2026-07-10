@@ -9,13 +9,13 @@ export type SuggestionConfidence = 'high' | 'medium' | 'low'
 
 
 /** Preview data types for lazy loading */
-export type PreviewData =
+type PreviewData =
   | { kind: 'beforeAfter'; rows: Array<{ before: CellValue; after: CellValue }> }
   | { kind: 'tableSample'; columns: string[]; rows: CellValue[][] }
   | { kind: 'aggregateSample'; columns: string[]; rows: CellValue[][] }
   | { kind: 'recipeOutputs'; outputs: Array<{ type: 'table' | 'chart'; name: string }> }
 
-export interface SuggestionPreview {
+interface SuggestionPreview {
   status: 'not_loaded' | 'loading' | 'ready' | 'error'
   data?: PreviewData
   error?: string
@@ -38,7 +38,7 @@ export type CleaningOperation =
   | { type: 'highlight_outliers'; lowerBound: number; upperBound: number }
 
 
-export interface SuggestionContext {
+interface SuggestionContext {
   tableId: string
   columnId?: string
   tableVersionHash: string
@@ -46,13 +46,13 @@ export interface SuggestionContext {
   cleaningOperation?: CleaningOperation
 }
 
-export interface SuggestionImpact {
+interface SuggestionImpact {
   kind: 'patch' | 'derivedTable' | 'chart' | 'recipe'
   summary: string
 }
 
 
-export interface ChartDef {
+interface ChartDef {
   chartType: ChartType | 'histogram'
   sourceTableId: string
   title?: string

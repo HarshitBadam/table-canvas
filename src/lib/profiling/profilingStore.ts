@@ -4,6 +4,7 @@ import type { ProfileResult } from '@/engine/types'
 import type { CellValue } from '@/types'
 import { useDataStore } from '@/state/dataStore'
 import { useProjectStore } from '@/state/projectStore'
+import { ensureTableMaterialized } from '@/engine/materializationService'
 import { detectSemanticHints } from './semanticHints'
 
 /**
@@ -104,14 +105,12 @@ export async function ensureTableInEngine(tableId: string, _force: boolean = fal
     if (!node) return false
     
     if (node.kind === 'derived_table') {
-      const { ensureTableMaterialized } = await import('@/engine/materializationService')
       const result = await ensureTableMaterialized(tableId)
       return result.status !== 'error'
     }
     
     const tableData = useDataStore.getState().tableData[tableId]
     if (!tableData?.rows || !node?.schema) {
-      const { ensureTableMaterialized } = await import('@/engine/materializationService')
       const result = await ensureTableMaterialized(tableId)
       return result.status !== 'error'
     }

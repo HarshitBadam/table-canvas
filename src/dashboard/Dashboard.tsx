@@ -10,13 +10,10 @@ import { LineageMiniMap } from './components/LineageMiniMap'
 import { TableStatsSection } from './components/TableStatsSection'
 import { QuickActionsSection } from './components/QuickActionsSection'
 import { CompletenessBar } from './components/ColumnStatComponents'
-
-import {
-  useProjectHealthMetrics,
-  useDataQualityMetrics,
-  useTopSuggestions,
-  useLineageData,
-} from './useDashboardData'
+import { useProjectHealthMetrics } from './useProjectHealthMetrics'
+import { useDataQualityMetrics } from './useDataQualityMetrics'
+import { useTopSuggestions } from './useTopSuggestions'
+import { useLineageData } from './useLineageData'
 
 export function Dashboard() {
   const { openTable, openChart } = useNavigation()

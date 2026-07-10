@@ -1,4 +1,4 @@
-import { openDB, DBSchema, IDBPDatabase } from 'idb'
+import { openDB, IDBPDatabase, type DBSchema } from 'idb'
 import type { ProjectNode, Edge } from '@/types'
 import type { Report } from '@/report/types'
 import type { SerializedPatches } from './patchSerialization'
@@ -29,16 +29,6 @@ export interface TableCanvasDB extends DBSchema {
       createdAt: string
     }
   }
-  cache: {
-    key: [string, string]
-    value: {
-      tableId: string
-      type: 'profile' | 'slice' | 'aggregation'
-      data: unknown
-      computedAt: string
-    }
-    indexes: { 'by-table': string }
-  }
   reports: {
     key: string
     value: Report
@@ -46,8 +36,9 @@ export interface TableCanvasDB extends DBSchema {
   }
 }
 
-const DB_NAME = 'table-canvas'
-const DB_VERSION = 2
+// Development reset: this database intentionally has no legacy upgrade path.
+const DB_NAME = 'table-canvas-v2'
+const DB_VERSION = 1
 
 let dbInstance: IDBPDatabase<TableCanvasDB> | null = null
 
@@ -55,21 +46,12 @@ export async function getDB(): Promise<IDBPDatabase<TableCanvasDB>> {
   if (dbInstance) return dbInstance
 
   dbInstance = await openDB<TableCanvasDB>(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion) {
-      if (oldVersion < 1) {
-        const projectStore = db.createObjectStore('projects', { keyPath: 'id' })
-        projectStore.createIndex('by-updated', 'updatedAt')
-
-        db.createObjectStore('files', { keyPath: 'id' })
-
-        const cacheStore = db.createObjectStore('cache', { keyPath: ['tableId', 'type'] })
-        cacheStore.createIndex('by-table', 'tableId')
-      }
-
-      if (oldVersion < 2) {
-        const reportsStore = db.createObjectStore('reports', { keyPath: 'id' })
-        reportsStore.createIndex('by-updated', 'updatedAt')
-      }
+    upgrade(db) {
+      const projectStore = db.createObjectStore('projects', { keyPath: 'id' })
+      projectStore.createIndex('by-updated', 'updatedAt')
+      db.createObjectStore('files', { keyPath: 'id' })
+      const reportsStore = db.createObjectStore('reports', { keyPath: 'id' })
+      reportsStore.createIndex('by-updated', 'updatedAt')
     },
   })
 
