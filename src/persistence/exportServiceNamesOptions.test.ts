@@ -12,7 +12,7 @@ import {
 vi.mock('./db', () => ({
   exportProjectFile: vi.fn(),
   loadProject: vi.fn(),
-  loadAllReports: vi.fn(),
+  loadReportsForProject: vi.fn(),
   loadFile: vi.fn(),
 }))
 vi.mock('@/engine/materializationService', () => ({
@@ -50,7 +50,7 @@ describe('exportProjectAsZip names and options', () => {
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
     vi.mocked(db.loadFile).mockResolvedValue(createCSVContent([{ ID: '1', Value: 100 }]))
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     const blob = await exportProjectAsZip('dup-names', { includeExcel: true })
     expect(blob).toBeInstanceOf(Blob)
     expect((await JSZip.loadAsync(blob)).files['data.xlsx']).toBeDefined()
@@ -72,7 +72,7 @@ describe('exportProjectAsZip names and options', () => {
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
     vi.mocked(db.loadFile).mockResolvedValue(createCSVContent([{ ID: '1', Value: 100 }]))
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     expect(await exportProjectAsZip('special-chars', { includeExcel: true })).toBeInstanceOf(Blob)
   })
 
@@ -94,7 +94,7 @@ describe('exportProjectAsZip names and options', () => {
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
     vi.mocked(db.loadFile).mockResolvedValue(createCSVContent([{ ID: '1', Value: 100 }]))
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     expect(await exportProjectAsZip('long-name', { includeExcel: true })).toBeInstanceOf(Blob)
   })
 
@@ -110,7 +110,7 @@ describe('exportProjectAsZip names and options', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     const zip = await JSZip.loadAsync(await exportProjectAsZip('no-excel', {
       includeExcel: false,
     }))
@@ -131,7 +131,7 @@ describe('exportProjectAsZip names and options', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({
       r1: createMockReport('r1', 'Skipped Report'),
     })
     const zip = await JSZip.loadAsync(await exportProjectAsZip('no-reports', {

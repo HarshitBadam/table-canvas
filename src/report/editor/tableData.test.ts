@@ -4,6 +4,8 @@ import {
   resolveDisplayColumns,
   toggleColumnSelection,
   DEFAULT_ROW_LIMIT,
+  aggregateReportChartRows,
+  formatReportCell,
 } from './tableData';
 import type { ColumnSchema } from '@/types';
 
@@ -106,5 +108,55 @@ describe('toggleColumnSelection', () => {
 
   it('ignores stale ids in the incoming selection', () => {
     expect(toggleColumnSelection(['a', 'stale'], allIds, 'c')).toEqual(['a', 'c']);
+  });
+});
+
+describe('formatReportCell', () => {
+  it('formats finite numbers while preserving numeric identifiers', () => {
+    const numberColumn: ColumnSchema = {
+      id: 'amount',
+      name: 'Amount',
+      type: 'number',
+      nullable: false,
+    };
+    expect(formatReportCell(12345.5, numberColumn)).toContain('12');
+    expect(formatReportCell(12345, {
+      ...numberColumn,
+      semanticHints: ['id'],
+    })).toBe('12345');
+  });
+
+  it('renders nulls and booleans consistently', () => {
+    const booleanColumn: ColumnSchema = {
+      id: 'active',
+      name: 'Active',
+      type: 'boolean',
+      nullable: true,
+    };
+    expect(formatReportCell(null, booleanColumn)).toBe('');
+    expect(formatReportCell(false, booleanColumn)).toBe('False');
+  });
+});
+
+describe('aggregateReportChartRows', () => {
+  const rows = [
+    { __rowId: '1', region: 'North', amount: 10 },
+    { __rowId: '2', region: 'North', amount: 20 },
+    { __rowId: '3', region: 'South', amount: 5 },
+    { __rowId: '4', region: 'South', amount: null },
+  ];
+
+  it('groups and sums repeated X values', () => {
+    expect(aggregateReportChartRows(rows, 'region', 'amount', 'sum')).toEqual([
+      { __rowId: 'report_group_0', region: 'North', amount: 30 },
+      { __rowId: 'report_group_1', region: 'South', amount: 5 },
+    ]);
+  });
+
+  it('counts rows without treating missing numeric values as zero-value rows', () => {
+    expect(aggregateReportChartRows(rows, 'region', 'amount', 'count')).toEqual([
+      { __rowId: 'report_group_0', region: 'North', amount: 2 },
+      { __rowId: 'report_group_1', region: 'South', amount: 2 },
+    ]);
   });
 });

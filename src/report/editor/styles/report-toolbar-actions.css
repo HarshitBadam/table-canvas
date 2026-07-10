@@ -2,6 +2,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .report-toolbar-v2-action {
@@ -17,6 +18,63 @@
   font-size: 13px;
   font-weight: 500;
   color: #374151;
+  white-space: nowrap;
+}
+
+.report-toolbar-v2-insert {
+  position: relative;
+}
+
+.report-toolbar-v2-insert-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 110;
+  width: 260px;
+  padding: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.report-toolbar-v2-insert-menu > button {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #374151;
+  text-align: left;
+}
+
+.report-toolbar-v2-insert-menu > button:hover {
+  background: #f3f4f6;
+}
+
+.report-toolbar-v2-insert-menu strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.report-toolbar-v2-insert-menu span {
+  margin-top: 2px;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+[data-theme="dark"] .report-toolbar-v2-insert-menu {
+  border-color: #333;
+  background: #1f1f1f;
+}
+
+[data-theme="dark"] .report-toolbar-v2-insert-menu > button {
+  color: #f5f5f5;
+}
+
+[data-theme="dark"] .report-toolbar-v2-insert-menu > button:hover {
+  background: #2a2a2a;
 }
 
 .report-toolbar-v2-action:hover {

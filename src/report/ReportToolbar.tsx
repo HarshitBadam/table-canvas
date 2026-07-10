@@ -3,30 +3,44 @@ import { useReportStore } from './reportStore';
 import type { Report } from './types';
 
 interface ReportToolbarProps {
-  activeReportId: string;
+  activeReportId: string | null;
   onHighlight?: () => void;
   onInsertTable?: () => void;
+  onInsertEmbeddedTable?: () => void;
+  onInsertChart?: () => void;
 }
 
 
-export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: ReportToolbarProps) {
+export function ReportToolbar({
+  activeReportId,
+  onHighlight,
+  onInsertTable,
+  onInsertEmbeddedTable,
+  onInsertChart,
+}: ReportToolbarProps) {
   const reports = useReportStore((state) => state.reports);
   const addReport = useReportStore((state) => state.addReport);
   const deleteReport = useReportStore((state) => state.deleteReport);
+  const duplicateReport = useReportStore((state) => state.duplicateReport);
   const selectReport = useReportStore((state) => state.selectReport);
   const updateReport = useReportStore((state) => state.updateReport);
+  const persistenceStatus = useReportStore((state) => state.persistenceStatus);
+  const persistenceError = useReportStore((state) => state.persistenceError);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [showReportList, setShowReportList] = useState(false);
+  const [showInsertMenu, setShowInsertMenu] = useState(false);
+  const [searchValue, setSearchValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const insertRef = useRef<HTMLDivElement>(null);
 
-  const reportsList = Object.values(reports).sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-  );
+  const reportsList = Object.values(reports)
+    .filter((report) => report.name.toLowerCase().includes(searchValue.trim().toLowerCase()))
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
-  const activeReport = reports[activeReportId] || null;
+  const activeReport = activeReportId ? reports[activeReportId] || null : null;
 
   // Count word estimate (more user-friendly than block count)
   const getWordCount = () => {
@@ -51,6 +65,9 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
       if (listRef.current && !listRef.current.contains(e.target as Node)) {
         setShowReportList(false);
       }
+      if (insertRef.current && !insertRef.current.contains(e.target as Node)) {
+        setShowInsertMenu(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -67,12 +84,26 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
     if (activeReport) {
       setEditValue(activeReport.name);
       setIsEditing(true);
+      setShowReportList(false);
     }
   };
 
   const handleFinishRename = () => {
     if (editValue.trim() && activeReport) {
-      updateReport(activeReport.id, { name: editValue.trim() });
+      const nextName = editValue.trim();
+      const firstNode = activeReport.tiptapContent?.content?.[0];
+      const firstText = firstNode?.content
+        ?.map((node: { text?: string }) => node.text || '')
+        .join('') || '';
+      if (firstNode?.type === 'heading' && firstText === activeReport.name) {
+        const tiptapContent = JSON.parse(
+          JSON.stringify(activeReport.tiptapContent),
+        ) as NonNullable<Report['tiptapContent']>;
+        tiptapContent.content[0].content = [{ type: 'text', text: nextName }];
+        updateReport(activeReport.id, { name: nextName, tiptapContent });
+      } else {
+        updateReport(activeReport.id, { name: nextName });
+      }
     }
     setIsEditing(false);
   };
@@ -89,6 +120,11 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
     addReport('Untitled Report');
     setShowReportList(false);
   }, [addReport]);
+
+  const handleDuplicateReport = useCallback(() => {
+    if (activeReport) duplicateReport(activeReport.id);
+    setShowReportList(false);
+  }, [activeReport, duplicateReport]);
 
   const handleSelectReport = (id: string) => {
     selectReport(id);
@@ -137,6 +173,8 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
               onClick={() => setShowReportList(!showReportList)}
               onDoubleClick={handleStartRename}
               title="Click to switch reports, double-click to rename"
+              aria-haspopup="listbox"
+              aria-expanded={showReportList}
             >
               <span>{activeReport?.name || 'Select Report'}</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -146,12 +184,39 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
           )}
 
           {showReportList && (
-            <div className="report-toolbar-v2-list">
+            <div className="report-toolbar-v2-list" role="listbox" aria-label="Reports">
+              {activeReport && (
+                <div className="report-toolbar-v2-list-actions">
+                  <button type="button" onClick={handleStartRename}>Rename</button>
+                  <button type="button" onClick={handleDuplicateReport}>Duplicate</button>
+                </div>
+              )}
+              {Object.keys(reports).length > 5 && (
+                <div className="px-2 pb-2">
+                  <input
+                    type="search"
+                    value={searchValue}
+                    onChange={(event) => setSearchValue(event.target.value)}
+                    placeholder="Search reports…"
+                    className="input text-sm w-full"
+                    autoFocus
+                  />
+                </div>
+              )}
               {reportsList.map((report) => (
                 <div
                   key={report.id}
                   className={`report-toolbar-v2-list-item ${report.id === activeReportId ? 'is-active' : ''}`}
                   onClick={() => handleSelectReport(report.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleSelectReport(report.id);
+                    }
+                  }}
+                  role="option"
+                  aria-selected={report.id === activeReportId}
+                  tabIndex={0}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -175,22 +240,28 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
               ))}
               {reportsList.length === 0 && (
                 <div className="report-toolbar-v2-list-empty">
-                  No reports yet
+                  {searchValue ? 'No matching reports' : 'No reports yet'}
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <span className="report-toolbar-v2-badge">
-          Document
-        </span>
+        <span className="report-toolbar-v2-badge">Report</span>
 
         {activeReport && (
           <span className="report-toolbar-v2-info">
             {wordCount > 0 ? `${wordCount.toLocaleString()} words` : 'Empty'} · Updated {formatDate(activeReport.updatedAt)}
           </span>
         )}
+        <span
+          className={persistenceStatus === 'error' ? 'text-xs text-red-600' : 'text-xs text-text-tertiary'}
+          title={persistenceError || undefined}
+        >
+          {persistenceStatus === 'saving' && 'Saving…'}
+          {persistenceStatus === 'saved' && 'Saved'}
+          {persistenceStatus === 'error' && 'Save failed'}
+        </span>
       </div>
 
       <div className="report-toolbar-v2-right">
@@ -207,18 +278,52 @@ export function ReportToolbar({ activeReportId, onHighlight, onInsertTable }: Re
           </button>
         )}
 
-        {onInsertTable && (
-          <button
-            className="report-toolbar-v2-action"
-            onClick={onInsertTable}
-            title="Insert table"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
-            </svg>
-            <span>Table</span>
-          </button>
+        {(onInsertTable || onInsertEmbeddedTable || onInsertChart) && (
+          <div className="report-toolbar-v2-insert" ref={insertRef}>
+            <button
+              className="report-toolbar-v2-action"
+              onClick={() => setShowInsertMenu((value) => !value)}
+              title="Insert content"
+              aria-haspopup="menu"
+              aria-expanded={showInsertMenu}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <span>Insert</span>
+            </button>
+            {showInsertMenu && (
+              <div className="report-toolbar-v2-insert-menu" role="menu">
+                {onInsertEmbeddedTable && (
+                  <button type="button" role="menuitem" onClick={() => {
+                    onInsertEmbeddedTable();
+                    setShowInsertMenu(false);
+                  }}>
+                    <strong>Linked table</strong>
+                    <span>Live excerpt from project data</span>
+                  </button>
+                )}
+                {onInsertChart && (
+                  <button type="button" role="menuitem" onClick={() => {
+                    onInsertChart();
+                    setShowInsertMenu(false);
+                  }}>
+                    <strong>Chart</strong>
+                    <span>Visualize a project table</span>
+                  </button>
+                )}
+                {onInsertTable && (
+                  <button type="button" role="menuitem" onClick={() => {
+                    onInsertTable();
+                    setShowInsertMenu(false);
+                  }}>
+                    <strong>Manual table</strong>
+                    <span>Small editable table in this report</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

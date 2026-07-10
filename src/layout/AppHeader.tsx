@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useReportStore } from '@/report/reportStore'
 import { useApp, useAppAuth } from '@/state/AppContext'
@@ -26,6 +26,8 @@ export function AppHeader({
 }: AppHeaderProps) {
   const { user, logout } = useAppAuth()
   const { isSaving } = useApp()
+  const [isExportingReport, setIsExportingReport] = useState(false)
+  const [reportExportError, setReportExportError] = useState<string | null>(null)
 
   const {
     isExporting,
@@ -41,14 +43,25 @@ export function AppHeader({
     setExportDropdownOpen,
   } = exportState
 
-  const handleExportPDF = useCallback(() => {
+  const handleExportPDF = useCallback(async () => {
     const reportContent = document.querySelector('.report-view .tiptap-editor-content')
     const currentReportId = useReportStore.getState().selectedReportId
     const report = currentReportId ? useReportStore.getState().reports[currentReportId] : null
-    if (reportContent) {
-      exportReportToPDF(reportContent as HTMLElement, {
-        reportName: report?.name || 'Report',
+    if (!reportContent || !report) {
+      setReportExportError('Open a report before exporting.')
+      return
+    }
+    setIsExportingReport(true)
+    setReportExportError(null)
+    try {
+      await useReportStore.getState().flushSaves()
+      await exportReportToPDF(reportContent as HTMLElement, {
+        reportName: report.name || 'Report',
       })
+    } catch (error) {
+      setReportExportError(error instanceof Error ? error.message : 'PDF export failed')
+    } finally {
+      setIsExportingReport(false)
     }
   }, [])
 
@@ -78,11 +91,18 @@ export function AppHeader({
           </svg>
           <span className="text-sm font-medium">Report</span>
           <div className="flex-1" />
-          <button onClick={handleExportPDF} className="btn btn-secondary gap-2 text-sm">
+          {reportExportError && (
+            <span className="text-xs text-red-600" role="alert">{reportExportError}</span>
+          )}
+          <button
+            onClick={handleExportPDF}
+            disabled={isExportingReport}
+            className="btn btn-secondary gap-2 text-sm"
+          >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            Export
+            {isExportingReport ? 'Exporting…' : 'Export PDF'}
           </button>
         </>
       )}

@@ -14,7 +14,7 @@ import {
 vi.mock('./db', () => ({
   exportProjectFile: vi.fn(),
   loadProject: vi.fn(),
-  loadAllReports: vi.fn(),
+  loadReportsForProject: vi.fn(),
   loadFile: vi.fn(),
 }))
 vi.mock('@/engine/materializationService', () => ({
@@ -50,7 +50,7 @@ describe('exportProjectAsZip happy paths', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
 
     const blob = await exportProjectAsZip('test-project', {
       includeExcel: false,
@@ -75,7 +75,7 @@ describe('exportProjectAsZip happy paths', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     vi.mocked(materializationService.getTableData).mockResolvedValue({
       rows: [
         { __rowId: 'row-1', col_1: '1', col_2: 100 },
@@ -117,7 +117,7 @@ describe('exportProjectAsZip happy paths', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({
       report_1: createMockReport('report_1', 'Monthly Report'),
       report_2: createMockReport('report_2', 'Quarterly Summary'),
     })
@@ -142,7 +142,7 @@ describe('exportProjectAsZip happy paths', () => {
       new Blob([JSON.stringify(project)], { type: 'application/json' }),
     )
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     const onProgress = vi.fn()
 
     await exportProjectAsZip('test-project', {
@@ -182,7 +182,7 @@ describe('exportProjectAsZip happy paths', () => {
       { ID: '1', Value: 100 },
       { ID: '2', Value: 200 },
     ]))
-    vi.mocked(db.loadAllReports).mockResolvedValue({})
+    vi.mocked(db.loadReportsForProject).mockResolvedValue({})
     vi.mocked(materializationService.ensureTableMaterialized).mockResolvedValue({
       status: 'computed',
       tableId: 'table_2',

@@ -1,5 +1,5 @@
 import { ChartTypeIcon } from '@/charts/ChartTypeIcon';
-import type { ChartType, ColumnSchema } from '@/types';
+import type { AggregationType, ChartType, ColumnSchema } from '@/types';
 import type { EnhancedChartConfig } from '../../types';
 
 interface ChartConfigPanelProps {
@@ -84,6 +84,27 @@ export function ChartConfigPanel({
         selectedId={config.yAxis}
         onSelect={yAxis => onConfigChange({ yAxis })}
       />
+
+      {chartType !== 'scatter' && (
+        <div className="block-config-section">
+          <label className="block-config-label">Combine repeated X values</label>
+          <select
+            value={config.aggregation || ''}
+            onChange={(event) => onConfigChange({
+              aggregation: (event.target.value || undefined) as AggregationType | undefined,
+            })}
+            className="input text-sm w-full"
+          >
+            <option value="">Do not combine</option>
+            <option value="sum">Sum</option>
+            <option value="avg">Average</option>
+            <option value="min">Minimum</option>
+            <option value="max">Maximum</option>
+            <option value="count">Count rows</option>
+            <option value="count_distinct">Count distinct Y values</option>
+          </select>
+        </div>
+      )}
 
       <div className="block-config-section">
         <label className="block-config-label">Title (optional)</label>

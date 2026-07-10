@@ -22,15 +22,24 @@ export async function loadAllReports(): Promise<Record<string, Report>> {
   return result
 }
 
-export async function listReports(): Promise<Array<{ id: string; name: string; updatedAt: string }>> {
+export async function loadReportsForProject(projectId: string): Promise<Record<string, Report>> {
+  const reports = await loadAllReports()
+  return Object.fromEntries(
+    Object.entries(reports).filter(([, report]) => report.projectId === projectId),
+  )
+}
+
+export async function listReports(projectId?: string): Promise<Array<{ id: string; name: string; updatedAt: string }>> {
   const db = await getDB()
   const reports = await db.getAllFromIndex('reports', 'by-updated')
 
-  return reports.map(r => ({
+  return reports
+    .filter(report => !projectId || report.projectId === projectId)
+    .map(r => ({
     id: r.id,
     name: r.name,
     updatedAt: r.updatedAt,
-  })).reverse()
+    })).reverse()
 }
 
 export async function deleteReport(id: string): Promise<void> {

@@ -2,6 +2,7 @@ import type { Report } from '@/report/types'
 import type { JSONContent } from '@tiptap/core'
 import type { TableRow } from '@/state/dataStore'
 import type { ProjectNode, TableNode } from '@/types'
+import { escapeHtml, renderInlineTable, safeLink } from './reportHtmlUtils'
 
 interface EmbeddedTableData {
   tableName: string
@@ -11,14 +12,6 @@ interface EmbeddedTableData {
 }
 
 export type EmbeddedDataMap = Record<string, EmbeddedTableData>
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
 
 function renderEmbeddedTable(
   tableId: string,
@@ -103,6 +96,17 @@ function nodeToHtml(node: JSONContent, dataMap: EmbeddedDataMap): string {
             case 'code':
               text = `<code>${text}</code>`
               break
+            case 'strike':
+              text = `<s>${text}</s>`
+              break
+            case 'highlight':
+              text = `<mark>${text}</mark>`
+              break
+            case 'link': {
+              const href = safeLink(mark.attrs?.href)
+              if (href) text = `<a href="${escapeHtml(href)}">${text}</a>`
+              break
+            }
           }
         }
       }
@@ -158,8 +162,23 @@ function nodeToHtml(node: JSONContent, dataMap: EmbeddedDataMap): string {
       return `<div class="block-placeholder">[Chart: ${escapeHtml(chartType)}]</div>\n`
     }
 
-    case 'tableBlock':
-      return `<div class="block-placeholder">[${nodeType}]</div>\n`
+    case 'inlineTable':
+    case 'editableTable':
+      return renderInlineTable(node.attrs || {})
+
+    case 'callout': {
+      const variant = ['info', 'warning', 'success', 'error'].includes(String(node.attrs?.variant))
+        ? String(node.attrs?.variant)
+        : 'info'
+      const calloutContent = node.content?.map((child) => nodeToHtml(child, dataMap)).join('') || ''
+      return `<aside class="callout callout-${variant}">${calloutContent}</aside>\n`
+    }
+
+    case 'toggle': {
+      const title = escapeHtml(String(node.attrs?.title || 'Details'))
+      const toggleContent = node.content?.map((child) => nodeToHtml(child, dataMap)).join('') || ''
+      return `<details open><summary>${title}</summary>${toggleContent}</details>\n`
+    }
 
     default:
       if (node.content) {
@@ -299,6 +318,37 @@ export function generateReportHtml(report: Report, dataMap: EmbeddedDataMap = {}
       width: 100%;
       margin: 1em 0;
     }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
+    th { background: #f7f7f7; }
+    caption {
+      caption-side: bottom;
+      color: #666;
+      font-size: 0.9em;
+      padding-top: 8px;
+    }
+    .table-note { color: #666; font-size: 0.85em; }
+    .callout {
+      border-left: 4px solid #217346;
+      background: #f5faf7;
+      padding: 0.5em 1em;
+      margin: 1em 0;
+    }
+    .callout-warning { border-left-color: #a16207; background: #fffbeb; }
+    .callout-error { border-left-color: #b91c1c; background: #fef2f2; }
+    details {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 0.75em 1em;
+      margin: 1em 0;
+    }
+    summary { font-weight: 600; }
+    mark { background: #d1fae5; padding: 0 0.1em; }
+    a { color: #17653a; }
     .block-placeholder {
       background: #f0f0f0;
       border: 1px dashed #ccc;

@@ -43,7 +43,7 @@ export interface EnhancedChartConfig {
 // TipTap Content
 // ============================================================================
 
-interface TipTapContent {
+export interface TipTapContent {
   type: 'doc';
   content: TipTapNode[];
 }
@@ -67,12 +67,18 @@ interface TipTapMark {
 
 export interface Report {
   id: string;
+  /** Owning project. Missing only on legacy records created before project scoping. */
+  projectId?: string;
+  schemaVersion?: number;
   name: string;
   /** TipTap JSON content. */
   tiptapContent?: TipTapContent;
   createdAt: string;
   updatedAt: string;
 }
+
+export type ReportTemplateId = 'blank' | 'executive-summary' | 'data-review';
+type ReportPersistenceStatus = 'idle' | 'loading' | 'saving' | 'saved' | 'error';
 
 // ============================================================================
 // Report Store State
@@ -81,12 +87,19 @@ export interface Report {
 export interface ReportStoreState {
   reports: Record<string, Report>;
   selectedReportId: string | null;
+  activeProjectId: string | null;
+  persistenceStatus: ReportPersistenceStatus;
+  persistenceError: string | null;
 
   // Report actions
-  addReport: (name?: string) => string;
+  initializeProject: (projectId: string) => Promise<void>;
+  reset: () => void;
+  addReport: (name?: string, template?: ReportTemplateId) => string;
+  duplicateReport: (id: string) => string | null;
   updateReport: (id: string, updates: Partial<Omit<Report, 'id' | 'createdAt'>>) => void;
   deleteReport: (id: string) => void;
   selectReport: (id: string | null) => void;
+  flushSaves: () => Promise<void>;
 
   // Selectors
   getReport: (id: string) => Report | undefined;

@@ -214,6 +214,10 @@ export async function exportReportToPDF(
 
   const wrapper = document.createElement('div');
   wrapper.style.cssText = `
+    position: fixed;
+    left: -100000px;
+    top: 0;
+    width: 8.5in;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: #1a1a1a;
     line-height: 1.6;
@@ -227,6 +231,9 @@ export async function exportReportToPDF(
     height: auto;
     padding: 0;
   `;
+
+  wrapper.appendChild(contentClone);
+  document.body.appendChild(wrapper);
 
   prepareTablesForPDF(contentClone);
   
@@ -253,8 +260,6 @@ export async function exportReportToPDF(
     }
   });
 
-  wrapper.appendChild(contentClone);
-
   const opt = {
     margin: [0.8, 0.6, 0.9, 0.6] as [number, number, number, number], // top, left, bottom, right
     filename: `${reportName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
@@ -277,50 +282,54 @@ export async function exportReportToPDF(
     },
   };
 
-  const pdf = html2pdf().set(opt).from(wrapper);
-  
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await pdf.toPdf().get('pdf').then((pdfDoc: any) => {
-    const totalPages = pdfDoc.internal.getNumberOfPages();
-    const pageWidth = pdfDoc.internal.pageSize.getWidth();
-    const pageHeight = pdfDoc.internal.pageSize.getHeight();
-    
-    for (let i = 1; i <= totalPages; i++) {
-      pdfDoc.setPage(i);
-      
-      pdfDoc.setDrawColor(33, 115, 70);
-      pdfDoc.setLineWidth(0.015);
-      pdfDoc.line(0.5, 0.55, pageWidth - 0.5, 0.55);
-      
-      pdfDoc.setFontSize(10);
-      pdfDoc.setTextColor(33, 115, 70);
-      pdfDoc.setFont('helvetica', 'bold');
-      pdfDoc.text(appName, 0.5, 0.4);
-      
-      pdfDoc.setFontSize(9);
-      pdfDoc.setTextColor(100, 100, 100);
-      pdfDoc.setFont('helvetica', 'normal');
-      pdfDoc.text(`Page ${i} of ${totalPages}`, pageWidth - 0.5, 0.4, { align: 'right' });
-      
-      pdfDoc.setDrawColor(33, 115, 70);
-      pdfDoc.setLineWidth(0.015);
-      pdfDoc.line(0.5, pageHeight - 0.6, pageWidth - 0.5, pageHeight - 0.6);
-      
-      pdfDoc.setFontSize(8);
-      pdfDoc.setTextColor(33, 115, 70);
-      pdfDoc.setFont('helvetica', 'bold');
-      pdfDoc.text(appName, 0.5, pageHeight - 0.4);
-      
-      pdfDoc.setTextColor(80, 80, 80);
-      pdfDoc.setFont('helvetica', 'normal');
-      pdfDoc.text(`${i} / ${totalPages}`, pageWidth / 2, pageHeight - 0.4, { align: 'center' });
-      
-      pdfDoc.setTextColor(100, 100, 100);
-      pdfDoc.setFontSize(7);
-      pdfDoc.text(timestamp, pageWidth - 0.5, pageHeight - 0.4, { align: 'right' });
-    }
-  });
-  
-  await pdf.save();
+  try {
+    const pdf = html2pdf().set(opt).from(wrapper);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await pdf.toPdf().get('pdf').then((pdfDoc: any) => {
+      const totalPages = pdfDoc.internal.getNumberOfPages();
+      const pageWidth = pdfDoc.internal.pageSize.getWidth();
+      const pageHeight = pdfDoc.internal.pageSize.getHeight();
+
+      for (let i = 1; i <= totalPages; i++) {
+        pdfDoc.setPage(i);
+
+        pdfDoc.setDrawColor(33, 115, 70);
+        pdfDoc.setLineWidth(0.015);
+        pdfDoc.line(0.5, 0.55, pageWidth - 0.5, 0.55);
+
+        pdfDoc.setFontSize(10);
+        pdfDoc.setTextColor(33, 115, 70);
+        pdfDoc.setFont('helvetica', 'bold');
+        pdfDoc.text(appName, 0.5, 0.4);
+
+        pdfDoc.setFontSize(9);
+        pdfDoc.setTextColor(100, 100, 100);
+        pdfDoc.setFont('helvetica', 'normal');
+        pdfDoc.text(`Page ${i} of ${totalPages}`, pageWidth - 0.5, 0.4, { align: 'right' });
+
+        pdfDoc.setDrawColor(33, 115, 70);
+        pdfDoc.setLineWidth(0.015);
+        pdfDoc.line(0.5, pageHeight - 0.6, pageWidth - 0.5, pageHeight - 0.6);
+
+        pdfDoc.setFontSize(8);
+        pdfDoc.setTextColor(33, 115, 70);
+        pdfDoc.setFont('helvetica', 'bold');
+        pdfDoc.text(appName, 0.5, pageHeight - 0.4);
+
+        pdfDoc.setTextColor(80, 80, 80);
+        pdfDoc.setFont('helvetica', 'normal');
+        pdfDoc.text(`${i} / ${totalPages}`, pageWidth / 2, pageHeight - 0.4, { align: 'center' });
+
+        pdfDoc.setTextColor(100, 100, 100);
+        pdfDoc.setFontSize(7);
+        pdfDoc.text(timestamp, pageWidth - 0.5, pageHeight - 0.4, { align: 'right' });
+      }
+    });
+
+    await pdf.save();
+  } finally {
+    wrapper.remove();
+  }
 }
 

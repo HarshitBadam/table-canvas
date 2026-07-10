@@ -11,7 +11,7 @@ import { useReportStore } from './reportStore';
 import { TipTapEditor, type TipTapEditorHandle } from './editor/TipTapEditor';
 import { ReportToolbar } from './ReportToolbar';
 import type { JSONContent } from '@tiptap/react';
-import type { Report } from './types';
+import type { Report, ReportTemplateId } from './types';
 
 import './PrintStyles.css';
 
@@ -31,13 +31,16 @@ function defaultDocFor(report: Report): JSONContent {
 }
 
 interface ReportViewProps {
-  reportId: string;
+  reportId: string | null;
   onOpenTable?: (tableId: string) => void;
 }
 
 export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
-  const report = useReportStore((state) => state.reports[reportId]);
+  const report = useReportStore((state) => reportId ? state.reports[reportId] : undefined);
   const updateReport = useReportStore((state) => state.updateReport);
+  const addReport = useReportStore((state) => state.addReport);
+  const persistenceStatus = useReportStore((state) => state.persistenceStatus);
+  const persistenceError = useReportStore((state) => state.persistenceError);
   const editorRef = useRef<TipTapEditorHandle>(null);
 
   // Resolve the content to display: the report's TipTap document, or a fresh
@@ -50,6 +53,7 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
 
   // Handle content changes - just save content, name is managed separately via toolbar
   const handleContentChange = useCallback((content: JSONContent) => {
+    if (!reportId) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     updateReport(reportId, { tiptapContent: content as unknown as any });
   }, [reportId, updateReport]);
@@ -70,18 +74,28 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
   const handleInsertTable = useCallback(() => {
     editorRef.current?.insertTable();
   }, []);
+  const handleInsertEmbeddedTable = useCallback(() => {
+    editorRef.current?.insertEmbeddedTable();
+  }, []);
+  const handleInsertChart = useCallback(() => {
+    editorRef.current?.insertChart();
+  }, []);
 
-  if (!report) {
+  if (!reportId || !report) {
     return (
-      <div className="flex items-center justify-center h-full bg-surface">
-        <div className="text-center">
-          <div className="text-6xl mb-4">📄</div>
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            Report not found
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400">
-            This report may have been deleted.
-          </p>
+      <div className="h-full flex flex-col bg-surface report-view">
+        <ReportToolbar activeReportId={null} />
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-4xl mx-auto px-6 py-16">
+            {persistenceStatus === 'loading' ? (
+              <div className="text-center text-sm text-text-secondary">Loading reports…</div>
+            ) : (
+              <ReportStart
+                error={persistenceError}
+                onCreate={(name, template) => addReport(name, template)}
+              />
+            )}
+          </div>
         </div>
       </div>
     );
@@ -94,6 +108,8 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
         activeReportId={reportId}
         onHighlight={handleHighlight}
         onInsertTable={handleInsertTable}
+        onInsertEmbeddedTable={handleInsertEmbeddedTable}
+        onInsertChart={handleInsertChart}
       />
 
       {/* Editor */}
@@ -108,6 +124,66 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
             placeholder="Type '/' for commands..."
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportStart({
+  error,
+  onCreate,
+}: {
+  error: string | null;
+  onCreate: (name: string, template: ReportTemplateId) => void;
+}) {
+  const templates: Array<{
+    id: ReportTemplateId;
+    title: string;
+    description: string;
+  }> = [
+    {
+      id: 'blank',
+      title: 'Blank report',
+      description: 'Start with a clean document and add only what you need.',
+    },
+    {
+      id: 'executive-summary',
+      title: 'Executive summary',
+      description: 'Frame findings, evidence, decisions, and recommended actions.',
+    },
+    {
+      id: 'data-review',
+      title: 'Data review',
+      description: 'Document scope, quality observations, trends, and outliers.',
+    },
+  ];
+
+  return (
+    <div>
+      <div className="max-w-xl mb-10">
+        <h1 className="text-2xl font-semibold text-text-primary mb-2">Create a report</h1>
+        <p className="text-sm text-text-secondary leading-6">
+          Reports combine narrative, live table excerpts, and charts. Linked data stays
+          connected to this project and refreshes when the source changes.
+        </p>
+        {error && (
+          <div className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600">
+            Reports could not be loaded: {error}
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {templates.map((template) => (
+          <button
+            key={template.id}
+            type="button"
+            onClick={() => onCreate(template.title, template.id)}
+            className="text-left rounded-lg border border-border bg-surface px-4 py-4 hover:bg-surface-secondary hover:border-accent-green transition-colors"
+          >
+            <div className="font-medium text-text-primary mb-1">{template.title}</div>
+            <div className="text-xs leading-5 text-text-secondary">{template.description}</div>
+          </button>
+        ))}
       </div>
     </div>
   );

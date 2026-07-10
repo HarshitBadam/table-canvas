@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { TableRow } from '@/state/dataStore'
-import { getTableData } from '@/engine/materializationService'
 import { computeSuggestionEffect } from './computeEffects'
 import { useCleaningApply } from './useCleaningApply'
+import { loadCleaningRows } from './cleaningRows'
 import type { Suggestion } from '@/types'
 
 interface CleaningPanelProps {
@@ -13,46 +13,26 @@ interface CleaningPanelProps {
   onCountChange?: (count: number) => void
 }
 
-const MAX_IN_MEMORY_CLEANING_ROWS = 100_000
-
 export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, onCountChange }: CleaningPanelProps) {
   const node = useProjectStore((state) => state.getTableNode(tableId))
   const patches = useProjectStore((state) => state.patches[tableId])
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  // Rows live in the engine now (the data store is emptied after materialization),
-  // so fetch the current, fully-patched, id-keyed rows from there. We pull the whole
-  // table because cleaning must scan and affect every row, not just a preview window.
   const [rows, setRows] = useState<TableRow[]>([])
   const [rowsLoaded, setRowsLoaded] = useState(false)
   const [rowsError, setRowsError] = useState<string | null>(null)
   const [retryNonce, setRetryNonce] = useState(0)
-  // node.updatedAt bumps after an apply, which re-triggers the fetch with cleaned data.
   const refreshKey = node?.updatedAt
 
   useEffect(() => {
     let cancelled = false
     setRowsLoaded(false)
     setRowsError(null)
-    const SCAN_PAGE = 10000
-    getTableData(tableId, 0, SCAN_PAGE)
-      .then(async ({ rows: firstRows, totalRows }) => {
+    loadCleaningRows(tableId)
+      .then((loadedRows) => {
         if (cancelled) return
-        if (totalRows > MAX_IN_MEMORY_CLEANING_ROWS) {
-          setRows([])
-          setRowsError(
-            `This table has ${totalRows.toLocaleString()} rows. In-place cleaning is limited to ${MAX_IN_MEMORY_CLEANING_ROWS.toLocaleString()} rows to protect browser memory.`,
-          )
-          return
-        }
-        let allRows = firstRows
-        if (totalRows > firstRows.length) {
-          const { rows: fullRows } = await getTableData(tableId, 0, totalRows)
-          if (cancelled) return
-          allRows = fullRows
-        }
-        setRows(allRows as TableRow[])
+        setRows(loadedRows)
       })
       .catch((cause) => {
         if (!cancelled) {
@@ -74,10 +54,6 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
 
   const suggestionsWithEffects = useMemo(() => {
     if (rows.length === 0) return []
-
-    // `rows` already reflects every patch (cell edits, deletions, insertions) because
-    // EngineAdapter.loadTable bakes them in before materialization, so there is no
-    // manual patch merge to do here.
 
     const seen = new Set<string>()
     const deduplicatedSuggestions = suggestions.filter(s => {
@@ -129,7 +105,6 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
   }, [suggestions, rows, existingHighlights])
 
   useEffect(() => {
-    // Don't report a (premature) zero while rows are still loading.
     if (!rowsLoaded || rowsError) return
     onCountChange?.(suggestionsWithEffects.length)
   }, [rowsLoaded, rowsError, suggestionsWithEffects.length, onCountChange])
