@@ -1,7 +1,7 @@
 /**
  * Unit tests for IndexedDB Persistence Layer
  * Tests project save/load, file operations, cache management, and export/import
- * 
+ *
  * Uses fake-indexeddb for browser-like IndexedDB simulation
  */
 
@@ -104,9 +104,10 @@ function createMockReport(id: string, name: string) {
   return {
     id,
     name,
-    blocks: [
-      { id: 'block_1', type: 'text' as const, content: 'Hello World', createdAt: now, updatedAt: now },
-    ],
+    tiptapContent: {
+      type: 'doc' as const,
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello World' }] }],
+    },
     createdAt: now,
     updatedAt: now,
   }
@@ -116,7 +117,7 @@ function createMockReport(id: string, name: string) {
 describe('Project Operations', () => {
   it('saves and loads a project', async () => {
     const db = await getDB()
-    
+
     const projectId = 'test-project-1'
     const projectName = 'Test Project'
     const nodes = {
@@ -144,14 +145,14 @@ describe('Project Operations', () => {
 
   it('returns null for non-existent project', async () => {
     const db = await getDB()
-    
+
     const loaded = await db.loadProject('non-existent-id')
     expect(loaded).toBeNull()
   })
 
   it('serializes patches with Sets correctly', async () => {
     const db = await getDB()
-    
+
     const projectId = 'patch-test'
     const patches = {
       table_1: {
@@ -174,7 +175,7 @@ describe('Project Operations', () => {
 
   it('lists projects sorted by updated date', async () => {
     const db = await getDB()
-    
+
     // Create projects with slight delays to ensure different timestamps
     await db.saveProject('proj_1', 'First Project', {}, {}, {})
     await new Promise(resolve => setTimeout(resolve, 10))
@@ -191,9 +192,9 @@ describe('Project Operations', () => {
 
   it('deletes a project', async () => {
     const db = await getDB()
-    
+
     await db.saveProject('to-delete', 'Delete Me', {}, {}, {})
-    
+
     let loaded = await db.loadProject('to-delete')
     expect(loaded).not.toBeNull()
 
@@ -205,11 +206,11 @@ describe('Project Operations', () => {
 
   it('updates existing project', async () => {
     const db = await getDB()
-    
+
     const projectId = 'update-test'
-    
+
     await db.saveProject(projectId, 'Initial Name', {}, {}, {})
-    
+
     const newNodes = { table_1: createMockSourceTableNode('table_1', 'New Table') }
     await db.saveProject(projectId, 'Updated Name', newNodes, {}, {})
 
@@ -223,7 +224,7 @@ describe('Project Operations', () => {
 describe('File Operations', () => {
   it('saves and loads a file', async () => {
     const db = await getDB()
-    
+
     const fileId = 'file_123'
     const fileName = 'data.csv'
     const fileType = 'text/csv'
@@ -237,7 +238,7 @@ describe('File Operations', () => {
 
     expect(loaded).not.toBeNull()
     expect(loaded?.byteLength).toBe(fileData.byteLength)
-    
+
     const decoder = new TextDecoder()
     const loadedContent = decoder.decode(loaded!)
     expect(loadedContent).toBe(content)
@@ -245,20 +246,20 @@ describe('File Operations', () => {
 
   it('returns null for non-existent file', async () => {
     const db = await getDB()
-    
+
     const loaded = await db.loadFile('non-existent-file')
     expect(loaded).toBeNull()
   })
 
   it('deletes a file', async () => {
     const db = await getDB()
-    
+
     const fileId = 'file-to-delete'
     const encoder = new TextEncoder()
     const fileData = encoder.encode('test').buffer
 
     await db.saveFile(fileId, 'test.txt', 'text/plain', fileData)
-    
+
     let loaded = await db.loadFile(fileId)
     expect(loaded).not.toBeNull()
 
@@ -270,18 +271,18 @@ describe('File Operations', () => {
 
   it('handles binary file data (Excel)', async () => {
     const db = await getDB()
-    
+
     // Create mock binary data (simulating Excel file)
     const binaryData = new Uint8Array([0x50, 0x4B, 0x03, 0x04, 0x00, 0x00])
     const fileData = binaryData.buffer
 
     await db.saveFile('excel_file', 'data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileData)
-    
+
     const loaded = await db.loadFile('excel_file')
-    
+
     expect(loaded).not.toBeNull()
     expect(loaded?.byteLength).toBe(6)
-    
+
     const loadedBytes = new Uint8Array(loaded!)
     expect(loadedBytes[0]).toBe(0x50)
     expect(loadedBytes[1]).toBe(0x4B)
@@ -292,7 +293,7 @@ describe('File Operations', () => {
 describe('Cache Operations', () => {
   it('saves and loads cache data', async () => {
     const db = await getDB()
-    
+
     const tableId = 'table_123'
     const profileData = {
       columns: [
@@ -310,16 +311,16 @@ describe('Cache Operations', () => {
 
   it('returns null for non-existent cache', async () => {
     const db = await getDB()
-    
+
     const loaded = await db.loadCache('unknown-table', 'profile')
     expect(loaded).toBeNull()
   })
 
   it('handles different cache types', async () => {
     const db = await getDB()
-    
+
     const tableId = 'table_multi_cache'
-    
+
     await db.saveCache(tableId, 'profile', { type: 'profile' })
     await db.saveCache(tableId, 'slice', { type: 'slice' })
     await db.saveCache(tableId, 'aggregation', { type: 'agg' })
@@ -335,7 +336,7 @@ describe('Cache Operations', () => {
 
   it('clears cache for a specific table', async () => {
     const db = await getDB()
-    
+
     await db.saveCache('table_1', 'profile', { data: 1 })
     await db.saveCache('table_1', 'slice', { data: 2 })
     await db.saveCache('table_2', 'profile', { data: 3 })
@@ -352,7 +353,7 @@ describe('Cache Operations', () => {
 describe('Report Operations', () => {
   it('saves and loads a report', async () => {
     const db = await getDB()
-    
+
     const report = createMockReport('report_1', 'Monthly Report')
 
     await db.saveReport(report)
@@ -360,19 +361,19 @@ describe('Report Operations', () => {
 
     expect(loaded).not.toBeNull()
     expect(loaded?.name).toBe('Monthly Report')
-    expect(loaded?.blocks).toHaveLength(1)
+    expect(loaded?.tiptapContent?.content).toHaveLength(1)
   })
 
   it('returns null for non-existent report', async () => {
     const db = await getDB()
-    
+
     const loaded = await db.loadReport('non-existent')
     expect(loaded).toBeNull()
   })
 
   it('lists reports', async () => {
     const db = await getDB()
-    
+
     await db.saveReport(createMockReport('r1', 'Report 1'))
     await new Promise(resolve => setTimeout(resolve, 10))
     await db.saveReport(createMockReport('r2', 'Report 2'))
@@ -384,9 +385,9 @@ describe('Report Operations', () => {
 
   it('deletes a report', async () => {
     const db = await getDB()
-    
+
     await db.saveReport(createMockReport('to-delete', 'Delete Me'))
-    
+
     let loaded = await db.loadReport('to-delete')
     expect(loaded).not.toBeNull()
 
@@ -398,7 +399,7 @@ describe('Report Operations', () => {
 
   it('loads all reports', async () => {
     const db = await getDB()
-    
+
     await db.saveReport(createMockReport('r1', 'Report 1'))
     await db.saveReport(createMockReport('r2', 'Report 2'))
     await db.saveReport(createMockReport('r3', 'Report 3'))
@@ -413,7 +414,7 @@ describe('Report Operations', () => {
 
   it('bulk saves reports', async () => {
     const db = await getDB()
-    
+
     const reports = {
       r1: createMockReport('r1', 'Bulk 1'),
       r2: createMockReport('r2', 'Bulk 2'),
@@ -430,16 +431,16 @@ describe('Report Operations', () => {
 describe('Export/Import Operations', () => {
   it('exports project with embedded files', async () => {
     const db = await getDB()
-    
+
     const projectId = 'export-test'
     const nodes = {
       table_1: createMockSourceTableNode('table_1', 'Data Table'),
     }
-    
+
     const fileContent = 'id,name\n1,Alice\n2,Bob'
     const encoder = new TextEncoder()
     await db.saveFile('file_table_1', 'data.csv', 'text/csv', encoder.encode(fileContent).buffer)
-    
+
     await db.saveProject(projectId, 'Export Test', nodes, {}, {})
 
     const exportBlob = await db.exportProjectFile(projectId)
@@ -460,13 +461,13 @@ describe('Export/Import Operations', () => {
 
   it('throws error when exporting non-existent project', async () => {
     const db = await getDB()
-    
+
     await expect(db.exportProjectFile('non-existent')).rejects.toThrow('Project not found')
   })
 
   it('parses import file and restores files with new IDs', async () => {
     const db = await getDB()
-    
+
     // Create export data
     const exportData = {
       version: '2.0.0',
@@ -510,7 +511,7 @@ describe('Export/Import Operations', () => {
 
     expect(parsed.name).toBe('Imported Project')
     expect(parsed.filesRestored).toBe(1)
-    
+
     const tableNode = parsed.nodes.table_1 as { plan: { fileRef: string } }
     expect(tableNode.plan.fileRef).not.toBe('old_file_id')
     expect(tableNode.plan.fileRef).toMatch(/^file_/)
@@ -518,7 +519,7 @@ describe('Export/Import Operations', () => {
 
   it('handles import with missing files gracefully', async () => {
     const db = await getDB()
-    
+
     const exportData = {
       version: '2.0.0',
       formatType: 'tablecanvas-full',
@@ -559,7 +560,7 @@ describe('Export/Import Operations', () => {
 
   it('rejects invalid export format', async () => {
     const db = await getDB()
-    
+
     const mockFile = new File(
       ['not valid json'],
       'invalid.json',
@@ -571,7 +572,7 @@ describe('Export/Import Operations', () => {
 
   it('rejects export with unsupported version', async () => {
     const db = await getDB()
-    
+
     const exportData = {
       version: '99.0.0', // Future version
       project: { id: 'test', name: 'Test', nodes: {}, edges: {}, patches: {} },
@@ -588,7 +589,7 @@ describe('Export/Import Operations', () => {
 
   it('imports reports when option is enabled', async () => {
     const db = await getDB()
-    
+
     const exportData = {
       version: '2.0.0',
       formatType: 'tablecanvas-full',
@@ -619,7 +620,7 @@ describe('Export/Import Operations', () => {
 
   it('skips reports when option is disabled', async () => {
     const db = await getDB()
-    
+
     const exportData = {
       version: '2.0.0',
       formatType: 'tablecanvas-full',
@@ -650,7 +651,7 @@ describe('Export/Import Operations', () => {
 
   it('converts patches Sets back to proper format on import', async () => {
     const db = await getDB()
-    
+
     const exportData = {
       version: '2.0.0',
       formatType: 'tablecanvas-full',
@@ -690,7 +691,7 @@ describe('Export/Import Operations', () => {
 describe('Edge Cases', () => {
   it('handles empty project', async () => {
     const db = await getDB()
-    
+
     await db.saveProject('empty', 'Empty Project', {}, {}, {})
     const loaded = await db.loadProject('empty')
 
@@ -701,7 +702,7 @@ describe('Edge Cases', () => {
 
   it('handles large file data', async () => {
     const db = await getDB()
-    
+
     const largeData = new Uint8Array(1024 * 1024)
     for (let i = 0; i < largeData.length; i++) {
       largeData[i] = i % 256
@@ -715,7 +716,7 @@ describe('Edge Cases', () => {
 
   it('handles special characters in project name', async () => {
     const db = await getDB()
-    
+
     const specialName = 'Test "Project" <with> & special \'chars\''
     await db.saveProject('special', specialName, {}, {}, {})
     const loaded = await db.loadProject('special')
@@ -725,9 +726,9 @@ describe('Edge Cases', () => {
 
   it('handles concurrent saves to same project', async () => {
     const db = await getDB()
-    
+
     const projectId = 'concurrent'
-    
+
     await Promise.all([
       db.saveProject(projectId, 'Version 1', {}, {}, {}),
       db.saveProject(projectId, 'Version 2', {}, {}, {}),
@@ -740,7 +741,7 @@ describe('Edge Cases', () => {
 
   it('handles complex nested data structures', async () => {
     const db = await getDB()
-    
+
     const complexData = {
       deeply: {
         nested: {

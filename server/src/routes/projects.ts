@@ -7,7 +7,6 @@ import {
   asyncHandler,
   ValidationError,
   NotFoundError,
-  AuthorizationError,
   AppError,
 } from '../middleware/errorHandler.js';
 import { User } from '../models/User.js';
@@ -16,7 +15,12 @@ import type { Tier } from '../config/limits.js';
 
 const router = Router();
 
+// All project routes require authentication
 router.use(requireAuth);
+
+// ============================================================================
+// GET /api/projects - List user's projects
+// ============================================================================
 
 router.get(
   '/',
@@ -41,6 +45,10 @@ router.get(
   })
 );
 
+// ============================================================================
+// POST /api/projects - Create new project
+// ============================================================================
+
 router.post(
   '/',
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -49,14 +57,13 @@ router.post(
 
     const userDoc = await User.findById(userId);
     const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
-
     const activeProjects = await Project.countDocuments({
       userId: new Types.ObjectId(userId),
       deletedAt: null,
     });
-    const projCheck = checkProjectCount(activeProjects, tier);
-    if (!projCheck.ok) {
-      throw new AppError(projCheck.reason, 403);
+    const projectCheck = checkProjectCount(activeProjects, tier);
+    if (!projectCheck.ok) {
+      throw new AppError(projectCheck.reason, 403);
     }
 
     const project = new Project({
@@ -80,12 +87,17 @@ router.post(
   })
 );
 
+// ============================================================================
+// GET /api/projects/:id - Get project by ID
+// ============================================================================
+
 router.get(
   '/:id',
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const projectId = req.params.id;
 
+    // Validate ObjectId format
     if (!Types.ObjectId.isValid(projectId)) {
       throw new ValidationError(['Invalid project ID format']);
     }
@@ -107,6 +119,10 @@ router.get(
   })
 );
 
+// ============================================================================
+// PUT /api/projects/:id - Update project
+// ============================================================================
+
 router.put(
   '/:id',
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -114,16 +130,19 @@ router.put(
     const projectId = req.params.id;
     const { name, nodes, edges, patches } = req.body;
 
+    // Validate ObjectId format
     if (!Types.ObjectId.isValid(projectId)) {
       throw new ValidationError(['Invalid project ID format']);
     }
 
+    // Find project and verify ownership
     const project = await Project.findByIdAndUser(projectId, userId);
 
     if (!project) {
       throw new NotFoundError('Project');
     }
 
+    // Update fields
     if (name !== undefined) {
       project.name = name;
     }
@@ -150,22 +169,29 @@ router.put(
   })
 );
 
+// ============================================================================
+// PATCH /api/projects/:id - Partial update project
+// ============================================================================
+
 router.patch(
   '/:id',
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const projectId = req.params.id;
 
+    // Validate ObjectId format
     if (!Types.ObjectId.isValid(projectId)) {
       throw new ValidationError(['Invalid project ID format']);
     }
 
+    // Find project and verify ownership
     const project = await Project.findByIdAndUser(projectId, userId);
 
     if (!project) {
       throw new NotFoundError('Project');
     }
 
+    // Apply partial updates
     const allowedFields = ['name', 'nodes', 'edges', 'patches'];
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
@@ -186,22 +212,29 @@ router.patch(
   })
 );
 
+// ============================================================================
+// DELETE /api/projects/:id - Soft delete project
+// ============================================================================
+
 router.delete(
   '/:id',
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const projectId = req.params.id;
 
+    // Validate ObjectId format
     if (!Types.ObjectId.isValid(projectId)) {
       throw new ValidationError(['Invalid project ID format']);
     }
 
+    // Find project first to verify ownership
     const project = await Project.findByIdAndUser(projectId, userId);
 
     if (!project) {
       throw new NotFoundError('Project');
     }
 
+    // Soft delete the project
     await project.softDelete();
 
     const response: ApiResponse = {
@@ -213,16 +246,22 @@ router.delete(
   })
 );
 
+// ============================================================================
+// POST /api/projects/:id/restore - Restore soft-deleted project
+// ============================================================================
+
 router.post(
   '/:id/restore',
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const projectId = req.params.id;
 
+    // Validate ObjectId format
     if (!Types.ObjectId.isValid(projectId)) {
       throw new ValidationError(['Invalid project ID format']);
     }
 
+    // Find project including deleted ones
     const project = await Project.findOne({
       _id: new Types.ObjectId(projectId),
       userId: new Types.ObjectId(userId),
@@ -233,6 +272,7 @@ router.post(
       throw new NotFoundError('Deleted project');
     }
 
+    // Restore the project
     await project.restore();
 
     const response: ApiResponse<{ project: IProjectPublic }> = {

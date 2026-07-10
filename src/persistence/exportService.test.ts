@@ -113,67 +113,36 @@ function createMockChartNode(id: string, name: string) {
   }
 }
 
-function createMockReport(id: string, name: string, options?: { useTipTap?: boolean }) {
-  const base = {
+function createMockReport(id: string, name: string) {
+  return {
     id,
     name,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
-  }
-
-  if (options?.useTipTap) {
-    return {
-      ...base,
-      tiptapContent: {
-        type: 'doc',
-        content: [
-          {
-            type: 'heading',
-            attrs: { level: 1 },
-            content: [{ type: 'text', text: 'Report Title' }],
-          },
-          {
-            type: 'paragraph',
-            content: [
-              { type: 'text', text: 'This is ' },
-              { type: 'text', text: 'bold', marks: [{ type: 'bold' }] },
-              { type: 'text', text: ' text.' },
-            ],
-          },
-        ],
-      },
-      blocks: [],
-    }
-  }
-
-  const blockDate = '2024-01-01T00:00:00.000Z'
-  return {
-    ...base,
-    blocks: [
-      { id: 'block_1', type: 'heading' as const, level: 1 as const, content: 'Monthly Report', createdAt: blockDate, updatedAt: blockDate },
-      { id: 'block_2', type: 'text' as const, content: 'This is the summary.', createdAt: blockDate, updatedAt: blockDate },
-      { id: 'block_3', type: 'divider' as const, createdAt: blockDate, updatedAt: blockDate },
-      { id: 'block_4', type: 'chart' as const, chartType: 'bar' as const, sourceTableId: '', config: {}, createdAt: blockDate, updatedAt: blockDate },
-      {
-        id: 'block_5',
-        type: 'table_inline' as const,
-        data: {
-          headers: ['Name', 'Value'],
-          rows: [
-            ['Item A', 100],
-            ['Item B', 200],
+    tiptapContent: {
+      type: 'doc' as const,
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: 'Report Title' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'This is ' },
+            { type: 'text', text: 'bold', marks: [{ type: 'bold' }] },
+            { type: 'text', text: ' text.' },
           ],
         },
-        createdAt: blockDate,
-        updatedAt: blockDate,
-      },
-    ],
+      ],
+    },
   }
 }
 
 function createCSVContent(rows: Record<string, unknown>[]): ArrayBuffer {
   if (rows.length === 0) return new TextEncoder().encode('').buffer
-  
+
   const headers = Object.keys(rows[0])
   const lines = [
     headers.join(','),
@@ -316,7 +285,7 @@ describe('exportProjectAsZip', () => {
 
       expect(progressCallback).toHaveBeenCalled()
       expect(progressCallback).toHaveBeenCalledWith(expect.any(String), expect.any(Number))
-      
+
       // Should have progress at start and end
       const calls = progressCallback.mock.calls
       expect(calls[0][1]).toBeLessThan(calls[calls.length - 1][1])
@@ -362,9 +331,8 @@ describe('exportProjectAsZip', () => {
         includeReportHtml: false,
       })
 
-      expect(materializationService.ensureTableMaterialized).toHaveBeenCalledWith('table_2')
-      expect(materializationService.getTableData).toHaveBeenCalledWith('table_2', 0, 100000)
-      
+      expect(materializationService.getTableData).toHaveBeenCalledWith('table_2', 0, 1_000_000)
+
       const zip = await JSZip.loadAsync(zipBlob)
       expect(zip.files['data.xlsx']).toBeDefined()
     })
@@ -674,7 +642,7 @@ describe('exportProjectAsZip', () => {
 
 
 describe('Report HTML Generation', () => {
-  it('generates HTML for reports with legacy blocks', async () => {
+  it('generates HTML for reports', async () => {
     const mockProject = {
       id: 'test',
       name: 'Test',
@@ -703,9 +671,8 @@ describe('Report HTML Generation', () => {
     const html = await htmlFile.async('string')
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('Test Report')
-    expect(html).toContain('<h1>Monthly Report</h1>')
-    expect(html).toContain('<p>This is the summary.</p>')
-    expect(html).toContain('<hr>')
+    expect(html).toContain('<h1>Report Title</h1>')
+    expect(html).toContain('<strong>bold</strong>')
   })
 
   it('generates HTML for reports with TipTap content', async () => {
@@ -717,7 +684,7 @@ describe('Report HTML Generation', () => {
       patches: {},
     }
 
-    const mockReport = createMockReport('r1', 'TipTap Report', { useTipTap: true })
+    const mockReport = createMockReport('r1', 'TipTap Report')
 
     vi.mocked(db.exportProjectFile).mockResolvedValue(
       new Blob([JSON.stringify(mockProject)], { type: 'application/json' })
@@ -751,7 +718,6 @@ describe('Report HTML Generation', () => {
     const emptyReport = {
       id: 'empty',
       name: 'Empty Report',
-      blocks: [],
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
     }
@@ -785,7 +751,10 @@ describe('Report HTML Generation', () => {
     const reportWithSpecialChars = {
       id: 'special',
       name: 'Report: Q1/Q2 <2024>',
-      blocks: [{ id: 'b1', type: 'text' as const, content: 'Test', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }],
+      tiptapContent: {
+        type: 'doc' as const,
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Test' }] }],
+      },
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
     }
@@ -907,8 +876,8 @@ describe('exportAndDownloadProject', () => {
 })
 
 
-describe('Data Store Fallback', () => {
-  it('falls back to data store when materialization returns empty rows', async () => {
+describe('Canonical table reads', () => {
+  it('does not bypass the materialization API when rows are empty', async () => {
     const storeData = {
       table_2: {
         rows: [{ ID: 'store-1', Value: 999 }],
@@ -950,7 +919,8 @@ describe('Data Store Fallback', () => {
       includeReportHtml: false,
     })
 
-    expect(useDataStore.getState).toHaveBeenCalled()
+    expect(useDataStore.getState).not.toHaveBeenCalled()
+    expect(materializationService.getTableData).toHaveBeenCalledWith('table_2', 0, 1_000_000)
     expect(zipBlob).toBeInstanceOf(Blob)
   })
 })

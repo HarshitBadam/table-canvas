@@ -44,7 +44,7 @@ function createFileTestApp(mockUser: MockUser): Express {
     try {
       const files = await fileService.listUserFiles((req as any).user.userId);
       res.json({ success: true, data: { files } });
-    } catch (err) {
+    } catch {
       res.status(500).json({ success: false, error: 'Failed to list files' });
     }
   });
@@ -59,7 +59,7 @@ function createFileTestApp(mockUser: MockUser): Express {
         return res.status(404).json({ success: false, error: 'File not found' });
       }
       res.json({ success: true, data: result });
-    } catch (err) {
+    } catch {
       res.status(500).json({ success: false, error: 'Failed to download file' });
     }
   });
@@ -74,7 +74,7 @@ function createFileTestApp(mockUser: MockUser): Express {
         return res.status(404).json({ success: false, error: 'File not found' });
       }
       res.json({ success: true, message: 'File deleted' });
-    } catch (err) {
+    } catch {
       res.status(500).json({ success: false, error: 'Failed to delete file' });
     }
   });

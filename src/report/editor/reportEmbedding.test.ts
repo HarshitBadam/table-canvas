@@ -153,7 +153,6 @@ describe('Report HTML export for embedded tables', () => {
     const report: Report = {
       id: 'r1',
       name: 'Test Report',
-      blocks: [],
       tiptapContent: {
         type: 'doc',
         content: [
@@ -197,7 +196,6 @@ describe('Report HTML export for embedded tables', () => {
     const report: Report = {
       id: 'r1',
       name: 'Test Report',
-      blocks: [],
       tiptapContent: {
         type: 'doc',
         content: [
@@ -237,7 +235,6 @@ describe('Report HTML export for embedded tables', () => {
     const report: Report = {
       id: 'r1',
       name: 'Test Report',
-      blocks: [],
       tiptapContent: {
         type: 'doc',
         content: [
@@ -271,7 +268,6 @@ describe('Report HTML export for embedded tables', () => {
     const report: Report = {
       id: 'r1',
       name: 'Test Report',
-      blocks: [],
       tiptapContent: {
         type: 'doc',
         content: [

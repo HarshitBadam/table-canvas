@@ -4,7 +4,6 @@ import { File } from './File.js';
 import {
   createTestFile,
   createTestFiles,
-  createTestProject,
   createMockUserId,
 } from '../test/helpers.js';
 import { setupMongoTestDB } from '../test/setup.js';
@@ -204,11 +203,11 @@ describe('File Model', () => {
     it('should sort by createdAt descending', async () => {
       const userId = createMockUserId();
 
-      const file1 = await createTestFile({ userId, filename: 'first.csv' });
+      await createTestFile({ userId, filename: 'first.csv' });
       await new Promise((r) => setTimeout(r, 10));
-      const file2 = await createTestFile({ userId, filename: 'second.csv' });
+      await createTestFile({ userId, filename: 'second.csv' });
       await new Promise((r) => setTimeout(r, 10));
-      const file3 = await createTestFile({ userId, filename: 'third.csv' });
+      await createTestFile({ userId, filename: 'third.csv' });
 
       const files = await File.findByUser(userId);
 
