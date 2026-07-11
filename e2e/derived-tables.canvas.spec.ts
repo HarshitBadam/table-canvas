@@ -1,120 +1,74 @@
-import { expect, test } from '@playwright/test'
-import { getTableNodes } from './derived-tables.support'
+import { expect, test } from './e2e.fixture'
+import { bootApp, createManualTable, openManualTable } from './app.support'
 
-test.setTimeout(60000)
-
-test.describe('Canvas View and Table Nodes', () => {
+test.describe('Canvas and table behavior', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/')
-
-    const canvasOrLogin = await Promise.race([
-      page.waitForSelector('.react-flow', { timeout: 10000 }).then(() => 'canvas'),
-      page.waitForSelector('input[type="email"]', { timeout: 10000 }).then(() => 'login'),
-    ]).catch(() => 'unknown')
-
-    if (canvasOrLogin === 'login') {
-      test.skip(true, 'Authentication required - skipping until auth is configured')
-    }
+    await bootApp(page)
   })
 
-  test('should display the canvas view with React Flow', async ({ page }) => {
-    const canvas = page.locator('.react-flow')
-    await expect(canvas).toBeVisible({ timeout: 10000 })
+  test('empty-state actions create a real table node with exact metadata', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Welcome to Table Canvas' })).toBeVisible()
+    await page.locator('.react-flow').getByRole('button', { name: 'New Table' }).click()
 
-    const viewport = page.locator('.react-flow__viewport')
-    await expect(viewport).toBeVisible()
+    const dialog = page.getByRole('dialog', { name: 'Create New Table' })
+    await dialog.getByLabel('Table Name').fill('Canvas Contract')
+    await dialog.getByLabel('Rows').fill('7')
+    await dialog.getByRole('button', { name: 'Create Table' }).click()
+
+    const node = page.locator('.react-flow__node').filter({ hasText: 'Canvas Contract' })
+    await expect(node).toHaveCount(1)
+    await expect(node).toContainText('7 rows · 2 cols')
+    await expect(node).toContainText('Name')
+    await expect(node).toContainText('Value')
+    await expect(page.locator('aside').getByRole('button', {
+      name: /^Canvas Contract 7 rows/,
+    })).toBeVisible()
   })
 
-  test('should show sidebar with Import Data button', async ({ page }) => {
-    const sidebar = page.locator('aside')
-    await expect(sidebar).toBeVisible()
+  test('a created source opens an editable grid and returns to the same canvas node', async ({ page }) => {
+    await createManualTable(page, 'Navigation Contract')
+    await openManualTable(page, 'Navigation Contract')
 
-    const importButton = sidebar.locator('button:has-text("Import Data")')
-    await expect(importButton).toBeVisible()
+    await expect(page.getByText('Source - Editable')).toBeVisible()
+    await expect(page.getByRole('grid', { name: 'Table data' })).toBeVisible()
+    await expect(page.getByRole('gridcell')).toHaveCount(10)
+    await page.locator('main').getByRole('button', { name: 'Canvas', exact: true }).click()
+
+    await expect(page.locator('.react-flow__node').filter({
+      hasText: 'Navigation Contract',
+    })).toHaveCount(1)
   })
 
-  test('should show New Table button in sidebar', async ({ page }) => {
-    const sidebar = page.locator('aside')
-    const newTableButton = sidebar.locator('button:has-text("New Table")')
-    await expect(newTableButton).toBeVisible()
+  test('new-table validation blocks empty and duplicate names with an explicit error', async ({ page }) => {
+    await page.locator('aside').getByRole('button', { name: 'New Table' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Create New Table' })
+    const create = dialog.getByRole('button', { name: 'Create Table' })
+
+    await dialog.getByLabel('Table Name').fill(' ')
+    await expect(create).toBeDisabled()
+    await dialog.getByLabel('Table Name').fill('Validation Contract')
+    await dialog.getByLabel('Column 2 name').fill('Name')
+    await expect(dialog.getByRole('alert')).toHaveText('Column names must be unique.')
+    await expect(create).toBeDisabled()
+    await dialog.getByLabel('Column 2 name').fill('Amount')
+    await expect(dialog.getByRole('alert')).toBeHidden()
+    await expect(create).toBeEnabled()
   })
 
-  test('should open New Table modal when clicking New Table button', async ({ page }) => {
-    const sidebar = page.locator('aside')
-    const newTableButton = sidebar.locator('button:has-text("New Table")')
-    await newTableButton.click()
+  test('CSV import materializes exact rows and schema instead of only exposing a file input', async ({ page }) => {
+    await page.locator('aside input[type="file"][accept*=".csv"]').setInputFiles({
+      name: 'import-contract.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('ID,Name\n1,Ada\n2,Grace\n3,Linus'),
+    })
 
-    const modal = page.locator('[role="dialog"], .modal')
-    const modalVisible = await modal.isVisible({ timeout: 2000 }).catch(() => false)
-
-    if (modalVisible) {
-      await expect(modal).toBeVisible()
-
-      const nameInput = modal.locator('input').first()
-      await expect(nameInput).toBeVisible()
-    }
-  })
-})
-
-test.describe('Table Node Status Indicators', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/')
-
-    const hasCanvas = await page.waitForSelector('.react-flow', { timeout: 10000 }).catch(() => null)
-    if (!hasCanvas) {
-      test.skip(true, 'Canvas not available - authentication may be required')
-    }
-  })
-
-  test('source tables should have green accent styling', async ({ page }) => {
-    const tableNodes = getTableNodes(page)
-    const count = await tableNodes.count()
-
-    if (count > 0) {
-      await expect(tableNodes.first()).toBeVisible()
-      const sourceTableIcon = page.locator('.bg-accent-green, .bg-\\[\\#217346\\]')
-      const hasSourceStyle = await sourceTableIcon.count() > 0
-      expect(hasSourceStyle).toBeDefined()
-    }
-  })
-
-  test('derived tables should have violet accent styling', async ({ page }) => {
-    const derivedTableIcon = page.locator('.bg-violet-500')
-    const derivedCount = await derivedTableIcon.count()
-    expect(derivedCount).toBeGreaterThanOrEqual(0)
-  })
-
-  test('table nodes should show row and column counts', async ({ page }) => {
-    const tableNodes = getTableNodes(page)
-    const count = await tableNodes.count()
-
-    if (count > 0) {
-      const statsText = page.locator('.react-flow__node:has-text("rows")')
-      const statsCount = await statsText.count()
-      expect(statsCount).toBeGreaterThanOrEqual(0)
-    }
-  })
-})
-
-test.describe('Data Import', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/')
-
-    const hasCanvas = await page.waitForSelector('.react-flow', { timeout: 10000 }).catch(() => null)
-    if (!hasCanvas) {
-      test.skip(true, 'Canvas not available')
-    }
-  })
-
-  test('should have file input for CSV/Excel import', async ({ page }) => {
-    const fileInput = page.locator('input[type="file"]')
-    const inputCount = await fileInput.count()
-    expect(inputCount).toBeGreaterThan(0)
-  })
-
-  test('file input should accept CSV and Excel formats', async ({ page }) => {
-    const fileInput = page.locator('input[type="file"]').first()
-    const acceptAttr = await fileInput.getAttribute('accept')
-    expect(acceptAttr).toContain('.csv')
+    const table = page.locator('aside').getByRole('button', {
+      name: /^import-contract 3 rows/,
+    })
+    await expect(table).toBeVisible({ timeout: 20_000 })
+    await table.click()
+    await expect(page.getByText('3 rows × 2 columns')).toBeVisible()
+    await expect(page.getByRole('gridcell').filter({ hasText: 'Ada' })).toHaveCount(1)
+    await expect(page.getByRole('gridcell').filter({ hasText: 'Linus' })).toHaveCount(1)
   })
 })

@@ -149,22 +149,26 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
       lastDragUpdate.current = now
       
       setNodes(currentNodes => {
-        const updatedNodes = currentNodes.map(n =>
+        return currentNodes.map(n =>
           n.id === node.id ? { ...n, position: node.position } : n
         )
-        const smartEdges = computeSmartEdges(updatedNodes, baseEdges)
-        setEdges(smartEdges)
-        return updatedNodes
       })
     },
-    [baseEdges, setNodes, setEdges]
+    [setNodes]
   )
 
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      setNodes(currentNodes => {
+        const updatedNodes = currentNodes.map(current =>
+          current.id === node.id ? { ...current, position: node.position } : current
+        )
+        setEdges(computeSmartEdges(updatedNodes, baseEdges))
+        return updatedNodes
+      })
       updateNodePosition(node.id, node.position)
     },
-    [updateNodePosition]
+    [baseEdges, setEdges, setNodes, updateNodePosition]
   )
 
   const onNodeClick = useCallback(

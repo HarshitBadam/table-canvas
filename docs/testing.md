@@ -4,32 +4,44 @@ Two layers: Vitest for unit/integration, Playwright for end-to-end.
 
 | Layer | Framework | Location |
 |-------|-----------|----------|
-| Frontend unit / integration | Vitest | `src/**/*.test.ts` |
+| Frontend unit / integration | Vitest | `src/**/*.test.{ts,tsx}` |
 | Backend unit / integration | Vitest | `server/src/**/*.test.ts` |
-| E2E | Playwright | `e2e/*.spec.ts` (3 files) |
+| E2E | Playwright | `e2e/**/*.spec.ts` |
 
 ## Running
 
-```bash
-npm run test            # watch mode
-npm run test:run        # once
-npm run test:coverage   # coverage report → ./coverage/index.html
-npm run test:ui         # Vitest UI
+Frontend unit and integration commands:
 
-# scoped subsets (verbose)
+```bash
+npm run test
+npm run test:run
+npm run test:coverage
+npm run test:ui
 npm run test:engine
 npm run test:formula
 npm run test:persistence
 npm run test:suggestions
-
-# E2E
-npm run test:e2e        # headless
-npm run test:e2e:ui     # Playwright UI
-
-npm run test:all        # unit + E2E
-npm run test:ci         # JUnit output → ./test-results/junit.xml
-npm run check:dead-code # unused files, exports, types, and dependencies
 ```
+
+Browser commands:
+
+```bash
+npm run test:e2e
+npm run test:e2e:ui
+npm run test:ux
+npm run test:ux:update
+```
+
+Aggregate and CI commands:
+
+```bash
+npm run test:all
+npm run test:release
+npm run test:ci
+npm run check:dead-code
+```
+
+`test:coverage` writes HTML to `coverage/index.html`. `test:ux:update` updates reviewed visual baselines. `test:ci` writes JUnit output to `test-results/junit.xml`.
 
 Run a single file: `npm run test:run src/engine/dependencyGraph.test.ts`.
 
@@ -57,7 +69,14 @@ service behavior, and limit enforcement.
 | Models and services | `models/*.test.ts`, `services/*.test.ts`, `config/enforce.test.ts` |
 
 **E2E**: `e2e/derived-tables.{canvas,interactions,layout}.spec.ts` covers canvas rendering,
-interactions, and responsive layout. Shared setup is in `e2e/derived-tables.support.ts`.
+interactions, and responsive layout. `sample-workbook.spec.ts` and `report-workflow.spec.ts`
+cover persisted import/edit/clean/report/export workflows. All specs use the deterministic
+mock API in `e2e/derived-tables.support.ts`.
+
+`e2e/ux/` is the release-blocking UX contract: committed visual baselines, WCAG checks,
+keyboard/focus behavior, supported viewport geometry, browser-error detection, project switching,
+canvas joins, production telemetry, bounded DOM/memory use, and main-thread long-task budgets.
+The exact pass/fail contract is documented in `docs/ux-quality.md`.
 
 The well-covered core is the engine (DAG, materialization), the formula parser, filtering,
 persistence, and the backend routes. React components are only lightly covered; canvas
@@ -65,7 +84,9 @@ interactions are exercised via E2E.
 
 ## Setup
 
-- **Frontend**: the `jsdom` environment is set in `vitest.config.ts`. `src/test/setup.ts` imports
+- **Frontend**: the `jsdom` environment is set in `vitest.config.ts`. Coverage instruments all
+  production TypeScript sources, emits text/HTML/LCOV/JSON reports, and enforces a ratchetable
+  baseline threshold. `src/test/setup.ts` imports
   `@testing-library/jest-dom` and enables Immer's MapSet plugin. Persistence tests import
   `fake-indexeddb/auto` directly (for example, `dbProjectFile.test.ts` and
   `exportServiceHappy.test.ts`) to run against an in-memory IndexedDB.
@@ -87,5 +108,5 @@ GitHub Actions workflows live in `.github/workflows/`:
 - **`release.yml`**: runs on `v*` tags to validate and build a release.
 
 CI artifacts: coverage report and Playwright report are uploaded on every run. Playwright
-screenshots are uploaded only on failure. Traces are captured on first retry; view one locally
+screenshots are uploaded only on failure. Traces are retained on failure; view one locally
 with `npx playwright show-trace test-results/*/trace.zip`.

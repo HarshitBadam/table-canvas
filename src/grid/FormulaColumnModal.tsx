@@ -55,7 +55,6 @@ export function FormulaColumnModal({
     if (columnName.trim()) {
       const suggestions = suggestFormulasFromName(columnName, columnInfo)
       setFormulaSuggestions(suggestions)
-      // Auto-switch to formula mode if high-confidence suggestion, but don't auto-fill
       if (suggestions.length > 0 && suggestions[0].confidence === 'high') {
         setIsFormula(true)
       }
@@ -64,7 +63,6 @@ export function FormulaColumnModal({
     }
   }, [columnName, columnInfo])
 
-  // Debounced validation - only show errors after user stops typing
   useEffect(() => {
     if (!isFormula || !formula.trim()) {
       setFormulaErrors([])
@@ -121,6 +119,10 @@ export function FormulaColumnModal({
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
       <div 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-column-title"
+        aria-describedby="new-column-description"
         className={`bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden flex flex-col transition-all duration-200 ${
           isFormula ? 'w-[520px] max-w-[95vw]' : 'w-[380px] max-w-[90vw]'
         }`}
@@ -129,16 +131,17 @@ export function FormulaColumnModal({
         onKeyDown={handleKeyDown}
       >
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">New Column</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Add a new column to your table</p>
+          <h3 id="new-column-title" className="text-base font-semibold text-gray-900 dark:text-gray-100">New Column</h3>
+          <p id="new-column-description" className="text-xs text-gray-500 mt-0.5">Add a new column to your table</p>
         </div>
         
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            <label htmlFor="formula-column-name" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Column Name
             </label>
             <input
+              id="formula-column-name"
               type="text"
               value={columnName}
               onChange={(e) => setColumnName(e.target.value)}
@@ -149,13 +152,14 @@ export function FormulaColumnModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            <span className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Column Type
-            </label>
+            </span>
             <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
               <button
                 type="button"
                 onClick={() => setIsFormula(false)}
+                aria-pressed={!isFormula}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
                   !isFormula
                     ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
@@ -168,6 +172,7 @@ export function FormulaColumnModal({
               <button
                 type="button"
                 onClick={() => setIsFormula(true)}
+                aria-pressed={isFormula}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
                   isFormula
                     ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
@@ -182,9 +187,9 @@ export function FormulaColumnModal({
 
           {!isFormula && (
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <span className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Data Type
-              </label>
+              </span>
               <div className="space-y-1.5">
                 {[
                   { value: 'string', label: 'Text', desc: 'Letters, words, sentences' },
@@ -196,6 +201,7 @@ export function FormulaColumnModal({
                     key={type.value}
                     type="button"
                     onClick={() => setStaticType(type.value as typeof staticType)}
+                    aria-pressed={staticType === type.value}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
                       staticType === type.value
                         ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
@@ -256,7 +262,7 @@ export function FormulaColumnModal({
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Formula</label>
+                  <label htmlFor="formula-column-expression" className="text-xs font-medium text-gray-700 dark:text-gray-300">Formula</label>
                   {formula && !formulaErrors.length && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">
                       Returns {inferredType}
@@ -264,6 +270,7 @@ export function FormulaColumnModal({
                   )}
                 </div>
                 <textarea
+                  id="formula-column-expression"
                   value={formula}
                   onChange={(e) => setFormula(e.target.value)}
                   placeholder='e.g., [unit_price] * [quantity]'
@@ -274,9 +281,11 @@ export function FormulaColumnModal({
                   }`}
                   rows={3}
                   spellCheck={false}
+                  aria-invalid={formulaErrors.length > 0}
+                  aria-describedby={formulaErrors.length > 0 ? 'formula-column-error' : undefined}
                 />
                 {formulaErrors.length > 0 && (
-                  <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{formulaErrors[0]}</p>
+                  <p id="formula-column-error" role="alert" className="mt-1.5 text-xs text-red-600 dark:text-red-400">{formulaErrors[0]}</p>
                 )}
               </div>
 

@@ -5,9 +5,10 @@ import { useGridContext } from './useGridContext'
 
 interface ColumnHeaderProps {
   column: ColumnSchema
+  columnIndex: number
 }
 
-export function ColumnHeader({ column }: ColumnHeaderProps) {
+export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
   const {
     isEditable,
     getColumnWidth,
@@ -60,12 +61,26 @@ export function ColumnHeader({ column }: ColumnHeaderProps) {
 
   return (
     <div
+      role="columnheader"
+      aria-colindex={columnIndex}
+      aria-selected={isSelected}
+      tabIndex={0}
       onClick={() => handleColumnClick(column.id)}
       onDoubleClick={() => handleColumnDoubleClick(column.id, column.name)}
+      onKeyDown={(event) => {
+        if (isEditing) return
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          handleColumnClick(column.id)
+        } else if (event.key === 'F2' && isEditable) {
+          event.preventDefault()
+          handleColumnDoubleClick(column.id, column.name)
+        }
+      }}
       onContextMenu={(e) => handleContextMenu(e, 'column', undefined, column.id)}
       className={`
         relative flex items-center gap-1 px-2 text-xs font-medium cursor-pointer select-none
-        border-r border-border group text-green-700 dark:text-[#8fc4a3]
+        border-r border-border group text-green-800 dark:text-[#a8d5b9]
         ${bgClass}
       `}
       style={{ width, minWidth: width, maxWidth: width, height: HEADER_HEIGHT }}
@@ -79,6 +94,7 @@ export function ColumnHeader({ column }: ColumnHeaderProps) {
           onChange={(e) => setEditColumnName(e.target.value)}
           onBlur={commitColumnNameEdit}
           onKeyDown={handleKeyDown}
+          aria-label={`Rename ${column.name} column`}
           className="absolute inset-0 w-full h-full px-2 text-xs font-medium bg-transparent outline-none border-none text-text-primary"
           onClick={(e) => e.stopPropagation()}
         />
@@ -113,6 +129,9 @@ export function ColumnHeader({ column }: ColumnHeaderProps) {
         </>
       )}
       <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={`Resize ${column.name} column`}
         onMouseDown={(e) => handleResizeStart(column.id, e)}
         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-500/50 transition-colors z-10"
         onClick={(e) => e.stopPropagation()}

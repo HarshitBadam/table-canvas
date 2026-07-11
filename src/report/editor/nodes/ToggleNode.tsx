@@ -45,12 +45,18 @@ const ToggleNodeView = memo(function ToggleNodeView({
   return (
     <NodeViewWrapper className="toggle-block">
       <div className={`tiptap-block-wrapper ${selected ? 'is-selected' : ''}`}>
-        <div className="toggle-header" onClick={toggleExpand}>
-          <span className={`toggle-arrow ${attrs.isExpanded ? 'is-expanded' : ''}`}>
+        <div className="toggle-header">
+          <button
+            type="button"
+            className={`toggle-arrow ${attrs.isExpanded ? 'is-expanded' : ''}`}
+            onClick={toggleExpand}
+            aria-expanded={attrs.isExpanded}
+            aria-label={`${attrs.isExpanded ? 'Collapse' : 'Expand'} ${attrs.title || 'Toggle'}`}
+          >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
               <path d="M4.5 2L9 6L4.5 10" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-          </span>
+          </button>
           
           {isEditing ? (
             <input
@@ -59,7 +65,6 @@ const ToggleNodeView = memo(function ToggleNodeView({
               onChange={(e) => setEditTitle(e.target.value)}
               onBlur={handleTitleBlur}
               onKeyDown={handleKeyDown}
-              onClick={(e) => e.stopPropagation()}
               autoFocus
               className="toggle-title bg-transparent border-none outline-none w-full"
               placeholder="Toggle title..."

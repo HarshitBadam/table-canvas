@@ -2,12 +2,14 @@ import { useTheme } from './themeContext'
 
 export function ThemeToggle() {
   const { theme, toggleTheme } = useTheme()
+  const nextTheme = theme === 'dark' ? 'light' : 'dark'
 
   return (
     <button
       onClick={toggleTheme}
       className="flex items-center gap-2 w-full text-xs text-text-tertiary hover:text-text-primary transition-colors"
-      title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      title={`Switch to ${nextTheme} mode`}
+      aria-label={`Switch to ${nextTheme} mode`}
     >
       {theme === 'dark' ? (
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -18,7 +20,7 @@ export function ThemeToggle() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
         </svg>
       )}
-      <span>Dark Mode</span>
+      <span>{nextTheme === 'dark' ? 'Dark mode' : 'Light mode'}</span>
     </button>
   )
 }

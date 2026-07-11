@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-const MAX_LINES = 400
+const LINE_LIMIT = 400
 const root = process.cwd()
 const codeExtensions = new Set(['.css', '.cjs', '.js', '.jsx', '.json', '.mjs', '.sh', '.ts', '.tsx'])
 const documentationExtensions = new Set(['.md', '.yaml', '.yml'])
@@ -86,15 +86,15 @@ const violations = []
 
 for (const file of files) {
   const lineCount = countPhysicalLines(await readFile(file, 'utf8'))
-  if (lineCount > MAX_LINES) {
-    violations.push(`${file.slice(root.length + 1)}: ${lineCount} lines (maximum ${MAX_LINES})`)
+  if (lineCount >= LINE_LIMIT) {
+    violations.push(`${file.slice(root.length + 1)}: ${lineCount} lines`)
   }
 }
 
 if (violations.length > 0) {
-  console.error(`Files must not exceed ${MAX_LINES} physical lines:`)
+  console.error(`Files must contain fewer than ${LINE_LIMIT} physical lines:`)
   console.error(violations.join('\n'))
   process.exitCode = 1
 } else {
-  console.log(`Checked ${files.length} files: all are at most ${MAX_LINES} physical lines.`)
+  console.log(`Checked ${files.length} files: all contain fewer than ${LINE_LIMIT} physical lines.`)
 }

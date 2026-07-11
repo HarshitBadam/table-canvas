@@ -93,7 +93,6 @@
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
-  cursor: pointer;
   user-select: none;
   padding: 0.25rem 0;
 }
@@ -105,6 +104,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
   color: var(--color-text-tertiary, #a1a1aa);
   transition: transform 150ms ease;
   margin-top: 2px;

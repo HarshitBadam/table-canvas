@@ -194,6 +194,12 @@ export async function createProjectWithSync(name = 'Untitled Project'): Promise<
 }
 
 const saveTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+const pendingBackendSaves = new Map<string, {
+  name: string
+  nodes: Record<string, ProjectNode>
+  edges: Record<string, Edge>
+  patches: Record<string, Patches>
+}>()
 
 async function saveToBackend(
   projectId: string,
@@ -203,11 +209,24 @@ async function saveToBackend(
   patches: Record<string, Patches>,
 ): Promise<void> {
   if (!isNetworkOnline() || projectId.startsWith('local_')) return
-  try {
-    await updateProject(projectId, { name, nodes, edges, patches: serializePatches(patches) })
-  } catch (error) {
-    console.error('[Sync] Failed to save to backend:', error)
-  }
+  await updateProject(projectId, { name, nodes, edges, patches: serializePatches(patches) })
+}
+
+export async function flushProjectSaveWithSync(projectId: string): Promise<void> {
+  const timeout = saveTimeouts.get(projectId)
+  if (timeout) clearTimeout(timeout)
+  saveTimeouts.delete(projectId)
+
+  const pending = pendingBackendSaves.get(projectId)
+  if (!pending) return
+  pendingBackendSaves.delete(projectId)
+  await saveToBackend(
+    projectId,
+    pending.name,
+    pending.nodes,
+    pending.edges,
+    pending.patches,
+  )
 }
 
 export async function saveProjectWithSync(
@@ -218,11 +237,13 @@ export async function saveProjectWithSync(
   patches: Record<string, Patches>,
 ): Promise<void> {
   await saveProjectLocal(projectId, name, nodes, edges, patches)
+  pendingBackendSaves.set(projectId, { name, nodes, edges, patches })
   const existingTimeout = saveTimeouts.get(projectId)
   if (existingTimeout) clearTimeout(existingTimeout)
   const timeout = setTimeout(() => {
-    saveTimeouts.delete(projectId)
-    void saveToBackend(projectId, name, nodes, edges, patches)
+    void flushProjectSaveWithSync(projectId).catch((error) => {
+      console.error('[Sync] Failed to save to backend:', error)
+    })
   }, 2000)
   saveTimeouts.set(projectId, timeout)
 }

@@ -4,6 +4,7 @@ import { useApp } from '@/state/AppContext'
 import { ImportButton } from '@/components/ImportButton'
 import { NewTableModal } from '@/canvas/modals/NewTableModal'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { ProjectSwitcher } from './ProjectSwitcher'
 import { useNavigation } from './NavigationContext'
 import type { ProjectNode, TableNode, ChartNode } from '@/types'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
@@ -71,6 +72,8 @@ export function Sidebar() {
         </div>
       </div>
 
+        <ProjectSwitcher />
+
         <div className="p-4 space-y-2 border-b border-border">
         <ImportButton />
         <button
@@ -111,6 +114,7 @@ export function Sidebar() {
                 <button
                   type="button"
                   onClick={() => handleTableClick(node.id)}
+                  aria-current={selectedNodeId === node.id ? 'page' : undefined}
                   className={`min-w-0 flex-1 text-left px-3 py-2.5 rounded-lg text-sm transition-all ${
                     selectedNodeId === node.id
                       ? 'bg-accent-green/10 text-accent-green'
@@ -159,6 +163,7 @@ export function Sidebar() {
                   <button
                     type="button"
                     onClick={() => handleChartClick(node.id)}
+                    aria-current={selectedNodeId === node.id ? 'page' : undefined}
                     className={`min-w-0 flex-1 text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
                       selectedNodeId === node.id
                         ? 'bg-accent-green/10 text-accent-green'
@@ -243,7 +248,13 @@ export function Sidebar() {
 
         {deleteConfirmId && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-surface border border-border rounded-lg shadow-lg p-5 max-w-sm mx-4">
+          <div
+            className="bg-surface border border-border rounded-lg shadow-lg p-5 max-w-sm mx-4"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-node-title"
+            aria-describedby="delete-node-description"
+          >
             <div className="flex items-start gap-3 mb-3">
               <div className="w-8 h-8 rounded bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
                 <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -251,13 +262,13 @@ export function Sidebar() {
                 </svg>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-text-primary">Delete Node</h3>
+                <h3 id="delete-node-title" className="text-sm font-semibold text-text-primary">Delete Node</h3>
                 <p className="text-xs text-text-secondary mt-0.5">
                   "{nodes[deleteConfirmId]?.name}"
                 </p>
               </div>
             </div>
-            <p className="text-xs text-text-secondary mb-4">
+            <p id="delete-node-description" className="text-xs text-text-secondary mb-4">
               {dependentDeleteCount > 0
                 ? `This will also delete ${dependentDeleteCount} dependent node${dependentDeleteCount === 1 ? '' : 's'} so the workflow remains valid.`
                 : 'Are you sure you want to delete this node?'}
@@ -265,13 +276,14 @@ export function Sidebar() {
             <div className="flex justify-end gap-2">
               <button 
                 onClick={cancelDelete} 
+                autoFocus
                 className="px-3 py-1.5 text-xs font-medium text-text-primary border border-border rounded hover:bg-surface-secondary transition-colors"
               >
                 Cancel
               </button>
               <button 
                 onClick={confirmDelete} 
-                className="px-3 py-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded transition-colors"
+                className="px-3 py-1.5 text-xs font-medium text-white bg-red-700 hover:bg-red-800 rounded transition-colors"
               >
                 Delete
               </button>

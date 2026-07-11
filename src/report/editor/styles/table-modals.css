@@ -199,6 +199,13 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .dimension-modal-overlay,
+  .dimension-modal {
+    animation: none;
+  }
+}
+
 [data-theme="dark"] .dimension-modal {
   background: var(--color-surface, #1a1a1a);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
@@ -349,7 +356,7 @@
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--color-text-secondary, #71717a);
+  color: var(--color-text-primary, #18181b);
   background: var(--color-surface-secondary, #f4f4f5);
   border: none;
   border-radius: 8px;
@@ -363,7 +370,7 @@
 
 [data-theme="dark"] .dimension-btn-cancel {
   background: var(--color-surface-secondary, #27272a);
-  color: var(--color-text-secondary, #a1a1aa);
+  color: var(--color-text-primary, #f4f4f5);
 }
 
 [data-theme="dark"] .dimension-btn-cancel:hover {

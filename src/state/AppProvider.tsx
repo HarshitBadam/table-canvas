@@ -10,10 +10,12 @@ import type { LoginCredentials } from '@/api/auth.api'
 import {
   createProjectWithSync,
   fetchProjects,
+  flushProjectSaveWithSync,
   loadProjectWithSync,
   saveProjectWithSync,
   syncLocalProjectsToBackend,
 } from '@/persistence/syncService'
+import type { ProjectWithSync } from '@/persistence/projectSync'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
 import { useReportStore } from '@/report/reportStore'
 import { checkProjectCount, type LimitExceeded } from '@/shared/enforce'
@@ -81,42 +83,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
     error: null,
   })
   const initialized = useRef(false)
-  const saving = useRef(false)
+  const saveInFlight = useRef<Promise<void> | null>(null)
   const savePending = useRef(false)
-  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nodes = useProjectStore(store => store.nodes)
   const edges = useProjectStore(store => store.edges)
   const patches = useProjectStore(store => store.patches)
   const projectName = useProjectStore(store => store.projectName)
 
   const saveLatestProject = useCallback(async () => {
-    if (saving.current) {
+    if (saveInFlight.current) {
       savePending.current = true
+      await saveInFlight.current
       return
     }
 
-    saving.current = true
-    setState(previous => ({ ...previous, isSaving: true }))
+    const save = async () => {
+      setState(previous => ({ ...previous, isSaving: true }))
+      try {
+        do {
+          savePending.current = false
+          const project = useProjectStore.getState()
+          if (!project.projectId) break
+          await saveProjectWithSync(
+            project.projectId,
+            project.projectName,
+            project.nodes,
+            project.edges,
+            project.patches,
+          )
+        } while (savePending.current)
+      } catch (error) {
+        console.error('[AppContext] Auto-save failed:', error)
+      } finally {
+        setState(previous => ({ ...previous, isSaving: false }))
+      }
+    }
+
+    const inFlight = save()
+    saveInFlight.current = inFlight
     try {
-      do {
-        savePending.current = false
-        const project = useProjectStore.getState()
-        if (!project.projectId) break
-        await saveProjectWithSync(
-          project.projectId,
-          project.projectName,
-          project.nodes,
-          project.edges,
-          project.patches,
-        )
-      } while (savePending.current)
-    } catch (error) {
-      console.error('[AppContext] Auto-save failed:', error)
+      await inFlight
     } finally {
-      saving.current = false
-      setState(previous => ({ ...previous, isSaving: false }))
+      if (saveInFlight.current === inFlight) saveInFlight.current = null
     }
   }, [])
+
+  const flushProjectSave = useCallback(async () => {
+    await saveLatestProject()
+    const projectId = useProjectStore.getState().projectId
+    if (projectId) await flushProjectSaveWithSync(projectId)
+  }, [saveLatestProject])
 
   const setPhase = useCallback((phase: AppPhase, error?: string) => {
     setState(previous => ({
@@ -126,6 +142,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       error: phase === 'error' ? error || 'Unknown error' : null,
     }))
   }, [])
+
+  const prepareProject = useCallback(async (project: ProjectWithSync) => {
+    await clearProjectRuntime(useProjectStore.getState().nodes)
+    useProjectStore.setState({
+      projectId: project.id,
+      projectName: project.name,
+      nodes: project.nodes,
+      edges: project.edges,
+      patches: project.patches,
+    })
+    await useReportStore.getState().initializeProject(project.id)
+    if (hasTables(project.nodes)) {
+      setPhase('materializing')
+      await materializeProjectTables(project.nodes)
+    }
+  }, [setPhase])
 
   useEffect(() => {
     setState(previous => ({ ...previous, user, isAuthenticated }))
@@ -152,6 +184,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         setPhase('loading_project')
         const { project, projectList } = await loadOrCreateProject()
+        await prepareProject(project)
         setState(previous => ({
           ...previous,
           projectId: project.id,
@@ -165,11 +198,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 createdAt: new Date(),
               }],
         }))
-        await useReportStore.getState().initializeProject(project.id)
-        if (hasTables(project.nodes)) {
-          setPhase('materializing')
-          await materializeProjectTables(project.nodes)
-        }
         setPhase('ready')
       } catch (error) {
         setPhase('error', error instanceof Error ? error.message : 'Initialization failed')
@@ -177,17 +205,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     void initialize()
-  }, [performCheckAuth, setPhase])
+  }, [performCheckAuth, prepareProject, setPhase])
 
   useEffect(() => {
     if (state.phase !== 'ready' || !state.isAuthenticated || !state.projectId) return
-    if (saveTimeout.current) clearTimeout(saveTimeout.current)
-    saveTimeout.current = setTimeout(() => {
-      void saveLatestProject()
-    }, 1500)
-    return () => {
-      if (saveTimeout.current) clearTimeout(saveTimeout.current)
-    }
+    void saveLatestProject()
   }, [
     edges,
     nodes,
@@ -205,6 +227,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await syncLocalProjectsToBackend()
     }
     const { project, projectList } = await loadOrCreateProject()
+    await prepareProject(project)
     setState(previous => ({
       ...previous,
       projectId: project.id,
@@ -218,13 +241,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             createdAt: new Date(),
           }],
     }))
-    await useReportStore.getState().initializeProject(project.id)
-    if (hasTables(project.nodes)) {
-      setPhase('materializing')
-      await materializeProjectTables(project.nodes)
-    }
     setPhase('ready')
-  }, [setPhase])
+  }, [prepareProject, setPhase])
 
   const login = useCallback(async (credentials: LoginCredentials) => {
     const loggedInUser = await performLogin(credentials)
@@ -238,9 +256,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
+      await flushProjectSave()
       await useReportStore.getState().flushSaves()
     } catch (error) {
-      console.error('[AppContext] Failed to flush reports before logout:', error)
+      console.error('[AppContext] Failed to flush saves before logout:', error)
     }
     await clearProjectRuntime(useProjectStore.getState().nodes)
     await performLogout()
@@ -260,7 +279,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
     useDataStore.setState({ tableData: {} })
     useReportStore.getState().reset()
-  }, [performLogout])
+  }, [flushProjectSave, performLogout])
 
   const createNewProject = useCallback(async (name?: string) => {
     const tier: Tier = user?.tier ?? 'guest'
@@ -269,16 +288,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setProjectLimitViolation(projectCheck)
       return
     }
+    await flushProjectSave()
+    await useReportStore.getState().flushSaves()
+    setPhase('loading_project')
     const project = await createProjectWithSync(name || 'Untitled Project')
-    await clearProjectRuntime(useProjectStore.getState().nodes)
-    useProjectStore.setState({
-      projectId: project.id,
-      projectName: project.name,
-      nodes: project.nodes,
-      edges: project.edges,
-      patches: project.patches,
-    })
-    await useReportStore.getState().initializeProject(project.id)
+    await prepareProject(project)
     setState(previous => ({
       ...previous,
       projectId: project.id,
@@ -290,36 +304,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
         createdAt: new Date(),
       }, ...previous.projects],
     }))
-  }, [state.projects.length, user?.tier])
+    setPhase('ready')
+  }, [flushProjectSave, prepareProject, setPhase, state.projects.length, user?.tier])
 
   const loadProject = useCallback(async (projectId: string) => {
     try {
+      await flushProjectSave()
+      await useReportStore.getState().flushSaves()
       setPhase('loading_project')
       const project = await loadProjectWithSync(projectId)
       if (!project) throw new Error('Project not found')
-      await clearProjectRuntime(useProjectStore.getState().nodes)
-      useProjectStore.setState({
-        projectId: project.id,
-        projectName: project.name,
-        nodes: project.nodes,
-        edges: project.edges,
-        patches: project.patches,
-      })
+      await prepareProject(project)
       setState(previous => ({
         ...previous,
         projectId: project.id,
         projectName: project.name,
       }))
-      await useReportStore.getState().initializeProject(project.id)
-      if (hasTables(project.nodes)) {
-        setPhase('materializing')
-        await materializeProjectTables(project.nodes)
-      }
       setPhase('ready')
     } catch (error) {
       setPhase('error', error instanceof Error ? error.message : 'Failed to load project')
     }
-  }, [setPhase])
+  }, [flushProjectSave, prepareProject, setPhase])
 
   const refreshProjects = useCallback(async () => {
     try {

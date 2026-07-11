@@ -130,17 +130,23 @@ export function FilterPanel({
       
       <div 
         ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="filter-data-title"
         className="relative w-full max-w-xl max-h-[85vh]
           bg-gray-50 dark:bg-gray-900
           rounded-2xl shadow-2xl
           border border-gray-200 dark:border-gray-800
           overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') onClose()
+        }}
       >
         <div className="px-6 pt-6 pb-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              <h2 id="filter-data-title" className="text-xl font-bold text-gray-900 dark:text-gray-100">
                 Filter Data
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
@@ -151,7 +157,7 @@ export function FilterPanel({
               <button
                 onClick={handleAddCondition}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white
-                  bg-emerald-500 hover:bg-emerald-600
+                  bg-emerald-700 hover:bg-emerald-800
                   rounded-lg
                   active:scale-[0.98] transition-all duration-150"
               >
@@ -162,6 +168,8 @@ export function FilterPanel({
               </button>
               <button
                 onClick={onClose}
+                aria-label="Close filter panel"
+                autoFocus
                 className="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200
                   hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-150"
               >
@@ -174,7 +182,14 @@ export function FilterPanel({
           
           {filters.conditions.length > 0 && (
             <div className="flex items-center gap-3 mt-4">
-              <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"
+                role="progressbar"
+                aria-label="Matching rows"
+                aria-valuemin={0}
+                aria-valuemax={totalRowCount}
+                aria-valuenow={matchingRowCount}
+              >
                 <div 
                   className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${percentage}%` }}
@@ -200,7 +215,7 @@ export function FilterPanel({
               <button
                 onClick={handleAddCondition}
                 className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold text-white
-                  bg-emerald-500 hover:bg-emerald-600
+                  bg-emerald-700 hover:bg-emerald-800
                   rounded-lg
                   active:scale-[0.98] transition-all duration-150"
               >
@@ -220,8 +235,8 @@ export function FilterPanel({
                   <button
                     onClick={handleToggleLogic}
                     className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide
-                      bg-emerald-500 text-white rounded-md
-                      hover:bg-emerald-600 active:scale-[0.97]
+                      bg-emerald-700 text-white rounded-md
+                      hover:bg-emerald-800 active:scale-[0.97]
                       transition-all duration-150"
                   >
                     {filters.logic === 'and' ? 'all' : 'any'}
@@ -297,7 +312,7 @@ export function FilterPanel({
             <button
               onClick={onClose}
               className="px-6 py-2 text-sm font-semibold text-white
-                bg-emerald-500 hover:bg-emerald-600
+                bg-emerald-700 hover:bg-emerald-800
                 rounded-lg
                 active:scale-[0.98] transition-all duration-150"
             >
