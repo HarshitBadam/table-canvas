@@ -4,6 +4,7 @@ export {
   createProjectWithSync,
   deleteProjectWithSync,
   fetchProjects,
+  flushProjectSaveWithSync,
   importProjectWithSync,
   loadProjectWithSync,
   saveProjectWithSync,

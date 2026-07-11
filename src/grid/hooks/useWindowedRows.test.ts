@@ -85,6 +85,33 @@ describe('useWindowedRows', () => {
     expect(row).toBeNull()
   })
 
+  it('retains adjacent rows while keeping the cache bounded', async () => {
+    mockGetSlice.mockImplementation(async (_tableId, offset: number, limit: number) => ({
+      tableId: 'test_table',
+      offset,
+      limit,
+      rows: Array.from({ length: limit }, (_, index) => ({
+        __rowId: `row_${offset + index}`,
+        Name: `Person ${offset + index}`,
+        Age: offset + index,
+      })),
+      totalRows: 500_000,
+    }))
+    const { result } = renderHook(() =>
+      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+    )
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 50))
+      result.current.getRowAtIndex(105)
+      await new Promise(resolve => setTimeout(resolve, 50))
+    })
+
+    expect(result.current.getRowAtIndex(0)?.__rowId).toBe('row_0')
+    expect(result.current.getRowAtIndex(100)?.__rowId).toBe('row_100')
+    expect(result.current.getLoadedRows().size).toBeLessThanOrEqual(300)
+  })
+
   it('uses getFilteredSlice when filters are provided', async () => {
     mockGetFilteredSlice.mockResolvedValue({
       tableId: 'test_table',

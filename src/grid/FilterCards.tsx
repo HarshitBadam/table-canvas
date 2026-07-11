@@ -18,6 +18,8 @@ import {
   StringInput,
 } from './FilterInputs'
 
+const ENUM_VALUE_DELIMITER = '|||'
+
 export interface FilterConditionWithId extends FilterCondition {
   _id: string
 }
@@ -38,8 +40,10 @@ export interface FilterCardProps {
 function RemoveButton({ onClick }: { onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+      aria-label="Remove filter"
+      className="p-1.5 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
     >
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -260,14 +264,13 @@ export function EnumFilterCard({
   onColumnChange,
   columnOptions,
 }: FilterCardProps) {
-  // '|||' is the delimiter used to serialize multiple selected values into a single string
   const selectedValues = useMemo(() => {
     if (!condition.value) return []
-    return String(condition.value).split('|||').filter(Boolean)
+    return String(condition.value).split(ENUM_VALUE_DELIMITER).filter(Boolean)
   }, [condition.value])
 
   const handleChange = (values: string[]) => {
-    onUpdate({ value: values.join('|||') })
+    onUpdate({ value: values.join(ENUM_VALUE_DELIMITER) })
   }
 
   return (

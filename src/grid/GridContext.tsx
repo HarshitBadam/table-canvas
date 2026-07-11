@@ -18,6 +18,7 @@ export interface GridContextValue {
   isIndexColumnSelected: boolean
   isCornerSelected: boolean
   cellRangeSelection: CellRangeSelection | null
+  setSelection: (selection: SelectionType) => void
   handleCellMouseDown: (rowIndex: number, columnId: string, e: React.MouseEvent) => void
   handleCellMouseEnter: (rowIndex: number, columnId: string) => void
   handleColumnClick: (columnId: string) => void

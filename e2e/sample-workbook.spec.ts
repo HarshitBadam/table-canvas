@@ -1,8 +1,9 @@
-import { expect, test, type Page, type Route } from '@playwright/test'
-import { readFileSync } from 'node:fs'
+import type { Page } from '@playwright/test'
+import { expect, test } from './e2e.fixture'
 import { resolve } from 'node:path'
-import JSZip from 'jszip'
 import * as XLSX from 'xlsx'
+import { installMockBackend } from './derived-tables.support'
+import { downloadProjectZip } from './app.support'
 
 const workbookPath = resolve(process.cwd(), 'data/sample_workbook.xlsx')
 const expectedRows: Record<string, number> = {
@@ -16,123 +17,15 @@ const expectedRows: Record<string, number> = {
   Projects: 8,
 }
 
-interface MockProject {
-  id: string
-  name: string
-  nodes: Record<string, unknown>
-  edges: Record<string, unknown>
-  patches: Record<string, unknown>
-  createdAt: string
-  updatedAt: string
-}
-
-async function json(route: Route, data: unknown, status = 200) {
-  await route.fulfill({
-    status,
-    contentType: 'application/json',
-    body: JSON.stringify({ success: status < 400, data }),
-  })
-}
-
-async function installBackend(page: Page) {
-  let project: MockProject | null = null
-  let fileNumber = 0
-  const user = {
-    id: 'sample-user',
-    email: 'sample@example.com',
-    name: 'Sample User',
-    tier: 'google',
-    createdAt: new Date().toISOString(),
-  }
-
-  await page.route('http://localhost:3001/api/**', async (route) => {
-    const request = route.request()
-    const url = new URL(request.url())
-    const path = url.pathname
-
-    if (path === '/api/auth/me') {
-      await json(route, { user })
-      return
-    }
-    if (path === '/api/projects' && request.method() === 'GET') {
-      await json(route, {
-        projects: project
-          ? [{
-              id: project.id,
-              name: project.name,
-              createdAt: project.createdAt,
-              updatedAt: project.updatedAt,
-            }]
-          : [],
-      })
-      return
-    }
-    if (path === '/api/projects' && request.method() === 'POST') {
-      const now = new Date().toISOString()
-      project = {
-        id: 'sample-project',
-        name: 'Sample Workbook Project',
-        nodes: {},
-        edges: {},
-        patches: {},
-        createdAt: now,
-        updatedAt: now,
-      }
-      await json(route, { project }, 201)
-      return
-    }
-    if (path === '/api/projects/sample-project' && request.method() === 'GET') {
-      await json(route, { project })
-      return
-    }
-    if (path === '/api/projects/sample-project' && request.method() === 'PUT') {
-      const update = request.postDataJSON() as Partial<MockProject>
-      project = {
-        ...project!,
-        ...update,
-        updatedAt: new Date().toISOString(),
-      }
-      await json(route, { project })
-      return
-    }
-    if (path === '/api/files/upload' && request.method() === 'POST') {
-      fileNumber += 1
-      await json(route, {
-        file: {
-          id: `sample-file-${fileNumber}`,
-          filename: 'sample_workbook.xlsx',
-          contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          size: readFileSync(workbookPath).byteLength,
-          uploadDate: new Date().toISOString(),
-        },
-      }, 201)
-      return
-    }
-
-    await route.fulfill({ status: 404, body: 'Not mocked' })
-  })
-
-  return {
-    getProject: () => project,
-  }
-}
-
 async function downloadWorkbook(page: Page): Promise<XLSX.WorkBook> {
-  await page.getByRole('button', { name: 'Export', exact: true }).click()
-  const downloadPromise = page.waitForEvent('download')
-  await page.getByRole('button', { name: /Export Project ZIP/ }).click()
-  const download = await downloadPromise
-  const stream = await download.createReadStream()
-  const chunks: Buffer[] = []
-  for await (const chunk of stream) chunks.push(Buffer.from(chunk))
-  const zip = await JSZip.loadAsync(Buffer.concat(chunks))
+  const zip = await downloadProjectZip(page)
   const workbookBytes = await zip.file('data.xlsx')!.async('nodebuffer')
   return XLSX.read(workbookBytes, { type: 'buffer' })
 }
 
-test('imports, reloads, and exports every sample workbook sheet with data', async ({ page }) => {
+test('@ux imports, reloads, and exports every sample workbook sheet with data', async ({ page }) => {
   test.setTimeout(120_000)
-  const backend = await installBackend(page)
+  const backend = await installMockBackend(page)
   await page.goto('/')
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
 
@@ -172,9 +65,9 @@ test('imports, reloads, and exports every sample workbook sheet with data', asyn
   }
 })
 
-test('exports an immediate edit to a newly created manual table', async ({ page }) => {
+test('@ux exports an immediate edit to a newly created manual table', async ({ page }) => {
   test.setTimeout(60_000)
-  await installBackend(page)
+  const backend = await installMockBackend(page)
   await page.goto('/')
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
 
@@ -195,7 +88,17 @@ test('exports an immediate edit to a newly created manual table', async ({ page 
   await editor.press('Enter')
   await expect(firstCell).toContainText('Exported immediately')
 
-  await page.locator('main').getByRole('button', { name: 'Canvas', exact: true }).click()
+  await expect.poll(() => {
+    const patches = backend.getProject()?.patches ?? {}
+    return Object.values(patches).some((value) => {
+      const tablePatches = value as { cellPatches?: Record<string, Record<string, unknown>> }
+      return Object.values(tablePatches.cellPatches ?? {})
+        .some(column => Object.keys(column).length > 0)
+    })
+  }, { timeout: 10_000 }).toBe(true)
+
+  await page.reload()
+  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
   const exported = await downloadWorkbook(page)
   const rows = XLSX.utils.sheet_to_json<unknown[]>(
     exported.Sheets['Manual Reliability'],
@@ -203,4 +106,69 @@ test('exports an immediate edit to a newly created manual table', async ({ page 
   )
 
   expect(rows[1][0]).toBe('Exported immediately')
+})
+
+test('@ux applies a cleaning suggestion and preserves it across reload', async ({ page }) => {
+  test.setTimeout(90_000)
+  const backend = await installMockBackend(page)
+  await page.goto('/')
+  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+
+  await page.locator('aside input[type="file"][accept*=".csv"]').setInputFiles({
+    name: 'cleaning-sample.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from([
+      'Name,Amount',
+      'N/A,10',
+      'Alice,20',
+      'Bob,30',
+      'Carol,40',
+      'Dave,50',
+    ].join('\n')),
+  })
+  await expect(page.locator('aside').getByRole('button', { name: 'Import Data' }))
+    .toBeEnabled({ timeout: 20_000 })
+  await page.locator('aside').getByRole('button', {
+    name: /^cleaning-sample 5 rows/,
+  }).click()
+  await expect(page.locator('.cursor-cell').first()).toBeVisible({ timeout: 15_000 })
+
+  await page.getByRole('button', { name: 'Suggestions', exact: true }).click()
+  const panel = page.getByRole('dialog')
+  await expect(panel.getByRole('heading', { name: 'Suggestions' })).toBeVisible()
+  await panel.getByRole('tab', { name: /Cleaning/ }).click()
+  await expect(panel.getByText('Convert placeholders to NULL in "Name"')).toBeVisible({
+    timeout: 30_000,
+  })
+  await panel.getByRole('button', { name: 'All', exact: true }).click()
+  await panel.getByRole('button', { name: /Apply \d+ fix/ }).click()
+  await expect(page.getByText(/Applied \d+ cell changes?/)).toBeVisible()
+  await panel.getByRole('button', { name: 'Close suggestions panel' }).click()
+  await expect(page.locator('.cursor-cell').first()).toHaveText('(empty)')
+  await expect(page.locator('.cursor-cell').nth(2)).toHaveText('Alice')
+
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(page.locator('.cursor-cell').first()).toHaveText('N/A', { timeout: 20_000 })
+  await expect(page.getByRole('button', { name: 'Redo' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Redo' }).click()
+  await expect(page.locator('.cursor-cell').first()).toHaveText('(empty)', { timeout: 20_000 })
+  await expect(page.locator('.cursor-cell').nth(2)).toHaveText('Alice')
+
+  await expect.poll(() => {
+    const patches = backend.getProject()?.patches ?? {}
+    return Object.values(patches).some((value) => {
+      const tablePatches = value as { cellPatches?: Record<string, Record<string, unknown>> }
+      return Object.values(tablePatches.cellPatches ?? {})
+        .some(column => Object.keys(column).length > 0)
+    })
+  }, { timeout: 10_000 }).toBe(true)
+
+  await page.reload()
+  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+  const exported = await downloadWorkbook(page)
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(
+    exported.Sheets['cleaning-sample'],
+    { header: 1, defval: null },
+  )
+  expect(rows[1][0]).toBe('')
 })

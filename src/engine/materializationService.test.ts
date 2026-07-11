@@ -20,7 +20,6 @@ const engine = {
   getSlice: vi.fn(),
 }
 const loadFile = vi.fn()
-
 vi.mock('@/state/projectStore', () => ({ useProjectStore: { getState: () => projectStore } }))
 vi.mock('@/state/dataStore', () => ({ useDataStore: { getState: () => dataStore } }))
 vi.mock('./EngineAdapter', () => ({ getEngine: () => engine }))

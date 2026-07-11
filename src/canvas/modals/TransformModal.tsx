@@ -181,10 +181,14 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               </svg>
             </div>
             <div className="join-header-text">
-              <h2>Combine Tables</h2>
-              <p>Link <strong>{leftNode?.name}</strong> with <strong>{rightNode?.name}</strong></p>
+              <Dialog.Title asChild>
+                <h2>Combine Tables</h2>
+              </Dialog.Title>
+              <Dialog.Description asChild>
+                <p>Link <strong>{leftNode?.name}</strong> with <strong>{rightNode?.name}</strong></p>
+              </Dialog.Description>
             </div>
-            <Dialog.Close className="join-close">
+            <Dialog.Close className="join-close" aria-label="Close combine tables">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M18 6L6 18M6 6l12 12"/>
               </svg>
@@ -198,6 +202,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
                 <button
                   type="button"
                   onClick={() => setOperation('join')}
+                  aria-pressed={operation === 'join'}
                   className={`join-type-card ${operation === 'join' ? 'active' : ''}`}
                 >
                   <span className="join-type-name">Join</span>
@@ -206,6 +211,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
                 <button
                   type="button"
                   onClick={() => setOperation('union')}
+                  aria-pressed={operation === 'union'}
                   className={`join-type-card ${operation === 'union' ? 'active' : ''}`}
                 >
                   <span className="join-type-name">Append</span>
@@ -229,6 +235,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
                     key={t.value}
                     type="button"
                     onClick={() => setJoinType(t.value)}
+                    aria-pressed={joinType === t.value}
                     className={`join-type-card ${joinType === t.value ? 'active' : ''}`}
                   >
                     <span className="join-type-name">{t.label}</span>
@@ -242,22 +249,24 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               <h3>Match Columns</h3>
               <div className="join-keys">
                 <div className="join-key-group">
-                  <label>{leftNode?.name}</label>
+                  <span className="join-key-label">{leftNode?.name}</span>
                   <JoinColumnSelect
                     value={leftKey}
                     options={leftOpts}
                     onChange={setLeftKey}
                     placeholder="Select column..."
+                    ariaLabel={`${leftNode?.name ?? 'Left table'} match column`}
                   />
                 </div>
                 <div className="join-key-equals">=</div>
                 <div className="join-key-group">
-                  <label>{rightNode?.name}</label>
+                  <span className="join-key-label">{rightNode?.name}</span>
                   <JoinColumnSelect
                     value={rightKey}
                     options={rightOpts}
                     onChange={setRightKey}
                     placeholder="Select column..."
+                    ariaLabel={`${rightNode?.name ?? 'Right table'} match column`}
                   />
                 </div>
               </div>
@@ -315,7 +324,9 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
 
             <section className="join-section">
               <h3>Output Table Name</h3>
+              <label className="sr-only" htmlFor="join-output-name">Output table name</label>
               <input
+                id="join-output-name"
                 type="text"
                 value={outputName}
                 onChange={e => setOutputName(e.target.value)}
@@ -328,6 +339,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
           <div className="join-footer">
             <Dialog.Close className="join-btn-cancel">Cancel</Dialog.Close>
             <button 
+              type="button"
               onClick={handleCreate} 
               disabled={operation === 'join' ? (!leftKey || !rightKey) : !canUnion}
               className="join-btn-create"

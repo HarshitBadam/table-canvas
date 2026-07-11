@@ -54,11 +54,37 @@ describe('materializeProjectTables', () => {
       source: tableNode('source', 'source_table'),
     }
 
-    await materializeProjectTables(nodes)
+    const summary = await materializeProjectTables(nodes)
 
     expect(ensureTableMaterialized).toHaveBeenNthCalledWith(1, 'source')
     expect(ensureTableMaterialized).toHaveBeenNthCalledWith(2, 'derived')
     expect(errorSpy).toHaveBeenCalledOnce()
+    expect(summary).toEqual({
+      completedTableIds: ['derived'],
+      failures: [{ tableId: 'source', error: 'source failed' }],
+    })
+    errorSpy.mockRestore()
+  })
+
+  it('reports error results instead of silently treating them as completed', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(ensureTableMaterialized).mockResolvedValueOnce({
+      status: 'error',
+      tableId: 'source',
+      error: 'Missing workbook file',
+    })
+
+    const summary = await materializeProjectTables({
+      source: tableNode('source', 'source_table'),
+    })
+
+    expect(summary).toEqual({
+      completedTableIds: [],
+      failures: [{ tableId: 'source', error: 'Missing workbook file' }],
+    })
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[AppContext] Failed to materialize table source: Missing workbook file',
+    )
     errorSpy.mockRestore()
   })
 })

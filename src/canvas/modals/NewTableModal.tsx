@@ -55,6 +55,9 @@ function TypeDropdown({
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-label={`Column type: ${selected?.label ?? value}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-text-secondary bg-surface-secondary hover:bg-surface-tertiary rounded transition-colors"
       >
         <span className="text-[10px] opacity-60">{selected?.icon}</span>
@@ -65,11 +68,17 @@ function TypeDropdown({
       </button>
       
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-surface rounded-lg shadow-lg border border-border py-1 z-50 min-w-[110px]">
+        <div
+          role="listbox"
+          aria-label="Column type"
+          className="absolute right-0 top-full mt-1 bg-surface rounded-lg shadow-lg border border-border py-1 z-50 min-w-[110px]"
+        >
           {COLUMN_TYPES.map(type => (
             <button
               key={type.value}
               type="button"
+              role="option"
+              aria-selected={value === type.value}
               onClick={() => {
                 onChange(type.value)
                 setOpen(false)
@@ -104,6 +113,13 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (isOpen && document.activeElement instanceof HTMLElement) {
+      returnFocusRef.current = document.activeElement
+    }
+  }, [isOpen])
 
   const trimmedColumnNames = columns.map(column => column.name.trim())
   const hasEmptyColumnName = trimmedColumnNames.some(name => name.length === 0)
@@ -213,7 +229,18 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-xl shadow-2xl w-full max-w-md z-50 overflow-hidden border border-border-elevation">
+        <Dialog.Content
+          onEscapeKeyDown={(event) => {
+            event.preventDefault()
+            handleClose()
+          }}
+          onCloseAutoFocus={(event) => {
+            if (!returnFocusRef.current) return
+            event.preventDefault()
+            returnFocusRef.current.focus()
+          }}
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-xl shadow-2xl w-full max-w-md z-50 overflow-hidden border border-border-elevation"
+        >
           <div className="px-5 pt-5 pb-4 border-b border-border-subtle">
             <Dialog.Title className="text-base font-semibold text-text-primary">
               Create New Table
@@ -225,10 +252,14 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
 
           <div className="px-5 py-4 space-y-5">
             <div>
-              <label className="block text-xs font-medium text-text-tertiary uppercase tracking-wide mb-2">
+              <label
+                htmlFor="new-table-name"
+                className="block text-xs font-medium text-text-tertiary uppercase tracking-wide mb-2"
+              >
                 Table Name
               </label>
               <input
+                id="new-table-name"
                 type="text"
                 value={tableName}
                 onChange={(e) => setTableName(e.target.value)}
@@ -238,11 +269,15 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-text-tertiary uppercase tracking-wide mb-2">
+              <label
+                htmlFor="new-table-rows"
+                className="block text-xs font-medium text-text-tertiary uppercase tracking-wide mb-2"
+              >
                 Rows
               </label>
               <div className="flex items-center gap-3">
                 <input
+                  id="new-table-rows"
                   type="range"
                   min={1}
                   max={100}
@@ -282,7 +317,9 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                       {index + 1}
                     </span>
                     <input
+                      id={`new-table-column-${index}`}
                       type="text"
+                      aria-label={`Column ${index + 1} name`}
                       value={col.name}
                       onChange={(e) => updateColumn(col.id, { name: e.target.value })}
                       className="flex-1 px-2 py-1.5 text-sm bg-surface border border-border rounded text-text-primary focus:outline-none focus:border-accent-green min-w-0"
@@ -295,6 +332,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                     <button
                       onClick={() => removeColumn(col.id)}
                       disabled={columns.length <= 1}
+                      aria-label={`Remove column ${index + 1}`}
                       className="p-1.5 text-text-tertiary hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-text-tertiary disabled:hover:bg-transparent transition-colors"
                       title={columns.length <= 1 ? 'Must have at least one column' : 'Remove'}
                     >

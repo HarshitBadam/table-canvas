@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
 interface JoinColumnSelectProps {
   value: string
   options: { value: string; label: string; type: string }[]
   onChange: (value: string) => void
   placeholder?: string
+  ariaLabel: string
 }
 
 export function JoinColumnSelect({
@@ -12,9 +13,11 @@ export function JoinColumnSelect({
   options,
   onChange,
   placeholder,
+  ariaLabel,
 }: JoinColumnSelectProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const listboxId = useId()
   const ref = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const selected = options.find((option) => option.value === value)
@@ -42,7 +45,22 @@ export function JoinColumnSelect({
 
   return (
     <div ref={ref} className="join-select">
-      <button type="button" onClick={() => setOpen(!open)} className="join-select-btn">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setOpen(false)
+          if (event.key === 'ArrowDown') {
+            event.preventDefault()
+            setOpen(true)
+          }
+        }}
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        className="join-select-btn"
+      >
         {selected ? (
           <>
             <span className="join-select-value">{selected.label}</span>
@@ -68,16 +86,19 @@ export function JoinColumnSelect({
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search columns..."
+              aria-label={`Search ${ariaLabel.toLowerCase()}`}
               className="join-select-search"
             />
           </div>
-          <div className="join-select-list">
+          <div id={listboxId} className="join-select-list" role="listbox" aria-label={ariaLabel}>
             {filtered.length === 0 ? (
               <div className="join-select-empty">No columns found</div>
             ) : filtered.map((option) => (
               <button
                 key={option.value}
                 type="button"
+                role="option"
+                aria-selected={value === option.value}
                 onClick={() => {
                   onChange(option.value)
                   setOpen(false)

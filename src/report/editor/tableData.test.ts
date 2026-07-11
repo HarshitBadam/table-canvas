@@ -1,4 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+
+const getTableData = vi.hoisted(() => vi.fn());
+
+vi.mock('@/engine/materializationService', () => ({ getTableData }));
+
 import {
   selectRows,
   resolveDisplayColumns,
@@ -6,8 +12,15 @@ import {
   DEFAULT_ROW_LIMIT,
   aggregateReportChartRows,
   formatReportCell,
+  useTableSource,
 } from './tableData';
 import type { ColumnSchema } from '@/types';
+import { addSource, resetStore } from '@/engine/integrationTestUtils';
+
+beforeEach(() => {
+  resetStore();
+  getTableData.mockReset();
+});
 
 describe('selectRows', () => {
   const rows = [1, 2, 3, 4, 5];
@@ -158,5 +171,64 @@ describe('aggregateReportChartRows', () => {
       { __rowId: 'report_group_0', region: 'North', amount: 2 },
       { __rowId: 'report_group_1', region: 'South', amount: 2 },
     ]);
+  });
+});
+
+describe('useTableSource', () => {
+  it('fetches the final page for last-N mode and reports truncation', async () => {
+    const tableId = addSource('Sales');
+    const firstPage = [
+      { __rowId: '1', col1: 'first' },
+      { __rowId: '2', col1: 'second' },
+    ];
+    const lastPage = [
+      { __rowId: '4', col1: 'fourth' },
+      { __rowId: '5', col1: 'fifth' },
+    ];
+    getTableData
+      .mockResolvedValueOnce({ rows: firstPage, totalRows: 5 })
+      .mockResolvedValueOnce({ rows: lastPage, totalRows: 5 });
+
+    const { result } = renderHook(() => useTableSource(tableId, {
+      rowSelectionMode: 'last_n',
+      rowLimit: 2,
+    }));
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(getTableData).toHaveBeenNthCalledWith(1, tableId, 0, 2);
+    expect(getTableData).toHaveBeenNthCalledWith(2, tableId, 3, 2);
+    expect(result.current.rows).toEqual(lastPage);
+    expect(result.current.isTruncated).toBe(true);
+  });
+
+  it('surfaces query errors and retries on demand', async () => {
+    const tableId = addSource('Sales');
+    getTableData
+      .mockRejectedValueOnce(new Error('DuckDB worker stopped'))
+      .mockResolvedValueOnce({
+        rows: [{ __rowId: '1', col1: 'recovered' }],
+        totalRows: 1,
+      });
+
+    const { result } = renderHook(() => useTableSource(tableId));
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.error).toBe('DuckDB worker stopped');
+
+    act(() => result.current.retry());
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.rows[0].col1).toBe('recovered');
+    expect(getTableData).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not present missing persisted rows as an empty table', async () => {
+    const tableId = addSource('Sales');
+    getTableData.mockResolvedValue({ rows: [], totalRows: 0 });
+
+    const { result } = renderHook(() => useTableSource(tableId));
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.error).toContain('expects 100 rows');
   });
 });

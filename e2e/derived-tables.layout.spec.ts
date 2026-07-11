@@ -1,79 +1,60 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './e2e.fixture'
+import { bootApp, expectNoViewportOverflow } from './app.support'
 
-test.setTimeout(60000)
+test.describe('Layout and theme behavior', () => {
+  test('theme changes the rendered palette and persists across reload', async ({ page }) => {
+    await bootApp(page)
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
 
-test.describe('Theme', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/')
+    await page.locator('aside').getByRole('button', { name: /switch to dark mode/i }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    const darkCanvas = await page.locator('body').evaluate(
+      element => getComputedStyle(element).backgroundColor,
+    )
 
-    const hasCanvas = await page.waitForSelector('.react-flow, aside', { timeout: 10000 }).catch(() => null)
-    if (!hasCanvas) {
-      test.skip(true, 'App not available')
-    }
+    await page.reload()
+    await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    expect(await page.locator('body').evaluate(
+      element => getComputedStyle(element).backgroundColor,
+    )).toBe(darkCanvas)
   })
 
-  test('should have theme toggle in sidebar', async ({ page }) => {
-    const themeToggle = page.locator('button[aria-label*="theme"], button:has(svg[class*="sun"]), button:has(svg[class*="moon"])')
-    const hasThemeToggle = await themeToggle.count() > 0
-    expect(hasThemeToggle).toBeDefined()
-  })
-})
-
-test.describe('Responsive Layout', () => {
-  test('should display properly on desktop viewport', async ({ page }) => {
-    await page.setViewportSize({ width: 1920, height: 1080 })
-    await page.goto('/')
-
-    const hasCanvas = await page.waitForSelector('.react-flow, aside', { timeout: 10000 }).catch(() => null)
-    if (!hasCanvas) {
-      test.skip(true, 'App not available')
-    }
-
-    const sidebar = page.locator('aside')
-    await expect(sidebar).toBeVisible()
-  })
-
-  test('should display properly on laptop viewport', async ({ page }) => {
+  test('sidebar, header, and canvas occupy non-overlapping desktop regions', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 768 })
-    await page.goto('/')
+    await bootApp(page)
+    await expectNoViewportOverflow(page)
 
-    const hasCanvas = await page.waitForSelector('.react-flow, aside', { timeout: 10000 }).catch(() => null)
-    if (!hasCanvas) {
-      test.skip(true, 'App not available')
-    }
-
-    const main = page.locator('main')
-    await expect(main).toBeVisible()
-  })
-})
-
-test.describe('Performance', () => {
-  test('app should load within acceptable time', async ({ page }) => {
-    const startTime = Date.now()
-    await page.goto('/')
-
-    await Promise.race([
-      page.waitForSelector('.react-flow', { timeout: 15000 }),
-      page.waitForSelector('input[type="email"]', { timeout: 15000 }),
-    ]).catch(() => null)
-
-    const loadTime = Date.now() - startTime
-    expect(loadTime).toBeLessThan(15000)
+    const sidebar = await page.locator('aside').boundingBox()
+    const main = await page.locator('main').boundingBox()
+    const header = await page.locator('header').boundingBox()
+    const canvas = await page.locator('.react-flow').boundingBox()
+    expect(sidebar).not.toBeNull()
+    expect(main).not.toBeNull()
+    expect(header).not.toBeNull()
+    expect(canvas).not.toBeNull()
+    expect(main!.x).toBeGreaterThanOrEqual(sidebar!.x + sidebar!.width - 1)
+    expect(header!.x).toBeGreaterThanOrEqual(main!.x)
+    expect(canvas!.x).toBeGreaterThanOrEqual(main!.x)
+    expect(main!.x + main!.width).toBeLessThanOrEqual(1366)
   })
 
-  test('canvas should remain responsive with nodes', async ({ page }) => {
-    await page.goto('/')
+  test('keyboard focus is visibly indicated on primary actions', async ({ page }) => {
+    await bootApp(page)
+    const button = page.locator('aside').getByRole('button', { name: 'New Table' })
+    await button.focus()
+    await expect(button).toBeFocused()
 
-    const hasCanvas = await page.waitForSelector('.react-flow', { timeout: 10000 }).catch(() => null)
-    if (!hasCanvas) {
-      test.skip(true, 'Canvas not available')
-    }
-
-    const startTime = Date.now()
-    const canvas = page.locator('.react-flow')
-    await canvas.click()
-
-    const interactionTime = Date.now() - startTime
-    expect(interactionTime).toBeLessThan(1000)
+    const focusStyle = await button.evaluate(element => {
+      const style = getComputedStyle(element)
+      return {
+        outlineStyle: style.outlineStyle,
+        outlineWidth: Number.parseFloat(style.outlineWidth),
+        outlineColor: style.outlineColor,
+      }
+    })
+    expect(focusStyle.outlineStyle).not.toBe('none')
+    expect(focusStyle.outlineWidth).toBeGreaterThanOrEqual(2)
+    expect(focusStyle.outlineColor).not.toBe('rgba(0, 0, 0, 0)')
   })
 })
