@@ -7,9 +7,10 @@ import App from './layout/App'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ThemeProvider } from './components/ThemeProvider'
 import { AppProvider } from './state/AppContext'
+import { initializeFrontendTelemetry } from './observability/frontendTelemetry'
 
-// Enable Immer's MapSet plugin for Set/Map support in stores
 enableMapSet()
+initializeFrontendTelemetry()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

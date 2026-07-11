@@ -1,12 +1,16 @@
+import { useEffect, useRef } from 'react'
 export type { ContextMenuState } from './types'
 import { useGridContext } from './useGridContext'
+import { focusMenuItem } from '@/lib/focusMenuItem'
 
 export function GridContextMenu() {
+  const menuRef = useRef<HTMLDivElement>(null)
   const {
     contextMenu,
     filteredRows,
     cellRangeSelection,
     highlightedCells,
+    columns,
     onInsertRowAbove,
     onInsertRowBelow,
     onDeleteRow,
@@ -21,17 +25,48 @@ export function GridContextMenu() {
     tableId,
   } = useGridContext()
 
+  useEffect(() => {
+    if (contextMenu) {
+      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+    }
+  }, [contextMenu])
+
   if (!contextMenu) return null
 
   return (
-    <div 
+    <div
+      ref={menuRef}
+      role="menu"
+      aria-label="Grid actions"
       className="fixed bg-surface rounded-lg shadow-xl border border-border py-1 z-50 min-w-[180px]"
       style={{ left: contextMenu.x, top: contextMenu.y }}
       onClick={(e) => e.stopPropagation()}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          const targetRow = contextMenu.rowIndex
+          const targetColumn = contextMenu.columnId
+          closeContextMenu()
+          requestAnimationFrame(() => {
+            if (targetRow !== undefined && targetColumn) {
+              const columnIndex = columns.findIndex(column => column.id === targetColumn)
+              document.querySelector<HTMLElement>(
+                `[role="gridcell"][aria-rowindex="${targetRow + 2}"][aria-colindex="${columnIndex + 2}"]`
+              )?.focus()
+            } else {
+              document.querySelector<HTMLElement>('[role="gridcell"][aria-selected="true"]')?.focus()
+            }
+          })
+          return
+        }
+        focusMenuItem(event, event.currentTarget)
+      }}
     >
       {(contextMenu.type === 'cell' || contextMenu.type === 'row') && (
         <>
           <button
+            type="button"
+            role="menuitem"
             onClick={onInsertRowAbove}
             className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
           >
@@ -41,6 +76,8 @@ export function GridContextMenu() {
             Insert Row Above
           </button>
           <button
+            type="button"
+            role="menuitem"
             onClick={onInsertRowBelow}
             className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
           >
@@ -51,6 +88,8 @@ export function GridContextMenu() {
           </button>
           <div className="border-t border-border my-1" />
           <button
+            type="button"
+            role="menuitem"
             onClick={onDeleteRow}
             className="w-full px-3 py-2 text-sm text-left hover:bg-red-50 text-red-600 flex items-center gap-2"
           >
@@ -71,6 +110,8 @@ export function GridContextMenu() {
             const isCurrentlyHighlighted = highlightedCells?.has(cellKey) ?? false
             return (
               <button
+                type="button"
+                role="menuitem"
                 onClick={() => {
                   if (cellRangeSelection) {
                     toggleHighlightForSelection()
@@ -82,7 +123,7 @@ export function GridContextMenu() {
                 className={`w-full px-3 py-2 text-sm text-left flex items-center gap-2 ${
                   isCurrentlyHighlighted 
                     ? 'hover:bg-surface-secondary text-text-secondary' 
-                    : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                    : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -105,6 +146,8 @@ export function GridContextMenu() {
       {contextMenu.type === 'header' && (
         <>
           <button
+            type="button"
+            role="menuitem"
             onClick={onInsertRowAtBeginning}
             className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
           >
@@ -119,6 +162,8 @@ export function GridContextMenu() {
       {contextMenu.type === 'corner' && (
         <>
           <button
+            type="button"
+            role="menuitem"
             onClick={onInsertRowAtBeginning}
             className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
           >
@@ -128,6 +173,8 @@ export function GridContextMenu() {
             Insert Row at Beginning
           </button>
           <button
+            type="button"
+            role="menuitem"
             onClick={onInsertColumnAtBeginning}
             className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
           >
@@ -142,6 +189,8 @@ export function GridContextMenu() {
       {contextMenu.type === 'index' && (
         <>
           <button
+            type="button"
+            role="menuitem"
             onClick={onInsertColumnAtBeginning}
             className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
           >
@@ -157,6 +206,8 @@ export function GridContextMenu() {
         <>
           {contextMenu.type === 'cell' && <div className="border-t border-border my-1" />}
           <button
+            type="button"
+            role="menuitem"
             onClick={onInsertColumnLeft}
             className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
           >
@@ -166,6 +217,8 @@ export function GridContextMenu() {
             Insert Column Left
           </button>
           <button
+            type="button"
+            role="menuitem"
             onClick={onInsertColumnRight}
             className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
           >
@@ -176,6 +229,8 @@ export function GridContextMenu() {
           </button>
           <div className="border-t border-border my-1" />
           <button
+            type="button"
+            role="menuitem"
             onClick={() => {
               onCreateChart(contextMenu.columnId!)
               closeContextMenu()

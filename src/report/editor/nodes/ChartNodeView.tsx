@@ -226,10 +226,17 @@ export const ChartNodeView = memo(function ChartNodeView({
         : 'Table not available';
     return (
       <NodeViewWrapper className="chart-block">
-        <div className={`block-empty-state ${selected ? 'is-selected' : ''}`} onClick={() => setShowPicker(true)}>
+        <div className={`block-empty-state ${selected ? 'is-selected' : ''}`}>
           <div className="block-empty-state-icon">📊</div>
           <div className="block-empty-state-title">{title}</div>
           <div className="block-empty-state-description">{description}</div>
+          <button
+            type="button"
+            onClick={() => setShowPicker(true)}
+            className="btn btn-secondary btn-sm mt-3"
+          >
+            Select table
+          </button>
           {status === 'error' && (
             <button
               type="button"

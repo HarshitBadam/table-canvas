@@ -40,9 +40,11 @@ export function GridCell({
     highlightedCells,
     isDraggingSelectionRef,
     columns,
+    setSelection,
   } = useGridContext()
 
   const inputRef = useRef<HTMLInputElement>(null)
+  const cellRef = useRef<HTMLDivElement>(null)
   const width = getColumnWidth(column.id)
   const value = getDisplayValue(row.__rowId, column.id, row[column.id], row)
 
@@ -98,6 +100,16 @@ export function GridCell({
     }
   }, [isEditing])
 
+  useEffect(() => {
+    if (
+      isCellSelected
+      && !isEditing
+      && document.activeElement?.closest('[role="grid"]')
+    ) {
+      cellRef.current?.focus()
+    }
+  }, [isCellSelected, isEditing])
+
   const formattedValue = useMemo(() => {
     if (value === null || value === undefined) return ''
     if (column.type === 'number' && typeof value === 'number') {
@@ -127,6 +139,19 @@ export function GridCell({
 
   return (
     <div
+      ref={cellRef}
+      role="gridcell"
+      aria-colindex={colIndex + 2}
+      aria-rowindex={rowIndex + 2}
+      aria-selected={isSelected}
+      aria-readonly={!isEditable || Boolean(isFormulaColumn)}
+      aria-label={`${column.name}, row ${rowIndex + 1}: ${formattedValue || 'empty'}`}
+      tabIndex={isCellSelected || (!selectedCell && rowIndex === 0 && colIndex === 0) ? 0 : -1}
+      onFocus={() => {
+        if (!isCellSelected) {
+          setSelection({ type: 'cell', rowIndex, columnId: column.id })
+        }
+      }}
       onMouseDown={(e) => handleCellMouseDown(rowIndex, column.id, e)}
       onDoubleClick={() => handleCellDoubleClick(rowIndex, column.id, value)}
       onContextMenu={(e) => handleContextMenu(e, 'cell', rowIndex, column.id)}
@@ -160,6 +185,8 @@ export function GridCell({
           <input
             ref={inputRef}
             type="text"
+            aria-label={`Edit ${column.name}, row ${rowIndex + 1}`}
+            aria-invalid={Boolean(currentEditError)}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={commitEdit}
@@ -168,7 +195,10 @@ export function GridCell({
             } ${currentEditError ? 'text-red-700 dark:text-red-300' : 'text-text-primary'}`}
           />
           {currentEditError && (
-            <div className="absolute left-0 top-full mt-1 z-20 px-2 py-1 bg-red-500 text-white text-xs rounded shadow-lg whitespace-nowrap">
+            <div
+              role="alert"
+              className="absolute left-0 top-full mt-1 z-20 px-2 py-1 bg-red-500 text-white text-xs rounded shadow-lg whitespace-nowrap"
+            >
               {currentEditError}
             </div>
           )}

@@ -42,7 +42,6 @@ export function ReportToolbar({
 
   const activeReport = activeReportId ? reports[activeReportId] || null : null;
 
-  // Count word estimate (more user-friendly than block count)
   const getWordCount = () => {
     if (!activeReport?.tiptapContent?.content) return 0;
     interface TipTapTextNode {
@@ -150,6 +149,7 @@ export function ReportToolbar({
           className="report-toolbar-v2-add"
           onClick={handleCreateReport}
           title="New report"
+          aria-label="New report"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M12 5v14M5 12h14" />
@@ -231,6 +231,7 @@ export function ReportToolbar({
                     className="report-toolbar-v2-list-delete"
                     onClick={(e) => handleDeleteReport(report, e)}
                     title="Delete report"
+                    aria-label={`Delete report ${report.name}`}
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M6 18L18 6M6 6l12 12" />
@@ -257,6 +258,8 @@ export function ReportToolbar({
         <span
           className={persistenceStatus === 'error' ? 'text-xs text-red-600' : 'text-xs text-text-tertiary'}
           title={persistenceError || undefined}
+          role="status"
+          aria-live="polite"
         >
           {persistenceStatus === 'saving' && 'Saving…'}
           {persistenceStatus === 'saved' && 'Saved'}

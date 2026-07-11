@@ -109,7 +109,29 @@ export function useWindowedRows(
         newRows.set(offset + idx, gridRow)
       })
 
-      windowRef.current = { start: offset, end: offset + slice.rows.length, rows: newRows }
+      const previous = windowRef.current
+      const nextEnd = offset + slice.rows.length
+      const isAdjacent = offset <= previous.end + PREFETCH_THRESHOLD
+        && nextEnd >= previous.start - PREFETCH_THRESHOLD
+      const mergedRows = isAdjacent ? new Map(previous.rows) : new Map<number, GridRow>()
+      newRows.forEach((row, index) => mergedRows.set(index, row))
+
+      const maxCachedRows = WINDOW_SIZE * 3
+      if (mergedRows.size > maxCachedRows) {
+        const center = offset + Math.floor(slice.rows.length / 2)
+        const retained = [...mergedRows.entries()]
+          .sort(([left], [right]) => Math.abs(left - center) - Math.abs(right - center))
+          .slice(0, maxCachedRows)
+        mergedRows.clear()
+        retained.forEach(([index, row]) => mergedRows.set(index, row))
+      }
+
+      const cachedIndexes = [...mergedRows.keys()]
+      windowRef.current = {
+        start: cachedIndexes.length > 0 ? Math.min(...cachedIndexes) : offset,
+        end: cachedIndexes.length > 0 ? Math.max(...cachedIndexes) + 1 : nextEnd,
+        rows: mergedRows,
+      }
       setTotalRows(slice.totalRows)
       setError(null)
       setVersion(v => v + 1)

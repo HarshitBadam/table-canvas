@@ -2,7 +2,6 @@
 
   .btn {
     @apply inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded transition-colors;
-    @apply focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-green;
     @apply disabled:pointer-events-none disabled:opacity-50;
   }
 

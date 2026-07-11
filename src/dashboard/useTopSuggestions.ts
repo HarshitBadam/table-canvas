@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { generateSuggestions } from '@/suggestions/engine'
+import { getExistingDerivedTables } from '@/suggestions/derivedTableContext'
 import { generateTableVersionHash, useSuggestionsStore } from '@/suggestions/suggestionsStore'
-import type { DerivedTableNode, Suggestion } from '@/types'
+import type { Suggestion } from '@/types'
 import { useTableNodes, useAllProfiles } from './dashboardHelpers'
 
 export function useTopSuggestions(limit: number = 5): {
@@ -32,21 +33,7 @@ export function useTopSuggestions(limit: number = 5): {
       )
 
       try {
-        const existingDerivedTables = tableNodes
-          .filter(
-            (candidate): candidate is DerivedTableNode =>
-              candidate.kind === 'derived_table' &&
-              candidate.plan.upstreamNodeIds.includes(table.id),
-          )
-          .map((candidate) => ({
-            id: candidate.id,
-            name: candidate.name,
-            transformType: candidate.plan.transformDef.type,
-            groupByColumns:
-              'groupByColumns' in candidate.plan.transformDef
-                ? candidate.plan.transformDef.groupByColumns
-                : undefined,
-          }))
+        const existingDerivedTables = getExistingDerivedTables(tableNodes, table.id)
 
         const tableSuggestions = generateSuggestions({
           tableId: table.id,

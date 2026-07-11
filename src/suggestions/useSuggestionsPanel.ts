@@ -8,6 +8,7 @@ import {
   generateTableVersionHash,
 } from './suggestionsStore'
 import { useCategoryCounts } from './useCategoryCounts'
+import { getExistingDerivedTables } from './derivedTableContext'
 import type { Suggestion, SuggestionCategory, TableNode } from '@/types'
 
 interface SuggestionsPanelHookResult {
@@ -41,14 +42,11 @@ export function useSuggestionsPanel(
   const setSuggestions = useSuggestionsStore((state) => state.setSuggestions)
   const getSuggestions = useSuggestionsStore((state) => state.getSuggestions)
   const clearCache = useSuggestionsStore((state) => state.clearCache)
-  // Subscribe to the entire cache so we re-render when it changes
   const suggestionsCache = useSuggestionsStore((state) => state.suggestionsCache)
   const setLoading = useSuggestionsStore((state) => state.setLoading)
   const isLoading = useSuggestionsStore((state) => state.isLoading)
   const error = useSuggestionsStore((state) => state.error)
   const setError = useSuggestionsStore((state) => state.setError)
-  const setCurrentRequestId = useSuggestionsStore((state) => state.setCurrentRequestId)
-  const shouldCancelRequest = useSuggestionsStore((state) => state.shouldCancelRequest)
   const consumed = useSuggestionsStore((state) => state.consumed)
   const dismissed = useSuggestionsStore((state) => state.dismissed)
   const dismissSuggestion = useSuggestionsStore((state) => state.dismissSuggestion)
@@ -57,9 +55,7 @@ export function useSuggestionsPanel(
   const [effectiveCleaningCount, setEffectiveCleaningCount] = useState<number | null>(null)
   const [retryNonce, setRetryNonce] = useState(0)
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastContextKeyRef = useRef<string | null>(null)
-  // Track if we've seen Phase 2 stats for this profile - used to detect when Phase 2 completes
   const lastPhase2StatsSeenRef = useRef<boolean>(false)
 
   const contextKey = useMemo(() => {
@@ -86,7 +82,6 @@ export function useSuggestionsPanel(
     )
   }, [profile])
 
-  // Clear cache when Phase 2 stats become available so suggestions regenerate with outlier data
   useEffect(() => {
     if (!contextKey || !isOpen) return
 
@@ -107,16 +102,11 @@ export function useSuggestionsPanel(
     }
   }, [contextKey, isOpen, hasPhase2Stats, getSuggestions, clearCache, tableId])
 
-  const derivedTableCount = useMemo(
-    () =>
-      Object.values(nodes).filter(
-        (n) =>
-          n.kind === 'derived_table' &&
-          'plan' in n &&
-          n.plan?.upstreamNodeIds?.includes(tableId),
-      ).length,
+  const existingDerivedTables = useMemo(
+    () => getExistingDerivedTables(Object.values(nodes), tableId),
     [nodes, tableId],
   )
+  const derivedTableCount = existingDerivedTables.length
   const lastDerivedCountRef = useRef(derivedTableCount)
 
   useEffect(() => {
@@ -139,84 +129,39 @@ export function useSuggestionsPanel(
       return
     }
 
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current)
-    }
-
-    const requestId = `${Date.now()}-${Math.random()}`
-    setCurrentRequestId(requestId)
     setLoading(true)
     setError(null)
 
-    debounceRef.current = setTimeout(() => {
-      if (shouldCancelRequest(requestId)) {
-        return
+    try {
+      const context = {
+        tableId,
+        tableName: node.name,
+        schema: node.schema,
+        profile: profile
+          ? {
+              columns: profile.columns,
+              rowCount: profile.rowCount,
+            }
+          : undefined,
+        selectedColumnId,
+        tableVersionHash: contextKey.split(':')[0],
+        existingDerivedTables,
       }
 
-      try {
-        const existingDerivedTables = Object.values(nodes)
-          .filter(
-            (n): n is Extract<typeof n, { kind: 'derived_table' }> =>
-              n.kind === 'derived_table' &&
-              'plan' in n &&
-              n.plan?.upstreamNodeIds?.includes(tableId),
-          )
-          .map((n) => ({
-            id: n.id,
-            name: n.name,
-            transformType: n.plan.transformDef.type,
-            groupByColumns:
-              'groupByColumns' in n.plan.transformDef
-                ? (n.plan.transformDef as { groupByColumns?: string[] }).groupByColumns
-                : undefined,
-          }))
-
-        const context = {
-          tableId,
-          tableName: node.name,
-          schema: node.schema!,
-          profile: profile
-            ? {
-                columns: profile.columns,
-                rowCount: profile.rowCount,
-              }
-            : undefined,
-          selectedColumnId,
-          tableVersionHash: contextKey.split(':')[0],
-          existingDerivedTables,
-        }
-
-        const newSuggestions = selectedColumnId
-          ? getColumnSuggestions(context)
-          : generateSuggestions(context)
-
-        if (!shouldCancelRequest(requestId)) {
-          setSuggestions(contextKey, newSuggestions)
-          lastContextKeyRef.current = contextKey
-          lastPhase2StatsSeenRef.current = hasPhase2Stats
-        }
-      } catch (cause) {
-        if (!shouldCancelRequest(requestId)) {
-          const message = cause instanceof Error ? cause.message : 'Suggestion analysis failed'
-          setError(message)
-        }
-      }
-    }, 100)
-
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-      }
-      const state = useSuggestionsStore.getState()
-      if (state.currentRequestId === requestId) {
-        state.setCurrentRequestId(null)
-        state.setLoading(false)
-      }
+      const newSuggestions = selectedColumnId
+        ? getColumnSuggestions(context)
+        : generateSuggestions(context)
+      setSuggestions(contextKey, newSuggestions)
+      lastContextKeyRef.current = contextKey
+      lastPhase2StatsSeenRef.current = hasPhase2Stats
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Suggestion analysis failed'
+      setError(message)
     }
   }, [
     isOpen,
     node,
-    nodes,
+    existingDerivedTables,
     profile,
     profileLoading,
     selectedColumnId,
@@ -224,8 +169,6 @@ export function useSuggestionsPanel(
     getSuggestions,
     setSuggestions,
     setLoading,
-    setCurrentRequestId,
-    shouldCancelRequest,
     tableId,
     hasPhase2Stats,
     retryNonce,

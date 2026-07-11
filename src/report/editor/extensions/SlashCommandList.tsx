@@ -50,7 +50,7 @@ export const SlashCommandList = memo(forwardRef<CommandListRef, CommandListProps
 
     if (items.length === 0) {
       return (
-        <div className="slash-command-menu">
+        <div className="slash-command-menu" role="listbox" aria-label="Report commands">
           <div className="p-3 text-sm text-gray-400">No results</div>
         </div>
       );
@@ -58,7 +58,7 @@ export const SlashCommandList = memo(forwardRef<CommandListRef, CommandListProps
 
     let globalIndex = 0;
     return (
-      <div className="slash-command-menu" ref={scrollRef}>
+      <div className="slash-command-menu" ref={scrollRef} role="listbox" aria-label="Report commands">
         {Object.entries(groupedItems).map(([category, categoryItems]) => (
           <div key={category} className="slash-command-group">
             <div className="slash-command-group-title">{category}</div>
@@ -68,6 +68,8 @@ export const SlashCommandList = memo(forwardRef<CommandListRef, CommandListProps
                 <div
                   key={item.title}
                   data-index={index}
+                  role="option"
+                  aria-selected={selectedIndex === index}
                   className={`slash-command-item ${selectedIndex === index ? 'is-active' : ''}`}
                   onClick={() => selectItem(index)}
                 >

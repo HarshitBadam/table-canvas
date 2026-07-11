@@ -1,5 +1,6 @@
 import { Component, ReactNode, ErrorInfo } from 'react';
 import { ErrorBoundaryFallback } from './ErrorBoundaryFallback';
+import { reportReactError } from '@/observability/frontendTelemetry';
 
 
 export interface ErrorBoundaryProps {
@@ -35,6 +36,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     this.setState({ errorInfo });
     
     console.error(`[ErrorBoundary${this.props.name ? `: ${this.props.name}` : ''}]`, error, errorInfo);
+    reportReactError(error);
     
     this.props.onError?.(error, errorInfo);
   }

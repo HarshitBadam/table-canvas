@@ -336,7 +336,6 @@ export const createNodesSlice: StateCreator<
           tableNode.cacheInfo = {}
         }
         Object.assign(tableNode.cacheInfo, cacheInfoUpdates)
-        tableNode.updatedAt = new Date().toISOString()
       }
     })
   },

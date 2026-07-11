@@ -25,6 +25,7 @@ export function CanvasAutoArrangePanel({ onArrange }: AutoArrangePanelProps) {
           onClick={() => onArrange('TB')}
           className="p-1.5 text-text-tertiary hover:text-accent-green hover:bg-surface-secondary rounded-md transition-colors"
           title="Arrange vertically (top to bottom)"
+          aria-label="Arrange vertically"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m0 0l-6-6m6 6l6-6" />
@@ -34,6 +35,7 @@ export function CanvasAutoArrangePanel({ onArrange }: AutoArrangePanelProps) {
           onClick={() => onArrange('LR')}
           className="p-1.5 text-text-tertiary hover:text-accent-green hover:bg-surface-secondary rounded-md transition-colors"
           title="Arrange horizontally (left to right)"
+          aria-label="Arrange horizontally"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16m0 0l-6-6m6 6l-6 6" />

@@ -73,7 +73,7 @@ export function GridToolbar({
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Add Row<span className="text-[10px] opacity-60 font-normal ml-1">{rowInsertionDescription}</span>
+            Add Row<span className="text-[10px] font-medium ml-1">{rowInsertionDescription}</span>
           </button>
           <button 
             onClick={onAddColumn}
@@ -83,7 +83,7 @@ export function GridToolbar({
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Add Column<span className="text-[10px] opacity-60 font-normal ml-1">{columnInsertionDescription}</span>
+            Add Column<span className="text-[10px] font-medium ml-1">{columnInsertionDescription}</span>
           </button>
           <span className="badge badge-blue">Editable</span>
         </>

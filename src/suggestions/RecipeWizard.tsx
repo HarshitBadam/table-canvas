@@ -30,9 +30,6 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
   const [isExecuting, setIsExecuting] = useState(false)
   const [executionError, setExecutionError] = useState<string | null>(null)
   
-  // Reset bindings whenever the wizard opens for a different suggestion. Seed defaults
-  // for option-backed selects (e.g. the period dropdown) so required-field validation
-  // passes without forcing the user to re-pick a value that's already displayed.
   useEffect(() => {
     if (suggestion?.action.kind !== 'launchRecipe') return
     const config = RECIPE_CONFIGS[suggestion.action.recipeId]
@@ -52,8 +49,6 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
   const getColumnsForField = (field: RecipeField): ColumnSchema[] => {
     if (field.type !== 'column') return []
 
-    // Key-column fields in multi-table recipes (e.g. reconciliation) must offer columns
-    // from the table picked in another field, not the table the wizard was launched from.
     let sourceColumns = columns
     if (field.sourceTableField) {
       const boundTableId = bindings[field.sourceTableField]
@@ -140,7 +135,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
             )}
             {recipeConfig.fields.map((field) => (
               <div key={field.id}>
-                <label className="block text-sm font-medium text-text-primary mb-1.5">
+                <label htmlFor={`recipe-field-${field.id}`} className="block text-sm font-medium text-text-primary mb-1.5">
                   {field.label}
                   {field.required && <span className="text-red-500 ml-0.5">*</span>}
                 </label>
@@ -148,6 +143,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
                 {field.type === 'column' && (
                   <div className="relative">
                     <select
+                      id={`recipe-field-${field.id}`}
                       value={bindings[field.id] || ''}
                       onChange={(e) => handleFieldChange(field.id, e.target.value)}
                       className="w-full h-11 px-4 pr-10 rounded-xl border-2 border-border bg-surface text-text-primary text-sm 
@@ -170,6 +166,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
                 {field.type === 'select' && field.options && (
                   <div className="relative">
                     <select
+                      id={`recipe-field-${field.id}`}
                       value={bindings[field.id] || field.options[0]?.value || ''}
                       onChange={(e) => handleFieldChange(field.id, e.target.value)}
                       className="w-full h-11 px-4 pr-10 rounded-xl border-2 border-border bg-surface text-text-primary text-sm 
@@ -191,6 +188,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
                 {field.type === 'select' && field.id.includes('TableId') && (
                   <div className="relative">
                     <select
+                      id={`recipe-field-${field.id}`}
                       value={bindings[field.id] || ''}
                       onChange={(e) => handleFieldChange(field.id, e.target.value)}
                       className="w-full h-11 px-4 pr-10 rounded-xl border-2 border-border bg-surface text-text-primary text-sm 

@@ -125,55 +125,62 @@ export function SuggestionsPanel({
               </div>
             )}
 
-            {error && (
-              <div className="m-4 rounded-lg border border-red-300 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/30" role="alert">
-                <p className="text-sm font-medium text-red-700 dark:text-red-300">Could not analyze this table</p>
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
-                <button onClick={retry} className="btn btn-secondary mt-3 text-xs">Try again</button>
-              </div>
-            )}
+            <div
+              id="suggestion-category-panel"
+              role="tabpanel"
+              aria-labelledby={`suggestion-tab-${activeCategory}`}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              {error && (
+                <div className="m-4 rounded-lg border border-red-300 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/30" role="alert">
+                  <p className="text-sm font-medium text-red-700 dark:text-red-300">Could not analyze this table</p>
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
+                  <button onClick={retry} className="btn btn-secondary mt-3 text-xs">Try again</button>
+                </div>
+              )}
 
-            {!error && activeCategory === 'cleaning' ? (
-              <CleaningPanel
-                suggestions={filteredSuggestions}
-                tableId={tableId}
-                onComplete={onClose}
-                onCountChange={setEffectiveCleaningCount}
-              />
-            ) : !error ? (
-              <div className="flex-1 overflow-y-auto p-4 space-y-3" aria-busy={showLoading}>
-                {showLoading && (
-                  <div className="space-y-3" role="status" aria-label="Analyzing table">
-                    {[1, 2, 3, 4].map((i) => (
-                      <SkeletonCard key={i} delay={i * 50} />
-                    ))}
-                  </div>
-                )}
+              {!error && activeCategory === 'cleaning' ? (
+                <CleaningPanel
+                  suggestions={filteredSuggestions}
+                  tableId={tableId}
+                  onComplete={onClose}
+                  onCountChange={setEffectiveCleaningCount}
+                />
+              ) : !error ? (
+                <div className="flex-1 overflow-y-auto p-4 space-y-3" aria-busy={showLoading}>
+                  {showLoading && (
+                    <div className="space-y-3" role="status" aria-label="Analyzing table">
+                      {[1, 2, 3, 4].map((i) => (
+                        <SkeletonCard key={i} delay={i * 50} />
+                      ))}
+                    </div>
+                  )}
 
-                {!showLoading && filteredSuggestions.length === 0 && (
-                  <EmptyState
-                    hasColumn={!!selectedColumnId}
-                    hasTable={!!node}
-                    category={activeCategory === 'all' ? undefined : activeCategory}
-                  />
-                )}
+                  {!showLoading && filteredSuggestions.length === 0 && (
+                    <EmptyState
+                      hasColumn={!!selectedColumnId}
+                      hasTable={!!node}
+                      category={activeCategory === 'all' ? undefined : activeCategory}
+                    />
+                  )}
 
-                {!showLoading && filteredSuggestions.map((suggestion, index) => (
-                  <SuggestionCard
-                    key={suggestion.id}
-                    suggestion={suggestion}
-                    isExpanded={expandedId === suggestion.id}
-                    isApplying={applyingId === suggestion.id}
-                    animationDelay={index * 50}
-                    onToggle={() => setExpandedId(
-                      expandedId === suggestion.id ? null : suggestion.id
-                    )}
-                    onApply={() => handleApply(suggestion)}
-                    onDismiss={() => dismissSuggestion(suggestion.id)}
-                  />
-                ))}
-              </div>
-            ) : null}
+                  {!showLoading && filteredSuggestions.map((suggestion, index) => (
+                    <SuggestionCard
+                      key={suggestion.id}
+                      suggestion={suggestion}
+                      isExpanded={expandedId === suggestion.id}
+                      isApplying={applyingId === suggestion.id}
+                      animationDelay={index * 50}
+                      onToggle={() => setExpandedId(
+                        expandedId === suggestion.id ? null : suggestion.id
+                      )}
+                      onApply={() => handleApply(suggestion)}
+                      onDismiss={() => dismissSuggestion(suggestion.id)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

@@ -129,6 +129,7 @@ export function SuggestionCard({
     >
       <button
         onClick={onToggle}
+        aria-label={`${suggestion.title}: ${isExpanded ? 'Collapse' : 'Expand'} details`}
         aria-expanded={isExpanded}
         aria-controls={detailsId}
         className="w-full flex items-start gap-3 p-4 text-left hover:bg-surface-secondary/30 transition-colors"

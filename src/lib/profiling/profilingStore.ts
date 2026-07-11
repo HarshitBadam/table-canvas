@@ -7,29 +7,22 @@ import { useProjectStore } from '@/state/projectStore'
 import { ensureTableMaterialized } from '@/engine/materializationService'
 import { detectSemanticHints } from './semanticHints'
 
-/**
- * The engine profiles the DuckDB table, whose columns are created from each column's
- * display `name` (see EngineAdapter.loadTable), so ColumnProfile.columnId comes back as a
- * NAME. The rest of the app keys profiles by the stable column `id` — e.g. every rule does
- * `profile.columns.find(p => p.columnId === col.id)` — so without this remap the lookup
- * misses and all profile-driven rules (cleaning, outliers, quality metrics) silently fail.
- */
-function remapProfileColumnIds(profile: ProfileResult, tableId: string): ProfileResult {
+function mapProfileColumnNamesToSchemaIds(profile: ProfileResult, tableId: string): ProfileResult {
   const node = useProjectStore.getState().getTableNode(tableId)
   const columns = node?.schema?.columns
   if (!columns || columns.length === 0) return profile
 
-  const nameToId = new Map<string, string>()
+  const schemaIdByProfileName = new Map<string, string>()
   for (const col of columns) {
-    nameToId.set(col.name, col.id)
-    if (col.duckDbName) nameToId.set(col.duckDbName, col.id)
+    schemaIdByProfileName.set(col.name, col.id)
+    if (col.duckDbName) schemaIdByProfileName.set(col.duckDbName, col.id)
   }
 
   return {
     ...profile,
     columns: profile.columns.map((col) => ({
       ...col,
-      columnId: nameToId.get(col.columnId) ?? col.columnId,
+      columnId: schemaIdByProfileName.get(col.columnId) ?? col.columnId,
     })),
   }
 }
@@ -37,13 +30,13 @@ function remapProfileColumnIds(profile: ProfileResult, tableId: string): Profile
 export async function runPhase1Profiling(tableId: string): Promise<ProfileResult> {
   const engine = getEngine()
   const profile = await engine.getProfile(tableId, 1)
-  return remapProfileColumnIds(profile, tableId)
+  return mapProfileColumnNamesToSchemaIds(profile, tableId)
 }
 
 export async function runPhase2Profiling(tableId: string): Promise<ProfileResult> {
   const engine = getEngine()
   const profile = await engine.getProfile(tableId, 2)
-  return remapProfileColumnIds(profile, tableId)
+  return mapProfileColumnNamesToSchemaIds(profile, tableId)
 }
 
 export interface ProfilingState {
@@ -98,27 +91,12 @@ export const useProfilingStore = create<ProfilingState>((set, get) => ({
   },
 }))
 
-// For derived tables this triggers materialization before profiling.
 export async function ensureTableInEngine(tableId: string, _force: boolean = false): Promise<boolean> {
   try {
     const node = useProjectStore.getState().getTableNode(tableId)
     if (!node) return false
-    
-    if (node.kind === 'derived_table') {
-      const result = await ensureTableMaterialized(tableId)
-      return result.status !== 'error'
-    }
-    
-    const tableData = useDataStore.getState().tableData[tableId]
-    if (!tableData?.rows || !node?.schema) {
-      const result = await ensureTableMaterialized(tableId)
-      return result.status !== 'error'
-    }
-    
-    const patches = useProjectStore.getState().patches[tableId]
-    const engine = getEngine()
-    await engine.loadTable(tableId, node.schema, tableData.rows, patches)
-    return true
+    const result = await ensureTableMaterialized(tableId)
+    return result.status !== 'error'
   } catch (err) {
     console.error('[Profiler] ensureTableInEngine failed:', tableId, err)
     return false

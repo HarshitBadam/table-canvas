@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, HistorySliceState, HistoryEntry } from './types'
 import type { Patches, ProjectNode } from '@/types'
+import { useDataStore } from '@/state/dataStore'
 const MAX_UNDO_HISTORY = 50
 
 function invalidateAllTableCaches(nodes: Record<string, ProjectNode>) {
@@ -78,6 +79,7 @@ export const createHistorySlice: StateCreator<
       })
       invalidateAllTableCaches(state.nodes)
     })
+    useDataStore.setState({ tableData: {} })
   },
 
   redo: () => {
@@ -111,6 +113,7 @@ export const createHistorySlice: StateCreator<
       })
       invalidateAllTableCaches(state.nodes)
     })
+    useDataStore.setState({ tableData: {} })
   },
 
   canUndo: () => get().history.past.length > 0,

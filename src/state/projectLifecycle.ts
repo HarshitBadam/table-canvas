@@ -2,7 +2,6 @@ import { getEngine } from '@/engine'
 import { ensureTableMaterialized } from '@/engine/materializationService'
 import { createProjectWithSync, fetchProjects, loadProjectWithSync } from '@/persistence/syncService'
 import type { ProjectNode } from '@/types'
-import { useProjectStore } from './projectStore'
 import { useDataStore } from './dataStore'
 
 export async function clearProjectRuntime(nodes: Record<string, ProjectNode>): Promise<void> {
@@ -13,19 +12,42 @@ export async function clearProjectRuntime(nodes: Record<string, ProjectNode>): P
   await Promise.allSettled(tableIds.map((tableId) => getEngine().dropTable(tableId)))
 }
 
-export async function materializeProjectTables(nodes: Record<string, ProjectNode>): Promise<void> {
+export interface ProjectMaterializationSummary {
+  completedTableIds: string[]
+  failures: Array<{ tableId: string; error: string }>
+}
+
+export async function materializeProjectTables(
+  nodes: Record<string, ProjectNode>,
+): Promise<ProjectMaterializationSummary> {
   const entries = Object.entries(nodes)
   const tableIds = [
     ...entries.filter(([, node]) => node.kind === 'source_table').map(([id]) => id),
     ...entries.filter(([, node]) => node.kind === 'derived_table').map(([id]) => id),
   ]
+  const summary: ProjectMaterializationSummary = {
+    completedTableIds: [],
+    failures: [],
+  }
   for (const tableId of tableIds) {
     try {
-      await ensureTableMaterialized(tableId)
+      const result = await ensureTableMaterialized(tableId)
+      if (result.status === 'error') {
+        const error = result.error || 'Unknown materialization error'
+        summary.failures.push({ tableId, error })
+        console.error(`[AppContext] Failed to materialize table ${tableId}: ${error}`)
+      } else {
+        summary.completedTableIds.push(tableId)
+      }
     } catch (error) {
+      summary.failures.push({
+        tableId,
+        error: error instanceof Error ? error.message : 'Unknown materialization error',
+      })
       console.error('[AppContext] Failed to materialize table:', error)
     }
   }
+  return summary
 }
 
 export async function initializeEngine(): Promise<void> {
@@ -38,13 +60,5 @@ export async function loadOrCreateProject() {
     ? await loadProjectWithSync(projects[0].id)
     : await createProjectWithSync('Untitled Project')
   const resolvedProject = project ?? await createProjectWithSync('Untitled Project')
-  await clearProjectRuntime(useProjectStore.getState().nodes)
-  useProjectStore.setState({
-    projectId: resolvedProject.id,
-    projectName: resolvedProject.name,
-    nodes: resolvedProject.nodes,
-    edges: resolvedProject.edges,
-    patches: resolvedProject.patches,
-  })
   return { project: resolvedProject, projectList: projects }
 }

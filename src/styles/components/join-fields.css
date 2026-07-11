@@ -111,19 +111,19 @@
   min-width: 0;
 }
 
-.join-key-group label {
+.join-key-label {
   display: block;
   font-size: 11px;
   font-weight: 500;
-  color: #666;
+  color: #555;
   margin-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-[data-theme="dark"] .join-key-group label {
-  color: #888;
+[data-theme="dark"] .join-key-label {
+  color: #bbb;
 }
 
 .join-key-equals {

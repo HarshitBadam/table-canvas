@@ -32,6 +32,8 @@ import {
   createProjectWithSync,
   deleteProjectWithSync,
   fetchProjects,
+  flushProjectSaveWithSync,
+  importProjectWithSync,
   loadProjectWithSync,
   saveProjectWithSync,
   syncLocalProjectsToBackend,
@@ -245,6 +247,81 @@ describe('saveProjectWithSync', () => {
       'proj_1',
       expect.objectContaining({ name: 'Version 3' }),
     )
+  })
+
+  it('flushes a pending backend save immediately and surfaces remote failures', async () => {
+    await saveProjectWithSync('proj_1', 'Important edit', {}, {}, {})
+    mockUpdateProject.mockRejectedValueOnce(new Error('Remote save failed'))
+
+    await expect(flushProjectSaveWithSync('proj_1')).rejects.toThrow(
+      'Remote save failed',
+    )
+    expect(mockUpdateProject).toHaveBeenCalledWith(
+      'proj_1',
+      expect.objectContaining({ name: 'Important edit' }),
+    )
+  })
+})
+
+describe('importProjectWithSync', () => {
+  const importedProject = {
+    name: 'Imported project',
+    nodes: {},
+    edges: {},
+    patches: {},
+  }
+
+  it('persists the completed remote import locally', async () => {
+    mockCreateProject.mockResolvedValue(createMockProject(
+      'remote-import',
+      importedProject.name,
+    ))
+
+    const result = await importProjectWithSync(importedProject)
+
+    expect(mockUpdateProject).toHaveBeenCalledWith(
+      'remote-import',
+      expect.objectContaining({ name: importedProject.name }),
+    )
+    expect(mockSaveProjectLocal).toHaveBeenCalledWith(
+      'remote-import',
+      importedProject.name,
+      {},
+      {},
+      {},
+    )
+    expect(result).toMatchObject({
+      id: 'remote-import',
+      isLocalOnly: false,
+      needsSync: false,
+    })
+  })
+
+  it('cleans up a partial remote project and preserves a local fallback', async () => {
+    mockCreateProject.mockResolvedValue(createMockProject(
+      'partial-import',
+      importedProject.name,
+    ))
+    mockUpdateProject.mockRejectedValueOnce(new Error('Upload failed'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await importProjectWithSync(importedProject)
+
+    expect(mockDeleteProject).toHaveBeenCalledWith('partial-import')
+    expect(result).toMatchObject({
+      name: importedProject.name,
+      isLocalOnly: true,
+      needsSync: true,
+    })
+    expect(result.id).toMatch(/^local_/)
+    expect(mockSaveProjectLocal).toHaveBeenLastCalledWith(
+      result.id,
+      importedProject.name,
+      {},
+      {},
+      {},
+    )
+    errorSpy.mockRestore()
   })
 })
 
