@@ -28,9 +28,9 @@ export function EarlyAccessPage() {
 
         <div className="bg-surface border border-border rounded-xl p-6 shadow-lg">
           <div className="text-center">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-accent-blue/10 flex items-center justify-center">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-accent-green/10 flex items-center justify-center">
               <svg
-                className="w-6 h-6 text-accent-blue"
+                className="w-6 h-6 text-accent-green"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"

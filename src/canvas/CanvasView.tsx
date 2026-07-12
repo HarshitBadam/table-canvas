@@ -10,17 +10,19 @@ import ReactFlow, {
   NodeMouseHandler,
   NodeDragHandler,
   ConnectionLineType,
+  type NodeProps,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 
 import { useProjectStore } from '@/state/projectStore'
 import { useProfilingStore } from '@/lib/profiling'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
 import type { ProjectNode, Edge as ProjectEdge } from '@/types'
 import { useCanvasKeyboard } from './useCanvasKeyboard'
 import { useCanvasViewMode } from './useCanvasViewMode'
 import { wouldCreateCycle } from '@/engine/dependencyGraph'
 import { TableNodeComponent } from './nodes/TableNode'
-import { ChartNodeComponent } from './nodes/ChartNode'
+import type { ChartNodeData } from './nodes/ChartNode'
 import { computeSmartEdges, SmartEdge } from './edgeRouter'
 import { CustomConnectionLine } from './ConnectionLine'
 import { getLayoutedNodes, LayoutDirection } from './autoLayout'
@@ -28,10 +30,23 @@ import { CanvasAutoArrangePanel, CanvasEmptyState, CycleWarningToast } from './C
 import { NewTableModal } from './modals/NewTableModal'
 
 const TransformModal = lazy(() => import('./modals/TransformModal').then(m => ({ default: m.TransformModal })))
+const LazyChartNodeComponent = lazy(() => import('./nodes/ChartNode').then(m => ({ default: m.ChartNodeComponent })))
+
+function ChartNodeLoader(props: NodeProps<ChartNodeData>) {
+  return (
+    <Suspense fallback={
+      <div className="flex h-44 w-[220px] items-center justify-center rounded-lg bg-surface shadow-md ring-1 ring-border">
+        <LoadingSpinner size="sm" />
+      </div>
+    }>
+      <LazyChartNodeComponent {...props} />
+    </Suspense>
+  )
+}
 
 const nodeTypes: NodeTypes = {
   tableNode: TableNodeComponent,
-  chartNode: ChartNodeComponent,
+  chartNode: ChartNodeLoader,
 }
 
 
@@ -65,6 +80,28 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
 
   const { handleSetViewMode } = useCanvasViewMode()
 
+  const requestConnection = useCallback((sourceId: string, targetId: string) => {
+    const sourceNode = projectNodes[sourceId]
+    const targetNode = projectNodes[targetId]
+    const sourceIsTable = sourceNode?.kind === 'source_table' || sourceNode?.kind === 'derived_table'
+    const targetIsTable = targetNode?.kind === 'source_table' || targetNode?.kind === 'derived_table'
+
+    if (!sourceIsTable || !targetIsTable) {
+      setCycleWarning('Charts are read-only outputs. Connect two tables to create a transformation.')
+      return
+    }
+    if (wouldCreateCycle(projectEdges, sourceId, targetId)) {
+      setCycleWarning(
+        `Cannot connect "${sourceNode.name}" to "${targetNode.name}": This would create a circular dependency.`,
+      )
+      return
+    }
+
+    setCycleWarning(null)
+    setPendingConnection({ source: sourceId, target: targetId })
+    setTransformModalOpen(true)
+  }, [projectEdges, projectNodes])
+
   const initialNodes: Node[] = useMemo(() => {
     return (Object.values(projectNodes) as ProjectNode[]).map((node) => ({
       id: node.id,
@@ -83,10 +120,25 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
           ? patches[node.id]
           : undefined,
         onSetViewMode: handleSetViewMode,
+        connectableTargets: (Object.values(projectNodes) as ProjectNode[])
+          .filter(target =>
+            target.id !== node.id
+            && (target.kind === 'source_table' || target.kind === 'derived_table'),
+          )
+          .map(target => ({ id: target.id, name: target.name })),
+        onConnectTo: requestConnection,
       },
       selected: node.id === selectedNodeId,
     }))
-  }, [projectNodes, selectedNodeId, profiles, profilesLoading, patches, handleSetViewMode])
+  }, [
+    projectNodes,
+    selectedNodeId,
+    profiles,
+    profilesLoading,
+    patches,
+    handleSetViewMode,
+    requestConnection,
+  ])
 
   const baseEdges: Edge[] = useMemo(() => {
     return (Object.values(projectEdges) as ProjectEdge[]).map((edge) => ({
@@ -103,7 +155,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
       zIndex: 0,
       style: {
         strokeWidth: 2.5,
-        stroke: '#3d6b52',
+        stroke: 'var(--edge-color)',
       },
       labelStyle: { 
         fontSize: 10, 
@@ -195,33 +247,9 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
 
   const onConnect = useCallback((connection: Connection) => {
     if (connection.source && connection.target) {
-      const sourceNode = projectNodes[connection.source]
-      const targetNode = projectNodes[connection.target]
-      const sourceIsTable = sourceNode?.kind === 'source_table' || sourceNode?.kind === 'derived_table'
-      const targetIsTable = targetNode?.kind === 'source_table' || targetNode?.kind === 'derived_table'
-      if (!sourceIsTable || !targetIsTable) {
-        setCycleWarning('Charts are read-only outputs. Connect two tables to create a transformation.')
-        setTimeout(() => setCycleWarning(null), 4000)
-        return
-      }
-      if (wouldCreateCycle(projectEdges, connection.source, connection.target)) {
-        const sourceName = projectNodes[connection.source]?.name || 'Source'
-        const targetName = projectNodes[connection.target]?.name || 'Target'
-        setCycleWarning(
-          `Cannot connect "${sourceName}" to "${targetName}": This would create a circular dependency.`
-        )
-        
-        setTimeout(() => setCycleWarning(null), 4000)
-        return
-      }
-      
-      setPendingConnection({
-        source: connection.source,
-        target: connection.target,
-      })
-      setTransformModalOpen(true)
+      requestConnection(connection.source, connection.target)
     }
-  }, [projectEdges, projectNodes])
+  }, [requestConnection])
 
   const onPaneClick = useCallback(() => {
     selectNode(null)
@@ -271,7 +299,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
           type: 'smoothstep',
           style: {
             strokeWidth: 2.5,
-            stroke: '#3d6b52',
+            stroke: 'var(--edge-color)',
           },
         }}
         connectionLineType={ConnectionLineType.SmoothStep}

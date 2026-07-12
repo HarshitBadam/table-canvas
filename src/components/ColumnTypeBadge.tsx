@@ -3,15 +3,15 @@ export function ColumnTypeBadge({ type }: { type: string }) {
   let color = 'bg-surface-tertiary text-text-secondary'
 
   if (['number', 'integer', 'float', 'double', 'decimal'].includes(t)) {
-    color = 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+    color = 'type-badge-number'
   } else if (['string', 'varchar', 'text', 'char'].includes(t)) {
-    color = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+    color = 'type-badge-string'
   } else if (['boolean', 'bool'].includes(t)) {
-    color = 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+    color = 'type-badge-boolean'
   } else if (['date', 'datetime', 'timestamp', 'time'].includes(t)) {
-    color = 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
+    color = 'type-badge-temporal'
   } else if (t === 'enum') {
-    color = 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300'
+    color = 'type-badge-enum'
   }
 
   return (

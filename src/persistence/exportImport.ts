@@ -1,7 +1,6 @@
 import type { ProjectNode, Edge, Patches } from '@/types'
 import type { Report } from '@/report/types'
 import type { SerializedPatches } from './dbCore'
-import JSZip from 'jszip'
 import { loadProject } from './projectStorage'
 import { loadFileRecord } from './fileStorage'
 import { loadReportsForProject } from './reportStorage'
@@ -56,7 +55,8 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
 
 async function readImportText(file: File): Promise<string> {
   if (file.name.toLowerCase().endsWith('.zip') || file.type === 'application/zip') {
-    let zip: JSZip
+    const { default: JSZip } = await import('jszip')
+    let zip: Awaited<ReturnType<typeof JSZip.loadAsync>>
     try {
       zip = await JSZip.loadAsync(await readFileAsArrayBuffer(file))
     } catch {

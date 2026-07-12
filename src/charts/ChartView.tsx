@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from 'react'
+import { useMemo, useCallback, useRef, useState } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useProjectStore } from '@/state/projectStore'
 import { ChartRenderer } from './ChartRenderer'
@@ -51,6 +51,7 @@ export function ChartView({ chartId }: ChartViewProps) {
   
   const [isEditingName, setIsEditingName] = useState(false)
   const [editName, setEditName] = useState('')
+  const skipNameBlurRef = useRef(false)
   
   const handleConfigChange = useCallback((updates: Partial<ChartConfig>) => {
     if (!chartNode) return
@@ -105,9 +106,19 @@ export function ChartView({ chartId }: ChartViewProps) {
   }, [chartId, chartNode, nodes, updateNode])
   
   const handleNameSave = useCallback(() => {
+    if (skipNameBlurRef.current) {
+      skipNameBlurRef.current = false
+      return
+    }
     if (editName.trim()) updateChartName(chartId, editName.trim())
+    skipNameBlurRef.current = true
     setIsEditingName(false)
   }, [chartId, editName, updateChartName])
+
+  const handleNameCancel = useCallback(() => {
+    skipNameBlurRef.current = true
+    setIsEditingName(false)
+  }, [])
   
   if (!chartNode) {
     return <div className="flex-1 flex items-center justify-center text-gray-500">Chart not found</div>
@@ -123,41 +134,58 @@ export function ChartView({ chartId }: ChartViewProps) {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="p-6 max-w-5xl mx-auto w-full space-y-4">
-        <div className="bg-white dark:bg-[#252526] rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+      <div className="mx-auto w-full max-w-5xl space-y-4 p-3 sm:p-6">
+        <div className="rounded-lg border border-border bg-surface shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-3 py-4 dark:border-gray-700 sm:px-5">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="w-10 h-10 bg-accent-green rounded-lg flex items-center justify-center">
                 <ChartTypeIcon type={chartType} className="w-5 h-5 text-white" />
               </div>
-              <div>
+              <div className="min-w-0">
                 {isEditingName ? (
                   <input
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     onBlur={handleNameSave}
-                    onKeyDown={(e) => e.key === 'Enter' && handleNameSave()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleNameSave()
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault()
+                        handleNameCancel()
+                      }
+                    }}
+                    aria-label="Chart name"
                     className="text-lg font-semibold bg-transparent border-b-2 border-accent-green outline-none text-gray-900 dark:text-white"
                     autoFocus
                   />
                 ) : (
-                  <h1 
-                    className="text-lg font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-accent-green transition-colors"
-                    onClick={() => { setEditName(chartNode.name); setIsEditingName(true); }}
-                    title="Click to rename"
-                  >
-                    {chartNode.name}
+                  <h1 className="truncate text-lg font-semibold text-gray-900 dark:text-white">
+                    <button
+                      type="button"
+                      className="block max-w-full truncate bg-transparent p-0 text-left text-lg font-semibold text-gray-900 transition-colors hover:text-accent-green dark:text-white"
+                      onClick={() => {
+                        skipNameBlurRef.current = false
+                        setEditName(chartNode.name)
+                        setIsEditingName(true)
+                      }}
+                      title="Rename chart"
+                      aria-label={`Rename chart ${chartNode.name}`}
+                    >
+                      {chartNode.name}
+                    </button>
                   </h1>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:gap-3">
               <select
                 value={sourceTableId}
                 onChange={(event) => handleSourceChange(event.target.value)}
                 aria-label="Chart source table"
-                className="px-2 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md"
+                className="min-w-0 max-w-40 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-800 sm:max-w-56"
               >
                 {tables.map((table) => (
                   <option key={table.id} value={table.id}>{table.name}</option>
@@ -165,15 +193,15 @@ export function ChartView({ chartId }: ChartViewProps) {
               </select>
               <button
                 onClick={() => openTable(sourceTableId)}
-                className="px-3 py-1.5 text-sm font-medium text-accent-green bg-accent-green/10 hover:bg-accent-green/20 rounded-md transition-colors"
+                className="max-w-40 truncate rounded-md bg-accent-green/10 px-3 py-1.5 text-sm font-medium text-accent-green transition-colors hover:bg-accent-green/20 sm:max-w-56"
               >
                 {sourceTable?.name}
               </button>
-              <span className="text-sm text-gray-400">{chartData.length} points</span>
+              <span className="hidden text-sm text-gray-400 sm:inline">{chartData.length} points</span>
             </div>
           </div>
           
-          <div className="p-6">
+          <div className="p-2 sm:p-6">
             {loading ? (
               <div className="h-[420px] flex items-center justify-center">
                 <LoadingSpinner size="lg" className="text-accent-green" />
@@ -232,10 +260,10 @@ export function ChartView({ chartId }: ChartViewProps) {
           </div>
         </div>
         
-        <div className="bg-white dark:bg-[#252526] rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <div className="flex items-center gap-8 pb-4 mb-4 border-b border-gray-100 dark:border-gray-700">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider w-14">Type</span>
-            <div className="flex gap-2">
+        <div className="rounded-lg border border-border bg-surface p-3 shadow-sm sm:p-5">
+          <div className="mb-4 flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-gray-700 sm:flex-row sm:items-center sm:gap-8">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider sm:w-14">Type</span>
+            <div className="flex flex-wrap gap-2">
               {(['bar', 'line', 'pie', 'scatter'] as ChartType[]).map((type) => (
                 <button
                   key={type}
@@ -253,7 +281,7 @@ export function ChartView({ chartId }: ChartViewProps) {
             </div>
           </div>
           
-          <div className="flex gap-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -282,7 +310,7 @@ export function ChartView({ chartId }: ChartViewProps) {
               </div>
             </div>
             
-            <div className="w-px bg-gray-200 dark:bg-gray-700" />
+            <div className="hidden w-px bg-gray-200 dark:bg-gray-700 lg:block" />
             
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-3">
@@ -310,7 +338,7 @@ export function ChartView({ chartId }: ChartViewProps) {
               </div>
             </div>
             
-            {chartType !== 'scatter' && <div className="w-px bg-gray-200 dark:bg-gray-700" />}
+            {chartType !== 'scatter' && <div className="hidden w-px bg-gray-200 dark:bg-gray-700 lg:block" />}
             
             {chartType !== 'scatter' && (
               <div className="flex-1 min-w-0">

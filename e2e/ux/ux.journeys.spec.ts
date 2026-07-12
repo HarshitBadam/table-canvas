@@ -33,11 +33,11 @@ test.describe('@ux critical journey contract', () => {
 
     const nodes = page.locator('.react-flow__node')
     await expect(nodes).toHaveCount(2)
-    await page.getByRole('button', { name: 'Auto-Arrange' }).click()
+    await page.getByRole('button', { name: 'Arrange horizontally' }).click()
     const customers = nodes.filter({ hasText: 'Customers' })
-    const orders = nodes.filter({ hasText: 'Orders' })
-    await customers.locator('.table-handle-right').first()
-      .dragTo(orders.locator('.table-handle-left').first(), { force: true })
+    await customers.getByRole('combobox', {
+      name: 'Connect Customers to another table',
+    }).selectOption({ label: 'Orders' })
 
     const dialog = page.getByRole('dialog', { name: 'Combine Tables' })
     await expect(dialog).toBeVisible()
@@ -97,5 +97,38 @@ test.describe('@ux critical journey contract', () => {
       name: /^Second Workspace Table 5 rows/,
     })).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('aside').getByText('First Workspace Table')).toHaveCount(0)
+  })
+})
+
+test.describe('@ux narrow viewport contract', () => {
+  test.use({ viewport: { width: 320, height: 700 } })
+
+  test('join dialog stays inside a narrow viewport', async ({ page }) => {
+    await bootApp(page)
+    await page.getByRole('button', { name: 'Open navigation' }).click()
+    await importCsv(page, 'Narrow Customers', [
+      'ID,Customer',
+      '1,Ada',
+      '2,Grace',
+    ])
+    await importCsv(page, 'Narrow Orders', [
+      'ID,Amount',
+      '1,120',
+      '2,240',
+    ])
+
+    const nodes = page.locator('.react-flow__node')
+    await page.locator('aside').getByRole('button', { name: 'Close navigation' }).click()
+    const customers = nodes.filter({ hasText: 'Narrow Customers' })
+    await customers.getByRole('combobox', {
+      name: 'Connect Narrow Customers to another table',
+    }).selectOption({ label: 'Narrow Orders' })
+
+    const dialog = page.getByRole('dialog', { name: 'Combine Tables' })
+    await expect(dialog).toBeVisible()
+    const box = await dialog.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(320)
   })
 })

@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import type { ColumnSchema } from '@/types'
-import { HEADER_HEIGHT } from './constants'
+import { HEADER_HEIGHT, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } from './constants'
 import { useGridContext } from './useGridContext'
 
 interface ColumnHeaderProps {
@@ -24,6 +24,8 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
     handleContextMenu,
     resizingColumn,
     handleResizeStart,
+    resizeColumnBy,
+    setColumnWidth,
     filters,
     handleToggleFilters,
   } = useGridContext()
@@ -54,9 +56,9 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
 
   const isHighlighted = isSelected || isHeaderRowSelected
   const bgClass = isResizing
-    ? 'bg-green-200 dark:bg-green-800/50'
+    ? 'bg-accent-green/20'
     : isHighlighted
-      ? 'bg-green-100 dark:bg-green-900/40'
+      ? 'bg-accent-green/10'
       : ''
 
   return (
@@ -80,7 +82,7 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
       onContextMenu={(e) => handleContextMenu(e, 'column', undefined, column.id)}
       className={`
         relative flex items-center gap-1 px-2 text-xs font-medium cursor-pointer select-none
-        border-r border-border group text-green-800 dark:text-[#a8d5b9]
+        border-r border-border group text-accent-text
         ${bgClass}
       `}
       style={{ width, minWidth: width, maxWidth: width, height: HEADER_HEIGHT }}
@@ -103,7 +105,7 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
           <span className="truncate flex-1 min-w-0">{column.name}</span>
           {column.isComputed && (
             <span
-              className="px-1 py-0.5 text-[9px] font-mono bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400 rounded flex-shrink-0"
+              className="px-1 py-0.5 text-xs font-mono bg-accent-purple/10 text-node-derived-text rounded flex-shrink-0"
               title={`Formula: ${column.formula}`}
             >
               fx
@@ -115,15 +117,16 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
                 e.stopPropagation()
                 handleToggleFilters()
               }}
-              className="p-0.5 text-green-500 hover:text-green-600 flex-shrink-0"
+              className="column-filter-trigger inline-flex flex-shrink-0 items-center justify-center p-0.5 text-accent-text hover:text-accent-green"
               title={`Column "${column.name}" is filtered`}
+              aria-label={`Edit filter for ${column.name}`}
             >
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
             </button>
           )}
-          <span className="text-[10px] font-mono text-text-tertiary uppercase flex-shrink-0">
+          <span className="flex-shrink-0 font-mono text-xs uppercase text-current">
             {column.type}
           </span>
         </>
@@ -132,8 +135,32 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
         role="separator"
         aria-orientation="vertical"
         aria-label={`Resize ${column.name} column`}
+        aria-valuemin={MIN_COLUMN_WIDTH}
+        aria-valuemax={MAX_COLUMN_WIDTH}
+        aria-valuenow={width}
+        tabIndex={0}
         onMouseDown={(e) => handleResizeStart(column.id, e)}
-        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-green-500/50 transition-colors z-10"
+        onKeyDown={(event) => {
+          const step = event.shiftKey ? 25 : 10
+          if (event.key === 'ArrowLeft') {
+            event.preventDefault()
+            event.stopPropagation()
+            resizeColumnBy(column.id, -step)
+          } else if (event.key === 'ArrowRight') {
+            event.preventDefault()
+            event.stopPropagation()
+            resizeColumnBy(column.id, step)
+          } else if (event.key === 'Home') {
+            event.preventDefault()
+            event.stopPropagation()
+            setColumnWidth(column.id, MIN_COLUMN_WIDTH)
+          } else if (event.key === 'End') {
+            event.preventDefault()
+            event.stopPropagation()
+            setColumnWidth(column.id, MAX_COLUMN_WIDTH)
+          }
+        }}
+        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-accent-green/50 focus:bg-accent-green/50 transition-colors z-10"
         onClick={(e) => e.stopPropagation()}
       />
     </div>

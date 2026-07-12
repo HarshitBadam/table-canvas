@@ -8,7 +8,8 @@ import { ColumnType, ColumnSchema, TableSchema, CellValue } from '@/types'
 import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
-import { loadTableIntoEngine } from '@/persistence/importParsers'
+import { loadTableIntoEngine } from '@/engine/loadTableIntoEngine'
+import { getVisibleFocusableElement, isVisibleElement } from '@/components/useDialogFocus'
 
 interface NewTableModalProps {
   isOpen: boolean
@@ -60,7 +61,7 @@ function TypeDropdown({
         aria-expanded={open}
         className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-text-secondary bg-surface-secondary hover:bg-surface-tertiary rounded transition-colors"
       >
-        <span className="text-[10px] opacity-60">{selected?.icon}</span>
+        <span className="text-xs opacity-60">{selected?.icon}</span>
         <span>{selected?.label}</span>
         <svg className={`w-3 h-3 opacity-50 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -117,10 +118,11 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
 
   useEffect(() => {
     if (isOpen && document.activeElement instanceof HTMLElement) {
-      returnFocusRef.current = document.activeElement
+      returnFocusRef.current = isVisibleElement(document.activeElement)
+        ? document.activeElement
+        : null
     }
   }, [isOpen])
-
   const trimmedColumnNames = columns.map(column => column.name.trim())
   const hasEmptyColumnName = trimmedColumnNames.some(name => name.length === 0)
   const hasDuplicateColumnName =
@@ -230,16 +232,16 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
         <Dialog.Content
-          onEscapeKeyDown={(event) => {
-            event.preventDefault()
-            handleClose()
-          }}
           onCloseAutoFocus={(event) => {
-            if (!returnFocusRef.current) return
+            const returnFocusElement = returnFocusRef.current && isVisibleElement(returnFocusRef.current)
+              ? returnFocusRef.current
+              : getVisibleFocusableElement()
+            if (!returnFocusElement) return
             event.preventDefault()
-            returnFocusRef.current.focus()
+            returnFocusElement.focus()
+            returnFocusRef.current = null
           }}
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-xl shadow-2xl w-full max-w-md z-50 overflow-hidden border border-border-elevation"
+          className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-1rem)] w-full max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl sm:max-w-md"
         >
           <div className="px-5 pt-5 pb-4 border-b border-border-subtle">
             <Dialog.Title className="text-base font-semibold text-text-primary">
@@ -250,7 +252,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
             </Dialog.Description>
           </div>
 
-          <div className="px-5 py-4 space-y-5">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
             <div>
               <label
                 htmlFor="new-table-name"
@@ -309,9 +311,9 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
               
               <div className="space-y-2 max-h-52 overflow-y-auto">
                 {columns.map((col, index) => (
-                  <div 
+                  <div
                     key={col.id} 
-                    className="flex items-center gap-2 p-2 bg-surface-secondary rounded-lg group"
+                    className="group flex flex-wrap items-center gap-2 rounded-lg bg-surface-secondary p-2 sm:flex-nowrap"
                   >
                     <span className="text-xs text-text-tertiary w-5 text-center tabular-nums font-medium">
                       {index + 1}
@@ -322,7 +324,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                       aria-label={`Column ${index + 1} name`}
                       value={col.name}
                       onChange={(e) => updateColumn(col.id, { name: e.target.value })}
-                      className="flex-1 px-2 py-1.5 text-sm bg-surface border border-border rounded text-text-primary focus:outline-none focus:border-accent-green min-w-0"
+                      className="min-w-36 flex-1 rounded border border-border bg-surface px-2 py-1.5 text-sm text-text-primary focus:border-accent-green focus:outline-none"
                       placeholder="Column name"
                     />
                     <TypeDropdown
@@ -346,7 +348,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
             </div>
           </div>
 
-          <div className="px-5 py-4 border-t border-border-subtle flex items-center justify-between bg-surface-secondary/50">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle bg-surface-secondary/50 px-4 py-4 sm:px-5">
             <div>
               <span className="text-xs text-text-secondary">
                 {rowCount} rows × {columns.length} columns

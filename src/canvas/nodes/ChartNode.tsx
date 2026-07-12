@@ -6,7 +6,7 @@ import { MiniChart } from '@/charts/ChartRenderer'
 import { useChartData } from '@/charts/useChartData'
 import { useProjectStore } from '@/state/projectStore'
 
-interface ChartNodeData extends ChartNodeType {
+export interface ChartNodeData extends ChartNodeType {
   selected: boolean
 }
 
@@ -103,15 +103,15 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <p className="text-[9px] font-medium text-red-600 dark:text-red-400 leading-tight">
+            <p className="text-xs font-medium leading-tight text-red-600 dark:text-red-400">
               {error.includes('column') ? 'Column not found' : 'Error'}
             </p>
-            <p className="text-[8px] text-text-tertiary mt-0.5">
+            <p className="mt-0.5 text-xs text-text-tertiary">
               Reconfigure chart axes
             </p>
           </div>
         ) : !chartData || chartData.length === 0 ? (
-          <div className="relative h-[110px] flex items-center justify-center text-[10px] text-text-tertiary">
+          <div className="relative flex h-[110px] items-center justify-center text-xs text-text-tertiary">
             No data
           </div>
         ) : (
@@ -129,7 +129,7 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
       </div>
 
       <div className="px-3 py-1.5 bg-surface-secondary/80 border-t border-border-subtle">
-        <div className="flex items-center justify-between text-[9px] text-text-secondary">
+        <div className="flex items-center justify-between text-xs text-text-secondary">
           {chartType === 'pie' ? (
             <>
               <span className="truncate max-w-[120px]">{xAxisName} → {yAxisName}</span>

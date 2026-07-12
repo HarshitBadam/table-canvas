@@ -8,8 +8,8 @@ import {
   computeSourceVersionHash,
   getEngineTableRowCount,
 } from './cacheUtils'
-import { parseFileData } from './fileParsers'
 import { computeDerivedTable } from './derivedTableComputation'
+import { loadEngineTable } from './loadTableIntoEngine'
 import type {
   SourceTableNode,
   CellValue,
@@ -52,9 +52,6 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
   projectStore.updateCacheInfo(tableId, { isComputing: true, error: undefined })
 
   try {
-    const engine = getEngine()
-    await engine.init()
-
     const existingData = dataStore.tableData[tableId]
     const patches = projectStore.patches[tableId]
 
@@ -91,6 +88,7 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
     if (node.plan.fileRef) {
       const fileData = await loadFileWithSync(node.plan.fileRef)
       if (fileData) {
+        const { parseFileData } = await import('./fileParsers')
         rows = await parseFileData(fileData, node.plan.fileType, node.plan.sheetName, node.schema)
 
         rows = rows.map((row, idx) => ({
@@ -125,7 +123,7 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
     }
 
     if (node.schema) {
-      await engine.loadTable(tableId, node.schema, rows as Record<string, CellValue>[], patches)
+      await loadEngineTable(tableId, node.schema, rows as Record<string, CellValue>[], patches)
     }
     const loadedRowCount = await getEngineTableRowCount(tableId)
     const rowCount = loadedRowCount >= 0 ? loadedRowCount : rows.length

@@ -19,6 +19,19 @@ export function useColumnResize() {
     setResizeStartWidth(getColumnWidth(columnId))
   }, [getColumnWidth])
 
+  const resizeColumnBy = useCallback((columnId: string, delta: number) => {
+    setColumnWidths(prev => {
+      const currentWidth = prev[columnId] || DEFAULT_COLUMN_WIDTH
+      const nextWidth = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, currentWidth + delta))
+      return { ...prev, [columnId]: nextWidth }
+    })
+  }, [])
+
+  const setColumnWidth = useCallback((columnId: string, width: number) => {
+    const nextWidth = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, width))
+    setColumnWidths(prev => ({ ...prev, [columnId]: nextWidth }))
+  }, [])
+
   useEffect(() => {
     if (!resizingColumn) return
 
@@ -41,5 +54,5 @@ export function useColumnResize() {
     }
   }, [resizingColumn, resizeStartX, resizeStartWidth])
 
-  return { getColumnWidth, handleResizeStart, resizingColumn }
+  return { getColumnWidth, handleResizeStart, resizeColumnBy, setColumnWidth, resizingColumn }
 }

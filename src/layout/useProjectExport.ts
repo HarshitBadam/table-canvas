@@ -1,9 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useApp } from '@/state/AppContext'
-import { parseImportFile, saveAllReports } from '@/persistence/db'
+import { saveAllReports } from '@/persistence/reportStorage'
 import { importProjectWithSync, saveProjectWithSync } from '@/persistence/syncService'
-import { exportAndDownloadProject } from '@/persistence/exportService'
 import { useReportStore } from '@/report/reportStore'
 
 export interface ProjectExportState {
@@ -71,6 +70,7 @@ export function useProjectExport(onImportComplete: () => void): ProjectExportSta
         project.patches,
       )
       await useReportStore.getState().flushSaves()
+      const { exportAndDownloadProject } = await import('@/persistence/exportService')
       await exportAndDownloadProject(projectId, projectName || 'project', {
         includeExcel: true,
         onProgress: (message) => setExportProgress(message),
@@ -99,6 +99,7 @@ export function useProjectExport(onImportComplete: () => void): ProjectExportSta
     setExportError(null)
 
     try {
+      const { parseImportFile } = await import('@/persistence/exportImport')
       const parsedData = await parseImportFile(file)
       const importedProject = await importProjectWithSync({
         name: parsedData.name,

@@ -48,11 +48,11 @@ export function CategoryTabs({
             document.getElementById(`suggestion-tab-${next}`)?.focus()
           }}
           className={`
-            px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150
+            rounded-lg px-3 py-1.5 text-xs font-medium
             ${
               activeCategory === cat
-                ? 'bg-primary-600 text-white shadow-sm'
-                : 'text-text-primary hover:bg-surface-tertiary'
+                ? 'bg-accent-green text-white shadow-sm'
+                : 'text-text-primary transition-colors duration-150 hover:bg-surface-tertiary'
             }
           `}
         >
@@ -61,7 +61,7 @@ export function CategoryTabs({
             ({categoryCounts[cat]}{cat === 'cleaning' && isPhase2Loading ? '+' : ''})
           </span>
           {cat === 'cleaning' && isPhase2Loading && (
-            <span className="ml-1 text-[10px]" role="status">
+            <span className="ml-1 text-xs" role="status">
               analyzing
             </span>
           )}

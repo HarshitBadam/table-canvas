@@ -95,40 +95,24 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay 
-          className="fixed inset-0 z-50" 
-          style={{ 
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            backdropFilter: 'blur(4px)',
-          }} 
-        />
+        <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
         <Dialog.Content 
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] z-50"
-          style={{
-            borderRadius: '16px',
-            overflow: 'hidden',
-            boxShadow: '0 24px 48px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05)',
-          }}
+          className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-1rem)] w-[480px] max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-lg"
         >
-          <div 
-            className="px-5 py-4 bg-accent-green"
-          >
+          <div className="px-5 py-4 border-b border-border-subtle">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div 
-                  className="w-9 h-9 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-                >
-                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-accent-green flex-shrink-0">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z" />
                   </svg>
                 </div>
                 <div>
-                  <Dialog.Title className="text-base font-semibold text-white">
+                  <Dialog.Title className="text-base font-semibold text-text-primary">
                     Create Chart
                   </Dialog.Title>
                   {selectedTable && (
-                    <p className="text-xs mt-0.5" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    <p className="text-xs mt-0.5 text-text-secondary">
                       {selectedTable.name} • {(selectedTable.cacheInfo?.lastRowCount
                         ?? selectedTable.schema?.rowCount
                         ?? 0).toLocaleString()} rows
@@ -137,25 +121,23 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                 </div>
               </div>
               <Dialog.Close 
-                className="p-1.5 rounded-lg transition-colors"
-                style={{ color: 'rgba(255, 255, 255, 0.6)' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-text-primary sm:min-h-0 sm:min-w-0 sm:p-1.5"
+                aria-label="Close"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </Dialog.Close>
             </div>
           </div>
           
-          <div className="bg-white dark:bg-[#1f1f1f]">
-          <div className="p-5 space-y-5">
+          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="space-y-5 overflow-y-auto p-4 sm:p-5">
             <div>
-              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+              <label className="mb-3 block text-sm font-medium text-text-secondary">
                 Chart Type
               </label>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
                 {[
                   { type: 'bar' as ChartType, label: 'Bar' },
                   { type: 'line' as ChartType, label: 'Line' },
@@ -166,22 +148,22 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                     key={ct.type}
                     onClick={() => { setChartType(ct.type); setXAxis(''); setYAxis(''); }}
                     className={`
-                      flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all
+                      flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-colors
                       ${chartType === ct.type
                         ? 'border-accent-green bg-accent-green/5 dark:bg-accent-green/10'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                        : 'border-border hover:border-text-tertiary'
                       }
                     `}
                   >
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-md ${
                       chartType === ct.type 
                         ? 'bg-accent-green text-white' 
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                        : 'bg-surface-secondary text-text-tertiary'
                     }`}>
                       <ChartTypeIcon type={ct.type} className="w-4 h-4" />
                     </div>
-                    <span className={`text-xs font-medium ${
-                      chartType === ct.type ? 'text-accent-green' : 'text-gray-600 dark:text-gray-400'
+                    <span className={`text-sm font-medium ${
+                      chartType === ct.type ? 'text-accent-text' : 'text-text-secondary'
                     }`}>
                       {ct.label}
                     </span>
@@ -192,12 +174,12 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
 
             {selectedTable && (
               <div className="space-y-4">
-                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
+                <div className="bg-surface-secondary rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <label className="text-sm font-medium text-text-secondary">
                       {chartType === 'pie' ? 'Category (Slices)' : chartType === 'scatter' ? 'X-Axis (Horizontal)' : 'Category (X-Axis)'}
                     </label>
-                    <span className="text-[10px] text-gray-400 dark:text-gray-500 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">
+                    <span className="rounded bg-surface-tertiary px-2 py-0.5 text-xs text-text-tertiary">
                       {chartType === 'scatter' ? 'Numeric' : 'Text/Date'}
                     </span>
                   </div>
@@ -212,7 +194,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                             px-3 py-1.5 text-xs font-medium rounded-lg transition-all
                             ${xAxis === col.id
                               ? 'bg-accent-green text-white shadow-sm'
-                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:border-accent-green/50'
+                              : 'bg-surface text-text-secondary border border-border hover:border-accent-green/50'
                             }
                           `}
                         >
@@ -222,12 +204,12 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                   </div>
                 </div>
 
-                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
+                <div className="bg-surface-secondary rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <label className="text-sm font-medium text-text-secondary">
                       {chartType === 'pie' ? 'Value (Size)' : 'Value (Y-Axis)'}
                     </label>
-                    <span className="text-[10px] text-gray-400 dark:text-gray-500 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">
+                    <span className="rounded bg-surface-tertiary px-2 py-0.5 text-xs text-text-tertiary">
                       Numeric
                     </span>
                   </div>
@@ -240,24 +222,24 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                           px-3 py-1.5 text-xs font-medium rounded-lg transition-all
                           ${yAxis === col.id
                             ? 'bg-accent-green text-white shadow-sm'
-                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:border-accent-green/50'
+                            : 'bg-surface text-text-secondary border border-border hover:border-accent-green/50'
                           }
                         `}
                       >
                         {col.name}
                       </button>
                     )) : (
-                      <span className="text-xs text-gray-400 italic">No numeric columns available</span>
+                      <span className="text-xs text-text-tertiary italic">No numeric columns available</span>
                     )}
                   </div>
                 </div>
 
                 {chartType !== 'scatter' && (
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                    <label className="mb-3 block text-sm font-medium text-text-secondary">
                       Aggregation Method
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {[
                         { value: 'sum', label: 'Sum' },
                         { value: 'avg', label: 'Average' },
@@ -270,10 +252,10 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                           key={agg.value}
                           onClick={() => setAggregation(agg.value as AggregationType)}
                           className={`
-                            flex-1 py-2 text-xs font-medium rounded-lg transition-all
+                            min-w-16 flex-1 rounded-lg py-2 text-xs font-medium transition-colors
                             ${aggregation === agg.value
                               ? 'bg-accent-green text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                              : 'bg-surface-secondary text-text-secondary hover:bg-surface-tertiary'
                             }
                           `}
                         >
@@ -288,25 +270,25 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
           </div>
 
           <div 
-            className="px-5 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-[#1a1a1a]"
+            className="shrink-0 border-t border-border-subtle bg-surface-secondary px-4 py-3 sm:px-5 sm:py-4"
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex items-center justify-between gap-3">
+              <div className="hidden items-center gap-2 text-sm text-text-secondary sm:flex">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span className="truncate max-w-[200px]">{chartName}</span>
               </div>
-              <div className="flex gap-3">
+              <div className="ml-auto flex gap-2">
                 <Dialog.Close asChild>
-                  <button className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700">
+                  <button className="btn btn-ghost">
                     Cancel
                   </button>
                 </Dialog.Close>
                 <button 
                   onClick={handleCreate}
                   disabled={!isValid}
-                  className="px-5 py-2 text-sm font-semibold text-white rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-accent-green hover:bg-accent-green-hover"
+                  className="btn btn-primary px-5"
                 >
                   Create Chart
                 </button>

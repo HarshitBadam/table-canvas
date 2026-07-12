@@ -43,7 +43,7 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Remove filter"
-      className="p-1.5 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+      className="rounded-lg p-1.5 text-error-text transition-colors hover:bg-error-light"
     >
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -92,13 +92,13 @@ export function DateFilterCard({
   }
 
   return (
-    <div className="relative p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl">
+    <div className="relative rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 flex items-center justify-center bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-bold rounded-full">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-green/10 text-xs font-semibold text-accent-text">
             {index + 1}
           </span>
-          <span className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">Date Filter</span>
+          <span className="text-xs font-medium text-text-secondary">Date filter</span>
         </div>
         <RemoveButton onClick={onRemove} />
       </div>
@@ -167,13 +167,13 @@ export function NumberFilterCard({
   const isNullCheck = condition.operator === 'is_null'
 
   return (
-    <div className="relative p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl">
+    <div className="relative rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 flex items-center justify-center bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 text-xs font-bold rounded-full">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-green/10 text-xs font-semibold text-accent-text">
             {index + 1}
           </span>
-          <span className="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase tracking-wide">Number Filter</span>
+          <span className="text-xs font-medium text-text-secondary">Number filter</span>
         </div>
         <RemoveButton onClick={onRemove} />
       </div>
@@ -227,13 +227,13 @@ export function BooleanFilterCard({
   columnOptions,
 }: FilterCardProps) {
   return (
-    <div className="relative p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl">
+    <div className="relative rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 flex items-center justify-center bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-full">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-green/10 text-xs font-semibold text-accent-text">
             {index + 1}
           </span>
-          <span className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">Yes/No Filter</span>
+          <span className="text-xs font-medium text-text-secondary">Yes/no filter</span>
         </div>
         <RemoveButton onClick={onRemove} />
       </div>
@@ -274,13 +274,13 @@ export function EnumFilterCard({
   }
 
   return (
-    <div className="relative p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl">
+    <div className="relative rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 flex items-center justify-center bg-teal-100 dark:bg-teal-900/40 text-teal-600 dark:text-teal-400 text-xs font-bold rounded-full">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-green/10 text-xs font-semibold text-accent-text">
             {index + 1}
           </span>
-          <span className="text-xs font-medium text-teal-600 dark:text-teal-400 uppercase tracking-wide">Select Values</span>
+          <span className="text-xs font-medium text-text-secondary">Select values</span>
         </div>
         <RemoveButton onClick={onRemove} />
       </div>
@@ -316,13 +316,13 @@ export function StringFilterCard({
   const isNullCheck = condition.operator === 'is_null'
 
   return (
-    <div className="relative p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl">
+    <div className="relative rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="w-6 h-6 flex items-center justify-center bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold rounded-full">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-green/10 text-xs font-semibold text-accent-text">
             {index + 1}
           </span>
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Text Filter</span>
+          <span className="text-xs font-medium text-text-secondary">Text filter</span>
         </div>
         <RemoveButton onClick={onRemove} />
       </div>

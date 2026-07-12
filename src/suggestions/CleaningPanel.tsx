@@ -206,7 +206,7 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         <div className="flex gap-2">
           <button
             onClick={selectAll}
-            className="text-xs text-accent-blue hover:underline"
+            className="text-xs text-accent-green hover:underline"
           >
             All
           </button>

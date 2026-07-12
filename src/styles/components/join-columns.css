@@ -1,15 +1,10 @@
 .join-cols-badge {
   font-size: 12px;
   font-weight: 500;
-  color: #666;
-  background: rgba(0, 0, 0, 0.04);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-tertiary);
   padding: 4px 10px;
-  border-radius: 6px;
-}
-
-[data-theme="dark"] .join-cols-badge {
-  background: rgba(255, 255, 255, 0.08);
-  color: #888;
+  border-radius: var(--radius-sm);
 }
 
 .join-cols-grid {
@@ -27,41 +22,26 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  background: #fff;
-  border: 1.5px solid rgba(0, 0, 0, 0.06);
-  border-radius: 10px;
+  background: var(--color-surface-secondary);
+  border: 1.5px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .join-col-item:hover {
-  border-color: rgba(0, 0, 0, 0.12);
-  background: #fafafa;
+  border-color: var(--color-text-tertiary);
+  background: var(--color-surface-tertiary);
 }
 
 .join-col-item.checked {
-  border-color: rgba(34, 197, 94, 0.3);
-  background: rgba(34, 197, 94, 0.04);
+  border-color: rgb(var(--color-accent-rgb) / 0.35);
+  background: rgb(var(--color-accent-rgb) / 0.06);
 }
 
 .join-col-item.disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-[data-theme="dark"] .join-col-item {
-  background: #252525;
-  border-color: rgba(255, 255, 255, 0.06);
-}
-
-[data-theme="dark"] .join-col-item:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: #2a2a2a;
-}
-
-[data-theme="dark"] .join-col-item.checked {
-  border-color: rgba(34, 197, 94, 0.4);
-  background: rgba(34, 197, 94, 0.08);
 }
 
 .join-col-item input {
@@ -73,13 +53,13 @@
 .join-col-checkbox {
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(0, 0, 0, 0.15);
-  border-radius: 5px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .join-col-checkbox svg {
@@ -89,16 +69,12 @@
 }
 
 .join-col-item.checked .join-col-checkbox {
-  background: #22c55e;
-  border-color: #22c55e;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .join-col-item.checked .join-col-checkbox svg {
   color: white;
-}
-
-[data-theme="dark"] .join-col-checkbox {
-  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .join-col-info {
@@ -112,14 +88,10 @@
 .join-col-name {
   font-size: 13px;
   font-weight: 500;
-  color: #111;
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-[data-theme="dark"] .join-col-name {
-  color: #fff;
 }
 
 .join-col-source {
@@ -130,33 +102,20 @@
 }
 
 .join-col-source.left {
-  color: #16a34a;
+  color: var(--color-accent-text);
 }
 
 .join-col-source.right {
-  color: #2563eb;
-}
-
-[data-theme="dark"] .join-col-source.left {
-  color: #4ade80;
-}
-
-[data-theme="dark"] .join-col-source.right {
-  color: #60a5fa;
+  color: var(--color-node-derived-text);
 }
 
 .join-col-key-badge {
   font-size: 10px;
   font-weight: 600;
-  color: #16a34a;
-  background: rgba(34, 197, 94, 0.1);
+  color: var(--color-accent-text);
+  background: rgb(var(--color-accent-rgb) / 0.12);
   padding: 3px 8px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   text-transform: uppercase;
   letter-spacing: 0.02em;
-}
-
-[data-theme="dark"] .join-col-key-badge {
-  color: #4ade80;
-  background: rgba(34, 197, 94, 0.15);
 }

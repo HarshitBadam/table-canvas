@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useReportStore } from './reportStore';
 import type { Report } from './types';
+import { focusMenuItem } from '@/lib/focusMenuItem';
 
 interface ReportToolbarProps {
   activeReportId: string | null;
@@ -35,6 +36,9 @@ export function ReportToolbar({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const insertRef = useRef<HTMLDivElement>(null);
+  const insertTriggerRef = useRef<HTMLButtonElement>(null);
+  const insertMenuRef = useRef<HTMLDivElement>(null);
+  const insertInitialFocusRef = useRef<'first' | 'last'>('first');
 
   const reportsList = Object.values(reports)
     .filter((report) => report.name.toLowerCase().includes(searchValue.trim().toLowerCase()))
@@ -78,6 +82,14 @@ export function ReportToolbar({
       inputRef.current.select();
     }
   }, [isEditing]);
+
+  useEffect(() => {
+    if (!showInsertMenu) return;
+    const items = insertMenuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+    const index = insertInitialFocusRef.current === 'last' ? (items?.length ?? 1) - 1 : 0;
+    items?.[index]?.focus();
+    insertInitialFocusRef.current = 'first';
+  }, [showInsertMenu]);
 
   const handleStartRename = () => {
     if (activeReport) {
@@ -137,16 +149,29 @@ export function ReportToolbar({
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const handleInsertMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setShowInsertMenu(false);
+      window.requestAnimationFrame(() => insertTriggerRef.current?.focus());
+      return;
+    }
+    focusMenuItem(event, insertMenuRef.current);
+  };
+
+  const handleInsertTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    insertInitialFocusRef.current = event.key === 'ArrowUp' ? 'last' : 'first';
+    setShowInsertMenu(true);
   };
 
   return (
-    <div className="report-toolbar-v2">
-      <div className="report-toolbar-v2-left">
+    <div className="report-toolbar-v2 min-w-0 max-sm:gap-1 max-sm:!px-2">
+      <div className="report-toolbar-v2-left max-sm:gap-1">
         <button
-          className="report-toolbar-v2-add"
+          type="button"
+          className="report-toolbar-v2-add max-sm:!h-10 max-sm:!w-10"
           onClick={handleCreateReport}
           title="New report"
           aria-label="New report"
@@ -156,7 +181,7 @@ export function ReportToolbar({
           </svg>
         </button>
 
-        <div className="report-toolbar-v2-selector" ref={listRef}>
+        <div className="report-toolbar-v2-selector min-w-0 max-sm:flex-1" ref={listRef}>
           {isEditing ? (
             <input
               ref={inputRef}
@@ -165,11 +190,11 @@ export function ReportToolbar({
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={handleFinishRename}
               onKeyDown={handleKeyDown}
-              className="report-toolbar-v2-name-input"
+              className="report-toolbar-v2-name-input max-sm:!w-full max-sm:!min-w-0"
             />
           ) : (
             <button 
-              className="report-toolbar-v2-name"
+              className="report-toolbar-v2-name max-sm:!max-w-full"
               onClick={() => setShowReportList(!showReportList)}
               onDoubleClick={handleStartRename}
               title="Click to switch reports, double-click to rename"
@@ -248,11 +273,9 @@ export function ReportToolbar({
           )}
         </div>
 
-        <span className="report-toolbar-v2-badge">Report</span>
-
         {activeReport && (
           <span className="report-toolbar-v2-info">
-            {wordCount > 0 ? `${wordCount.toLocaleString()} words` : 'Empty'} · Updated {formatDate(activeReport.updatedAt)}
+            {wordCount > 0 ? `${wordCount.toLocaleString()} words` : 'Empty'}
           </span>
         )}
         <span
@@ -267,38 +290,58 @@ export function ReportToolbar({
         </span>
       </div>
 
-      <div className="report-toolbar-v2-right">
+      <div className="report-toolbar-v2-right shrink-0 max-sm:gap-1">
         {onHighlight && (
           <button
-            className="report-toolbar-v2-action"
+            type="button"
+            className="report-toolbar-v2-action max-sm:!h-10 max-sm:!w-10 max-sm:!p-0"
             onClick={onHighlight}
             title="Highlight text"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
             </svg>
-            <span>Highlight</span>
+            <span className="hidden sm:inline">Highlight</span>
           </button>
         )}
 
         {(onInsertTable || onInsertEmbeddedTable || onInsertChart) && (
-          <div className="report-toolbar-v2-insert" ref={insertRef}>
+          <div
+            className="report-toolbar-v2-insert"
+            ref={insertRef}
+            onBlur={(event) => {
+              const nextTarget = event.relatedTarget
+              if (!nextTarget || !event.currentTarget.contains(nextTarget as Node)) {
+                setShowInsertMenu(false)
+              }
+            }}
+          >
             <button
-              className="report-toolbar-v2-action"
+              ref={insertTriggerRef}
+              type="button"
+              className="report-toolbar-v2-action max-sm:!h-10 max-sm:!w-10 max-sm:!p-0"
               onClick={() => setShowInsertMenu((value) => !value)}
+              onKeyDown={handleInsertTriggerKeyDown}
               title="Insert content"
               aria-haspopup="menu"
               aria-expanded={showInsertMenu}
+              aria-controls={showInsertMenu ? 'report-insert-menu' : undefined}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M12 5v14M5 12h14" />
               </svg>
-              <span>Insert</span>
+              <span className="hidden sm:inline">Insert</span>
             </button>
             {showInsertMenu && (
-              <div className="report-toolbar-v2-insert-menu" role="menu">
+              <div
+                ref={insertMenuRef}
+                id="report-insert-menu"
+                className="report-toolbar-v2-insert-menu"
+                role="menu"
+                onKeyDown={handleInsertMenuKeyDown}
+              >
                 {onInsertEmbeddedTable && (
-                  <button type="button" role="menuitem" onClick={() => {
+                  <button type="button" role="menuitem" tabIndex={-1} onClick={() => {
                     onInsertEmbeddedTable();
                     setShowInsertMenu(false);
                   }}>
@@ -307,7 +350,7 @@ export function ReportToolbar({
                   </button>
                 )}
                 {onInsertChart && (
-                  <button type="button" role="menuitem" onClick={() => {
+                  <button type="button" role="menuitem" tabIndex={-1} onClick={() => {
                     onInsertChart();
                     setShowInsertMenu(false);
                   }}>
@@ -316,7 +359,7 @@ export function ReportToolbar({
                   </button>
                 )}
                 {onInsertTable && (
-                  <button type="button" role="menuitem" onClick={() => {
+                  <button type="button" role="menuitem" tabIndex={-1} onClick={() => {
                     onInsertTable();
                     setShowInsertMenu(false);
                   }}>

@@ -102,6 +102,35 @@ export function useGridAutofill({
     setAutofillPreview(preview)
   }, [autofillDragging, cellRangeSelection, selection, rows, getDisplayValue, columns])
 
+  const handleAutofillOneRow = useCallback((rowIndex: number, columnId: string) => {
+    if (!isEditable) return
+
+    const sourceRange = getAutofillSourceRange(rowIndex, columnId)
+    const targetRow = rows[sourceRange.endRow + 1]
+    if (!targetRow) return
+
+    const sourceValues: CellValue[] = []
+    for (let index = sourceRange.startRow; index <= sourceRange.endRow; index++) {
+      const row = rows[index]
+      if (row) {
+        sourceValues.push(getDisplayValue(row.__rowId, columnId, row[columnId], row))
+      }
+    }
+    if (sourceValues.length === 0) return
+
+    const [nextValue] = generateNextValues(detectPattern(sourceValues), 1)
+    saveSnapshot('Autofill')
+    setCellValue(tableId, targetRow.__rowId, columnId, nextValue)
+  }, [
+    getAutofillSourceRange,
+    getDisplayValue,
+    isEditable,
+    rows,
+    saveSnapshot,
+    setCellValue,
+    tableId,
+  ])
+
   const handleAutofillEnd = useCallback(() => {
     if (!autofillDragging || autofillEndRow === null || !autofillColumnId.current) {
       setAutofillDragging(false)
@@ -177,6 +206,7 @@ export function useGridAutofill({
     autofillColumnId,
     handleAutofillStart,
     handleAutofillMove,
+    handleAutofillOneRow,
     handleAutofillEnd,
   }
 }

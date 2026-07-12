@@ -1,5 +1,6 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { useSelectableTables } from '../tableData';
+import { useDialogFocus } from '@/components/useDialogFocus';
 
 interface TablePickerModalProps {
   title?: string;
@@ -16,21 +17,12 @@ export const TablePickerModal = memo(function TablePickerModal({
 }: TablePickerModalProps) {
   const tables = useSelectableTables();
   const [query, setQuery] = useState('');
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useDialogFocus<HTMLDivElement>(true, onClose);
   const visibleTables = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return tables;
     return tables.filter((table) => table.name.toLowerCase().includes(normalizedQuery));
   }, [query, tables]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    dialogRef.current?.focus();
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
 
   return (
     <div className="table-picker-overlay" onClick={onClose} role="presentation">
@@ -48,7 +40,7 @@ export const TablePickerModal = memo(function TablePickerModal({
             <h3 id="table-picker-title">{title}</h3>
             {subtitle && <p className="table-picker-item-meta">{subtitle}</p>}
           </div>
-          <button onClick={onClose} className="table-picker-close" aria-label="Close">
+          <button type="button" onClick={onClose} className="table-picker-close" aria-label="Close" data-dialog-initial-focus={tables.length <= 5 ? true : undefined}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
@@ -63,7 +55,7 @@ export const TablePickerModal = memo(function TablePickerModal({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search tables…"
               className="input text-sm w-full mb-3"
-              autoFocus
+              data-dialog-initial-focus
             />
           )}
           {tables.length === 0 ? (

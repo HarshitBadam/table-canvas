@@ -1,13 +1,3 @@
-/**
- * React Flow Overrides
- * 
- * Custom styles for ReactFlow components (nodes, edges, handles, controls).
- */
-
-/* ============================================================================
-   Node Styles
-   ============================================================================ */
-
 .react-flow__node {
   cursor: grab;
 }
@@ -16,33 +6,28 @@
   cursor: grabbing;
 }
 
-/* Ensure handles are always visible and above card content */
 .react-flow__node .react-flow__handle {
   z-index: 10 !important;
 }
 
-/* Smooth transition for node selection */
 .react-flow__node > div:first-child {
   transition: box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ============================================================================
-   Connection Handles - Larger hit areas, better feedback
-   ============================================================================ */
-
-/* Base handle styles - 16px visible, 28px hit area */
 .react-flow__handle {
   width: 16px;
   height: 16px;
-  background: #217346;
-  border: 2.5px solid white;
+  background: var(--color-accent);
+  border: 2.5px solid var(--color-surface);
   border-radius: 50%;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), 0 0 0 0 rgba(33, 115, 70, 0);
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm), 0 0 0 0 rgb(var(--color-accent-rgb) / 0);
+  transition:
+    transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 10;
 }
 
-/* Extended hit area using pseudo-element */
 .react-flow__handle::before {
   content: '';
   position: absolute;
@@ -55,59 +40,36 @@
   background: transparent;
 }
 
-/* Hover state - scale up with glow */
 .react-flow__handle:hover {
   transform: scale(1.25);
-  background: #28a55a;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25), 0 0 0 4px rgba(33, 115, 70, 0.2);
+  background: var(--color-accent-green-light);
+  box-shadow: var(--shadow-md), 0 0 0 4px rgb(var(--color-accent-rgb) / 0.2);
 }
 
-/* Connecting state - pulsing glow animation */
 .react-flow__handle.connectingfrom,
 .react-flow__handle.connectingto {
   transform: scale(1.35);
-  background: #28a55a;
-  box-shadow: 0 0 0 6px rgba(33, 115, 70, 0.35), 0 4px 12px rgba(0, 0, 0, 0.3);
-  animation: handle-pulse 1s ease-in-out infinite;
+  background: var(--color-accent-green-light);
+  box-shadow: 0 0 0 6px rgb(var(--color-accent-rgb) / 0.35), var(--shadow-md);
 }
 
-/* Valid connection target - strong glow */
 .react-flow__handle.valid {
   transform: scale(1.4);
-  background: #28a55a;
-  box-shadow: 0 0 0 8px rgba(33, 115, 70, 0.4), 0 0 20px rgba(33, 115, 70, 0.5);
-  animation: handle-glow 0.8s ease-in-out infinite alternate;
+  background: var(--color-accent-green-light);
+  box-shadow: 0 0 0 8px rgb(var(--color-accent-rgb) / 0.4), var(--shadow-md);
 }
 
-/* Pulsing animation for active connections */
-@keyframes handle-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 6px rgba(33, 115, 70, 0.35), 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 0 10px rgba(33, 115, 70, 0.2), 0 4px 16px rgba(0, 0, 0, 0.3);
-  }
-}
-
-/* Glow animation for valid targets */
-@keyframes handle-glow {
-  0% {
-    box-shadow: 0 0 0 6px rgba(33, 115, 70, 0.3), 0 0 15px rgba(33, 115, 70, 0.4);
-  }
-  100% {
-    box-shadow: 0 0 0 10px rgba(33, 115, 70, 0.4), 0 0 25px rgba(33, 115, 70, 0.6);
-  }
-}
-
-/* Custom table handles with proper positioning */
 .table-handle {
   width: 16px !important;
   height: 16px !important;
-  background: #217346 !important;
-  border: 2.5px solid white !important;
+  background: var(--color-accent) !important;
+  border: 2.5px solid var(--color-surface) !important;
   border-radius: 50% !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition:
+    transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1) !important;
   z-index: 10 !important;
 }
 
@@ -129,114 +91,72 @@
 
 .table-handle:hover {
   transform: scale(1.25) !important;
-  background: #28a55a !important;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25), 0 0 0 4px rgba(33, 115, 70, 0.25) !important;
+  background: var(--color-accent-green-light) !important;
+  box-shadow: var(--shadow-md), 0 0 0 4px rgb(var(--color-accent-rgb) / 0.25) !important;
 }
 
-/* Dark mode handles - muted professional green */
 [data-theme="dark"] .react-flow__handle,
 [data-theme="dark"] .table-handle {
-  background: #3d6b52 !important;
-  border-color: #1a1a1a !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important;
+  background: var(--color-accent) !important;
+  border-color: var(--color-surface) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 
 [data-theme="dark"] .react-flow__handle:hover,
 [data-theme="dark"] .table-handle:hover {
-  background: #4a7d60 !important;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4), 0 0 0 4px rgba(61, 107, 82, 0.3) !important;
+  background: var(--color-accent-hover) !important;
+  box-shadow: var(--shadow-md), 0 0 0 4px rgb(var(--color-accent-rgb) / 0.3) !important;
 }
 
 [data-theme="dark"] .react-flow__handle.connectingfrom,
 [data-theme="dark"] .react-flow__handle.connectingto {
-  background: #4a7d60 !important;
-  box-shadow: 0 0 0 6px rgba(61, 107, 82, 0.35), 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  background: var(--color-accent-hover) !important;
+  box-shadow: 0 0 0 6px rgb(var(--color-accent-rgb) / 0.35), var(--shadow-md) !important;
 }
 
 [data-theme="dark"] .react-flow__handle.valid {
-  background: #5a9070 !important;
-  box-shadow: 0 0 0 8px rgba(61, 107, 82, 0.45), 0 0 24px rgba(61, 107, 82, 0.6) !important;
+  background: color-mix(in srgb, var(--color-accent-hover) 70%, var(--color-accent-text) 30%) !important;
+  box-shadow: 0 0 0 8px rgb(var(--color-accent-rgb) / 0.45), var(--shadow-md) !important;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .react-flow__handle,
-  :root:not([data-theme="light"]) .table-handle {
-    background: #3d6b52 !important;
-    border-color: #1a1a1a !important;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important;
-  }
-  
-  :root:not([data-theme="light"]) .react-flow__handle:hover,
-  :root:not([data-theme="light"]) .table-handle:hover {
-    background: #4a7d60 !important;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4), 0 0 0 4px rgba(61, 107, 82, 0.3) !important;
-  }
-}
-
-/* ============================================================================
-   Edge Styles
-   ============================================================================ */
 
 .react-flow__edge-path {
-  stroke: #217346 !important;
+  stroke: var(--edge-color) !important;
   stroke-width: 2.5 !important;
   stroke-linecap: round !important;
   stroke-linejoin: round !important;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15)) !important;
+  filter: drop-shadow(var(--shadow-sm)) !important;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: #185c37 !important;
+  stroke: var(--color-accent-hover) !important;
   stroke-width: 3 !important;
-  filter: drop-shadow(0 2px 4px rgba(33, 115, 70, 0.4)) !important;
+  filter: drop-shadow(0 2px 4px rgb(var(--color-accent-rgb) / 0.4)) !important;
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
-  stroke: #28a55a !important;
+  stroke: var(--color-accent-green-light) !important;
   stroke-width: 3 !important;
-  filter: drop-shadow(0 2px 4px rgba(33, 115, 70, 0.3)) !important;
+  filter: drop-shadow(0 2px 4px rgb(var(--color-accent-rgb) / 0.3)) !important;
 }
 
-/* Dark mode edges - muted professional green */
 [data-theme="dark"] .react-flow__edge-path {
-  stroke: #3d6b52 !important;
+  stroke: var(--edge-color) !important;
   stroke-width: 2.5 !important;
   filter: none !important;
 }
 
 [data-theme="dark"] .react-flow__edge.selected .react-flow__edge-path {
-  stroke: #4a7d60 !important;
+  stroke: var(--color-accent-hover) !important;
   stroke-width: 3 !important;
   filter: none !important;
 }
 
 [data-theme="dark"] .react-flow__edge:hover .react-flow__edge-path {
-  stroke: #5a9070 !important;
+  stroke: var(--color-accent-green-light) !important;
   stroke-width: 3 !important;
   filter: none !important;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .react-flow__edge-path {
-    stroke: #3d6b52 !important;
-    stroke-width: 2.5 !important;
-    filter: none !important;
-  }
-  
-  :root:not([data-theme="light"]) .react-flow__edge.selected .react-flow__edge-path {
-    stroke: #4a7d60 !important;
-    stroke-width: 3 !important;
-    filter: none !important;
-  }
-  
-  :root:not([data-theme="light"]) .react-flow__edge:hover .react-flow__edge-path {
-    stroke: #5a9070 !important;
-    stroke-width: 3 !important;
-    filter: none !important;
-  }
-}
-
-/* Edge z-index - ensure edges render below nodes */
 .react-flow__edges {
   z-index: 0 !important;
 }
@@ -245,18 +165,13 @@
   pointer-events: all;
 }
 
-/* Edge path refinements */
 .react-flow__edge-path {
-  transition: stroke-width 150ms ease-out, filter 150ms ease-out;
+  transition: filter 150ms ease-out;
 }
-
-/* ============================================================================
-   Controls
-   ============================================================================ */
 
 .react-flow__controls {
   box-shadow: var(--shadow-md);
-  border-radius: 8px !important;
+  border-radius: var(--radius-md) !important;
   overflow: hidden !important;
 }
 
@@ -268,13 +183,13 @@
 }
 
 .react-flow__controls-button:first-child {
-  border-top-left-radius: 8px !important;
-  border-top-right-radius: 8px !important;
+  border-top-left-radius: var(--radius-md) !important;
+  border-top-right-radius: var(--radius-md) !important;
 }
 
 .react-flow__controls-button:last-child {
-  border-bottom-left-radius: 8px !important;
-  border-bottom-right-radius: 8px !important;
+  border-bottom-left-radius: var(--radius-md) !important;
+  border-bottom-right-radius: var(--radius-md) !important;
 }
 
 .react-flow__controls-button:hover {
@@ -285,19 +200,10 @@
   fill: var(--color-text-secondary) !important;
 }
 
-/* Dark mode specific overrides */
 [data-theme="dark"] .react-flow__background {
   background-color: var(--color-canvas);
 }
 
 [data-theme="dark"] .react-flow__controls-button {
   border-color: var(--color-border) !important;
-}
-
-/* ============================================================================
-   Snap-to-handle Effect
-   ============================================================================ */
-
-.react-flow__node:has(.react-flow__handle.valid) {
-  filter: drop-shadow(0 0 12px rgba(33, 115, 70, 0.4));
 }

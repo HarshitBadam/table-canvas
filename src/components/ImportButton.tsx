@@ -2,20 +2,14 @@ import { useRef, useState } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import * as Dialog from '@radix-ui/react-dialog'
-import * as XLSX from 'xlsx'
+import type { WorkBook } from 'xlsx'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
 import { useAppAuth } from '@/state/AppContext'
 import { checkFileSize, checkRowCount, checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
-import {
-  SheetInfo,
-  parseCSVFile,
-  parseExcelFile,
-  importSheetAndPersist,
-  loadTableIntoEngine,
-} from '@/persistence/importParsers'
-import { parseWorkbookSheet } from '@/engine/fileParsers'
+import type { SheetInfo } from '@/persistence/importParsers'
+import { loadTableIntoEngine } from '@/engine/loadTableIntoEngine'
 
 function getTableCount(nodes: Record<string, { kind: string }>): number {
   return Object.values(nodes).filter(
@@ -32,7 +26,7 @@ export function ImportButton() {
   const [isImporting, setIsImporting] = useState(false)
   const [sheetModalOpen, setSheetModalOpen] = useState(false)
   const [sheets, setSheets] = useState<SheetInfo[]>([])
-  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
+  const [workbook, setWorkbook] = useState<WorkBook | null>(null)
   const [excelBuffer, setExcelBuffer] = useState<ArrayBuffer | null>(null)
   const [fileName, setFileName] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
@@ -68,6 +62,7 @@ export function ImportButton() {
       const extension = file.name.split('.').pop()?.toLowerCase()
 
       if (extension === 'csv') {
+        const { parseCSVFile } = await import('@/persistence/importParsers')
         const nodes = useProjectStore.getState().nodes
         const tableCheck = checkTableCount(getTableCount(nodes), tier)
         if (!tableCheck.ok) {
@@ -93,6 +88,7 @@ export function ImportButton() {
         setTableData(tableId, rows)
         await loadTableIntoEngine(tableId, schema, rows)
       } else if (extension === 'xlsx' || extension === 'xls') {
+        const { parseExcelFile } = await import('@/persistence/importParsers')
         const result = await parseExcelFile(file)
         if (result.kind === 'single') {
           const nodes = useProjectStore.getState().nodes
@@ -144,6 +140,13 @@ export function ImportButton() {
     setIsImporting(true)
     setImportError(null)
     try {
+      const [
+        { importSheetAndPersist },
+        { parseWorkbookSheet },
+      ] = await Promise.all([
+        import('@/persistence/importParsers'),
+        import('@/engine/fileParsers'),
+      ])
       const selectedSheets = sheets.filter((s) => s.selected)
       const nodes = useProjectStore.getState().nodes
       const currentTableCount = getTableCount(nodes)

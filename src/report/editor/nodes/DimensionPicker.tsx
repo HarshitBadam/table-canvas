@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import { useDialogFocus } from '@/components/useDialogFocus';
 
 interface DimensionPickerProps {
   onSelect: (rows: number, cols: number) => void;
@@ -8,11 +9,7 @@ interface DimensionPickerProps {
 export function DimensionPicker({ onSelect, onCancel }: DimensionPickerProps) {
   const [rows, setRows] = useState(3);
   const [cols, setCols] = useState(3);
-  const closeRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    const timeout = window.setTimeout(() => closeRef.current?.focus(), 0);
-    return () => window.clearTimeout(timeout);
-  }, []);
+  const dialogRef = useDialogFocus<HTMLDivElement>(true, onCancel);
   const increment = (setter: React.Dispatch<React.SetStateAction<number>>, max: number) => {
     setter(value => Math.min(value + 1, max));
   };
@@ -23,18 +20,23 @@ export function DimensionPicker({ onSelect, onCancel }: DimensionPickerProps) {
   return (
     <div className="dimension-modal-overlay" onClick={onCancel}>
       <div
+        ref={dialogRef}
         className="dimension-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="insert-table-title"
         onClick={event => event.stopPropagation()}
-        onKeyDown={event => {
-          if (event.key === 'Escape') onCancel();
-        }}
+        tabIndex={-1}
       >
         <div className="dimension-modal-header">
           <h3 id="insert-table-title">Insert Table</h3>
-          <button ref={closeRef} type="button" className="dimension-modal-close" onClick={onCancel} aria-label="Close table picker">
+          <button
+            type="button"
+            className="dimension-modal-close"
+            onClick={onCancel}
+            aria-label="Close table picker"
+            data-dialog-initial-focus
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
