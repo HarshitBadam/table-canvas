@@ -49,7 +49,7 @@ test.describe('Canvas interaction behavior', () => {
     await exportButton.click()
     const menu = page.getByRole('menu', { name: 'Project actions' })
     await expect(menu).toBeVisible()
-    await expect(menu.getByRole('menuitem')).toHaveCount(3)
+    await expect(menu.getByRole('menuitem')).toHaveCount(2)
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
     await expect(exportButton).toBeFocused()

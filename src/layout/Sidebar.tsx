@@ -6,10 +6,17 @@ import { NewTableModal } from '@/canvas/modals/NewTableModal'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { ProjectSwitcher } from './ProjectSwitcher'
 import { useNavigation } from './NavigationContext'
+import { WORKSPACE_NAV_ITEMS } from './viewNavigation'
 import type { ProjectNode, TableNode, ChartNode } from '@/types'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
+import { useDialogFocus } from '@/components/useDialogFocus'
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean
+  onClose?: () => void
+}
+
+export function Sidebar({ isOpen = false, onClose = () => undefined }: SidebarProps) {
   const { openTable, openChart, openCanvas, openDashboard, openReport } = useNavigation()
   const nodes = useProjectStore((state) => state.nodes)
   const edges = useProjectStore((state) => state.edges)
@@ -33,15 +40,18 @@ export function Sidebar() {
 
   const handleNewTable = useCallback(() => {
     setNewTableModalOpen(true)
-  }, [])
+    onClose()
+  }, [onClose])
 
   const handleTableClick = useCallback((nodeId: string) => {
     openTable(nodeId)
-  }, [openTable])
+    onClose()
+  }, [onClose, openTable])
 
   const handleChartClick = useCallback((chartId: string) => {
     openChart(chartId)
-  }, [openChart])
+    onClose()
+  }, [onClose, openChart])
 
   const handleDeleteTable = useCallback((nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -58,19 +68,48 @@ export function Sidebar() {
   const cancelDelete = useCallback(() => {
     setDeleteConfirmId(null)
   }, [])
+  const drawerDialogRef = useDialogFocus<HTMLElement>(isOpen, onClose)
+  const deleteDialogRef = useDialogFocus<HTMLDivElement>(Boolean(deleteConfirmId), cancelDelete)
 
   return (
-      <aside className="w-64 border-r border-border bg-surface flex flex-col">
+    <>
+      {isOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          onClick={onClose}
+          className="fixed inset-0 z-modal-backdrop bg-black/40 lg:hidden"
+        />
+      )}
+      <aside
+        ref={drawerDialogRef}
+        role={isOpen ? 'dialog' : undefined}
+        aria-modal={isOpen ? true : undefined}
+        aria-label="Primary navigation"
+        className={`safe-area-top fixed inset-y-0 left-0 z-modal flex w-[min(20rem,calc(100vw-3rem))] flex-col border-r border-border bg-surface shadow-lg transition-transform duration-200 lg:visible lg:static lg:z-auto lg:w-64 lg:translate-x-0 lg:shadow-none ${
+          isOpen ? 'visible translate-x-0' : 'invisible -translate-x-full'
+        }`}
+      >
         <div className="h-14 border-b border-border flex items-center px-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded bg-[#217346] dark:bg-[#4a7d60] flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="w-9 h-9 rounded bg-accent-green flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <span className="truncate font-bold text-base text-text-primary">Table Canvas</span>
           </div>
-          <span className="font-bold text-base text-text-primary">Table Canvas</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-ghost min-h-11 min-w-11 p-0 lg:hidden"
+            aria-label="Close navigation"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-      </div>
 
         <ProjectSwitcher />
 
@@ -89,13 +128,10 @@ export function Sidebar() {
       </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-hide p-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3">
           <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">
             Tables
           </div>
-          <span className="text-xs font-medium text-text-tertiary bg-surface-secondary px-2 py-0.5 rounded-full">
-            {tableNodes.length}
-          </span>
         </div>
         {tableNodes.length === 0 ? (
           <div className="text-center py-8 px-4">
@@ -126,7 +162,9 @@ export function Sidebar() {
                     <span className="truncate flex-1 font-medium">{node.name}</span>
                   </div>
                   {node.schema && (
-                    <div className="text-[11px] text-text-tertiary mt-1 ml-7">
+                    <div className={`ml-7 mt-1 text-xs ${
+                      selectedNodeId === node.id ? 'text-accent-text' : 'text-text-tertiary'
+                    }`}>
                       {node.cacheInfo?.lastRowCount ?? node.schema.rowCount ?? 0} rows · {node.schema.columns.length} cols
                     </div>
                   )}
@@ -134,7 +172,7 @@ export function Sidebar() {
                 <button
                   type="button"
                   onClick={(e) => handleDeleteTable(node.id, e)}
-                  className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-text-tertiary hover:text-red-500 transition-all"
+                  className="sidebar-delete-action p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-text-tertiary hover:text-red-500 transition-all"
                   title="Delete table"
                   aria-label={`Delete ${node.name}`}
                 >
@@ -149,13 +187,10 @@ export function Sidebar() {
 
         {chartNodes.length > 0 && (
           <>
-            <div className="flex items-center justify-between mb-2 mt-6">
+            <div className="mb-2 mt-6">
               <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">
                 Charts
               </div>
-              <span className="text-xs font-medium text-text-tertiary bg-surface-secondary px-2 py-0.5 rounded-full">
-                {chartNodes.length}
-              </span>
             </div>
             <ul className="space-y-1">
               {chartNodes.map((node) => (
@@ -182,7 +217,7 @@ export function Sidebar() {
                   <button
                     type="button"
                     onClick={(e) => handleDeleteTable(node.id, e)}
-                    className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-text-tertiary hover:text-red-500 transition-all"
+                    className="sidebar-delete-action p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-text-tertiary hover:text-red-500 transition-all"
                     title="Delete chart"
                     aria-label={`Delete ${node.name}`}
                   >
@@ -198,44 +233,28 @@ export function Sidebar() {
 
       </div>
 
-        <div className="px-4 py-3 border-t border-border">
-          <button
-            type="button"
-            onClick={openCanvas}
-          className="btn btn-ghost w-full gap-2.5 justify-start text-sm"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-          </svg>
-          Canvas
-        </button>
-      </div>
-      
-        <div className="px-4 py-3 border-t border-border">
-          <button
-            type="button"
-            onClick={openDashboard}
-          className="btn btn-ghost w-full gap-2.5 justify-start text-sm"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-          Dashboard
-        </button>
-      </div>
-      
-        <div className="px-4 py-3 border-t border-border">
-          <button
-            type="button"
-            onClick={openReport}
-          className="btn btn-ghost w-full gap-2.5 justify-start text-sm"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          Report
-        </button>
-      </div>
+        <nav className="space-y-1 border-t border-border px-4 py-3" aria-label="Views">
+          {WORKSPACE_NAV_ITEMS.map((item) => {
+            const openView = item.id === 'canvas'
+              ? openCanvas
+              : item.id === 'dashboard'
+                ? openDashboard
+                : openReport
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => { openView(); onClose() }}
+                className="btn btn-ghost w-full gap-2.5 justify-start text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.iconPath} />
+                </svg>
+                {item.label}
+              </button>
+            )
+          })}
+        </nav>
 
         <div className="p-4 border-t border-border bg-surface-secondary/50">
           <ThemeToggle />
@@ -249,11 +268,13 @@ export function Sidebar() {
         {deleteConfirmId && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div
+            ref={deleteDialogRef}
             className="bg-surface border border-border rounded-lg shadow-lg p-5 max-w-sm mx-4"
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="delete-node-title"
             aria-describedby="delete-node-description"
+            tabIndex={-1}
           >
             <div className="flex items-start gap-3 mb-3">
               <div className="w-8 h-8 rounded bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
@@ -275,8 +296,9 @@ export function Sidebar() {
             </p>
             <div className="flex justify-end gap-2">
               <button 
+                type="button"
                 onClick={cancelDelete} 
-                autoFocus
+                data-dialog-initial-focus
                 className="px-3 py-1.5 text-xs font-medium text-text-primary border border-border rounded hover:bg-surface-secondary transition-colors"
               >
                 Cancel
@@ -292,7 +314,8 @@ export function Sidebar() {
         </div>
       )}
 
-    </aside>
+      </aside>
+    </>
   )
 }
 

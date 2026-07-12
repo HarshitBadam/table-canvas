@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useReportStore } from '@/report/reportStore'
 import { useApp, useAppAuth } from '@/state/AppContext'
-import { exportReportToPDF } from '@/report/pdfExport'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { focusMenuItem } from '@/lib/focusMenuItem'
 import { useNavigation } from './NavigationContext'
@@ -16,7 +15,7 @@ interface AppHeaderProps {
   selectedNode: ProjectNode | null
   exportState: ProjectExportState
   onBackToCanvas: () => void
-  onOpenDashboard: () => void
+  onOpenNavigation: () => void
 }
 
 export function AppHeader({
@@ -24,7 +23,7 @@ export function AppHeader({
   selectedNode,
   exportState,
   onBackToCanvas,
-  onOpenDashboard,
+  onOpenNavigation,
 }: AppHeaderProps) {
   const { user, logout } = useAppAuth()
   const { isSaving } = useApp()
@@ -83,6 +82,7 @@ export function AppHeader({
     setReportExportError(null)
     try {
       await useReportStore.getState().flushSaves()
+      const { exportReportToPDF } = await import('@/report/pdfExport')
       await exportReportToPDF(reportContent as HTMLElement, {
         reportName: report.name || 'Report',
       })
@@ -94,7 +94,17 @@ export function AppHeader({
   }, [])
 
   return (
-    <header className="h-12 border-b border-border bg-surface flex items-center px-4 gap-4">
+    <header className="safe-area-top flex min-h-12 shrink-0 items-center gap-2 border-b border-border bg-surface px-2 sm:gap-4 sm:px-4">
+      <button
+        type="button"
+        onClick={onOpenNavigation}
+        className="btn btn-ghost min-h-11 min-w-11 shrink-0 p-0 lg:hidden"
+        aria-label="Open navigation"
+      >
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
       {viewMode === 'grid' && selectedNode && (
         <GridHeaderContent
           selectedNode={selectedNode}
@@ -113,30 +123,30 @@ export function AppHeader({
       {viewMode === 'report' && (
         <>
           <BackToCanvasButton onClick={onBackToCanvas} />
-          <div className="h-6 w-px bg-border" />
-          <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="hidden h-6 w-px bg-border sm:block" />
+          <svg className="hidden w-4 h-4 text-text-tertiary sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <span className="text-sm font-medium">Report</span>
+          <span className="hidden text-sm font-medium sm:inline">Report</span>
           <div className="flex-1" />
           {reportExportError && (
-            <span className="text-xs text-red-600" role="alert">{reportExportError}</span>
+            <span className="sr-only max-w-48 truncate text-xs text-error-text md:not-sr-only md:inline" role="alert">{reportExportError}</span>
           )}
           <button
             onClick={handleExportPDF}
             disabled={isExportingReport}
-            className="btn btn-secondary gap-2 text-sm"
+            className="btn btn-secondary min-h-11 min-w-11 gap-2 p-0 text-sm sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5"
+            aria-label={isExportingReport ? 'Exporting report' : 'Export report as PDF'}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            {isExportingReport ? 'Exporting…' : 'Export PDF'}
+            <span className="hidden sm:inline">{isExportingReport ? 'Exporting…' : 'Export PDF'}</span>
           </button>
         </>
       )}
       {viewMode === 'canvas' && (
         <>
-          <span className="text-sm font-medium text-text-secondary">Table Canvas</span>
           <div className="flex-1" />
 
           {exportError && (
@@ -155,6 +165,12 @@ export function AppHeader({
             className="relative"
             ref={dropdownRef}
             onKeyDown={handleExportMenuKeyDown}
+            onBlur={(event) => {
+              const nextTarget = event.relatedTarget
+              if (!nextTarget || !event.currentTarget.contains(nextTarget as Node)) {
+                setExportDropdownOpen(false)
+              }
+            }}
           >
             <button
               ref={exportButtonRef}
@@ -163,7 +179,8 @@ export function AppHeader({
               aria-haspopup="menu"
               aria-expanded={exportDropdownOpen}
               aria-controls="project-export-menu"
-              className="btn btn-secondary gap-2"
+              aria-label="Export"
+              className="btn btn-secondary min-h-11 min-w-11 gap-2 p-0 sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5"
             >
               {(isExporting || isImporting) ? (
                 <>
@@ -177,7 +194,7 @@ export function AppHeader({
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                   </svg>
-                  Export
+                  <span className="hidden sm:inline">Export</span>
                   <svg className="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -189,7 +206,6 @@ export function AppHeader({
               <ProjectActionsMenu
                 onExport={handleExport}
                 onImport={handleImportClick}
-                onDashboard={() => { setExportDropdownOpen(false); onOpenDashboard() }}
               />
             )}
           </div>
@@ -236,37 +252,39 @@ export function AppHeader({
       {isSaving && (
         <div className="flex items-center gap-1.5 text-text-tertiary" role="status" aria-live="polite">
           <LoadingSpinner size="sm" className="w-3 h-3" />
-          <span className="text-xs">Saving...</span>
+          <span className="hidden text-xs sm:inline">Saving...</span>
         </div>
       )}
 
-      <div className="h-6 w-px bg-border ml-2" />
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-text-secondary">{user?.name || user?.email}</span>
-        {user?.id !== 'local-user' && (
-          <button
-            onClick={logout}
-            className="btn btn-ghost text-xs px-2 py-1"
-            title="Sign out"
-            aria-label="Sign out"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
-        )}
-      </div>
+      {user?.id !== 'local-user' && (
+        <>
+          <div className="ml-2 hidden h-6 w-px bg-border md:block" />
+          <div className="flex items-center gap-2">
+            <span className="hidden max-w-40 truncate text-sm text-text-secondary md:inline">{user?.name || user?.email}</span>
+            <button
+              onClick={logout}
+              className="btn btn-ghost min-h-11 min-w-11 p-0 text-xs md:min-h-0 md:min-w-0 md:px-2 md:py-1"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+          </div>
+        </>
+      )}
     </header>
   )
 }
 
 function BackToCanvasButton({ onClick }: { onClick: () => void }) {
   return (
-    <button onClick={onClick} className="btn btn-ghost gap-2">
+    <button onClick={onClick} className="btn btn-ghost min-h-11 min-w-11 shrink-0 gap-2 p-0 sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5" aria-label="Back to Canvas">
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
       </svg>
-      Canvas
+      <span className="hidden sm:inline">Canvas</span>
     </button>
   )
 }
@@ -275,16 +293,11 @@ function GridHeaderContent({ selectedNode, onBackToCanvas }: { selectedNode: Pro
   return (
     <>
       <BackToCanvasButton onClick={onBackToCanvas} />
-      <div className="h-6 w-px bg-border" />
-      <span className="text-sm font-medium">{selectedNode.name}</span>
-      <span className="badge badge-blue">
+      <div className="hidden h-6 w-px bg-border sm:block" />
+      <span className="min-w-0 max-w-36 truncate text-sm font-medium sm:max-w-56">{selectedNode.name}</span>
+      <span className={`badge hidden md:inline-flex ${selectedNode.kind === 'source_table' ? 'badge-accent' : 'badge-purple'}`}>
         {selectedNode.kind === 'source_table' ? 'Source - Editable' : 'Derived - View Only'}
       </span>
-      {selectedNode.kind === 'source_table' && (
-        <span className="text-xs text-text-tertiary ml-2">
-          Double-click a cell or press Enter to edit
-        </span>
-      )}
       <div className="flex-1" />
     </>
   )
@@ -306,13 +319,12 @@ function ChartHeaderContent({
   return (
     <>
       <BackToCanvasButton onClick={onBackToCanvas} />
-      <div className="h-6 w-px bg-border" />
-      <span className="text-sm font-medium">{selectedNode.name}</span>
-      <span className="badge badge-purple">Chart</span>
+      <div className="hidden h-6 w-px bg-border sm:block" />
+      <span className="min-w-0 max-w-36 truncate text-sm font-medium sm:max-w-56">{selectedNode.name}</span>
       {chartNode.plan.sourceTableId && (
         <button
           onClick={() => openTable(chartNode.plan.sourceTableId)}
-          className="text-xs text-accent-green hover:underline ml-2"
+          className="ml-2 hidden max-w-48 truncate text-xs text-accent-green hover:underline xl:inline"
         >
           Source: {sourceTableName}
         </button>
@@ -326,8 +338,8 @@ function SimpleHeaderContent({ label, onBackToCanvas }: { label: string; onBackT
   return (
     <>
       <BackToCanvasButton onClick={onBackToCanvas} />
-      <div className="h-6 w-px bg-border" />
-      <span className="text-sm font-medium">{label}</span>
+      <div className="hidden h-6 w-px bg-border sm:block" />
+      <span className="min-w-0 truncate text-sm font-medium">{label}</span>
       <div className="flex-1" />
     </>
   )

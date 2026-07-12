@@ -48,12 +48,18 @@ test.describe('@ux visual regression contract', () => {
     await freezeVisualMotion(page)
     await createManualTable(page, 'Visual Left')
     await createManualTable(page, 'Visual Right')
-    await page.getByRole('button', { name: 'Auto-Arrange' }).click()
+    await page.getByRole('button', { name: 'Arrange horizontally' }).click()
 
     const nodes = page.locator('.react-flow__node')
-    await nodes.filter({ hasText: 'Visual Left' }).locator('.table-handle-right').first()
+    const leftNode = nodes.filter({
+      has: page.getByRole('heading', { name: 'Visual Left', exact: true }),
+    })
+    const rightNode = nodes.filter({
+      has: page.getByRole('heading', { name: 'Visual Right', exact: true }),
+    })
+    await leftNode.locator('.table-handle-right').first()
       .dragTo(
-        nodes.filter({ hasText: 'Visual Right' }).locator('.table-handle-left').first(),
+        rightNode.locator('.table-handle-left').first(),
         { force: true },
       )
     await expect(page.getByRole('dialog', { name: 'Combine Tables' })).toBeVisible()

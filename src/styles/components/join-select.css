@@ -8,67 +8,49 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #fff;
-  border: 1.5px solid rgba(0, 0, 0, 0.1);
-  border-radius: 10px;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .join-select-btn:hover {
-  border-color: rgba(0, 0, 0, 0.2);
-}
-
-[data-theme="dark"] .join-select-btn {
-  background: #252525;
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-[data-theme="dark"] .join-select-btn:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--color-text-tertiary);
 }
 
 .join-select-value {
   flex: 1;
   font-size: 13px;
   font-weight: 500;
-  color: #111;
+  color: var(--color-text-primary);
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-[data-theme="dark"] .join-select-value {
-  color: #fff;
-}
-
 .join-select-type {
   font-size: 10px;
   font-weight: 600;
-  color: #999;
+  color: var(--color-text-tertiary);
   text-transform: uppercase;
   padding: 2px 6px;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--color-surface-tertiary);
   border-radius: 4px;
-}
-
-[data-theme="dark"] .join-select-type {
-  background: rgba(255, 255, 255, 0.08);
-  color: #666;
 }
 
 .join-select-placeholder {
   flex: 1;
   font-size: 13px;
-  color: #999;
+  color: var(--color-text-tertiary);
   text-align: left;
 }
 
 .join-select-arrow {
   width: 16px;
   height: 16px;
-  color: #999;
+  color: var(--color-text-tertiary);
   flex-shrink: 0;
 }
 
@@ -77,10 +59,10 @@
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   z-index: 100;
   overflow: hidden;
   animation: join-dropdown-in 0.15s ease-out;
@@ -91,28 +73,18 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-[data-theme="dark"] .join-select-popup {
-  background: #252525;
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-}
-
 .join-select-search-wrap {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-[data-theme="dark"] .join-select-search-wrap {
-  border-color: rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .join-select-search-icon {
   width: 14px;
   height: 14px;
-  color: #999;
+  color: var(--color-text-tertiary);
   flex-shrink: 0;
 }
 
@@ -121,16 +93,12 @@
   border: none;
   background: none;
   font-size: 13px;
-  color: #111;
+  color: var(--color-text-primary);
   outline: none;
 }
 
 .join-select-search::placeholder {
-  color: #999;
-}
-
-[data-theme="dark"] .join-select-search {
-  color: #fff;
+  color: var(--color-text-tertiary);
 }
 
 .join-select-list {
@@ -154,47 +122,35 @@
 }
 
 .join-select-option:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--color-surface-secondary);
 }
 
 .join-select-option.selected {
-  background: rgba(34, 197, 94, 0.08);
-}
-
-[data-theme="dark"] .join-select-option:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-[data-theme="dark"] .join-select-option.selected {
-  background: rgba(34, 197, 94, 0.12);
+  background: rgb(var(--color-accent-rgb) / 0.1);
 }
 
 .join-select-option-name {
   flex: 1;
   font-size: 13px;
-  color: #111;
-}
-
-[data-theme="dark"] .join-select-option-name {
-  color: #fff;
+  color: var(--color-text-primary);
 }
 
 .join-select-option-type {
   font-size: 10px;
   font-weight: 600;
-  color: #999;
+  color: var(--color-text-tertiary);
   text-transform: uppercase;
 }
 
 .join-select-check {
   width: 14px;
   height: 14px;
-  color: #22c55e;
+  color: var(--color-accent-text);
 }
 
 .join-select-empty {
   padding: 20px;
   text-align: center;
   font-size: 13px;
-  color: #999;
+  color: var(--color-text-tertiary);
 }

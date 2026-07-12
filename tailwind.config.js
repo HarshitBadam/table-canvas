@@ -1,15 +1,3 @@
-/** @type {import('tailwindcss').Config} */
-
-/**
- * Tailwind CSS Configuration
- * 
- * Design System Integration:
- * - 4px base grid spacing system
- * - WCAG AA compliant colors
- * - Modular typography scale (1.25 ratio)
- * - Consistent border radius scale
- */
-
 export default {
   content: [
     "./index.html",
@@ -19,11 +7,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        // CSS variable-based colors for runtime theming
         canvas: 'var(--color-canvas)',
         surface: {
           DEFAULT: 'var(--color-surface)',
-          secondary: 'var(--color-surface-secondary)',
+          secondary: 'rgb(var(--color-surface-secondary-rgb) / <alpha-value>)',
           tertiary: 'var(--color-surface-tertiary)',
         },
         border: {
@@ -37,72 +24,39 @@ export default {
           secondary: 'var(--color-text-secondary)',
           tertiary: 'var(--color-text-tertiary)',
         },
-        
-        // Primary palette - Excel Green Theme (WCAG AA: 4.5:1)
-        primary: {
-          50: '#e6f4ea',
-          100: '#c2e5cd',
-          200: '#9bd6af',
-          300: '#72c690',
-          400: '#52ba79',
-          500: '#217346',
-          600: '#185c37',
-          700: '#124a2c',
-          800: '#0c3820',
-          900: '#062614',
-        },
-        
-        // Accent colors - Semantic palette
         accent: {
-          green: 'var(--color-accent)',
+          green: 'rgb(var(--color-accent-rgb) / <alpha-value>)',
           'green-hover': 'var(--color-accent-hover)',
-          blue: '#3b82f6',
-          orange: 'var(--color-warning)',
+          text: 'var(--color-accent-text)',
+          orange: 'rgb(var(--color-warning-rgb) / <alpha-value>)',
           red: 'var(--color-error)',
-          purple: '#a855f7',
-          teal: '#14b8a6',
+          purple: 'rgb(var(--color-node-derived-rgb) / <alpha-value>)',
         },
-        
-        // Semantic colors
         success: {
-          light: '#dcfce7',
-          DEFAULT: '#22c55e',
-          dark: '#166534',
+          light: 'var(--color-success-soft)',
+          DEFAULT: 'rgb(var(--color-success-rgb) / <alpha-value>)',
+          dark: 'var(--color-accent-text)',
         },
         warning: {
-          light: '#fef3c7',
-          DEFAULT: '#f59e0b',
-          dark: '#92400e',
+          light: 'var(--color-warning-soft)',
+          DEFAULT: 'rgb(var(--color-warning-rgb) / <alpha-value>)',
+          text: 'var(--color-warning-text)',
+          dark: 'var(--color-warning-text)',
         },
         error: {
-          light: '#fee2e2',
-          DEFAULT: '#ef4444',
-          dark: '#991b1b',
+          light: 'var(--color-error-soft)',
+          DEFAULT: 'rgb(var(--color-error-rgb) / <alpha-value>)',
+          text: 'var(--color-error-text)',
+          dark: 'var(--color-error-text)',
         },
-        info: {
-          light: '#dbeafe',
-          DEFAULT: '#3b82f6',
-          dark: '#1e40af',
-        },
-        
-        // Node colors for canvas (CSS variable-based for theme support)
         node: {
           source: 'var(--color-node-source)',
           'source-border': 'var(--color-node-source-border)',
           derived: 'var(--color-node-derived)',
           'derived-border': 'var(--color-node-derived-border)',
+          'derived-text': 'var(--color-node-derived-text)',
           chart: 'var(--color-node-chart)',
           'chart-border': 'var(--color-node-chart-border)',
-        },
-        
-        // Chart colors - Accessible palette
-        chart: {
-          blue: '#3b82f6',
-          green: '#22c55e',
-          orange: '#f59e0b',
-          purple: '#a855f7',
-          teal: '#14b8a6',
-          pink: '#ec4899',
         },
       },
       
@@ -167,7 +121,7 @@ export default {
         'none': '0px',
         'sm': '4px',
         'DEFAULT': '8px',
-        'md': '10px',
+        'md': '8px',
         'lg': '12px',
         'xl': '16px',
         '2xl': '20px',

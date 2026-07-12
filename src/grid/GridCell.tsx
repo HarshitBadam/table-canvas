@@ -37,6 +37,7 @@ export function GridCell({
     autofillColumnId,
     handleAutofillStart,
     handleAutofillMove,
+    handleAutofillOneRow,
     highlightedCells,
     isDraggingSelectionRef,
     columns,
@@ -206,7 +207,7 @@ export function GridCell({
       ) : (
         <>
           {isInAutofillRange && autofillPreviewValue !== undefined ? (
-            <span className="truncate w-full text-green-400 dark:text-green-300 italic">
+            <span className="truncate w-full text-accent-text italic">
               {formattedPreviewValue || '(empty)'}
             </span>
           ) : (
@@ -216,16 +217,29 @@ export function GridCell({
           )}
 
           {showFillHandle && (
-            <div
+            <button
+              type="button"
+              aria-label={`Fill ${column.name} down one row`}
               onMouseDown={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
                 handleAutofillStart(rowIndex, column.id)
               }}
-              className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 cursor-crosshair z-10 hover:bg-green-600"
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                event.stopPropagation()
+                handleAutofillOneRow(rowIndex, column.id)
+              }}
+              className="grid-autofill-handle group absolute bottom-0 right-0 z-10 h-3 w-3 cursor-crosshair bg-transparent p-0"
               style={{ transform: 'translate(50%, 50%)' }}
-              title="Drag to fill cells below"
-            />
+              title="Drag to fill cells below, or press Enter to fill one row"
+            >
+              <span
+                aria-hidden="true"
+                className="absolute bottom-0 right-0 h-3 w-3 bg-accent-green transition-colors group-hover:bg-accent-green-hover"
+              />
+            </button>
           )}
         </>
       )}

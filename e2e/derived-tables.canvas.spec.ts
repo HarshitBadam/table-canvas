@@ -7,7 +7,7 @@ test.describe('Canvas and table behavior', () => {
   })
 
   test('empty-state actions create a real table node with exact metadata', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Welcome to Table Canvas' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Start with a table' })).toBeVisible()
     await page.locator('.react-flow').getByRole('button', { name: 'New Table' }).click()
 
     const dialog = page.getByRole('dialog', { name: 'Create New Table' })
@@ -32,7 +32,7 @@ test.describe('Canvas and table behavior', () => {
     await expect(page.getByText('Source - Editable')).toBeVisible()
     await expect(page.getByRole('grid', { name: 'Table data' })).toBeVisible()
     await expect(page.getByRole('gridcell')).toHaveCount(10)
-    await page.locator('main').getByRole('button', { name: 'Canvas', exact: true }).click()
+    await page.getByRole('button', { name: 'Back to Canvas' }).click()
 
     await expect(page.locator('.react-flow__node').filter({
       hasText: 'Navigation Contract',

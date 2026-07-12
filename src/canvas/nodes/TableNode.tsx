@@ -21,6 +21,8 @@ interface TableNodeData {
   }
   viewFilters?: ViewFilterConfig
   onSetViewMode: (nodeId: string, mode: NodeViewMode) => void
+  connectableTargets: Array<{ id: string; name: string }>
+  onConnectTo: (sourceId: string, targetId: string) => void
 }
 
 
@@ -83,8 +85,8 @@ function ViewModeDropdown({
           setIsOpen(!isOpen)
         }}
         className={`
-          flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium
-          ${isSource ? 'text-[#217346]' : 'text-violet-600 dark:text-violet-400'}
+          flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium
+          ${isSource ? 'text-accent-text' : 'text-node-derived-text'}
           hover:bg-black/5 dark:hover:bg-white/10
           active:bg-black/10 dark:active:bg-white/15
           transition-colors
@@ -104,7 +106,7 @@ function ViewModeDropdown({
 
       {isOpen && (
         <div 
-          className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[100px]"
+          className="absolute right-0 top-full mt-1 z-50 bg-surface rounded-lg shadow-xl border border-border py-1 min-w-[100px]"
           onClick={(e) => e.stopPropagation()}
         >
           {(Object.keys(VIEW_MODE_CONFIG) as NodeViewMode[]).map((mode) => (
@@ -112,12 +114,12 @@ function ViewModeDropdown({
               key={mode}
               onClick={() => handleSelect(mode)}
               className={`
-                w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-left
+                w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left
                 ${mode === currentMode 
-                  ? isSource 
-                    ? 'bg-green-50 dark:bg-[#1a2e22]/50 text-[#217346] dark:text-[#7ab892]' 
-                    : 'bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'
-                  : 'text-text-primary hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  ? isSource
+                    ? 'bg-accent-green/10 text-accent-text'
+                    : 'bg-node-derived text-node-derived-text'
+                  : 'text-text-primary hover:bg-surface-secondary'
                 }
               `}
             >
@@ -154,7 +156,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
       style={{
         width: NODE_WIDTH,
         boxShadow: selected
-          ? `0 0 0 2px ${isSource ? '#217346' : 'rgb(139 92 246)'}, 0 12px 40px -8px rgba(0,0,0,0.25), 0 4px 16px -4px rgba(0,0,0,0.15)`
+          ? `0 0 0 2px ${isSource ? 'var(--color-node-source-border)' : 'var(--color-node-derived-border)'}, 0 12px 40px -8px rgba(0,0,0,0.25), 0 4px 16px -4px rgba(0,0,0,0.15)`
           : '0 4px 16px -4px rgba(0,0,0,0.15), 0 12px 32px -8px rgba(0,0,0,0.12), 0 0 0 1px var(--color-border-elevation)',
       }}
     >
@@ -164,22 +166,28 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0
             ${isSource 
               ? 'bg-accent-green shadow-md shadow-accent-green/30' 
-              : 'bg-violet-500 shadow-md shadow-violet-500/30'
+              : 'bg-accent-purple shadow-md shadow-accent-purple/30'
             }
           `}>
-            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
+            {isSource ? (
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3zM4 7v10c0 1.657 3.582 3 8 3s8-1.343 8-3V7M4 12c0 1.657 3.582 3 8 3s8-1.343 8-3" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            )}
           </div>
           
           <div className="flex-1 min-w-0">
-            <h3 className="text-[14px] font-semibold text-text-primary truncate tracking-tight">
+            <h3 className="text-sm font-semibold text-text-primary truncate tracking-tight">
               {data.name}
             </h3>
-            <p className="text-[12px] text-text-secondary mt-0.5 flex items-center gap-1.5">
+            <p className="text-xs text-text-secondary mt-0.5 flex items-center gap-1.5">
               {formatNumber(rowCount)} rows · {colCount} cols
               {hasFilters && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-[#1a2e22]/60 text-emerald-600 dark:text-[#7ab892] text-[10px] font-medium">
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent-green/10 text-accent-text text-xs font-medium">
                   <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                   </svg>
@@ -204,14 +212,14 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
               {schema.columns.slice(0, 4).map((col) => {
                 return (
                   <div key={col.id} className="flex items-center justify-between gap-3">
-                    <span className="text-[13px] text-text-primary truncate">{col.name}</span>
+                    <span className="text-xs text-text-primary truncate">{col.name}</span>
                     <ColumnTypeBadge type={col.type} />
                   </div>
                 )
               })}
             </div>
             {schema.columns.length > 4 && (
-              <div className="text-[11px] text-text-tertiary mt-3 pt-2 border-t border-border-subtle">
+              <div className="text-xs text-text-tertiary mt-3 pt-2 border-t border-border-subtle">
                 +{schema.columns.length - 4} more
               </div>
             )}
@@ -231,7 +239,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
 
         
         {data.cacheInfo?.error && (
-          <div className="px-4 py-2.5 text-[12px] font-medium text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 flex items-center gap-2">
+          <div className="px-4 py-2.5 text-xs font-medium text-error-text bg-error/10 flex items-center gap-2">
             <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -242,18 +250,43 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
         )}
         
         {data.cacheInfo?.isComputing && !data.cacheInfo?.error && (
-          <div className="px-4 py-2.5 text-[12px] font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 flex items-center gap-2">
+          <div className="px-4 py-2.5 text-xs font-medium text-text-secondary bg-surface-secondary flex items-center gap-2">
             <LoadingSpinner size="sm" />
             Computing...
           </div>
         )}
         
         {data.cacheInfo?.isDirty && !data.cacheInfo?.error && !data.cacheInfo?.isComputing && (
-          <div className="px-4 py-2.5 text-[12px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 flex items-center gap-2">
+          <div className="px-4 py-2.5 text-xs font-medium text-warning-text bg-warning/10 flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
             Needs refresh
+          </div>
+        )}
+
+        {data.connectableTargets.length > 0 && (
+          <div className="px-4 py-3 border-t border-border-subtle">
+            <label className="sr-only" htmlFor={`connect-${data.id}`}>
+              Connect {data.name} to another table
+            </label>
+            <select
+              id={`connect-${data.id}`}
+              value=""
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => {
+                event.stopPropagation()
+                if (event.target.value) data.onConnectTo(data.id, event.target.value)
+              }}
+              className="input w-full text-xs"
+            >
+              <option value="">Connect to…</option>
+              {data.connectableTargets.map(target => (
+                <option key={target.id} value={target.id}>
+                  {target.name}
+                </option>
+              ))}
+            </select>
           </div>
         )}
       </div>

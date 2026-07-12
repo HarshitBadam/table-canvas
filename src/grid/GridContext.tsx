@@ -67,12 +67,15 @@ export interface GridContextValue {
   autofillColumnId: React.MutableRefObject<string | null>
   handleAutofillStart: (rowIndex: number, columnId: string) => void
   handleAutofillMove: (targetRowIndex: number) => void
+  handleAutofillOneRow: (rowIndex: number, columnId: string) => void
 
   filters: { conditions: { columnId: string }[] }
   handleToggleFilters: () => void
 
   resizingColumn: string | null
   handleResizeStart: (columnId: string, e: React.MouseEvent) => void
+  resizeColumnBy: (columnId: string, delta: number) => void
+  setColumnWidth: (columnId: string, width: number) => void
 
   highlightedCells: Set<string> | undefined
 

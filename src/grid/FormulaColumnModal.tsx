@@ -7,6 +7,7 @@ import {
   FormulaSuggestion,
   getFunctionsByCategory,
 } from '@/formula'
+import { useDialogFocus } from '@/components/useDialogFocus'
 
 interface FormulaColumnModalProps {
   isOpen: boolean
@@ -25,6 +26,7 @@ export function FormulaColumnModal({
   onConfirm,
   onCancel,
 }: FormulaColumnModalProps) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(isOpen, onCancel)
   const [columnName, setColumnName] = useState('')
   const [isFormula, setIsFormula] = useState(false)
   const [formula, setFormula] = useState('')
@@ -104,8 +106,7 @@ export function FormulaColumnModal({
       e.preventDefault()
       handleConfirm()
     }
-    if (e.key === 'Escape') onCancel()
-  }, [columnName, isFormula, formulaErrors, handleConfirm, onCancel])
+  }, [columnName, isFormula, formulaErrors, handleConfirm])
 
   const insertIntoFormula = useCallback((text: string) => {
     setFormula(prev => prev + text)
@@ -115,18 +116,19 @@ export function FormulaColumnModal({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-2 sm:p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
       <div 
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-column-title"
         aria-describedby="new-column-description"
-        className={`bg-white dark:bg-gray-900 rounded-xl shadow-xl overflow-hidden flex flex-col transition-all duration-200 ${
-          isFormula ? 'w-[520px] max-w-[95vw]' : 'w-[380px] max-w-[90vw]'
+        tabIndex={-1}
+        className={`flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-xl bg-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${
+          isFormula ? 'w-[520px] max-w-full' : 'w-[380px] max-w-full'
         }`}
-        style={{ maxHeight: '85vh' }}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
@@ -152,18 +154,18 @@ export function FormulaColumnModal({
           </div>
 
           <div>
-            <span className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            <span className="block text-xs font-medium text-text-secondary mb-1.5">
               Column Type
             </span>
-            <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            <div className="flex p-1 bg-surface-secondary rounded-lg">
               <button
                 type="button"
                 onClick={() => setIsFormula(false)}
                 aria-pressed={!isFormula}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
                   !isFormula
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+                    ? 'bg-surface text-text-primary shadow-sm'
+                    : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 <span className="font-semibold">T</span>
@@ -175,11 +177,11 @@ export function FormulaColumnModal({
                 aria-pressed={isFormula}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
                   isFormula
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+                    ? 'bg-surface text-text-primary shadow-sm'
+                    : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
-                <span className="italic font-serif">fx</span>
+                <span className="font-mono">fx</span>
                 Formula
               </button>
             </div>
@@ -238,7 +240,7 @@ export function FormulaColumnModal({
             <>
               {formulaSuggestions.length > 0 && (
                 <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800">
-                  <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide mb-2">
+                  <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide mb-2">
                     Suggested Formula
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -264,7 +266,7 @@ export function FormulaColumnModal({
                 <div className="flex items-center justify-between mb-1.5">
                   <label htmlFor="formula-column-expression" className="text-xs font-medium text-gray-700 dark:text-gray-300">Formula</label>
                   {formula && !formulaErrors.length && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">
                       Returns {inferredType}
                     </span>
                   )}
@@ -292,7 +294,7 @@ export function FormulaColumnModal({
               <div className="flex gap-3" style={{ height: '200px' }}>
                 <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Columns</span>
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Columns</span>
                   </div>
                   <div className="flex-1 overflow-y-auto p-1.5">
                     {columnInfo.map((col) => (
@@ -302,7 +304,7 @@ export function FormulaColumnModal({
                         onClick={() => insertIntoFormula(`[${col.name}]`)}
                         className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-white dark:hover:bg-gray-700 transition-colors group"
                       >
-                        <span className={`w-5 h-5 rounded text-[10px] font-bold flex items-center justify-center flex-shrink-0 ${
+                        <span className={`w-5 h-5 rounded text-xs font-bold flex items-center justify-center flex-shrink-0 ${
                           col.type === 'number' ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-600' :
                           col.type === 'date' ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600' :
                           col.type === 'boolean' ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-600' :
@@ -318,13 +320,13 @@ export function FormulaColumnModal({
 
                 <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Functions</span>
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Functions</span>
                   </div>
                   <div className="flex-1 overflow-y-auto">
                     {Object.entries(functionCategories).map(([category, funcs]) => (
                       funcs.length > 0 && (
                         <div key={category}>
-                          <div className="px-3 py-1 text-[9px] font-semibold text-gray-400 uppercase tracking-wider sticky top-0 bg-gray-50 dark:bg-gray-800/50">
+                          <div className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider sticky top-0 bg-gray-50 dark:bg-gray-800/50">
                             {category}
                           </div>
                           {funcs.map((fn) => (
@@ -337,7 +339,7 @@ export function FormulaColumnModal({
                               <div className="text-xs font-mono font-semibold text-green-600 dark:text-green-500">
                                 {fn.name}
                               </div>
-                              <div className="text-[10px] text-gray-500 leading-tight">
+                              <div className="text-xs text-gray-500 leading-tight">
                                 {fn.description}
                               </div>
                             </button>

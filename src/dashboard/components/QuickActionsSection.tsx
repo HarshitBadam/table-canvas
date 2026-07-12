@@ -72,22 +72,16 @@ export function QuickActionsSection({
   if (isLoading) {
     return (
       <div>
-        <div className="mb-4">
-          <h2 className="text-base font-semibold text-text-primary">Suggested Actions</h2>
-          <p className="text-sm text-text-tertiary">Recommendations based on your data</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h2 className="mb-3 text-base font-semibold text-text-primary">Suggested Actions</h2>
+        <div className="divide-y divide-border border-y border-border">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-surface rounded-xl border border-border p-5 animate-pulse">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-surface-secondary rounded-lg" />
-                <div className="flex-1">
-                  <div className="h-4 w-32 bg-surface-secondary rounded mb-2" />
-                  <div className="h-3 w-20 bg-surface-secondary rounded" />
-                </div>
+            <div key={i} className="flex animate-pulse items-center gap-3 py-4">
+              <div className="h-8 w-8 shrink-0 rounded bg-surface-secondary" />
+              <div className="min-w-0 flex-1">
+                <div className="mb-2 h-4 w-40 rounded bg-surface-secondary" />
+                <div className="h-3 w-64 max-w-full rounded bg-surface-secondary" />
               </div>
-              <div className="h-3 w-full bg-surface-secondary rounded mb-4" />
-              <div className="h-10 w-full bg-surface-secondary rounded-lg" />
+              <div className="h-8 w-24 rounded bg-surface-secondary" />
             </div>
           ))}
         </div>
@@ -98,53 +92,39 @@ export function QuickActionsSection({
   if (topSuggestions.length === 0) {
     return (
       <div>
-        <div className="mb-4">
-          <h2 className="text-base font-semibold text-text-primary">Suggested Actions</h2>
-          <p className="text-sm text-text-tertiary">Recommendations based on your data</p>
-        </div>
-        <div className="bg-surface rounded-xl border border-border p-8 text-center">
-          <p className="text-text-tertiary">
-            No suggestions yet. Import more data to discover insights.
-          </p>
-        </div>
+        <h2 className="mb-3 text-base font-semibold text-text-primary">Suggested Actions</h2>
+        <p className="border-y border-border py-5 text-sm text-text-tertiary">
+          No suggestions yet. Import more data to discover insights.
+        </p>
       </div>
     )
   }
 
   return (
     <div>
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-text-primary">Suggested Actions</h2>
-        <p className="text-sm text-text-tertiary">Recommendations based on your data</p>
-      </div>
+      <h2 className="mb-3 text-base font-semibold text-text-primary">Suggested Actions</h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="divide-y divide-border border-y border-border">
         {topSuggestions.map((suggestion) => (
-          <div
-            key={suggestion.id}
-            className="bg-surface rounded-xl border border-border p-5 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-start gap-3 mb-4">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getCategoryColor(suggestion.category)}`}>
-                {getSuggestionIcon(suggestion)}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-text-primary leading-tight">
-                  {suggestion.title}
-                </h4>
-                <button
-                  onClick={() => openTable(suggestion.context.tableId)}
-                  className="text-xs text-text-tertiary hover:text-accent-green transition-colors"
-                >
-                  View table
-                </button>
-              </div>
+          <div key={suggestion.id} className="flex items-center gap-3 py-4">
+            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${getCategoryColor(suggestion.category)}`}>
+              {getSuggestionIcon(suggestion)}
             </div>
 
-            <p className="text-sm text-text-secondary mb-4 line-clamp-2">
-              {suggestion.description}
-            </p>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-medium text-text-primary">
+                {suggestion.title}
+              </h3>
+              <p className="mt-0.5 line-clamp-1 text-sm text-text-secondary">
+                {suggestion.description}
+              </p>
+              <button
+                onClick={() => openTable(suggestion.context.tableId)}
+                className="mt-1 text-xs text-text-tertiary transition-colors hover:text-accent-green"
+              >
+                View source table
+              </button>
+            </div>
 
             <button
               onClick={() => {
@@ -154,7 +134,7 @@ export function QuickActionsSection({
                   onApply(suggestion)
                 }
               }}
-              className="w-full px-4 py-2.5 text-sm font-medium bg-accent-green text-white rounded-lg hover:bg-accent-green/90 transition-colors"
+              className="btn btn-secondary shrink-0"
             >
               {getActionLabel(suggestion)}
             </button>

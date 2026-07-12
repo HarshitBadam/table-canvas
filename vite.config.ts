@@ -70,15 +70,12 @@ export default defineConfig({
         // single chunk balloons past the size warning threshold. Each group
         // below is a self-contained library that is safe to isolate.
         manualChunks(id) {
+          if (id.includes('commonjsHelpers')) return 'vendor-runtime'
           if (!id.includes('node_modules')) return
           if (id.includes('@duckdb')) return 'duckdb'
           if (id.includes('/xlsx/') || id.includes('/xlsx@')) return 'xlsx'
-          if (id.includes('recharts') || id.includes('/d3-') || id.includes('victory-vendor')) return 'charts'
-          if (id.includes('@tiptap') || id.includes('prosemirror')) return 'editor'
-          if (id.includes('reactflow') || id.includes('@reactflow') || id.includes('/dagre/') || id.includes('/graphlib/')) return 'flow'
           if (id.includes('html2canvas')) return 'html2canvas'
           if (id.includes('html2pdf')) return 'html2pdf'
-          if (id.includes('/jszip/')) return 'jszip'
         },
       },
     },

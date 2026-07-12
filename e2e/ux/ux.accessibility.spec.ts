@@ -48,6 +48,7 @@ test.describe('@ux accessibility contract', () => {
 
     await page.getByRole('button', { name: 'Suggestions', exact: true }).click()
     await expect(page.getByRole('dialog', { name: 'Suggestions' })).toBeVisible()
+    await page.waitForTimeout(250)
     await expectAccessible(page, 'Suggestions panel')
   })
 
@@ -129,6 +130,45 @@ test.describe('@ux keyboard contract', () => {
     await page.keyboard.press('Escape')
     await expect(exportItem).toBeHidden()
     await expect(trigger).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(exportItem).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(exportItem).toBeHidden()
+  })
+
+  test('report insert menu follows menu button keyboard behavior', async ({ page }) => {
+    await bootApp(page)
+    await page.locator('aside').getByRole('button', { name: 'Report', exact: true }).click()
+    await page.getByRole('button', { name: /Blank report/ }).click()
+    await page.waitForTimeout(200)
+
+    const trigger = page.getByRole('button', { name: 'Insert', exact: true })
+    const menu = page.getByRole('menu')
+    const items = menu.getByRole('menuitem')
+    await trigger.focus()
+    await page.keyboard.press('ArrowDown')
+    await expect(items.first()).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(trigger).toBeFocused()
+    await page.keyboard.press('ArrowUp')
+    await expect(items.last()).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(trigger).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(items.first()).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    await expect(items.nth(1)).toBeFocused()
+    await page.keyboard.press('Home')
+    await expect(items.first()).toBeFocused()
+    await page.keyboard.press('End')
+    await expect(items.last()).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    await expect(trigger).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(items.first()).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(menu).toBeHidden()
   })
 
   test('grid cells enter and commit edit mode from the keyboard', async ({ page }) => {
@@ -146,6 +186,40 @@ test.describe('@ux keyboard contract', () => {
     await expect(firstCell).toContainText('Keyboard edit')
   })
 
+  test('column resizing and autofill have keyboard equivalents', async ({ page }) => {
+    await bootApp(page)
+    await createManualTable(page)
+    await openManualTable(page)
+
+    const separator = page.getByRole('separator', { name: 'Resize Name column' })
+    await separator.focus()
+    const initialWidth = Number(await separator.getAttribute('aria-valuenow'))
+    await page.keyboard.press('ArrowRight')
+    await expect(separator).toHaveAttribute('aria-valuenow', String(initialWidth + 10))
+
+    const firstCell = page.getByRole('gridcell', { name: /^Name, row 1:/ })
+    await firstCell.focus()
+    await page.keyboard.press('Enter')
+    await firstCell.locator('input').fill('Repeat me')
+    await page.keyboard.press('Enter')
+
+    const fillButton = firstCell.getByRole('button', { name: 'Fill Name down one row' })
+    await fillButton.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('gridcell', { name: /^Name, row 2:/ })).not.toContainText('(empty)')
+  })
+
+  test('tables can be connected without pointer dragging', async ({ page }) => {
+    await bootApp(page)
+    await createManualTable(page, 'Source Table')
+    await createManualTable(page, 'Target Table')
+    await page.locator('aside').getByRole('button', { name: 'Canvas', exact: true }).click()
+
+    const connectSelect = page.getByLabel('Connect Source Table to another table')
+    await connectSelect.selectOption({ label: 'Target Table' })
+    await expect(page.getByRole('dialog')).toBeVisible()
+  })
+
   test('suggestion tabs use arrow-key navigation', async ({ page }) => {
     await bootApp(page)
     await createManualTable(page)
@@ -159,5 +233,42 @@ test.describe('@ux keyboard contract', () => {
     await expect(cleaningTab).toBeFocused()
     await expect(cleaningTab).toHaveAttribute('aria-controls', 'suggestion-category-panel')
     await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'suggestion-tab-cleaning')
+  })
+})
+
+test.describe('@ux mobile nested dialog contract', () => {
+  test.use({ viewport: { width: 320, height: 700 } })
+
+  test('new table close restores focus to a visible control', async ({ page }) => {
+    await bootApp(page)
+    const openNavigation = page.getByRole('button', { name: 'Open navigation' })
+    await openNavigation.click()
+
+    const sidebar = page.locator('aside')
+    await sidebar.getByRole('button', { name: 'New Table' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Create New Table' })
+    await expect(dialog.getByLabel('Table Name')).toBeFocused()
+
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(sidebar).toHaveClass(/invisible/)
+    await expect(openNavigation).toBeFocused()
+  })
+
+  test('escape closes only the topmost sidebar dialog', async ({ page }) => {
+    await bootApp(page)
+    await page.getByRole('button', { name: 'Open navigation' }).click()
+    await createManualTable(page, 'Nested Dialog Table')
+    await page.getByRole('button', { name: 'Open navigation' }).click()
+
+    const sidebar = page.locator('aside')
+    const trigger = sidebar.getByRole('button', { name: 'Delete Nested Dialog Table' })
+    await trigger.click()
+    const dialog = page.getByRole('alertdialog', { name: 'Delete Node' })
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(sidebar).toBeVisible()
+    await expect(trigger).toBeFocused()
   })
 })

@@ -1,4 +1,4 @@
-import JSZip from 'jszip'
+import type JSZipInstance from 'jszip'
 import { exportProjectFile, loadReportsForProject, loadProject } from './db'
 import { getTableData } from '@/engine/materializationService'
 import type { ProjectNode } from '@/types'
@@ -43,7 +43,7 @@ async function buildReportData(
 }
 
 async function addReports(
-  zip: JSZip,
+  zip: JSZipInstance,
   reports: Awaited<ReturnType<typeof loadReportsForProject>>,
   nodes: Record<string, ProjectNode>,
 ): Promise<void> {
@@ -67,6 +67,7 @@ export async function exportProjectAsZip(
   projectId: string,
   options: ZipExportOptions = {},
 ): Promise<Blob> {
+  const { default: JSZip } = await import('jszip')
   const zip = new JSZip()
   const { includeExcel = true, includeReportHtml = true, onProgress } = options
 

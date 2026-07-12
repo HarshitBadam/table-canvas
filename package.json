@@ -39,6 +39,7 @@
   "dependencies": {
     "@duckdb/duckdb-wasm": "^1.33.1-dev16.0",
     "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "@radix-ui/react-dialog": "^1.1.4",
     "@tanstack/react-virtual": "^3.14.2",
     "@tiptap/extension-highlight": "^3.17.0",
