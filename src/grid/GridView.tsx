@@ -16,6 +16,7 @@ import { useGridEditing } from './useGridEditing'
 import { useGridOperations } from './useGridOperations'
 import { GridProvider, type GridContextValue } from './GridContext'
 import { GridViewport } from './GridViewport'
+import { useNavigation } from '@/layout/NavigationContext'
 
 const SuggestionsPanel = lazy(() => import('@/suggestions/SuggestionsPanel').then(m => ({ default: m.SuggestionsPanel })))
 const ChartBuilder = lazy(() => import('@/charts/ChartBuilder').then(m => ({ default: m.ChartBuilder })))
@@ -25,6 +26,7 @@ interface GridViewProps {
 }
 
 export function GridView({ tableId }: GridViewProps) {
+  const { openCanvas } = useNavigation()
   const toggleCellHighlight = useProjectStore((state) => state.toggleCellHighlight)
   const clearHighlights = useProjectStore((state) => state.clearHighlights)
 
@@ -65,7 +67,7 @@ export function GridView({ tableId }: GridViewProps) {
 
   const {
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
-    handleAutofillStart, handleAutofillMove,
+    handleAutofillStart, handleAutofillMove, handleAutofillOneRow,
   } = useGridAutofill({
     isEditable, columns, rows, selection, cellRangeSelection,
     getDisplayValue, saveSnapshot, setCellValue, tableId,
@@ -82,7 +84,13 @@ export function GridView({ tableId }: GridViewProps) {
     getSelectedCellData, formatClipboardText,
   })
 
-  const { getColumnWidth, handleResizeStart, resizingColumn } = useColumnResize()
+  const {
+    getColumnWidth,
+    handleResizeStart,
+    resizeColumnBy,
+    setColumnWidth,
+    resizingColumn,
+  } = useColumnResize()
 
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showFilterPanel, setShowFilterPanel] = useState(false)
@@ -90,6 +98,21 @@ export function GridView({ tableId }: GridViewProps) {
   const [chartPreselectedColumn, setChartPreselectedColumn] = useState<string | undefined>(undefined)
 
   const totalRows = filteredRows.length
+  const isInitialLoad = (isMaterializing || isComputing) && totalRows === 0 && !tableData?.rows?.length
+  const [loadingElapsedSeconds, setLoadingElapsedSeconds] = useState(0)
+
+  useEffect(() => {
+    if (!isInitialLoad) {
+      setLoadingElapsedSeconds(0)
+      return
+    }
+
+    const startedAt = Date.now()
+    const timer = window.setInterval(() => {
+      setLoadingElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [isInitialLoad, tableId])
 
   useEffect(() => {
     if (!contextMenu) return
@@ -114,8 +137,9 @@ export function GridView({ tableId }: GridViewProps) {
     editingCell, editValue, editError, setEditValue,
     startEditing, commitEdit, cancelEdit, handleContextMenu,
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
-    handleAutofillStart, handleAutofillMove,
+    handleAutofillStart, handleAutofillMove, handleAutofillOneRow,
     filters, handleToggleFilters, resizingColumn, handleResizeStart,
+    resizeColumnBy, setColumnWidth,
     highlightedCells, handleAddRow, handleCellDoubleClick,
     contextMenu,
     filteredRows,
@@ -141,8 +165,9 @@ export function GridView({ tableId }: GridViewProps) {
     editingCell, editValue, editError, setEditValue,
     startEditing, commitEdit, cancelEdit, handleContextMenu,
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
-    handleAutofillStart, handleAutofillMove,
+    handleAutofillStart, handleAutofillMove, handleAutofillOneRow,
     filters, handleToggleFilters, resizingColumn, handleResizeStart,
+    resizeColumnBy, setColumnWidth,
     highlightedCells, handleAddRow, handleCellDoubleClick,
     contextMenu, filteredRows, setContextMenu,
     handleInsertRowAbove, handleInsertRowBelow, handleDeleteRow,
@@ -193,22 +218,46 @@ export function GridView({ tableId }: GridViewProps) {
     )
   }
 
-  if ((isMaterializing || isComputing) && totalRows === 0 && !tableData?.rows?.length) {
+  if (isInitialLoad) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full" aria-busy="true">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-surface">
           <span className="text-sm text-text-secondary">{node.name}</span>
           <div className="flex-1" />
-          <span className="badge badge-blue animate-pulse">{node.kind === 'derived_table' ? 'Computing...' : 'Loading...'}</span>
+          <span className="badge badge-accent animate-pulse">{node.kind === 'derived_table' ? 'Computing...' : 'Loading...'}</span>
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
+          <div className="text-center max-w-md px-6" role="status" aria-live="polite">
             <div className="w-16 h-16 mx-auto mb-4 relative">
               <div className="absolute inset-0 rounded-full border-4 border-green-200 dark:border-green-800" />
               <div className="absolute inset-0 rounded-full border-4 border-green-500 border-t-transparent animate-spin" />
             </div>
             <h3 className="text-lg font-semibold text-text-primary mb-2">{node.kind === 'derived_table' ? 'Computing Table' : 'Loading Table'}</h3>
-            <p className="text-sm text-text-secondary">{node.kind === 'derived_table' ? 'Executing transform and loading data...' : 'Loading table data...'}</p>
+            <p className="text-sm text-text-secondary">
+              {node.kind === 'derived_table' ? 'Executing transform and loading data...' : 'Loading table data...'}
+            </p>
+            {loadingElapsedSeconds >= 8 && (
+              <p className="text-sm text-text-secondary mt-2">
+                This is taking longer than expected. Your table and edits are still safe.
+              </p>
+            )}
+            <div className="flex items-center justify-center gap-2 mt-5">
+              <button type="button" className="btn btn-secondary" onClick={openCanvas}>
+                Back to Canvas
+              </button>
+              {loadingElapsedSeconds >= 8 && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setMaterializationError(null)
+                    void ensureTableMaterialized(tableId).then(() => windowed.invalidate())
+                  }}
+                >
+                  Retry
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -252,7 +301,7 @@ export function GridView({ tableId }: GridViewProps) {
         <GridContextMenu />
 
         {showSuggestions && (
-          <Suspense fallback={<div className="fixed right-0 top-0 w-96 h-full bg-surface border-l border-border animate-pulse" />}>
+          <Suspense fallback={<div className="fixed right-0 top-0 h-full w-full max-w-96 animate-pulse border-l border-border bg-surface" />}>
             <SuggestionsPanel isOpen={showSuggestions} onClose={() => setShowSuggestions(false)} tableId={tableId} selectedColumnId={selectedColumn ?? undefined} />
           </Suspense>
         )}
@@ -269,10 +318,10 @@ export function GridView({ tableId }: GridViewProps) {
 
         {chartBuilderOpen && (
           <Suspense fallback={
-            <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(2px)' }}>
-              <div className="bg-white dark:bg-[#1f1f1f] rounded-2xl p-6 shadow-2xl flex items-center gap-3" style={{ boxShadow: '0 24px 48px rgba(0, 0, 0, 0.15)' }}>
-                <LoadingSpinner size="sm" className="text-[#217346]" />
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Loading...</span>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+              <div className="bg-surface rounded-xl p-6 shadow-2xl border border-border-elevation flex items-center gap-3">
+                <LoadingSpinner size="sm" className="text-accent-green" />
+                <span className="text-sm font-medium text-text-secondary">Loading...</span>
               </div>
             </div>
           }>

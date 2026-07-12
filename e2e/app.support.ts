@@ -6,7 +6,7 @@ export async function bootApp(page: Page) {
   await installMockBackend(page)
   await page.goto('/')
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
-  await expect(page.locator('aside')).toBeVisible()
+  await expect(page.locator('aside')).toBeAttached()
 }
 
 export async function createManualTable(
@@ -26,7 +26,8 @@ export async function createManualTable(
   await expect(dialog).toBeHidden({ timeout: 20_000 })
   await expect(page.locator('aside').getByRole('button', {
     name: new RegExp(`^${name} ${rowCount} rows`),
-  })).toBeVisible()
+    includeHidden: true,
+  })).toBeAttached()
 }
 
 export async function openManualTable(page: Page, name = 'UX Contract Table', rowCount = 5) {

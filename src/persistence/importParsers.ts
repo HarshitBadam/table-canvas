@@ -1,9 +1,5 @@
 import type { WorkBook } from 'xlsx'
-import type { TableSchema } from '@/types'
-import type { TableRow } from '@/state/dataStore'
 import { readFileAsArrayBuffer } from '@/lib/utils'
-import { getEngine } from '@/engine'
-import { computePatchesVersion, computeSourceVersionHash } from '@/engine/cacheUtils'
 import {
   parseCsvBuffer,
   parseWorkbookSheet,
@@ -39,44 +35,6 @@ interface ExcelSingleSheet {
 }
 
 type ExcelParseResult = ExcelMultiSheet | ExcelSingleSheet
-
-export async function loadTableIntoEngine(
-  tableId: string,
-  schema: TableSchema,
-  rows: TableRow[],
-): Promise<boolean> {
-  try {
-    const engine = getEngine()
-    await engine.init()
-
-    const node = useProjectStore.getState().getTableNode(tableId)
-    const patches = useProjectStore.getState().patches[tableId]
-    await engine.loadTable(tableId, schema, rows, patches)
-    const fileRef = node?.kind === 'source_table' ? node.plan.fileRef : undefined
-    const currentVersionHash = computeSourceVersionHash(
-      tableId,
-      fileRef ?? '',
-      computePatchesVersion(patches),
-    )
-
-    useProjectStore.getState().updateCacheInfo(tableId, {
-      isDirty: false,
-      isComputing: false,
-      lastComputedAt: new Date().toISOString(),
-      lastRowCount: rows.length,
-      currentVersionHash,
-      error: undefined,
-    })
-    return true
-  } catch (error) {
-    useProjectStore.getState().updateCacheInfo(tableId, {
-      isDirty: true,
-      isComputing: false,
-      error: error instanceof Error ? error.message : 'Failed to load into engine',
-    })
-    return false
-  }
-}
 
 export async function parseCSVFile(file: File): Promise<CSVParseResult> {
   const buffer = await readFileAsArrayBuffer(file)

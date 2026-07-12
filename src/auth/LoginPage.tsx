@@ -16,7 +16,7 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [gisReady, setGisReady] = useState(false);
 
   const { login, googleLogin } = useApp();
@@ -26,25 +26,35 @@ export function LoginPage() {
 
   const from = (location.state as { from?: Location })?.from?.pathname || '/';
 
-  const clearError = useCallback(() => setError(null), []);
+  const clearFormError = useCallback(() => setFormError(null), []);
 
   const handleError = useCallback((err: unknown) => {
     if (err instanceof ApiError) {
-      if (err.errors && err.errors.length > 0) {
-        setError(err.errors.join('. '));
+      if (err.statusCode === 401) {
+        setFormError('The email or password is incorrect. Check your details and try again.');
+      } else if (err.statusCode === 403) {
+        setFormError('This account does not have access to Table Canvas.');
+      } else if (err.statusCode === 429) {
+        setFormError('Too many sign-in attempts. Wait a few minutes, then try again.');
+      } else if (err.statusCode >= 500) {
+        setFormError('Table Canvas could not sign you in right now. Your details were not lost; please try again.');
+      } else if (err.errors && err.errors.length > 0) {
+        setFormError(err.errors.join('. '));
       } else {
-        setError(err.message);
+        setFormError(err.message);
       }
-    } else if (err instanceof Error) {
-      setError(err.message);
+    } else if (err instanceof TypeError) {
+      setFormError('Cannot reach Table Canvas. Check your connection and try again.');
+    } else if (err instanceof Error && err.message) {
+      setFormError('Sign-in failed. Check your connection and try again.');
     } else {
-      setError('An unexpected error occurred');
+      setFormError('Sign-in failed unexpectedly. Please try again.');
     }
   }, []);
 
   const handleGoogleCredential = useCallback(
     async (response: GoogleCredentialResponse) => {
-      clearError();
+      clearFormError();
       setIsSubmitting(true);
       try {
         await googleLogin(response.credential);
@@ -55,7 +65,7 @@ export function LoginPage() {
         setIsSubmitting(false);
       }
     },
-    [googleLogin, navigate, from, clearError, handleError],
+    [googleLogin, navigate, from, clearFormError, handleError],
   );
 
   useEffect(() => {
@@ -110,7 +120,7 @@ export function LoginPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    clearError();
+    clearFormError();
     setIsSubmitting(true);
 
     try {
@@ -147,9 +157,13 @@ export function LoginPage() {
         </div>
 
         <div className="bg-surface border border-border rounded-xl p-6 shadow-lg">
-          {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
-              {error}
+          {formError && (
+            <div
+              id="login-error"
+              role="alert"
+              className="mb-4 p-3 rounded-lg bg-error/10 border border-error/20 text-error-text text-sm"
+            >
+              {formError}
             </div>
           )}
 
@@ -167,7 +181,11 @@ export function LoginPage() {
             </>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-4"
+            aria-describedby={formError ? 'login-error' : undefined}
+          >
             <div>
               <label
                 htmlFor="email"
@@ -179,10 +197,14 @@ export function LoginPage() {
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  clearFormError();
+                }}
                 className="w-full px-3 py-2 rounded-lg border border-border bg-surface-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
                 placeholder="Enter your email"
                 required
+                maxLength={254}
                 autoComplete="email"
               />
             </div>
@@ -198,10 +220,14 @@ export function LoginPage() {
                 id="password"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  clearFormError();
+                }}
                 className="w-full px-3 py-2 rounded-lg border border-border bg-surface-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
                 placeholder="Enter your password"
                 required
+                maxLength={1024}
                 autoComplete="current-password"
               />
             </div>

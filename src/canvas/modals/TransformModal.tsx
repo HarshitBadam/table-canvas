@@ -172,7 +172,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
     <Dialog.Root open={isOpen} onOpenChange={open => !open && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="join-overlay" />
-        <Dialog.Content className="join-modal">
+        <Dialog.Content className="join-modal w-[min(520px,calc(100vw-2rem))]">
           <div className="join-header">
             <div className="join-header-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

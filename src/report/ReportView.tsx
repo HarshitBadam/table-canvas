@@ -86,7 +86,7 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
       <div className="h-full flex flex-col bg-surface report-view">
         <ReportToolbar activeReportId={null} />
         <div className="flex-1 overflow-auto">
-          <div className="max-w-4xl mx-auto px-6 py-16">
+          <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-16">
             {persistenceStatus === 'loading' ? (
               <div className="text-center text-sm text-text-secondary">Loading reports…</div>
             ) : (
@@ -114,7 +114,7 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
 
       {/* Editor */}
       <div className="flex-1 overflow-auto">
-        <div className="max-w-3xl mx-auto px-6 py-12 print:px-0 print:py-8 print:max-w-none">
+        <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12 print:max-w-none print:px-0 print:py-8">
           <TipTapEditor
             ref={editorRef}
             content={content}
@@ -160,7 +160,7 @@ function ReportStart({
 
   return (
     <div>
-      <div className="max-w-xl mb-10">
+      <div className="mb-7 max-w-xl sm:mb-10">
         <h1 className="text-2xl font-semibold text-text-primary mb-2">Create a report</h1>
         <p className="text-sm text-text-secondary leading-6">
           Reports combine narrative, live table excerpts, and charts. Linked data stays
