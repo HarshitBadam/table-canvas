@@ -1,4 +1,4 @@
-import { memo, useCallback, useState, useRef, useEffect } from 'react'
+import { memo, useCallback } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { Handle, Position, NodeProps } from 'reactflow'
 import { TableSchema, CacheInfo, NodeUI, NodeViewMode, CellValue, ViewFilterConfig } from '@/types'
@@ -30,23 +30,9 @@ function getViewMode(ui: NodeUI | undefined): NodeViewMode {
   return ui?.viewMode ?? 'collapsed'
 }
 
-const VIEW_MODE_CONFIG: Record<NodeViewMode, { label: string; icon: JSX.Element }> = {
-  collapsed: {
-    label: 'Schema',
-    icon: (
-      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-      </svg>
-    ),
-  },
-  data: {
-    label: 'Data',
-    icon: (
-      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-      </svg>
-    ),
-  },
+const VIEW_MODE_LABELS: Record<NodeViewMode, string> = {
+  collapsed: 'Schema',
+  data: 'Data',
 }
 
 function ViewModeDropdown({ 
@@ -58,83 +44,20 @@ function ViewModeDropdown({
   onSelect: (mode: NodeViewMode) => void
   isSource: boolean
 }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!isOpen) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isOpen])
-
-  const handleSelect = (mode: NodeViewMode) => {
-    onSelect(mode)
-    setIsOpen(false)
-  }
-
   return (
-    <div ref={dropdownRef} className="relative">
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          setIsOpen(!isOpen)
-        }}
-        className={`
-          flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium
-          ${isSource ? 'text-accent-text' : 'text-node-derived-text'}
-          hover:bg-black/5 dark:hover:bg-white/10
-          active:bg-black/10 dark:active:bg-white/15
-          transition-colors
-        `}
-      >
-        {VIEW_MODE_CONFIG[currentMode].icon}
-        <span>{VIEW_MODE_CONFIG[currentMode].label}</span>
-        <svg 
-          className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
-          fill="none" 
-          viewBox="0 0 24 24" 
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div 
-          className="absolute right-0 top-full mt-1 z-50 bg-surface rounded-lg shadow-xl border border-border py-1 min-w-[100px]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {(Object.keys(VIEW_MODE_CONFIG) as NodeViewMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => handleSelect(mode)}
-              className={`
-                w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left
-                ${mode === currentMode 
-                  ? isSource
-                    ? 'bg-accent-green/10 text-accent-text'
-                    : 'bg-node-derived text-node-derived-text'
-                  : 'text-text-primary hover:bg-surface-secondary'
-                }
-              `}
-            >
-              {VIEW_MODE_CONFIG[mode].icon}
-              <span>{VIEW_MODE_CONFIG[mode].label}</span>
-              {mode === currentMode && (
-                <svg className="w-3 h-3 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <select
+      value={currentMode}
+      onClick={event => event.stopPropagation()}
+      onChange={event => onSelect(event.target.value as NodeViewMode)}
+      aria-label="Table view"
+      className={`rounded-lg border-0 bg-transparent px-2 py-1 text-xs font-medium outline-none transition-colors hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-accent-green dark:hover:bg-white/10 ${
+        isSource ? 'text-accent-text' : 'text-node-derived-text'
+      }`}
+    >
+      {(Object.keys(VIEW_MODE_LABELS) as NodeViewMode[]).map(mode => (
+        <option key={mode} value={mode}>{VIEW_MODE_LABELS[mode]}</option>
+      ))}
+    </select>
   )
 }
 
@@ -185,7 +108,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
               {data.name}
             </h3>
             <p className="text-xs text-text-secondary mt-0.5 flex items-center gap-1.5">
-              {formatNumber(rowCount)} rows · {colCount} cols
+              {formatNumber(rowCount)} rows · {colCount} columns
               {hasFilters && (
                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent-green/10 text-accent-text text-xs font-medium">
                   <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -220,7 +143,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             </div>
             {schema.columns.length > 4 && (
               <div className="text-xs text-text-tertiary mt-3 pt-2 border-t border-border-subtle">
-                +{schema.columns.length - 4} more
+                +{schema.columns.length - 4} more columns
               </div>
             )}
           </div>
@@ -244,7 +167,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <span className="truncate" title={data.cacheInfo.error}>
-              Error: {data.cacheInfo.error}
+              Could not update table: {data.cacheInfo.error}
             </span>
           </div>
         )}
@@ -252,7 +175,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
         {data.cacheInfo?.isComputing && !data.cacheInfo?.error && (
           <div className="px-4 py-2.5 text-xs font-medium text-text-secondary bg-surface-secondary flex items-center gap-2">
             <LoadingSpinner size="sm" />
-            Computing...
+            Updating table…
           </div>
         )}
         
@@ -261,7 +184,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Needs refresh
+            Update pending
           </div>
         )}
 
@@ -280,7 +203,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
               }}
               className="input w-full text-xs"
             >
-              <option value="">Connect to…</option>
+              <option value="">Connect to a table…</option>
               {data.connectableTargets.map(target => (
                 <option key={target.id} value={target.id}>
                   {target.name}

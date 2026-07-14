@@ -45,10 +45,13 @@ export const MiniTableView = memo(({
   const [rows, setRows] = useState<TableRow[]>([])
   const [engineTotalRows, setEngineTotalRows] = useState(0)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     setIsLoaded(false)
+    setLoadError(false)
     getTableData(tableId, 0, PREVIEW_LIMIT)
       .then(({ rows: fetched, totalRows }) => {
         if (cancelled) return
@@ -59,6 +62,7 @@ export const MiniTableView = memo(({
         if (cancelled) return
         setRows([])
         setEngineTotalRows(0)
+        setLoadError(true)
       })
       .finally(() => {
         if (!cancelled) setIsLoaded(true)
@@ -66,7 +70,7 @@ export const MiniTableView = memo(({
     return () => {
       cancelled = true
     }
-  }, [tableId, versionHash])
+  }, [tableId, versionHash, reloadKey])
 
   const getDisplayValue = useCallback((rowId: string, columnId: string, baseValue: CellValue, row?: TableRow): CellValue => {
     return computeDisplayValue(rowId, columnId, baseValue, row, columns, patches?.cellPatches)
@@ -138,16 +142,31 @@ export const MiniTableView = memo(({
 
   if (!isLoaded) {
     return (
-      <div className="flex items-center justify-center h-[100px] text-[11px] text-text-tertiary">
-        Loading…
+      <div className="flex h-[100px] items-center justify-center text-xs text-text-tertiary" role="status">
+        Loading table preview…
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex h-[100px] flex-col items-center justify-center gap-2 px-4 text-center text-xs text-text-secondary" role="alert">
+        <span>Could not load the table preview.</span>
+        <button
+          type="button"
+          className="font-medium text-accent-green hover:underline"
+          onClick={() => setReloadKey((key) => key + 1)}
+        >
+          Try again
+        </button>
       </div>
     )
   }
 
   if (visibleRows.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[100px] text-[11px] text-text-tertiary">
-        No data available
+      <div className="flex h-[100px] items-center justify-center px-4 text-center text-xs text-text-tertiary">
+        {filtersActive ? 'No rows match these filters.' : 'This table has no rows.'}
       </div>
     )
   }
@@ -158,11 +177,6 @@ export const MiniTableView = memo(({
       className="flex flex-col overflow-hidden rounded-b-2xl"
       style={{ height: maxHeight }}
     >
-      <div 
-        className="flex-shrink-0 bg-gray-50 dark:bg-gray-800/80 border-b border-border"
-        style={{ height: 8 }}
-      />
-
       {/* Scrollable table area - hide scrollbars but keep functionality */}
       <div 
         ref={scrollContainerRef}
@@ -184,7 +198,7 @@ export const MiniTableView = memo(({
             {columns.map((col, idx) => (
               <div
                 key={col.id}
-                className={`flex items-center px-1.5 text-[10px] font-medium text-accent-green truncate ${
+                className={`flex items-center px-1.5 text-xs font-medium text-accent-green truncate ${
                   idx < columns.length - 1 ? 'border-r border-border' : ''
                 }`}
                 style={{ width: cellWidth, minWidth: MIN_CELL_WIDTH, flex: idx === columns.length - 1 ? 1 : undefined }}
@@ -215,7 +229,7 @@ export const MiniTableView = memo(({
                     return (
                       <div
                         key={col.id}
-                        className={`flex items-center px-1.5 text-[11px] overflow-hidden ${
+                        className={`flex items-center px-1.5 text-xs overflow-hidden ${
                           !isLastColumn ? 'border-r border-border-subtle' : ''
                         } ${
                           col.type === 'number' ? 'justify-end font-mono text-text-primary' : 'text-text-primary'
@@ -237,7 +251,7 @@ export const MiniTableView = memo(({
       </div>
 
       <div 
-        className="flex-shrink-0 px-3 flex items-center text-[11px] text-text-tertiary bg-gray-50 dark:bg-gray-800/80 border-t border-border rounded-b-2xl"
+        className="flex-shrink-0 px-3 flex items-center text-xs text-text-tertiary bg-gray-50 dark:bg-gray-800/80 border-t border-border rounded-b-2xl"
         style={{ height: FOOTER_HEIGHT }}
       >
         {filtersActive ? (
@@ -249,7 +263,7 @@ export const MiniTableView = memo(({
             <span className="text-accent-green ml-1">●</span>
           </>
         ) : (
-          <>{formatNumber(engineTotalRows)} rows × {columns.length} cols</>
+          <>{formatNumber(engineTotalRows)} rows × {columns.length} columns</>
         )}
       </div>
     </div>

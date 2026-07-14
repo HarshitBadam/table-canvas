@@ -11,13 +11,13 @@ export function useCanvasKeyboard() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
-      const isTyping =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
+      const target = e.target instanceof HTMLElement ? e.target : null
+      const isEditing = Boolean(
+        target?.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]'),
+      )
+      const isInDialog = Boolean(target?.closest('[role="dialog"]'))
 
-      if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !isEditing && !isInDialog) {
         if (selectedNodeId) {
           e.preventDefault()
           const project = useProjectStore.getState()
@@ -36,11 +36,22 @@ export function useCanvasKeyboard() {
         }
       }
 
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+      if (
+        (e.metaKey || e.ctrlKey)
+        && e.key === 'z'
+        && !e.shiftKey
+        && !isEditing
+        && !isInDialog
+      ) {
         e.preventDefault()
         undo()
       }
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      if (
+        (e.metaKey || e.ctrlKey)
+        && (e.key === 'y' || (e.key === 'z' && e.shiftKey))
+        && !isEditing
+        && !isInDialog
+      ) {
         e.preventDefault()
         redo()
       }

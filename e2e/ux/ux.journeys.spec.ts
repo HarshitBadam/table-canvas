@@ -33,7 +33,7 @@ test.describe('@ux critical journey contract', () => {
 
     const nodes = page.locator('.react-flow__node')
     await expect(nodes).toHaveCount(2)
-    await page.getByRole('button', { name: 'Arrange horizontally' }).click()
+    await page.getByRole('button', { name: 'Arrange tables left to right' }).click()
     const customers = nodes.filter({ hasText: 'Customers' })
     await customers.getByRole('combobox', {
       name: 'Connect Customers to another table',
@@ -50,8 +50,10 @@ test.describe('@ux critical journey contract', () => {
     await dialog.getByRole('option', { name: /ID/ }).click()
     await dialog.getByRole('button', { name: 'Orders match column' }).click()
     await dialog.getByRole('option', { name: /ID/ }).click()
-    await dialog.getByLabel('Output table name').fill('Customer Orders')
-    await dialog.getByRole('button', { name: 'Create Table' }).click()
+    await expect(dialog.getByLabel('Table Name')).toBeHidden()
+    await dialog.getByText('Output options', { exact: true }).click()
+    await dialog.getByLabel('Table Name').fill('Customer Orders')
+    await dialog.getByRole('button', { name: 'Create joined table' }).click()
 
     await expect(dialog).toBeHidden({ timeout: 20_000 })
     await expect(page.locator('.react-flow__node')).toHaveCount(3)
