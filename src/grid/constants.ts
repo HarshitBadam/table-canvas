@@ -1,4 +1,5 @@
 export const ROW_HEIGHT = 36
+export const TOUCH_ROW_HEIGHT = 44
 export const HEADER_HEIGHT = 44
 
 export const MINI_ROW_HEIGHT = 32

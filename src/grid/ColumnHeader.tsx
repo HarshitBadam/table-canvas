@@ -22,6 +22,7 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
     handleColumnClick,
     handleColumnDoubleClick,
     handleContextMenu,
+    openContextMenu,
     resizingColumn,
     handleResizeStart,
     resizeColumnBy,
@@ -54,12 +55,11 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
     }
   }
 
-  const isHighlighted = isSelected || isHeaderRowSelected
-  const bgClass = isResizing
-    ? 'bg-accent-green/20'
-    : isHighlighted
-      ? 'bg-accent-green/10'
-      : ''
+  const headerStateClass = isResizing
+    ? 'bg-accent-green/20 text-accent-text'
+    : isSelected || isHeaderRowSelected
+      ? 'bg-accent-green/10 text-accent-text'
+      : 'text-text-secondary hover:bg-surface-tertiary'
 
   return (
     <div
@@ -71,7 +71,12 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
       onDoubleClick={() => handleColumnDoubleClick(column.id, column.name)}
       onKeyDown={(event) => {
         if (isEditing) return
-        if (event.key === 'Enter' || event.key === ' ') {
+        if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+          event.preventDefault()
+          event.stopPropagation()
+          const rect = event.currentTarget.getBoundingClientRect()
+          openContextMenu(rect.left + 16, rect.top + 16, 'column', undefined, column.id)
+        } else if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
           handleColumnClick(column.id)
         } else if (event.key === 'F2' && isEditable) {
@@ -82,8 +87,8 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
       onContextMenu={(e) => handleContextMenu(e, 'column', undefined, column.id)}
       className={`
         relative flex items-center gap-1 px-2 text-xs font-medium cursor-pointer select-none
-        border-r border-border group text-accent-text
-        ${bgClass}
+        border-r border-border group transition-colors
+        ${headerStateClass}
       `}
       style={{ width, minWidth: width, maxWidth: width, height: HEADER_HEIGHT }}
       title={isEditable ? `"${column.name}" - Double-click to rename, drag edge to resize` : `"${column.name}"`}
@@ -126,7 +131,7 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
               </svg>
             </button>
           )}
-          <span className="flex-shrink-0 font-mono text-xs uppercase text-current">
+          <span className="flex-shrink-0 font-mono text-xs uppercase text-text-tertiary">
             {column.type}
           </span>
         </>

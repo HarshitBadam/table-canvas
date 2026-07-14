@@ -50,11 +50,9 @@ export function useGridClipboard(
   }, [cellRangeSelection, selection, columns, filteredRows, getDisplayValue, tableId, node])
 
   const formatClipboardText = useCallback((data: GridClipboardData): string => {
-    const headerRow = data.headers.join('\t')
-    const dataRows = data.rows.map(row =>
+    return data.rows.map(row =>
       row.map(cell => cell === null || cell === undefined ? '' : String(cell)).join('\t')
-    )
-    return [headerRow, ...dataRows].join('\n')
+    ).join('\n')
   }, [])
 
   return {

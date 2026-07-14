@@ -3,6 +3,9 @@ import type { CellValue, ColumnSchema } from '@/types'
 import type { GridRow, SelectionType } from './types'
 import type { CellRangeSelection } from './useGridSelection'
 import type { GridClipboardData } from './types'
+import type { GridFeedbackMessage } from './GridFeedback'
+import { useProjectStore } from '@/state/projectStore'
+import { createGridPastePlan, describePasteSkips } from './gridPaste'
 
 interface UseGridKeyboardOptions {
   editingCell: { rowIndex: number; columnId: string } | null
@@ -22,6 +25,7 @@ interface UseGridKeyboardOptions {
   tableId: string
   getSelectedCellData: () => GridClipboardData | null
   formatClipboardText: (data: GridClipboardData) => string
+  onFeedback: (feedback: GridFeedbackMessage) => void
 }
 
 export function useGridKeyboard({
@@ -42,19 +46,14 @@ export function useGridKeyboard({
   tableId,
   getSelectedCellData,
   formatClipboardText,
+  onFeedback,
 }: UseGridKeyboardOptions) {
+  const undo = useProjectStore((state) => state.undo)
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
-        if (cellRangeSelection || selection?.type === 'cell') {
-          const data = getSelectedCellData()
-          if (data) {
-            e.preventDefault()
-            window.__gridClipboard = data
-            navigator.clipboard.writeText(formatClipboardText(data)).catch(console.error)
-          }
-        }
-      }
+      const target = e.target instanceof HTMLElement ? e.target : null
+      if (!target?.closest('[role="grid"]')) return
 
       if (editingCell) {
         if (e.key === 'Enter') {
@@ -73,6 +72,23 @@ export function useGridKeyboard({
             if (row && nextCol) {
               startEditing(editingCell.rowIndex, nextCol.id, getDisplayValue(row.__rowId, nextCol.id, row[nextCol.id], row))
             }
+          }
+        }
+        return
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c') {
+        if (cellRangeSelection || selection?.type === 'cell') {
+          const data = getSelectedCellData()
+          if (data) {
+            e.preventDefault()
+            window.__gridClipboard = data
+            navigator.clipboard.writeText(formatClipboardText(data)).catch(() => {
+              onFeedback({
+                message: 'Could not copy to the system clipboard. Check browser clipboard permissions.',
+                tone: 'error',
+              })
+            })
           }
         }
         return
@@ -127,5 +143,63 @@ export function useGridKeyboard({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [editingCell, selectedCell, selection, columns, rows, isEditable, setSelection, commitEdit, cancelEdit, startEditing, getDisplayValue, saveSnapshot, setCellValue, tableId, cellRangeSelection, getSelectedCellData, formatClipboardText])
+  }, [editingCell, selectedCell, selection, columns, rows, isEditable, setSelection, commitEdit, cancelEdit, startEditing, getDisplayValue, saveSnapshot, setCellValue, tableId, cellRangeSelection, getSelectedCellData, formatClipboardText, onFeedback])
+
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      if (!isEditable || editingCell || !selectedCell) return
+
+      const target = event.target instanceof HTMLElement ? event.target : null
+      if (!target?.closest('[role="grid"]')) return
+      if (target.matches('input, textarea, [contenteditable="true"]')) return
+
+      const text = event.clipboardData?.getData('text/plain')
+      if (!text) return
+
+      event.preventDefault()
+
+      const startRow = cellRangeSelection?.startRow ?? selectedCell.rowIndex
+      const selectedColumnIndex = columns.findIndex(column => column.id === selectedCell.columnId)
+      const startColIndex = cellRangeSelection?.startColIndex ?? selectedColumnIndex
+      if (startColIndex < 0) return
+
+      const plan = createGridPastePlan({
+        text,
+        startRow,
+        startColIndex,
+        rows,
+        columns,
+      })
+      const skippedCount = plan.invalidCount + plan.readOnlyCount + plan.outOfBoundsCount
+
+      if (!plan.changes.length) {
+        const reason = describePasteSkips(plan)
+        onFeedback({
+          message: reason ? `Nothing was pasted: ${reason}.` : 'Nothing was pasted.',
+          tone: 'warning',
+        })
+        return
+      }
+
+      saveSnapshot('Paste cells')
+      plan.changes.forEach(change => {
+        setCellValue(tableId, change.rowId, change.columnId, change.value)
+      })
+
+      const pastedLabel = `${plan.changes.length} cell${plan.changes.length === 1 ? '' : 's'} pasted.`
+      const skippedLabel = skippedCount ? ` ${skippedCount} skipped: ${describePasteSkips(plan)}.` : ''
+      onFeedback({
+        message: pastedLabel + skippedLabel,
+        tone: skippedCount ? 'warning' : 'success',
+        actionLabel: 'Undo',
+        onAction: () => {
+          undo()
+          onFeedback({ message: 'Paste undone.', tone: 'success' })
+        },
+      })
+    }
+
+    window.addEventListener('paste', handlePaste)
+    return () => window.removeEventListener('paste', handlePaste)
+  }, [cellRangeSelection, columns, editingCell, isEditable, onFeedback, rows, saveSnapshot, selectedCell, setCellValue, tableId, undo])
 }

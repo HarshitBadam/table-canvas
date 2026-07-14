@@ -17,6 +17,7 @@ import { useGridOperations } from './useGridOperations'
 import { GridProvider, type GridContextValue } from './GridContext'
 import { GridViewport } from './GridViewport'
 import { useNavigation } from '@/layout/NavigationContext'
+import { GridFeedback, type GridFeedbackMessage } from './GridFeedback'
 
 const SuggestionsPanel = lazy(() => import('@/suggestions/SuggestionsPanel').then(m => ({ default: m.SuggestionsPanel })))
 const ChartBuilder = lazy(() => import('@/charts/ChartBuilder').then(m => ({ default: m.ChartBuilder })))
@@ -39,13 +40,27 @@ export function GridView({ tableId }: GridViewProps) {
     windowed,
   } = useGridData(tableId)
 
+  const [gridFeedback, setGridFeedback] = useState<GridFeedbackMessage | null>(null)
+  const showGridFeedback = useCallback((feedback: GridFeedbackMessage) => {
+    setGridFeedback({ ...feedback, id: Date.now() })
+  }, [])
+
+  useEffect(() => {
+    if (!gridFeedback) return
+    const feedbackId = gridFeedback.id
+    const timer = window.setTimeout(() => {
+      setGridFeedback(current => current?.id === feedbackId ? null : current)
+    }, 6500)
+    return () => window.clearTimeout(timer)
+  }, [gridFeedback])
+
   const {
     editingCell, editValue, editError, setEditValue,
     startEditing, commitEdit, cancelEdit, handleCellDoubleClick,
     editingColumnId, editColumnName, setEditColumnName,
     handleColumnDoubleClick, commitColumnNameEdit, cancelColumnNameEdit,
     saveSnapshot, setCellValue,
-  } = useGridEditing(tableId, columns, rows, isEditable)
+  } = useGridEditing(tableId, columns, filteredRows, isEditable)
 
   const {
     selection, setSelection,
@@ -60,16 +75,16 @@ export function GridView({ tableId }: GridViewProps) {
 
   const {
     contextMenu, setContextMenu, newColumnModal, setNewColumnModal,
-    doInsertRow, openNewColumnModal, doInsertColumn, handleContextMenu,
+    doInsertRow, openNewColumnModal, doInsertColumn, handleContextMenu, openContextMenu,
     handleInsertRowAbove, handleInsertRowBelow, handleDeleteRow,
     handleInsertColumnLeft, handleInsertColumnRight,
-  } = useGridOperations(tableId, columns, rows, isEditable, saveSnapshot)
+  } = useGridOperations(tableId, columns, filteredRows, isEditable, saveSnapshot, showGridFeedback)
 
   const {
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
     handleAutofillStart, handleAutofillMove, handleAutofillOneRow,
   } = useGridAutofill({
-    isEditable, columns, rows, selection, cellRangeSelection,
+    isEditable, columns, rows: filteredRows, selection, cellRangeSelection,
     getDisplayValue, saveSnapshot, setCellValue, tableId,
   })
 
@@ -78,10 +93,11 @@ export function GridView({ tableId }: GridViewProps) {
   )
 
   useGridKeyboard({
-    editingCell, selectedCell, selection, columns, rows, isEditable,
+    editingCell, selectedCell, selection, columns, rows: filteredRows, isEditable,
     cellRangeSelection, setSelection, commitEdit, cancelEdit, startEditing,
     getDisplayValue, saveSnapshot, setCellValue, tableId,
     getSelectedCellData, formatClipboardText,
+    onFeedback: showGridFeedback,
   })
 
   const {
@@ -135,7 +151,7 @@ export function GridView({ tableId }: GridViewProps) {
     editingColumnId, editColumnName, setEditColumnName,
     commitColumnNameEdit, cancelColumnNameEdit, handleColumnDoubleClick,
     editingCell, editValue, editError, setEditValue,
-    startEditing, commitEdit, cancelEdit, handleContextMenu,
+    startEditing, commitEdit, cancelEdit, handleContextMenu, openContextMenu,
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
     handleAutofillStart, handleAutofillMove, handleAutofillOneRow,
     filters, handleToggleFilters, resizingColumn, handleResizeStart,
@@ -163,7 +179,7 @@ export function GridView({ tableId }: GridViewProps) {
     editingColumnId, editColumnName, setEditColumnName,
     commitColumnNameEdit, cancelColumnNameEdit, handleColumnDoubleClick,
     editingCell, editValue, editError, setEditValue,
-    startEditing, commitEdit, cancelEdit, handleContextMenu,
+    startEditing, commitEdit, cancelEdit, handleContextMenu, openContextMenu,
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
     handleAutofillStart, handleAutofillMove, handleAutofillOneRow,
     filters, handleToggleFilters, resizingColumn, handleResizeStart,
@@ -195,8 +211,8 @@ export function GridView({ tableId }: GridViewProps) {
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md p-8">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-              <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-error-light">
+              <svg className="h-8 w-8 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
@@ -204,14 +220,22 @@ export function GridView({ tableId }: GridViewProps) {
               {node.kind === 'derived_table' ? 'Computation Error' : 'Data Loading Error'}
             </h3>
             <p className="text-sm text-text-secondary mb-4">
-              {node.kind === 'derived_table' ? 'Failed to compute this derived table:' : 'Failed to load this table:'}
+              {node.kind === 'derived_table'
+                ? 'This table could not be computed. Your source data and edits are unchanged.'
+                : 'This table could not be loaded. Your saved data is unchanged.'}
             </p>
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 text-left">
-              <code className="text-xs text-red-700 dark:text-red-300 break-all">{displayError}</code>
+            <details className="rounded-lg border border-error/20 bg-error-light p-3 text-left">
+              <summary className="cursor-pointer text-sm font-medium text-error-text">Technical details</summary>
+              <code className="mt-2 block max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs text-error-text">{displayError}</code>
+            </details>
+            <div className="mt-4 flex items-center justify-center gap-2">
+              <button type="button" onClick={openCanvas} className="btn btn-secondary">
+                Back to Canvas
+              </button>
+              <button type="button" onClick={() => { setMaterializationError(null); ensureTableMaterialized(tableId).then(() => windowed.invalidate()) }} className="btn btn-primary">
+                Try Again
+              </button>
             </div>
-            <button onClick={() => { setMaterializationError(null); ensureTableMaterialized(tableId).then(() => windowed.invalidate()) }} className="mt-4 btn btn-primary">
-              Retry
-            </button>
           </div>
         </div>
       </div>
@@ -299,6 +323,12 @@ export function GridView({ tableId }: GridViewProps) {
         <GridViewport totalRows={totalRows} windowed={windowed} onAddColumn={handleAddColumn} />
 
         <GridContextMenu />
+        {gridFeedback && (
+          <GridFeedback
+            feedback={gridFeedback}
+            onDismiss={() => setGridFeedback(null)}
+          />
+        )}
 
         {showSuggestions && (
           <Suspense fallback={<div className="fixed right-0 top-0 h-full w-full max-w-96 animate-pulse border-l border-border bg-surface" />}>
