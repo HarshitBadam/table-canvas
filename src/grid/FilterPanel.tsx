@@ -128,7 +128,7 @@ export function FilterPanel({
   const percentage = totalRowCount > 0 ? Math.round((matchingRowCount / totalRowCount) * 100) : 100
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-modal flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40" />
       
       <div 
@@ -142,8 +142,8 @@ export function FilterPanel({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-border bg-surface px-4 py-4 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
               <h2 id="filter-data-title" className="text-base font-semibold text-text-primary">
                 Filter Data
               </h2>
@@ -151,28 +151,17 @@ export function FilterPanel({
                 Narrow down your results
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleAddCondition}
-                className="btn btn-primary gap-1.5"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                Add Filter
-              </button>
-              <button
-                onClick={onClose}
-                aria-label="Close filter panel"
-                data-dialog-initial-focus
-                className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-text-tertiary
-                  transition-colors duration-150 hover:bg-surface-secondary hover:text-text-primary sm:min-h-9 sm:min-w-9"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+            <button
+              onClick={onClose}
+              aria-label="Close filter panel"
+              data-dialog-initial-focus
+              className="flex min-h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-lg text-text-tertiary
+                transition-colors duration-150 hover:bg-surface-secondary hover:text-text-primary sm:min-h-9 sm:min-w-9"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
           
           {filters.conditions.length > 0 && (
@@ -186,8 +175,8 @@ export function FilterPanel({
                 aria-valuenow={matchingRowCount}
               >
                 <div 
-                  className="h-full rounded-full bg-accent-green transition-[width] duration-500 ease-out"
-                  style={{ width: `${percentage}%` }}
+                  className="h-full origin-left rounded-full bg-accent-green transition-transform duration-300 ease-out"
+                  style={{ transform: `scaleX(${percentage / 100})` }}
                 />
               </div>
               <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-text-primary">

@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 export type { ContextMenuState } from './types'
 import { useGridContext } from './useGridContext'
 import { focusMenuItem } from '@/lib/focusMenuItem'
 
 export function GridContextMenu() {
   const menuRef = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState({ left: 0, top: 0 })
   const {
     contextMenu,
     filteredRows,
@@ -31,6 +32,25 @@ export function GridContextMenu() {
     }
   }, [contextMenu])
 
+  useLayoutEffect(() => {
+    if (!contextMenu || !menuRef.current) return
+
+    const updatePosition = () => {
+      const menu = menuRef.current
+      if (!menu) return
+      const margin = 8
+      const rect = menu.getBoundingClientRect()
+      setPosition({
+        left: Math.max(margin, Math.min(contextMenu.x, window.innerWidth - rect.width - margin)),
+        top: Math.max(margin, Math.min(contextMenu.y, window.innerHeight - rect.height - margin)),
+      })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    return () => window.removeEventListener('resize', updatePosition)
+  }, [contextMenu])
+
   if (!contextMenu) return null
 
   return (
@@ -38,20 +58,30 @@ export function GridContextMenu() {
       ref={menuRef}
       role="menu"
       aria-label="Grid actions"
-      className="fixed bg-surface rounded-lg shadow-xl border border-border py-1 z-50 min-w-[180px]"
-      style={{ left: contextMenu.x, top: contextMenu.y }}
+      className="fixed z-popover min-w-[180px] rounded-lg border border-border bg-surface py-1 shadow-xl"
+      style={position}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault()
           const targetRow = contextMenu.rowIndex
           const targetColumn = contextMenu.columnId
+          const targetType = contextMenu.type
           closeContextMenu()
           requestAnimationFrame(() => {
             if (targetRow !== undefined && targetColumn) {
               const columnIndex = columns.findIndex(column => column.id === targetColumn)
               document.querySelector<HTMLElement>(
                 `[role="gridcell"][aria-rowindex="${targetRow + 2}"][aria-colindex="${columnIndex + 2}"]`
+              )?.focus()
+            } else if (targetColumn) {
+              const columnIndex = columns.findIndex(column => column.id === targetColumn)
+              document.querySelector<HTMLElement>(
+                `[role="columnheader"][aria-colindex="${columnIndex + 2}"]`
+              )?.focus()
+            } else if (targetType === 'row' && targetRow !== undefined) {
+              document.querySelector<HTMLElement>(
+                `[role="row"][aria-rowindex="${targetRow + 2}"] [role="rowheader"]`
               )?.focus()
             } else {
               document.querySelector<HTMLElement>('[role="gridcell"][aria-selected="true"]')?.focus()
