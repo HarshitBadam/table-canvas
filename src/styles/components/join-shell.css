@@ -1,7 +1,7 @@
 .join-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: color-mix(in srgb, #1d1d1f 60%, transparent);
   backdrop-filter: blur(8px);
   animation: join-fade-in 0.2s ease-out;
 }
@@ -45,28 +45,10 @@
 .join-header {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 20px 24px;
+  gap: 12px;
+  padding: 16px 24px;
   background: var(--color-surface-secondary);
   border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.join-header-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-lg);
-  background: var(--color-accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: var(--shadow-sm);
-}
-
-.join-header-icon svg {
-  width: 20px;
-  height: 20px;
-  color: white;
 }
 
 .join-header-text {
@@ -76,14 +58,14 @@
 
 .join-header-text h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text-primary);
   letter-spacing: -0.02em;
 }
 
 .join-header-text p {
-  margin: 3px 0 0;
+  margin: 4px 0 0;
   font-size: 13px;
   color: var(--color-text-secondary);
 }

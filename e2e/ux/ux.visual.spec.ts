@@ -48,7 +48,7 @@ test.describe('@ux visual regression contract', () => {
     await freezeVisualMotion(page)
     await createManualTable(page, 'Visual Left')
     await createManualTable(page, 'Visual Right')
-    await page.getByRole('button', { name: 'Arrange horizontally' }).click()
+    await page.getByRole('button', { name: 'Arrange tables left to right' }).click()
 
     const nodes = page.locator('.react-flow__node')
     const leftNode = nodes.filter({

@@ -1,5 +1,6 @@
 import type { Node, Edge } from 'reactflow'
-import { NODE_WIDTH, NODE_HEIGHT } from './canvasConstants'
+import { NODE_WIDTH } from './canvasConstants'
+import { getNodeHeight } from './autoLayout'
 
 // SmartEdge is just Edge with guaranteed handles - compatible with Edge[]
 export type SmartEdge = Edge
@@ -8,9 +9,11 @@ type HandlePosition = 'left' | 'right' | 'top' | 'bottom'
 interface Point { x: number; y: number }
 
 function getNodeCenter(node: Node): Point {
+  const width = node.width ?? NODE_WIDTH
+  const height = node.height ?? getNodeHeight(node)
   return {
-    x: node.position.x + NODE_WIDTH / 2,
-    y: node.position.y + NODE_HEIGHT / 2,
+    x: node.position.x + width / 2,
+    y: node.position.y + height / 2,
   }
 }
 

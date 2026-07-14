@@ -35,6 +35,7 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
 
   const columns = sourceTable?.schema?.columns
   const { data: chartData, loading, error } = useChartData(sourceTableId, config, sourceVersionHash, columns)
+  const chartError = sourceTable ? error : 'Source table unavailable'
 
   const typeColors: Record<string, string> = {
     bar: '#217346',
@@ -92,27 +93,30 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
           }}
         />
         
-        {loading ? (
-          <div className="relative h-[110px] flex items-center justify-center" style={{ color: accentColor }}>
+        {sourceTable && loading ? (
+          <div className="relative flex h-[110px] items-center justify-center gap-2 text-xs" style={{ color: accentColor }} role="status">
             <LoadingSpinner size="sm" />
+            Loading chart…
           </div>
-        ) : error ? (
+        ) : chartError ? (
           <div className="relative h-[110px] flex flex-col items-center justify-center px-3 text-center">
-            <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-2">
-              <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-error/10">
+              <svg className="h-4 w-4 text-error-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <p className="text-xs font-medium leading-tight text-red-600 dark:text-red-400">
-              {error.includes('column') ? 'Column not found' : 'Error'}
+            <p className="text-xs font-medium leading-tight text-error-text">
+              {chartError.includes('column') ? 'A chart column is missing' : 'Could not load chart'}
             </p>
             <p className="mt-0.5 text-xs text-text-tertiary">
-              Reconfigure chart axes
+              {sourceTable
+                ? 'Choose available columns for the chart axes.'
+                : 'Choose an available source table in the chart settings.'}
             </p>
           </div>
         ) : !chartData || chartData.length === 0 ? (
           <div className="relative flex h-[110px] items-center justify-center text-xs text-text-tertiary">
-            No data
+            No rows to chart
           </div>
         ) : (
           <div className="relative h-[110px]">
@@ -128,8 +132,8 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
         )}
       </div>
 
-      <div className="px-3 py-1.5 bg-surface-secondary/80 border-t border-border-subtle">
-        <div className="flex items-center justify-between text-xs text-text-secondary">
+      <div className="border-t border-border-subtle bg-surface-secondary/80 px-3 py-2">
+        <div className="flex items-center justify-between gap-2 text-xs text-text-secondary">
           {chartType === 'pie' ? (
             <>
               <span className="truncate max-w-[120px]">{xAxisName} → {yAxisName}</span>
@@ -137,8 +141,8 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
             </>
           ) : (
             <>
-              <span>X: <span className="text-text-primary">{xAxisName}</span></span>
-              <span>Y: <span className="text-text-primary">{yAxisName}</span></span>
+              <span className="min-w-0 truncate" title={`X: ${xAxisName}`}>X: <span className="text-text-primary">{xAxisName}</span></span>
+              <span className="min-w-0 truncate" title={`Y: ${yAxisName}`}>Y: <span className="text-text-primary">{yAxisName}</span></span>
               <span className="font-medium" style={{ color: accentColor }}>{chartData?.length || 0}</span>
             </>
           )}

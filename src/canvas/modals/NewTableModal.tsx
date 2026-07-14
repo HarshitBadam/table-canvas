@@ -10,6 +10,7 @@ import type { Tier } from '@/shared/limits'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { loadTableIntoEngine } from '@/engine/loadTableIntoEngine'
 import { getVisibleFocusableElement, isVisibleElement } from '@/components/useDialogFocus'
+import { ColumnTypeDropdown } from './ColumnTypeDropdown'
 
 interface NewTableModalProps {
   isOpen: boolean
@@ -22,81 +23,8 @@ interface ColumnConfig {
   type: ColumnType
 }
 
-const COLUMN_TYPES: { value: ColumnType; label: string; icon: string }[] = [
-  { value: 'string', label: 'Text', icon: 'T' },
-  { value: 'number', label: 'Number', icon: '#' },
-  { value: 'boolean', label: 'Yes/No', icon: '◉' },
-  { value: 'date', label: 'Date', icon: '◷' },
-]
-
-function TypeDropdown({ 
-  value, 
-  onChange 
-}: { 
-  value: ColumnType
-  onChange: (value: ColumnType) => void 
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  
-  const selected = COLUMN_TYPES.find(t => t.value === value)
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-label={`Column type: ${selected?.label ?? value}`}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-text-secondary bg-surface-secondary hover:bg-surface-tertiary rounded transition-colors"
-      >
-        <span className="text-xs opacity-60">{selected?.icon}</span>
-        <span>{selected?.label}</span>
-        <svg className={`w-3 h-3 opacity-50 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      
-      {open && (
-        <div
-          role="listbox"
-          aria-label="Column type"
-          className="absolute right-0 top-full mt-1 bg-surface rounded-lg shadow-lg border border-border py-1 z-50 min-w-[110px]"
-        >
-          {COLUMN_TYPES.map(type => (
-            <button
-              key={type.value}
-              type="button"
-              role="option"
-              aria-selected={value === type.value}
-              onClick={() => {
-                onChange(type.value)
-                setOpen(false)
-              }}
-              className={`w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 hover:bg-surface-secondary transition-colors ${
-                value === type.value ? 'text-accent-green font-medium' : 'text-text-primary'
-              }`}
-            >
-              <span className="opacity-50 w-3">{type.icon}</span>
-              {type.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+const MAX_TABLE_NAME_LENGTH = 100
+const MAX_COLUMN_NAME_LENGTH = 100
 
 export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   const addSourceTable = useProjectStore((state) => state.addSourceTable)
@@ -115,6 +43,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   const [isCreating, setIsCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
+  const creatingRef = useRef(false)
 
   useEffect(() => {
     if (isOpen && document.activeElement instanceof HTMLElement) {
@@ -124,6 +53,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
     }
   }, [isOpen])
   const trimmedColumnNames = columns.map(column => column.name.trim())
+  const tableNameError = tableName.trim() ? null : 'Enter a table name.'
   const hasEmptyColumnName = trimmedColumnNames.some(name => name.length === 0)
   const hasDuplicateColumnName =
     new Set(trimmedColumnNames.map(name => name.toLocaleLowerCase())).size
@@ -131,7 +61,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   const columnError = hasEmptyColumnName
     ? 'Every column needs a name.'
     : hasDuplicateColumnName
-      ? 'Column names must be unique.'
+      ? 'Give each column a different name.'
       : null
 
   const addColumn = () => {
@@ -152,7 +82,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   }
 
   const handleCreate = async () => {
-    if (!tableName.trim() || columnError) return
+    if (creatingRef.current || tableNameError || columnError) return
 
     const tier: Tier = user?.tier ?? 'guest'
     const currentTableCount = Object.values(nodes).filter(
@@ -185,29 +115,36 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
       return row
     })
 
+    creatingRef.current = true
     setIsCreating(true)
     setCreateError(null)
-    const tableId = addSourceTable({
-      name: tableName.trim(),
-      fileRef: '',
-      fileName: '',
-      fileType: 'csv',
-      schema,
-      initialRows: rows,
-    })
+    let tableId: string | null = null
 
     try {
+      tableId = addSourceTable({
+        name: tableName.trim(),
+        fileRef: '',
+        fileName: '',
+        fileType: 'csv',
+        schema,
+        initialRows: rows,
+      })
       setTableData(tableId, rows)
       const loaded = await loadTableIntoEngine(tableId, schema, rows)
       if (!loaded) {
-        useProjectStore.getState().deleteNode(tableId)
-        useDataStore.getState().clearTableData(tableId)
-        setCreateError('The table could not be initialized. Please try again.')
-        return
+        throw new Error('The data engine did not initialize the table.')
       }
       resetForm()
       onClose()
+    } catch (error) {
+      if (tableId) {
+        useProjectStore.getState().deleteNode(tableId)
+        useDataStore.getState().clearTableData(tableId)
+      }
+      console.error('[NewTableModal] Failed to create table:', error)
+      setCreateError('We could not create the table. Try again.')
     } finally {
+      creatingRef.current = false
       setIsCreating(false)
     }
   }
@@ -223,6 +160,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   }
 
   const handleClose = () => {
+    if (creatingRef.current) return
     resetForm()
     onClose()
   }
@@ -230,7 +168,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
+        <Dialog.Overlay className="join-overlay z-50" />
         <Dialog.Content
           onCloseAutoFocus={(event) => {
             const returnFocusElement = returnFocusRef.current && isVisibleElement(returnFocusRef.current)
@@ -243,16 +181,16 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
           }}
           className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-1rem)] w-full max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl sm:max-w-md"
         >
-          <div className="px-5 pt-5 pb-4 border-b border-border-subtle">
+          <div className="border-b border-border-subtle px-4 py-4 sm:px-6">
             <Dialog.Title className="text-base font-semibold text-text-primary">
               Create New Table
             </Dialog.Title>
             <Dialog.Description className="text-sm text-text-secondary mt-0.5">
-              Define columns and structure for your table
+              Name the table, choose its columns, and set the starting row count.
             </Dialog.Description>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
+          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:px-6">
             <div>
               <label
                 htmlFor="new-table-name"
@@ -264,10 +202,21 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                 id="new-table-name"
                 type="text"
                 value={tableName}
-                onChange={(e) => setTableName(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm bg-surface-secondary border border-border rounded-lg text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-green focus:ring-1 focus:ring-accent-green/20"
+                onChange={(e) => {
+                  setTableName(e.target.value)
+                  setCreateError(null)
+                }}
+                maxLength={MAX_TABLE_NAME_LENGTH}
+                aria-invalid={Boolean(tableNameError)}
+                aria-describedby={tableNameError ? 'new-table-name-error' : undefined}
+                className="w-full rounded-lg border border-border bg-surface-secondary px-3 py-2.5 text-sm text-text-primary placeholder-text-tertiary focus-visible:border-accent-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green/20"
                 placeholder="Enter table name"
               />
+              {tableNameError && (
+                <p id="new-table-name-error" className="mt-1.5 text-xs text-red-600" role="alert">
+                  {tableNameError}
+                </p>
+              )}
             </div>
 
             <div>
@@ -285,7 +234,8 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                   max={100}
                   value={rowCount}
                   onChange={(e) => setRowCount(parseInt(e.target.value))}
-                  className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent-green [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-accent-green [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer bg-surface-tertiary"
+                  aria-valuetext={`${rowCount} ${rowCount === 1 ? 'row' : 'rows'}`}
+                  className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-surface-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-accent-green [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent-green [&::-webkit-slider-thumb]:shadow-sm"
                 />
                 <div className="w-14 px-2 py-1.5 text-sm bg-surface-secondary border border-border rounded-lg text-text-primary text-center font-medium">
                   {rowCount}
@@ -299,13 +249,14 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                   Columns
                 </label>
                 <button
+                  type="button"
                   onClick={addColumn}
-                  className="text-xs font-medium text-accent-green hover:text-accent-green/80 transition-colors flex items-center gap-1"
+                  className="canvas-touch-target flex items-center gap-1 rounded text-xs font-medium text-accent-text transition-colors hover:text-accent-text/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                   </svg>
-                  Add
+                  Add column
                 </button>
               </div>
               
@@ -323,54 +274,72 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                       type="text"
                       aria-label={`Column ${index + 1} name`}
                       value={col.name}
-                      onChange={(e) => updateColumn(col.id, { name: e.target.value })}
-                      className="min-w-36 flex-1 rounded border border-border bg-surface px-2 py-1.5 text-sm text-text-primary focus:border-accent-green focus:outline-none"
+                      onChange={(e) => {
+                        updateColumn(col.id, { name: e.target.value })
+                        setCreateError(null)
+                      }}
+                      maxLength={MAX_COLUMN_NAME_LENGTH}
+                      aria-invalid={Boolean(columnError)}
+                      aria-describedby={columnError ? 'new-table-column-error' : undefined}
+                      className="min-w-36 flex-1 rounded border border-border bg-surface px-2 py-1.5 text-sm text-text-primary focus-visible:border-accent-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green/20"
                       placeholder="Column name"
                     />
-                    <TypeDropdown
+                    <ColumnTypeDropdown
                       value={col.type}
                       onChange={(type) => updateColumn(col.id, { type })}
+                      ariaLabel={`Column ${index + 1} type`}
                     />
                     <button
+                      type="button"
                       onClick={() => removeColumn(col.id)}
                       disabled={columns.length <= 1}
-                      aria-label={`Remove column ${index + 1}`}
-                      className="p-1.5 text-text-tertiary hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-text-tertiary disabled:hover:bg-transparent transition-colors"
-                      title={columns.length <= 1 ? 'Must have at least one column' : 'Remove'}
+                      aria-label={`Remove ${col.name || `column ${index + 1}`}`}
+                      className="canvas-touch-target rounded p-1.5 text-text-tertiary transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-text-tertiary dark:hover:bg-red-900/20"
+                      title={columns.length <= 1 ? 'A table needs at least one column' : `Remove ${col.name || `column ${index + 1}`}`}
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                     </button>
                   </div>
                 ))}
               </div>
+              {columnError && (
+                <p id="new-table-column-error" className="mt-2 text-xs text-red-600" role="alert">
+                  {columnError}
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle bg-surface-secondary/50 px-4 py-4 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle bg-surface-secondary/50 p-4 sm:px-6">
             <div>
               <span className="text-xs text-text-secondary">
                 {rowCount} rows × {columns.length} columns
               </span>
-              {(columnError || createError) && (
+              {createError && (
                 <p className="mt-1 text-xs text-red-600" role="alert">
-                  {columnError || createError}
+                  {createError}
                 </p>
               )}
             </div>
             <div className="flex gap-2">
               <Dialog.Close asChild>
-                <button className="px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-tertiary rounded-lg transition-colors">
+                <button
+                  type="button"
+                  disabled={isCreating}
+                  className="canvas-touch-target rounded-lg px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   Cancel
                 </button>
               </Dialog.Close>
-              <button 
+              <button
+                type="button"
                 onClick={() => void handleCreate()}
                 disabled={isCreating || !tableName.trim() || columns.length === 0 || Boolean(columnError)}
-                className="px-4 py-2 text-sm font-medium text-white bg-accent-green hover:bg-accent-green/90 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="canvas-touch-target rounded-lg bg-accent-green px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-green/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {isCreating ? 'Creating...' : 'Create Table'}
+                {isCreating ? 'Creating…' : 'Create Table'}
               </button>
             </div>
           </div>

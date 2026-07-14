@@ -22,7 +22,7 @@ interface LayoutOptions {
   spacing?: number
 }
 
-function getNodeHeight(node: Node): number {
+export function getNodeHeight(node: Node): number {
   return node.data?.ui?.viewMode === 'data'
     ? BASE_HEIGHTS.data
     : BASE_HEIGHTS.collapsed

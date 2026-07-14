@@ -165,7 +165,7 @@ export function Sidebar({ isOpen = false, onClose = () => undefined }: SidebarPr
                     <div className={`ml-7 mt-1 text-xs ${
                       selectedNodeId === node.id ? 'text-accent-text' : 'text-text-tertiary'
                     }`}>
-                      {node.cacheInfo?.lastRowCount ?? node.schema.rowCount ?? 0} rows · {node.schema.columns.length} cols
+                      {node.cacheInfo?.lastRowCount ?? node.schema.rowCount ?? 0} rows · {node.schema.columns.length} columns
                     </div>
                   )}
                 </button>
