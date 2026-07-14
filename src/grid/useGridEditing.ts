@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import type { CellValue, ColumnSchema } from '@/types'
 import type { GridRow } from './types'
+import { validateCellInput } from './cellValueValidation'
 
 export function useGridEditing(
   tableId: string,
@@ -19,34 +20,6 @@ export function useGridEditing(
 
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null)
   const [editColumnName, setEditColumnName] = useState<string>('')
-
-  const validateValue = useCallback((value: string, columnType: string): { valid: boolean; error: string | null; parsedValue: CellValue } => {
-    if (value === '' || value.trim() === '') {
-      return { valid: true, error: null, parsedValue: '' }
-    }
-    switch (columnType) {
-      case 'number': {
-        const cleanValue = value.replace(/,/g, '').trim()
-        const num = Number(cleanValue)
-        if (isNaN(num)) return { valid: false, error: 'Please enter a valid number', parsedValue: value }
-        return { valid: true, error: null, parsedValue: num }
-      }
-      case 'boolean': {
-        const lower = value.toLowerCase().trim()
-        if (['true', 'false', '1', '0', 'yes', 'no'].includes(lower)) {
-          return { valid: true, error: null, parsedValue: ['true', '1', 'yes'].includes(lower) ? 'True' : 'False' }
-        }
-        return { valid: false, error: 'Please enter true/false, yes/no, or 1/0', parsedValue: value }
-      }
-      case 'date': {
-        const date = new Date(value)
-        if (isNaN(date.getTime())) return { valid: false, error: 'Please enter a valid date (e.g., 2024-01-15 or Jan 15, 2024)', parsedValue: value }
-        return { valid: true, error: null, parsedValue: value }
-      }
-      default:
-        return { valid: true, error: null, parsedValue: value }
-    }
-  }, [])
 
   const startEditing = useCallback((rowIndex: number, columnId: string, currentValue: CellValue) => {
     if (!isEditable) return
@@ -67,7 +40,7 @@ export function useGridEditing(
     if (!row) return
     const column = columns.find(c => c.id === editingCell.columnId)
     const columnType = column?.type || 'string'
-    const validation = validateValue(editValue, columnType)
+    const validation = validateCellInput(editValue, columnType)
     if (!validation.valid) {
       setEditError(validation.error)
       return
@@ -77,7 +50,7 @@ export function useGridEditing(
     setEditingCell(null)
     setEditValue('')
     setEditError(null)
-  }, [editingCell, rows, tableId, editValue, setCellValue, saveSnapshot, columns, validateValue])
+  }, [editingCell, rows, tableId, editValue, setCellValue, saveSnapshot, columns])
 
   const cancelEdit = useCallback(() => {
     setEditingCell(null)

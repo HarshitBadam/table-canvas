@@ -1,4 +1,5 @@
-import { useRef, useEffect, useMemo } from 'react'
+import { useRef, useEffect, useId, useLayoutEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ColumnSchema } from '@/types'
 import { formatNumber } from '@/lib/utils'
 import { useGridContext } from './useGridContext'
@@ -31,6 +32,7 @@ export function GridCell({
     handleCellMouseEnter,
     handleCellDoubleClick,
     handleContextMenu,
+    openContextMenu,
     autofillDragging,
     autofillEndRow,
     autofillPreview,
@@ -46,6 +48,8 @@ export function GridCell({
 
   const inputRef = useRef<HTMLInputElement>(null)
   const cellRef = useRef<HTMLDivElement>(null)
+  const editErrorId = useId()
+  const [editErrorPosition, setEditErrorPosition] = useState<{ left: number; top: number; width: number } | null>(null)
   const width = getColumnWidth(column.id)
   const value = getDisplayValue(row.__rowId, column.id, row[column.id], row)
 
@@ -137,50 +141,83 @@ export function GridCell({
 
   const isFormulaColumn = column.isComputed
   const currentEditError = isEditing ? editError : null
+  const isEmptyValue = value === null || value === undefined || value === ''
+
+  useLayoutEffect(() => {
+    if (!currentEditError || !inputRef.current) {
+      setEditErrorPosition(null)
+      return
+    }
+
+    const updatePosition = () => {
+      const rect = inputRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const tooltipWidth = Math.min(Math.max(rect.width, 180), 280)
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - tooltipWidth - 8))
+      const top = rect.bottom + 6 <= window.innerHeight - 48 ? rect.bottom + 6 : rect.top - 42
+      setEditErrorPosition({ left, top, width: tooltipWidth })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [currentEditError])
 
   return (
-    <div
-      ref={cellRef}
-      role="gridcell"
-      aria-colindex={colIndex + 2}
-      aria-rowindex={rowIndex + 2}
-      aria-selected={isSelected}
-      aria-readonly={!isEditable || Boolean(isFormulaColumn)}
-      aria-label={`${column.name}, row ${rowIndex + 1}: ${formattedValue || 'empty'}`}
-      tabIndex={isCellSelected || (!selectedCell && rowIndex === 0 && colIndex === 0) ? 0 : -1}
-      onFocus={() => {
-        if (!isCellSelected) {
-          setSelection({ type: 'cell', rowIndex, columnId: column.id })
-        }
-      }}
-      onMouseDown={(e) => handleCellMouseDown(rowIndex, column.id, e)}
-      onDoubleClick={() => handleCellDoubleClick(rowIndex, column.id, value)}
-      onContextMenu={(e) => handleContextMenu(e, 'cell', rowIndex, column.id)}
-      onMouseEnter={() => {
-        if (autofillDragging) handleAutofillMove(rowIndex)
-        if (isDraggingSelectionRef.current) handleCellMouseEnter(rowIndex, column.id)
-      }}
-      className={`
-        relative flex items-center px-2 text-sm overflow-hidden box-border
-        ${isEditable && !isFormulaColumn ? 'cursor-cell' : 'cursor-default'}
-        ${isCellHighlighted && !isSelected ? 'bg-emerald-100 dark:bg-emerald-900/50 outline outline-2 outline-emerald-500' : ''}
-        ${isSelected && !isInCellRange && !currentEditError ? 'bg-accent-green/20 dark:bg-accent-green/30 outline outline-2 outline-accent-green' : ''}
-        ${isInCellRange ? 'bg-accent-green/20 dark:bg-accent-green/30' : ''}
-        ${currentEditError ? 'outline outline-2 outline-red-500 bg-red-50 dark:bg-red-900/30' : ''}
-        ${isInAutofillRange ? 'bg-accent-green/10 dark:bg-accent-green/20' : ''}
-        ${(isColumnHighlighted || isRowSelected || isCellInRowSelected) && !isSelected && !isInAutofillRange && !isInCellRange && !isCellHighlighted ? 'bg-accent-green/5 dark:bg-accent-green/10' : ''}
-        ${column.type === 'number' ? 'justify-end font-mono' : ''}
-        ${isFormulaColumn && !isSelected && !isInCellRange && !isCellHighlighted ? 'bg-purple-50/30 dark:bg-purple-900/10' : ''}
-        ${isEditable && !isEditing && !isSelected && !isInCellRange && !isFormulaColumn && !isCellHighlighted ? 'hover:bg-gray-50 dark:hover:bg-gray-800/50' : ''}
-        ${!isInCellRange && !isSelected && !isCellHighlighted ? 'border-r border-border-subtle' : ''}
-        ${isSelectionTopEdge ? 'border-t-2 border-t-accent-green' : ''}
-        ${isSelectionBottomEdge ? 'border-b-2 border-b-accent-green' : ''}
-        ${isSelectionLeftEdge ? 'border-l-2 border-l-accent-green' : ''}
-        ${isSelectionRightEdge ? 'border-r-2 border-r-accent-green' : ''}
-      `}
-      style={{ width, minWidth: width, maxWidth: width }}
-      title={isFormulaColumn ? `Computed: ${column.formula}` : undefined}
-    >
+    <>
+      <div
+        ref={cellRef}
+        role="gridcell"
+        aria-colindex={colIndex + 2}
+        aria-rowindex={rowIndex + 2}
+        aria-selected={isSelected}
+        aria-readonly={!isEditable || Boolean(isFormulaColumn)}
+        aria-label={`${column.name}, row ${rowIndex + 1}: ${formattedValue || 'empty'}`}
+        tabIndex={isCellSelected || (!selectedCell && rowIndex === 0 && colIndex === 0) ? 0 : -1}
+        onFocus={() => {
+          if (!isCellSelected) {
+            setSelection({ type: 'cell', rowIndex, columnId: column.id })
+          }
+        }}
+        onMouseDown={(e) => handleCellMouseDown(rowIndex, column.id, e)}
+        onDoubleClick={() => handleCellDoubleClick(rowIndex, column.id, value)}
+        onContextMenu={(e) => handleContextMenu(e, 'cell', rowIndex, column.id)}
+        onKeyDown={(event) => {
+          if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return
+          event.preventDefault()
+          event.stopPropagation()
+          const rect = event.currentTarget.getBoundingClientRect()
+          openContextMenu(rect.left + 16, rect.top + 16, 'cell', rowIndex, column.id)
+        }}
+        onMouseEnter={() => {
+          if (autofillDragging) handleAutofillMove(rowIndex)
+          if (isDraggingSelectionRef.current) handleCellMouseEnter(rowIndex, column.id)
+        }}
+        className={`
+          relative flex items-center px-2 text-sm overflow-hidden box-border
+          ${isEditable && !isFormulaColumn ? 'cursor-cell' : 'cursor-default'}
+          ${isCellHighlighted && !isSelected ? 'bg-accent-green/10 outline outline-2 outline-accent-green' : ''}
+          ${isSelected && !isInCellRange && !currentEditError ? 'bg-accent-green/20 dark:bg-accent-green/30 outline outline-2 outline-accent-green' : ''}
+          ${isInCellRange ? 'bg-accent-green/20 dark:bg-accent-green/30' : ''}
+          ${currentEditError ? 'bg-error-light outline outline-2 outline-error' : ''}
+          ${isInAutofillRange ? 'bg-accent-green/10 dark:bg-accent-green/20' : ''}
+          ${(isColumnHighlighted || isRowSelected || isCellInRowSelected) && !isSelected && !isInAutofillRange && !isInCellRange && !isCellHighlighted ? 'bg-accent-green/5 dark:bg-accent-green/10' : ''}
+          ${column.type === 'number' ? 'justify-end font-mono' : ''}
+          ${isFormulaColumn && !isSelected && !isInCellRange && !isCellHighlighted ? 'bg-purple-50/30 dark:bg-purple-900/10' : ''}
+          ${isEditable && !isEditing && !isSelected && !isInCellRange && !isFormulaColumn && !isCellHighlighted ? 'hover:bg-surface-secondary' : ''}
+          ${!isInCellRange && !isSelected && !isCellHighlighted ? 'border-r border-border-subtle' : ''}
+          ${isSelectionTopEdge ? 'border-t-2 border-t-accent-green' : ''}
+          ${isSelectionBottomEdge ? 'border-b-2 border-b-accent-green' : ''}
+          ${isSelectionLeftEdge ? 'border-l-2 border-l-accent-green' : ''}
+          ${isSelectionRightEdge ? 'border-r-2 border-r-accent-green' : ''}
+        `}
+        style={{ width, minWidth: width, maxWidth: width }}
+        title={isFormulaColumn ? `Computed: ${column.formula}` : undefined}
+      >
       {isEditing ? (
         <div className="absolute inset-0 flex items-center">
           <input
@@ -188,31 +225,24 @@ export function GridCell({
             type="text"
             aria-label={`Edit ${column.name}, row ${rowIndex + 1}`}
             aria-invalid={Boolean(currentEditError)}
+            aria-describedby={currentEditError ? editErrorId : undefined}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={commitEdit}
             className={`w-full h-full px-2 border-none outline-none text-sm bg-transparent ${
               column.type === 'number' ? 'text-right font-mono' : ''
-            } ${currentEditError ? 'text-red-700 dark:text-red-300' : 'text-text-primary'}`}
+            } ${currentEditError ? 'text-error-text' : 'text-text-primary'}`}
           />
-          {currentEditError && (
-            <div
-              role="alert"
-              className="absolute left-0 top-full mt-1 z-20 px-2 py-1 bg-red-500 text-white text-xs rounded shadow-lg whitespace-nowrap"
-            >
-              {currentEditError}
-            </div>
-          )}
         </div>
       ) : (
         <>
           {isInAutofillRange && autofillPreviewValue !== undefined ? (
             <span className="truncate w-full text-accent-text italic">
-              {formattedPreviewValue || '(empty)'}
+              {formattedPreviewValue || 'Clear'}
             </span>
           ) : (
-            <span className={`truncate w-full ${value === null || value === undefined || value === '' ? 'text-text-tertiary italic' : ''}`}>
-              {value === null || value === undefined || value === '' ? '(empty)' : formattedValue}
+            <span className="w-full truncate">
+              {!isEmptyValue ? formattedValue : null}
             </span>
           )}
 
@@ -243,6 +273,18 @@ export function GridCell({
           )}
         </>
       )}
-    </div>
+      </div>
+      {currentEditError && editErrorPosition && createPortal(
+        <div
+          id={editErrorId}
+          role="alert"
+          className="fixed z-tooltip rounded border border-error/30 bg-error-light px-2 py-1.5 text-xs text-error-text shadow-md"
+          style={editErrorPosition}
+        >
+          {currentEditError}
+        </div>,
+        document.body,
+      )}
+    </>
   )
 }

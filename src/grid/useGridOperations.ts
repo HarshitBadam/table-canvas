@@ -4,6 +4,9 @@ import type { CellValue, ColumnSchema, UserColumnType } from '@/types'
 import { generateId } from '@/lib/utils'
 import type { ContextMenuState } from './GridContextMenu'
 import type { GridRow } from './types'
+import type { GridFeedbackMessage } from './GridFeedback'
+
+type ContextMenuTarget = 'cell' | 'row' | 'column' | 'header' | 'index' | 'corner'
 
 export function useGridOperations(
   tableId: string,
@@ -11,12 +14,14 @@ export function useGridOperations(
   rows: GridRow[],
   isEditable: boolean,
   saveSnapshot: (label: string) => void,
+  onFeedback: (feedback: GridFeedbackMessage) => void,
 ) {
   const insertRow = useProjectStore((state) => state.insertRow)
   const deleteRow = useProjectStore((state) => state.deleteRow)
   const addColumn = useProjectStore((state) => state.addColumn)
   const insertColumnAt = useProjectStore((state) => state.insertColumnAt)
   const addFormulaColumn = useProjectStore((state) => state.addFormulaColumn)
+  const undo = useProjectStore((state) => state.undo)
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [newColumnModal, setNewColumnModal] = useState<{ isOpen: boolean; insertIndex: number }>({ isOpen: false, insertIndex: 0 })
@@ -49,16 +54,26 @@ export function useGridOperations(
     }
   }, [isEditable, saveSnapshot, insertColumnAt, addColumn, addFormulaColumn, tableId])
 
+  const openContextMenu = useCallback((
+    x: number,
+    y: number,
+    type: ContextMenuTarget,
+    rowIndex?: number,
+    columnId?: string
+  ) => {
+    if (!isEditable) return
+    setContextMenu({ x, y, type, rowIndex, columnId })
+  }, [isEditable])
+
   const handleContextMenu = useCallback((
     e: React.MouseEvent,
-    type: 'cell' | 'row' | 'column' | 'header' | 'index' | 'corner',
+    type: ContextMenuTarget,
     rowIndex?: number,
     columnId?: string
   ) => {
     e.preventDefault()
-    if (!isEditable) return
-    setContextMenu({ x: e.clientX, y: e.clientY, type, rowIndex, columnId })
-  }, [isEditable])
+    openContextMenu(e.clientX, e.clientY, type, rowIndex, columnId)
+  }, [openContextMenu])
 
   const handleInsertRowAbove = useCallback(() => {
     if (contextMenu?.rowIndex !== undefined) doInsertRow(contextMenu.rowIndex)
@@ -79,7 +94,16 @@ export function useGridOperations(
     saveSnapshot('Delete row')
     deleteRow(tableId, row.__rowId)
     setContextMenu(null)
-  }, [isEditable, contextMenu, rows, saveSnapshot, deleteRow, tableId])
+    onFeedback({
+      message: `Row ${contextMenu.rowIndex + 1} deleted.`,
+      tone: 'success',
+      actionLabel: 'Undo',
+      onAction: () => {
+        undo()
+        onFeedback({ message: 'Row restored.', tone: 'success' })
+      },
+    })
+  }, [isEditable, contextMenu, rows, saveSnapshot, deleteRow, tableId, onFeedback, undo])
 
   const handleInsertColumnLeft = useCallback(() => {
     if (contextMenu?.columnId) {
@@ -109,6 +133,7 @@ export function useGridOperations(
     doInsertRow,
     openNewColumnModal,
     doInsertColumn,
+    openContextMenu,
     handleContextMenu,
     handleInsertRowAbove,
     handleInsertRowBelow,

@@ -48,6 +48,13 @@ export interface GridContextValue {
     rowIndex?: number,
     columnId?: string
   ) => void
+  openContextMenu: (
+    x: number,
+    y: number,
+    type: 'cell' | 'row' | 'column' | 'header' | 'index' | 'corner',
+    rowIndex?: number,
+    columnId?: string
+  ) => void
   contextMenu: ContextMenuState | null
   filteredRows: GridRow[]
   closeContextMenu: () => void
