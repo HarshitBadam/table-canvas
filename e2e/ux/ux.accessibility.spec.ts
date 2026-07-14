@@ -217,7 +217,11 @@ test.describe('@ux keyboard contract', () => {
 
     const connectSelect = page.getByLabel('Connect Source Table to another table')
     await connectSelect.selectOption({ label: 'Target Table' })
-    await expect(page.getByRole('dialog')).toBeVisible()
+    const dialog = page.getByRole('dialog', { name: 'Combine Tables' })
+    await expect(dialog).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(connectSelect).toBeFocused()
   })
 
   test('suggestion tabs use arrow-key navigation', async ({ page }) => {

@@ -17,7 +17,7 @@ test.describe('Canvas and table behavior', () => {
 
     const node = page.locator('.react-flow__node').filter({ hasText: 'Canvas Contract' })
     await expect(node).toHaveCount(1)
-    await expect(node).toContainText('7 rows · 2 cols')
+    await expect(node).toContainText('7 rows · 2 columns')
     await expect(node).toContainText('Name')
     await expect(node).toContainText('Value')
     await expect(page.locator('aside').getByRole('button', {
@@ -48,7 +48,7 @@ test.describe('Canvas and table behavior', () => {
     await expect(create).toBeDisabled()
     await dialog.getByLabel('Table Name').fill('Validation Contract')
     await dialog.getByLabel('Column 2 name').fill('Name')
-    await expect(dialog.getByRole('alert')).toHaveText('Column names must be unique.')
+    await expect(dialog.getByRole('alert')).toHaveText('Give each column a different name.')
     await expect(create).toBeDisabled()
     await dialog.getByLabel('Column 2 name').fill('Amount')
     await expect(dialog.getByRole('alert')).toBeHidden()

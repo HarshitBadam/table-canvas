@@ -8,29 +8,29 @@ interface AutoArrangePanelProps {
 
 export function CanvasAutoArrangePanel({ onArrange }: AutoArrangePanelProps) {
   return (
-    <Panel position="bottom-left" className="ml-3 mb-3">
+    <Panel position="top-left" className="ml-3 mt-3">
       <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1 shadow-md">
-        <span className="px-2 text-xs font-medium text-text-secondary">Arrange</span>
+        <span className="px-2 text-xs font-medium text-text-secondary">Arrange tables</span>
         <div className="h-5 w-px bg-border" />
         <button
           type="button"
           onClick={() => onArrange('TB')}
-          className="rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-accent-green"
-          title="Arrange vertically (top to bottom)"
-          aria-label="Arrange vertically"
+          className="canvas-touch-target rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-accent-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
+          title="Arrange tables top to bottom"
+          aria-label="Arrange tables top to bottom"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m0 0l-6-6m6 6l6-6" />
           </svg>
         </button>
         <button
           type="button"
           onClick={() => onArrange('LR')}
-          className="rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-accent-green"
-          title="Arrange horizontally (left to right)"
-          aria-label="Arrange horizontally"
+          className="canvas-touch-target rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-accent-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
+          title="Arrange tables left to right"
+          aria-label="Arrange tables left to right"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16m0 0l-6-6m6 6l-6 6" />
           </svg>
         </button>
@@ -56,7 +56,7 @@ export function CanvasEmptyState({ onNewTable }: EmptyStateProps) {
           Start with a table
         </h2>
         <p className="mx-auto mb-6 max-w-sm text-sm leading-relaxed text-text-secondary">
-          Import a file or create a table, then connect transformations on the canvas.
+          Import a spreadsheet or create a blank table. Then connect tables to build a repeatable transformation.
         </p>
         <div className="flex flex-col justify-center gap-2 sm:flex-row">
           <div className="sm:w-40">
@@ -98,11 +98,12 @@ export function CycleWarningToast({ warning, onClose }: CycleWarningToastProps) 
         </div>
         <p className="flex-1 text-sm text-text-primary">{warning}</p>
         <button
+          type="button"
           onClick={onClose}
-          className="flex-shrink-0 p-1 text-text-tertiary hover:text-text-primary transition-colors"
+          className="canvas-touch-target flex-shrink-0 rounded p-1 text-text-tertiary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
           aria-label="Dismiss connection warning"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>

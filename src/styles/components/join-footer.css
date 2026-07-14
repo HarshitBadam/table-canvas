@@ -1,7 +1,7 @@
 .join-name-input {
   width: 100%;
-  padding: 12px 14px;
-  font-size: 14px;
+  padding: 12px 16px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--color-text-primary);
   background: var(--color-surface);
@@ -76,9 +76,4 @@
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
-}
-
-.join-btn-create svg {
-  width: 14px;
-  height: 14px;
 }

@@ -87,12 +87,12 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     const targetIsTable = targetNode?.kind === 'source_table' || targetNode?.kind === 'derived_table'
 
     if (!sourceIsTable || !targetIsTable) {
-      setCycleWarning('Charts are read-only outputs. Connect two tables to create a transformation.')
+      setCycleWarning('Charts cannot start transformations. Connect two tables instead.')
       return
     }
     if (wouldCreateCycle(projectEdges, sourceId, targetId)) {
       setCycleWarning(
-        `Cannot connect "${sourceNode.name}" to "${targetNode.name}": This would create a circular dependency.`,
+        `Cannot connect "${sourceNode.name}" to "${targetNode.name}" because it would create a circular dependency. Choose a different table.`,
       )
       return
     }
@@ -318,7 +318,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         <Controls 
           showInteractive={false}
           position="bottom-left"
-          style={{ marginLeft: 12, marginBottom: 60 }}
+          style={{ marginLeft: 12, marginBottom: 12 }}
           className="!bg-surface !border !border-border !rounded-lg !shadow-md [&>button]:!bg-surface [&>button]:!border-0 [&>button]:!text-text-secondary [&>button:hover]:!bg-surface-secondary"
         />
         
@@ -328,7 +328,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
       </ReactFlow>
 
       {transformModalOpen && pendingConnection && (
-        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center"><div className="bg-surface rounded-lg p-8 animate-pulse">Loading...</div></div>}>
+        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center"><div className="bg-surface rounded-lg p-8 animate-pulse">Loading table options…</div></div>}>
           <TransformModal
             isOpen={transformModalOpen}
             onClose={handleTransformModalClose}

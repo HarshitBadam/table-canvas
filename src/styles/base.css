@@ -208,6 +208,11 @@ body {
     min-height: 44px;
   }
 
+  .canvas-touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .grid-autofill-handle,
   .column-filter-trigger,
   .report-toolbar-v2-add,
