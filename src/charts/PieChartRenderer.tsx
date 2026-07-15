@@ -53,7 +53,7 @@ export function PieChartRenderer({
       name: String(entry[xAxisKey]),
       value,
       percent,
-      color: isOther ? '#6B7280' : colors[index % colors.length],
+      color: isOther ? 'var(--color-text-tertiary)' : colors[index % colors.length],
     }
   })
 
@@ -142,7 +142,7 @@ export function PieChartRenderer({
                     {item.name}
                   </div>
                   <div className="text-xs text-text-secondary">
-                    {item.value.toLocaleString()} · {item.percent.toFixed(0)}%
+                    {item.value.toLocaleString()} - {item.percent.toFixed(0)}%
                   </div>
                 </div>
               </div>

@@ -327,12 +327,12 @@ export const ChartNodeView = memo(function ChartNodeView({
           </div>
           <div className="chart-block-footer relative z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <span>
-              Source: {tableNode?.name || 'Unknown table'}
+              Source - {tableNode?.name || 'Unknown table'}
               {isTruncated
-                ? ` · first ${tableData.length.toLocaleString()} of ${rowCount.toLocaleString()} rows`
-                : ` · ${rowCount.toLocaleString()} rows`}
+                ? ` - first ${tableData.length.toLocaleString()} of ${rowCount.toLocaleString()} rows`
+                : ` - ${rowCount.toLocaleString()} rows`}
               {availableChartPoints < tableData.length || chartData.length < availableChartPoints
-                ? ` · ${chartData.length.toLocaleString()} of ${availableChartPoints.toLocaleString()} points plotted`
+                ? ` - ${chartData.length.toLocaleString()} of ${availableChartPoints.toLocaleString()} points plotted`
                 : ''}
             </span>
             <button onClick={openConfig} className="text-xs text-accent-green hover:text-accent-green-hover flex items-center gap-1 font-medium">

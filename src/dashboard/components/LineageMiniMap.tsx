@@ -23,7 +23,7 @@ export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProp
         <div className="flex items-center gap-3">
           <h3 className="text-sm font-semibold text-text-primary">Data Flow</h3>
           <span className="text-xs text-text-tertiary">
-            {sourceNodes.length} source{sourceNodes.length !== 1 ? 's' : ''}, {derivedNodes.length} derived{chartNodes.length > 0 ? `, ${chartNodes.length} chart${chartNodes.length !== 1 ? 's' : ''}` : ''}
+            {sourceNodes.length} source{sourceNodes.length !== 1 ? 's' : ''} - {derivedNodes.length} derived{chartNodes.length > 0 ? ` - ${chartNodes.length} chart${chartNodes.length !== 1 ? 's' : ''}` : ''}
           </span>
         </div>
         <div className="flex items-center gap-4 text-xs text-text-tertiary">
@@ -281,7 +281,7 @@ function LineageVisualization({
               </span>
             </div>
             
-            <div className="text-[11px] text-text-tertiary mt-1 text-left">
+            <div className="mt-1 text-left text-xs text-text-tertiary">
               {isChart ? (node.chartType || 'Chart') : `${node.rowCount.toLocaleString()} rows`}
             </div>
           </button>

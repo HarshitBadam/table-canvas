@@ -176,14 +176,29 @@ test.describe('@ux keyboard contract', () => {
     await createManualTable(page)
     await openManualTable(page)
 
-    const firstCell = page.locator('.cursor-cell').first()
+    const firstCell = page.getByRole('gridcell', { name: /^Name, row 1:/ })
+    const secondCell = page.getByRole('gridcell', { name: /^Name, row 2:/ })
     await firstCell.focus()
+    await expect(firstCell).toBeFocused()
+    await expect(firstCell).toHaveCSS('outline-style', 'none')
+
     await page.keyboard.press('Enter')
     const editor = firstCell.locator('input')
     await expect(editor).toBeFocused()
+    await expect(editor).toHaveCSS('outline-style', 'none')
     await editor.fill('Keyboard edit')
     await page.keyboard.press('Enter')
+
     await expect(firstCell).toContainText('Keyboard edit')
+    await expect(firstCell).toBeFocused()
+    await expect(editor).toBeHidden()
+
+    const scrollBeforeNavigation = await page.evaluate(() => window.scrollY)
+    await page.keyboard.press('ArrowDown')
+    await expect(secondCell).toBeFocused()
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBeforeNavigation)
+    await page.keyboard.press('ArrowUp')
+    await expect(firstCell).toBeFocused()
   })
 
   test('column resizing and autofill have keyboard equivalents', async ({ page }) => {

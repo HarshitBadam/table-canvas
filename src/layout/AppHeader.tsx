@@ -228,8 +228,8 @@ export function AppHeader({
             aria-label="Undo"
             title="Undo"
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7H5v4m0 0c2-4 7-6 11-3 3 2 4 6 2 9" />
+            <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m15 18-6-6 6-6" />
             </svg>
           </button>
           <button
@@ -240,8 +240,8 @@ export function AppHeader({
             aria-label="Redo"
             title="Redo"
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7h4v4m0 0c-2-4-7-6-11-3-3 2-4 6-2 9" />
+            <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m9 18 6-6-6-6" />
             </svg>
           </button>
         </div>
@@ -318,7 +318,7 @@ function ChartHeaderContent({
           onClick={() => openTable(chartNode.plan.sourceTableId)}
           className="ml-2 hidden max-w-48 truncate text-xs text-accent-green hover:underline xl:inline"
         >
-          Source: {sourceTableName}
+          Source - {sourceTableName}
         </button>
       )}
       <div className="flex-1" />
