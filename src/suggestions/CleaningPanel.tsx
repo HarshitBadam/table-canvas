@@ -201,7 +201,7 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       <div className="p-3 border-b border-border flex items-center justify-between">
         <span className="text-sm font-medium text-text-primary">
           {suggestionsWithEffects.length} issue{suggestionsWithEffects.length !== 1 ? 's' : ''}
-          {selectedCount > 0 && ` · ${selectedCount} selected`}
+          {selectedCount > 0 && ` - ${selectedCount} selected`}
         </span>
         <div className="flex gap-2">
           <button

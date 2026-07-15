@@ -133,7 +133,7 @@ function TableCard({
           <div>
             <h3 className="text-sm font-semibold text-text-primary">{table.tableName}</h3>
             <p className="text-xs text-text-secondary mt-0.5">
-              {table.rowCount.toLocaleString()} rows · {table.columnCount} columns · {table.freshnessLabel}
+              {table.rowCount.toLocaleString()} rows - {table.columnCount} columns - {table.freshnessLabel}
             </p>
           </div>
         </div>

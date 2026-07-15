@@ -63,13 +63,13 @@ export function Dashboard() {
           <h1 className="text-sm font-semibold text-text-primary">Project Overview</h1>
           {hasData && (
             <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-text-secondary">
-              <span className="hidden text-text-tertiary sm:inline">|</span>
+              <span className="hidden text-text-tertiary sm:inline">-</span>
               <Stat value={totalTables} label="Tables" />
-              <span className="text-text-tertiary">·</span>
+              <span className="text-text-tertiary">-</span>
               <Stat value={formatNumber(totalRows)} label="Rows" />
-              <span className="text-text-tertiary">·</span>
+              <span className="text-text-tertiary">-</span>
               <Stat value={totalColumns} label="Cols" />
-              <span className="hidden text-text-tertiary sm:inline">·</span>
+              <span className="hidden text-text-tertiary sm:inline">-</span>
               <span className="hidden sm:inline-flex">
                 <CompletenessBar value={overallCompleteness} barWidth="w-12" barHeight="h-1" />
               </span>

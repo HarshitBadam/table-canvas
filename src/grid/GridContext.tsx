@@ -19,6 +19,7 @@ export interface GridContextValue {
   isCornerSelected: boolean
   cellRangeSelection: CellRangeSelection | null
   setSelection: (selection: SelectionType) => void
+  selectCell: (rowIndex: number, columnId: string, options?: { extend?: boolean }) => void
   handleCellMouseDown: (rowIndex: number, columnId: string, e: React.MouseEvent) => void
   handleCellMouseEnter: (rowIndex: number, columnId: string) => void
   handleColumnClick: (columnId: string) => void
@@ -37,9 +38,15 @@ export interface GridContextValue {
   editingCell: { rowIndex: number; columnId: string } | null
   editValue: string
   editError: string | null
+  selectEditValue: boolean
   setEditValue: (v: string) => void
-  startEditing: (rowIndex: number, columnId: string, currentValue: CellValue) => void
-  commitEdit: () => void
+  startEditing: (
+    rowIndex: number,
+    columnId: string,
+    currentValue: CellValue,
+    options?: { initialValue?: string; selectValue?: boolean },
+  ) => void
+  commitEdit: () => boolean
   cancelEdit: () => void
 
   handleContextMenu: (

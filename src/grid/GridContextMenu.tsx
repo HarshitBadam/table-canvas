@@ -164,7 +164,7 @@ export function GridContextMenu() {
                   )}
                 </svg>
                 {cellRangeSelection 
-                  ? 'Toggle Highlight (Ctrl+H)' 
+                  ? 'Toggle Highlight (Ctrl+Shift+H)'
                   : isCurrentlyHighlighted ? 'Remove Highlight' : 'Highlight Cell'
                 }
               </button>

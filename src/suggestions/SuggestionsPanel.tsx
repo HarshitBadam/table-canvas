@@ -157,7 +157,7 @@ export function SuggestionsPanel({
                   onCountChange={setEffectiveCleaningCount}
                 />
               ) : !error ? (
-                <div className="flex-1 overflow-y-auto p-4 space-y-3" aria-busy={showLoading}>
+                <div className="flex-1 space-y-1 overflow-y-auto p-3" aria-busy={showLoading}>
                   {showLoading && (
                     <div className="space-y-3" role="status" aria-label="Analyzing table">
                       {[1, 2, 3, 4].map((i) => (
@@ -174,13 +174,12 @@ export function SuggestionsPanel({
                     />
                   )}
 
-                  {!showLoading && filteredSuggestions.map((suggestion, index) => (
+                  {!showLoading && filteredSuggestions.map((suggestion) => (
                     <SuggestionCard
                       key={suggestion.id}
                       suggestion={suggestion}
                       isExpanded={expandedId === suggestion.id}
                       isApplying={applyingId === suggestion.id}
-                      animationDelay={index * 50}
                       onToggle={() => setExpandedId(
                         expandedId === suggestion.id ? null : suggestion.id
                       )}

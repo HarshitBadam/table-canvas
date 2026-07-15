@@ -23,7 +23,7 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
   )
   const { ensureRange, isLoading, totalRows: windowedTotalRows } = windowed
   const {
-    columns, filteredRows, getColumnWidth, isEditable, isCornerSelected, selection,
+    columns, filteredRows, getColumnWidth, isEditable, isCornerSelected, selection, selectedCell,
     isIndexColumnSelected, handleCornerClick, handleContextMenu, handleRowClick,
     openContextMenu,
   } = useGridContext()
@@ -53,13 +53,20 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
     if (windowedTotalRows > 0) ensureRange(firstVisibleIndex, lastVisibleIndex)
   }, [ensureRange, firstVisibleIndex, lastVisibleIndex, windowedTotalRows])
 
+  useEffect(() => {
+    if (selectedCell) {
+      rowVirtualizer.scrollToIndex(selectedCell.rowIndex, { align: 'auto' })
+    }
+  }, [rowVirtualizer, selectedCell])
+
   if (totalRows === 0 && !isLoading) return null
 
   return (
     <div
       ref={containerRef}
       role="grid"
-      aria-label="Table data"
+      aria-label="Table data. Use arrow keys to move, Shift plus arrow keys to extend selection, F2 to edit, and Enter or Tab to confirm."
+      aria-multiselectable="true"
       aria-rowcount={totalRows + 1}
       aria-colcount={columns.length + 1}
       className="flex-1 overflow-auto select-none"

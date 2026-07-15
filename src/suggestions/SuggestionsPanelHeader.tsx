@@ -8,11 +8,11 @@ interface SuggestionsPanelHeaderProps {
 
 export function SuggestionsPanelHeader({ tableName, selectedColumnName, onClose }: SuggestionsPanelHeaderProps) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+    <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
       <div className="min-w-0">
         <Dialog.Title className="text-lg font-semibold text-text-primary">Suggestions</Dialog.Title>
         <p className="truncate text-xs text-text-tertiary">
-          {selectedColumnName ? `${tableName} · ${selectedColumnName}` : tableName}
+          {selectedColumnName ? `${tableName} - ${selectedColumnName}` : tableName}
         </p>
       </div>
       <Dialog.Close
