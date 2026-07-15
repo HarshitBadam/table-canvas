@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Patches } from '@/types'
+import type { Patches, TableSchema } from '@/types'
 
 vi.mock('./EngineAdapter', () => ({
   getEngine: vi.fn(),
 }))
 
-import { computePatchesVersion } from './cacheUtils'
+import {
+  computePatchesVersion,
+  computeSchemaFingerprint,
+  computeSourceVersionHash,
+} from './cacheUtils'
 
 function patches(value: string): Patches {
   return {
@@ -35,5 +39,58 @@ describe('computePatchesVersion', () => {
       insertedRows: [],
     }
     expect(computePatchesVersion(first)).toBe(computePatchesVersion(second))
+  })
+})
+
+describe('source schema versioning', () => {
+  const schema: TableSchema = {
+    columns: [{
+      id: 'amount',
+      name: 'Amount',
+      sourceName: 'raw_amount',
+      duckDbName: 'Amount',
+      type: 'number',
+      nullable: true,
+      isComputed: false,
+    }],
+  }
+
+  it('changes source versions for schema-only changes', () => {
+    const original = computeSourceVersionHash(
+      'table',
+      'file',
+      'patches',
+      computeSchemaFingerprint(schema),
+    )
+    const renamed = computeSourceVersionHash(
+      'table',
+      'file',
+      'patches',
+      computeSchemaFingerprint({
+        ...schema,
+        columns: [{ ...schema.columns[0], name: 'Total' }],
+      }),
+    )
+    const computed = computeSourceVersionHash(
+      'table',
+      'file',
+      'patches',
+      computeSchemaFingerprint({
+        ...schema,
+        columns: [{
+          ...schema.columns[0],
+          isComputed: true,
+          formula: '[Amount] * 2',
+        }],
+      }),
+    )
+
+    expect(new Set([original, renamed, computed])).toHaveLength(3)
+  })
+
+  it('is deterministic for equivalent schema copies', () => {
+    expect(computeSchemaFingerprint(schema)).toBe(
+      computeSchemaFingerprint(structuredClone(schema)),
+    )
   })
 })

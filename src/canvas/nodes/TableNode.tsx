@@ -156,6 +156,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             patches={data.patches}
             viewFilters={data.viewFilters}
             versionHash={data.cacheInfo?.currentVersionHash}
+            dataRevision={data.cacheInfo?.dataRevision}
           />
         )}
 

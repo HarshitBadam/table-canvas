@@ -1,2 +1,6 @@
-export { useProfilingStore, loadProfileForTable } from './profilingStore'
+export {
+  getTableProfileVersionForNode,
+  loadProfileForTable,
+  useProfilingStore,
+} from './profilingStore'
 export { useProfile } from './useProfile'

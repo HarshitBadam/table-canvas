@@ -1,16 +1,73 @@
 import { getEngine } from './EngineAdapter'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
-import { simpleHash, computeDerivedVersionHash, getEngineTableRowCount } from './cacheUtils'
+import {
+  simpleHash,
+  computeDerivedVersionHash,
+  computeSchemaFingerprint,
+  getEngineTableRowCount,
+} from './cacheUtils'
 import type { DerivedTableNode } from '@/types'
 import type { MaterializationResult } from './materializationService'
 
-export async function computeDerivedTable(tableId: string): Promise<MaterializationResult> {
-  const projectStore = useProjectStore.getState()
-  const dataStore = useDataStore.getState()
-  const node = projectStore.getTableNode(tableId) as DerivedTableNode | undefined
+interface DerivedSnapshot {
+  generation: string
+  node: DerivedTableNode
+  upstreamHashes: string[]
+  transformDefJson: string
+  currentVersionHash: string
+}
 
-  if (!node || node.kind !== 'derived_table') {
+function captureDerivedSnapshot(tableId: string): DerivedSnapshot | undefined {
+  const state = useProjectStore.getState()
+  const node = state.getTableNode(tableId)
+  if (!node || node.kind !== 'derived_table') return undefined
+
+  const upstreamHashes = node.plan.upstreamNodeIds.map((upstreamId) =>
+    state.getTableNode(upstreamId)?.cacheInfo?.currentVersionHash ?? 'missing'
+  )
+  const transformDefJson = JSON.stringify(node.plan.transformDef)
+  const currentVersionHash = computeDerivedVersionHash(
+    tableId,
+    transformDefJson,
+    upstreamHashes,
+  )
+  const generation = simpleHash(JSON.stringify({
+    currentVersionHash,
+    revision: node.cacheInfo?.dataRevision ?? 0,
+    updatedAt: node.updatedAt,
+    schema: computeSchemaFingerprint(node.schema),
+    upstreamNodeIds: node.plan.upstreamNodeIds,
+  }))
+
+  return {
+    generation,
+    node: {
+      ...node,
+      plan: {
+        ...node.plan,
+        transformDef: structuredClone(node.plan.transformDef),
+        upstreamNodeIds: [...node.plan.upstreamNodeIds],
+      },
+      schema: node.schema
+        ? { ...node.schema, columns: node.schema.columns.map((column) => ({ ...column })) }
+        : undefined,
+      cacheInfo: node.cacheInfo ? { ...node.cacheInfo } : undefined,
+    },
+    upstreamHashes,
+    transformDefJson,
+    currentVersionHash,
+  }
+}
+
+function derivedGenerationIsCurrent(tableId: string, generation: string): boolean {
+  return captureDerivedSnapshot(tableId)?.generation === generation
+}
+
+export async function computeDerivedTable(tableId: string): Promise<MaterializationResult> {
+  const snapshot = captureDerivedSnapshot(tableId)
+
+  if (!snapshot) {
     return {
       status: 'error',
       tableId,
@@ -18,54 +75,48 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
     }
   }
 
-  projectStore.updateCacheInfo(tableId, { isComputing: true, error: undefined })
+  useProjectStore.getState().updateCacheInfo(tableId, { isComputing: true })
 
   try {
     const engine = getEngine()
     await engine.init()
-
-    const upstreamHashes: string[] = []
-    for (const upstreamId of node.plan.upstreamNodeIds) {
-      const upstreamNode = projectStore.getTableNode(upstreamId)
-      if (upstreamNode?.cacheInfo?.currentVersionHash) {
-        upstreamHashes.push(upstreamNode.cacheInfo.currentVersionHash)
-      }
+    if (!derivedGenerationIsCurrent(tableId, snapshot.generation)) {
+      return { status: 'loading', tableId }
     }
 
-    const transformDefJson = JSON.stringify(node.plan.transformDef)
-    const currentVersionHash = computeDerivedVersionHash(
-      tableId,
-      transformDefJson,
-      upstreamHashes
-    )
-
     const engineRowCount = await getEngineTableRowCount(tableId)
+    if (!derivedGenerationIsCurrent(tableId, snapshot.generation)) {
+      return { status: 'loading', tableId }
+    }
     const existsInEngine = engineRowCount >= 0
-    const expectedRows = node.cacheInfo?.lastRowCount
+    const expectedRows = snapshot.node.cacheInfo?.lastRowCount
     const engineHasExpectedData =
       expectedRows !== undefined && engineRowCount === expectedRows
 
     if (
       existsInEngine &&
       engineHasExpectedData &&
-      !node.cacheInfo?.isDirty &&
-      node.cacheInfo?.currentVersionHash === currentVersionHash &&
-      node.cacheInfo?.lastUpstreamHash === upstreamHashes.join(':')
+      !snapshot.node.cacheInfo?.isDirty &&
+      snapshot.node.cacheInfo?.currentVersionHash === snapshot.currentVersionHash &&
+      snapshot.node.cacheInfo?.lastUpstreamHash === snapshot.upstreamHashes.join(':')
     ) {
-      projectStore.updateCacheInfo(tableId, { isComputing: false })
+      useProjectStore.getState().updateCacheInfo(tableId, {
+        isComputing: false,
+        error: undefined,
+      })
       return {
         status: 'cached',
         tableId,
-        rowCount: node.cacheInfo.lastRowCount,
-        schema: node.schema,
+        rowCount: snapshot.node.cacheInfo?.lastRowCount,
+        schema: snapshot.node.schema,
       }
     }
 
     const nameToId = new Map<string, string>()
     const idToName = new Map<string, string>()
 
-    for (const upstreamId of node.plan.upstreamNodeIds) {
-      const upstreamNode = projectStore.getTableNode(upstreamId)
+    for (const upstreamId of snapshot.node.plan.upstreamNodeIds) {
+      const upstreamNode = useProjectStore.getState().getTableNode(upstreamId)
       if (upstreamNode?.schema?.columns) {
         for (const col of upstreamNode.schema.columns) {
           nameToId.set(col.name, col.id)
@@ -80,7 +131,14 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
       columnIdToName[id] = name
     })
 
-    const result = await engine.executeTransform(node.plan.transformDef, tableId, columnIdToName)
+    const result = await engine.executeTransform(
+      snapshot.node.plan.transformDef,
+      tableId,
+      columnIdToName,
+    )
+    if (!derivedGenerationIsCurrent(tableId, snapshot.generation)) {
+      return { status: 'loading', tableId }
+    }
 
     if (result.schema) {
       const schemaWithIds = {
@@ -98,18 +156,18 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
         }),
       }
 
-      projectStore.updateTableSchema(tableId, schemaWithIds)
+      useProjectStore.getState().updateTableSchema(tableId, schemaWithIds)
     }
 
-    dataStore.setTableData(tableId, [])
+    useDataStore.getState().setTableData(tableId, [])
 
-    projectStore.updateCacheInfo(tableId, {
+    useProjectStore.getState().updateCacheInfo(tableId, {
       isDirty: false,
       isComputing: false,
       lastComputedAt: new Date().toISOString(),
-      currentVersionHash,
-      lastUpstreamHash: upstreamHashes.join(':'),
-      lastPlanHash: simpleHash(transformDefJson),
+      currentVersionHash: snapshot.currentVersionHash,
+      lastUpstreamHash: snapshot.upstreamHashes.join(':'),
+      lastPlanHash: simpleHash(snapshot.transformDefJson),
       lastRowCount: result.rowCount,
       error: undefined,
     })
@@ -125,10 +183,13 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error(`[MaterializationService] Error computing derived table ${tableId}:`, error)
 
-    projectStore.updateCacheInfo(tableId, {
-      isComputing: false,
-      error: errorMessage,
-    })
+    if (derivedGenerationIsCurrent(tableId, snapshot.generation)) {
+      useProjectStore.getState().updateCacheInfo(tableId, {
+        isDirty: true,
+        isComputing: false,
+        error: errorMessage,
+      })
+    }
 
     return {
       status: 'error',

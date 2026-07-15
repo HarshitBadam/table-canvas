@@ -5,18 +5,25 @@ import {
   runPhase1Profiling,
   runPhase2Profiling,
   enrichProfileWithSemanticHints,
+  getTableProfileVersionForNode,
 } from './profilingStore'
 import { useProjectStore } from '@/state/projectStore'
 
-function isProfileCurrent(computedAt: string | undefined, updatedAt: string | undefined): boolean {
-  if (!computedAt || !updatedAt) return true
-  return Date.parse(computedAt) >= Date.parse(updatedAt)
-}
-
 export function useProfile(tableId: string | null) {
-  const profile = useProfilingStore((state) => tableId ? state.profiles[tableId] : undefined)
-  const loading = useProfilingStore((state) => tableId ? state.loading[tableId] : false)
-  const tableUpdatedAt = useProjectStore((state) => tableId ? state.nodes[tableId]?.updatedAt : undefined)
+  const tableNode = useProjectStore((state) =>
+    tableId ? state.getTableNode(tableId) : undefined,
+  )
+  const tableVersion = getTableProfileVersionForNode(tableNode)
+  const profile = useProfilingStore((state) =>
+    tableId && state.profileVersions[tableId] === tableVersion
+      ? state.profiles[tableId]
+      : undefined,
+  )
+  const loading = useProfilingStore((state) =>
+    tableId
+      ? state.loading[tableId] && state.loadingVersions[tableId] === tableVersion
+      : false,
+  )
   const setProfile = useProfilingStore((state) => state.setProfile)
   const setLoading = useProfilingStore((state) => state.setLoading)
   const clearProfile = useProfilingStore((state) => state.clearProfile)
@@ -28,45 +35,47 @@ export function useProfile(tableId: string | null) {
     const currentLoading = store.loading[tableId]
     const currentProfile = store.profiles[tableId]
     
-    if (currentLoading) {
+    if (currentLoading && store.loadingVersions[tableId] === tableVersion) {
       return
     }
 
-    if (currentProfile && isProfileCurrent(currentProfile.computedAt, tableUpdatedAt)) return
+    if (currentProfile && store.profileVersions[tableId] === tableVersion) return
     if (currentProfile) clearProfile(tableId)
     
-    setLoading(tableId, true)
-    const requestedVersion = tableUpdatedAt
+    setLoading(tableId, true, tableVersion)
+    const requestedVersion = tableVersion
     const requestIsCurrent = () =>
-      useProjectStore.getState().nodes[tableId]?.updatedAt === requestedVersion
+      getTableProfileVersionForNode(
+        useProjectStore.getState().getTableNode(tableId),
+      ) === requestedVersion
     
     try {
       const loaded = await ensureTableInEngine(tableId)
       if (!loaded) {
-        setLoading(tableId, false)
+        setLoading(tableId, false, requestedVersion)
         return
       }
       
       const phase1 = await runPhase1Profiling(tableId)
       if (!requestIsCurrent()) {
-        setLoading(tableId, false)
+        setLoading(tableId, false, requestedVersion)
         return
       }
       const enrichedPhase1 = enrichProfileWithSemanticHints(phase1, tableId)
-      setProfile(tableId, enrichedPhase1)
+      setProfile(tableId, enrichedPhase1, requestedVersion)
       
       runPhase2Profiling(tableId).then(phase2 => {
         if (!requestIsCurrent()) return
         const enrichedPhase2 = enrichProfileWithSemanticHints(phase2, tableId)
-        setProfile(tableId, enrichedPhase2)
+        setProfile(tableId, enrichedPhase2, requestedVersion)
       }).catch((error) => {
         console.error('[useProfile] Phase 2 profiling failed:', error)
       })
     } catch (error) {
       console.error('[useProfile] Failed to load profile for table:', tableId, error)
-      setLoading(tableId, false)
+      setLoading(tableId, false, requestedVersion)
     }
-  }, [tableId, tableUpdatedAt, setLoading, setProfile, clearProfile])
+  }, [tableId, tableVersion, setLoading, setProfile, clearProfile])
 
   return { profile, loading, loadProfile }
 }

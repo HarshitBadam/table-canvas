@@ -17,16 +17,27 @@ export async function loadTable(conn: duckdb.AsyncDuckDBConnection, request: Loa
     .map((name, index) => `${quoteIdentifier(name)} ${mapTypeToDuckDB(data.types[index])}`)
     .join(', ')
 
-  await conn.query(`DROP TABLE IF EXISTS ${tableName}`)
-  await conn.query(`CREATE TABLE ${tableName} (${columnDefinitions})`)
+  await conn.query('BEGIN TRANSACTION')
+  try {
+    await conn.query(`DROP TABLE IF EXISTS ${tableName}`)
+    await conn.query(`CREATE TABLE ${tableName} (${columnDefinitions})`)
 
-  for (let index = 0; index < data.rows.length; index += 1000) {
-    const batch = data.rows.slice(index, index + 1000)
-    const values = batch.map(row =>
-      `(${row.map((value, columnIndex) => formatValueWithType(value, data.types[columnIndex])).join(', ')})`
-    ).join(', ')
-    const columns = data.columns.map(quoteIdentifier).join(', ')
-    await conn.query(`INSERT INTO ${tableName} (${columns}) VALUES ${values}`)
+    for (let index = 0; index < data.rows.length; index += 1000) {
+      const batch = data.rows.slice(index, index + 1000)
+      const values = batch.map(row =>
+        `(${row.map((value, columnIndex) => formatValueWithType(value, data.types[columnIndex])).join(', ')})`
+      ).join(', ')
+      const columns = data.columns.map(quoteIdentifier).join(', ')
+      await conn.query(`INSERT INTO ${tableName} (${columns}) VALUES ${values}`)
+    }
+    await conn.query('COMMIT')
+  } catch (error) {
+    try {
+      await conn.query('ROLLBACK')
+    } catch {
+      // Preserve the original load failure; the connection will surface rollback issues later.
+    }
+    throw error
   }
 }
 

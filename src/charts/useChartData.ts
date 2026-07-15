@@ -66,7 +66,21 @@ export function useChartData(
       setError(null)
 
       try {
-        await ensureTableMaterialized(sourceTableId)
+        const materialization = await ensureTableMaterialized(sourceTableId)
+        if (materialization.status === 'error') {
+          if (!cancelled) {
+            setData([])
+            setError(materialization.error || 'Failed to materialize table')
+          }
+          return
+        }
+        if (materialization.status === 'loading') {
+          if (!cancelled) {
+            setData([])
+            setError('Table data changed while loading. Please try again.')
+          }
+          return
+        }
 
         const engine = getEngine()
         await engine.init()

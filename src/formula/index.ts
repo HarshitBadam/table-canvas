@@ -16,3 +16,16 @@ export {
 export {
   suggestFormulasFromName,
 } from './suggestions'
+
+export {
+  canonicalizeFormulaReferences,
+} from './canonicalize'
+
+export type {
+  CanonicalizeFormulaResult,
+  FormulaColumnReference,
+} from './canonicalize'
+
+export {
+  evaluateComputedColumns,
+} from './computedColumns'

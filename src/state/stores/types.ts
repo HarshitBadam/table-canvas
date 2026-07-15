@@ -20,6 +20,22 @@ export interface HistoryEntry {
   description: string
 }
 
+export type ColumnOperationResult =
+  | { ok: true; columnId: string }
+  | {
+      ok: false
+      code:
+        | 'TABLE_NOT_FOUND'
+        | 'COLUMN_NOT_FOUND'
+        | 'NOT_COMPUTED'
+        | 'INVALID_NAME'
+        | 'DUPLICATE_NAME'
+        | 'INVALID_FORMULA'
+        | 'CIRCULAR_DEPENDENCY'
+        | 'COLUMN_IN_USE'
+      error: string
+    }
+
 interface HistoryState {
   past: HistoryEntry[]
   future: HistoryEntry[]
@@ -58,10 +74,12 @@ export interface NodesSliceState {
     position: Position
   }) => string
   updateTableSchema: (tableId: string, schema: TableSchema) => void
-  addColumn: (tableId: string, columnName: string, columnType?: UserColumnType) => void
-  insertColumnAt: (tableId: string, columnName: string, columnType: UserColumnType, index: number, formula?: string) => void
-  addFormulaColumn: (tableId: string, columnName: string, formula: string, columnType: UserColumnType, index?: number) => void
-  renameColumn: (tableId: string, columnId: string, newName: string) => void
+  addColumn: (tableId: string, columnName: string, columnType?: UserColumnType) => ColumnOperationResult
+  insertColumnAt: (tableId: string, columnName: string, columnType: UserColumnType, index: number, formula?: string) => ColumnOperationResult
+  addFormulaColumn: (tableId: string, columnName: string, formula: string, columnType: UserColumnType, index?: number) => ColumnOperationResult
+  updateFormulaColumn: (tableId: string, columnId: string, formula: string, columnType?: UserColumnType) => ColumnOperationResult
+  removeFormulaColumn: (tableId: string, columnId: string) => ColumnOperationResult
+  renameColumn: (tableId: string, columnId: string, newName: string) => ColumnOperationResult
   updateChartConfig: (chartId: string, updates: Partial<ChartConfig>) => void
   updateChartName: (chartId: string, name: string) => void
   setTableFilters: (tableId: string, filters: ViewFilterConfig | null) => void

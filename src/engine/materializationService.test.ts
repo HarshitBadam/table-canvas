@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DerivedTableNode, SourceTableNode, TableSchema } from '@/types'
-
 const projectStore = {
   nodes: {} as Record<string, SourceTableNode | DerivedTableNode>,
   edges: {} as Record<string, { id: string; fromNodeId: string; toNodeId: string }>,
@@ -39,11 +38,13 @@ vi.mock('papaparse', () => ({
   },
 }))
 vi.mock('xlsx', () => ({ read: vi.fn(), utils: { sheet_to_json: vi.fn() } }))
-
 import { ensureTableMaterialized, getTableData } from './materializationService'
 import { computeDerivedTable } from './derivedTableComputation'
-import { computeDerivedVersionHash, computeSourceVersionHash } from './cacheUtils'
-
+import {
+  computeDerivedVersionHash,
+  computeSchemaFingerprint,
+  computeSourceVersionHash,
+} from './cacheUtils'
 const schema: TableSchema = {
   columns: [
     { id: 'col_1', name: 'ID', type: 'string', nullable: false },
@@ -51,7 +52,6 @@ const schema: TableSchema = {
   ],
   rowCount: 10,
 }
-
 function sourceNode(id: string, cacheInfo: Partial<SourceTableNode['cacheInfo']> = {}): SourceTableNode {
   return {
     id,
@@ -77,7 +77,6 @@ function sourceNode(id: string, cacheInfo: Partial<SourceTableNode['cacheInfo']>
     updatedAt: new Date().toISOString(),
   }
 }
-
 function derivedNode(
   id: string,
   upstreamNodeIds: string[],
@@ -104,7 +103,6 @@ function derivedNode(
     updatedAt: new Date().toISOString(),
   }
 }
-
 const edge = (fromNodeId: string, toNodeId: string) => ({
   id: `edge_${fromNodeId}_${toNodeId}`,
   fromNodeId,
@@ -112,7 +110,6 @@ const edge = (fromNodeId: string, toNodeId: string) => ({
   transformType: 'filter',
 })
 const csv = (contents = 'ID,Value\n1,100') => new TextEncoder().encode(contents).buffer
-
 beforeEach(() => {
   vi.clearAllMocks()
   projectStore.nodes = {}
@@ -126,21 +123,18 @@ beforeEach(() => {
   engine.executeTransform.mockResolvedValue({ schema: { columns: [], rowCount: 10 }, rowCount: 10, preview: [] })
   engine.getSlice.mockResolvedValue({ rows: [], totalRows: 0 })
 })
-
 describe('source table materialization', () => {
   it('returns an error for a missing table', async () => {
     const result = await ensureTableMaterialized('missing')
     expect(result.status).toBe('error')
     expect(result.error).toBe('Table not found')
   })
-
   it('returns an error when the source file is missing', async () => {
     projectStore.nodes.table_1 = sourceNode('table_1', { isDirty: true, currentVersionHash: undefined })
     const result = await ensureTableMaterialized('table_1')
     expect(result.status).toBe('error')
     expect(result.error).toContain('Data file not found')
   })
-
   it('loads a dirty source table from its file', async () => {
     projectStore.nodes.table_1 = sourceNode('table_1', { isDirty: true, currentVersionHash: undefined })
     loadFile.mockResolvedValue(csv('ID,Value\n1,100\n2,200'))
@@ -164,7 +158,12 @@ describe('source table materialization', () => {
 
   it('reloads a source table when the engine row count is incomplete', async () => {
     const node = sourceNode('table_1', {
-      currentVersionHash: computeSourceVersionHash('table_1', 'file_table_1', 'none'),
+      currentVersionHash: computeSourceVersionHash(
+        'table_1',
+        'file_table_1',
+        'none',
+        computeSchemaFingerprint(schema),
+      ),
       lastRowCount: 2,
     })
     projectStore.nodes.table_1 = node
@@ -354,6 +353,7 @@ describe('materialization concurrency and errors', () => {
     expect(result.status).toBe('error')
     expect(result.error).toContain('Engine crashed')
     expect(projectStore.updateCacheInfo).toHaveBeenCalledWith('table_1', expect.objectContaining({
+      isDirty: true,
       isComputing: false,
       error: expect.stringContaining('Engine crashed'),
     }))

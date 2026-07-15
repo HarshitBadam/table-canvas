@@ -69,7 +69,19 @@ describe('evaluateFormula - Edge Cases', () => {
     expect(result.error?.message).toContain("Expected ')'")
   })
   it('handles unclosed bracket in column reference', () => {
-    expect(evaluateFormula('[price', createContext({}))).toBeDefined()
+    const result = evaluateFormula('[price', createContext({}))
+    expect(result.success).toBe(false)
+    expect(result.error?.message).toContain('Unclosed column reference')
+  })
+  it('rejects unclosed strings', () => {
+    const result = evaluateFormula('"unfinished', createContext({}))
+    expect(result.success).toBe(false)
+    expect(result.error?.message).toContain('Unclosed string literal')
+  })
+  it('rejects unknown characters instead of skipping them', () => {
+    const result = evaluateFormula('1 @ + 2', createContext({}))
+    expect(result.success).toBe(false)
+    expect(result.error?.message).toContain('Unexpected character')
   })
   it('handles function with wrong argument count', () => {
     const result = evaluateFormula('ABS(1, 2, 3)', createContext({}))

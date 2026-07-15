@@ -1,5 +1,5 @@
 import { Token, TokenType, ASTNode, FormulaError } from './types'
-import { tokenize } from './tokenizer'
+import { FormulaTokenizeError, tokenize } from './tokenizer'
 
 export interface ParseResult {
   success: boolean
@@ -44,7 +44,7 @@ class FormulaParser {
 
       return { success: true, ast }
     } catch (error) {
-      if (error instanceof ParseError) {
+      if (error instanceof ParseError || error instanceof FormulaTokenizeError) {
         return {
           success: false,
           error: {

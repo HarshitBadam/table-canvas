@@ -3,7 +3,6 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useProjectStore } from '@/state/projectStore'
 import { FilterPanel } from './FilterPanel'
 import { FormulaColumnModal } from './FormulaColumnModal'
-import { ensureTableMaterialized } from '@/engine/materializationService'
 import { GridContextMenu } from './GridContextMenu'
 import { GridToolbar } from './GridToolbar'
 import { useColumnResize } from './useColumnResize'
@@ -28,6 +27,10 @@ interface GridViewProps {
 export function GridView({ tableId }: GridViewProps) {
   const toggleCellHighlight = useProjectStore((state) => state.toggleCellHighlight)
   const clearHighlights = useProjectStore((state) => state.clearHighlights)
+  const updateCacheInfo = useProjectStore((state) => state.updateCacheInfo)
+  const updateFormulaColumn = useProjectStore((state) => state.updateFormulaColumn)
+  const removeFormulaColumn = useProjectStore((state) => state.removeFormulaColumn)
+  const undo = useProjectStore((state) => state.undo)
 
   const {
     node, columns, rows, filteredRows, unfilteredTotalRows,
@@ -108,8 +111,14 @@ export function GridView({ tableId }: GridViewProps) {
 
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const [editingFormulaColumnId, setEditingFormulaColumnId] = useState<string | null>(null)
   const [chartBuilderOpen, setChartBuilderOpen] = useState(false)
   const [chartPreselectedColumn, setChartPreselectedColumn] = useState<string | undefined>(undefined)
+  const handleRetry = useCallback(() => {
+    updateCacheInfo(tableId, { error: undefined, isDirty: true, isComputing: false })
+    setMaterializationError(null)
+    windowed.invalidate()
+  }, [setMaterializationError, tableId, updateCacheInfo, windowed])
 
   const totalRows = filteredRows.length
   const isInitialLoad = (isMaterializing || isComputing) && totalRows === 0 && !tableData?.rows?.length
@@ -138,6 +147,52 @@ export function GridView({ tableId }: GridViewProps) {
   const handleAddRow = useCallback(() => doInsertRow(getRowInsertionIndex()), [getRowInsertionIndex, doInsertRow])
   const handleAddColumn = useCallback(() => openNewColumnModal(getColumnInsertionIndex()), [getColumnInsertionIndex, openNewColumnModal])
   const handleToggleFilters = useCallback(() => setShowFilterPanel(prev => !prev), [])
+  const editingFormulaColumn = columns.find(column => column.id === editingFormulaColumnId)
+  const handleEditFormulaColumn = useCallback((columnId: string) => {
+    setContextMenu(null)
+    setEditingFormulaColumnId(columnId)
+  }, [setContextMenu])
+  const handleDeleteFormulaColumn = useCallback((columnId: string) => {
+    setContextMenu(null)
+    const column = columns.find(candidate => candidate.id === columnId)
+    if (!column?.isComputed) return
+    if (!window.confirm(`Delete formula column "${column.name}"? This removes its values from the table.`)) {
+      return
+    }
+    const result = removeFormulaColumn(tableId, columnId)
+    if (!result.ok) {
+      showGridFeedback({ message: result.error, tone: 'error' })
+      return
+    }
+    showGridFeedback({
+      message: `Formula column "${column.name}" deleted.`,
+      tone: 'success',
+      actionLabel: 'Undo',
+      onAction: () => {
+        undo()
+        showGridFeedback({ message: `Formula column "${column.name}" restored.`, tone: 'success' })
+      },
+    })
+  }, [columns, removeFormulaColumn, setContextMenu, showGridFeedback, tableId, undo])
+  const handleSaveFormula = useCallback((
+    _name: string,
+    type: Parameters<typeof updateFormulaColumn>[3],
+    formula?: string,
+  ) => {
+    if (!editingFormulaColumnId || !formula) return 'A formula is required.'
+    const result = updateFormulaColumn(tableId, editingFormulaColumnId, formula, type)
+    if (!result.ok) return result.error
+    setEditingFormulaColumnId(null)
+    showGridFeedback({
+      message: 'Formula updated.',
+      tone: 'success',
+      actionLabel: 'Undo',
+      onAction: () => {
+        undo()
+        showGridFeedback({ message: 'Formula edit undone.', tone: 'success' })
+      },
+    })
+  }, [editingFormulaColumnId, showGridFeedback, tableId, undo, updateFormulaColumn])
 
   const contextValue: GridContextValue = useMemo(() => ({
     tableId, isEditable, columns, getDisplayValue, getColumnWidth,
@@ -167,6 +222,8 @@ export function GridView({ tableId }: GridViewProps) {
     onInsertColumnAtBeginning: () => { openNewColumnModal(0); setContextMenu(null) },
     onToggleCellHighlight: toggleCellHighlight,
     onCreateChart: (colId: string) => { setChartPreselectedColumn(colId); setChartBuilderOpen(true) },
+    onEditFormulaColumn: handleEditFormulaColumn,
+    onDeleteFormulaColumn: handleDeleteFormulaColumn,
   }), [
     tableId, isEditable, columns, getDisplayValue, getColumnWidth,
     selection, selectedCell, selectedColumn, isHeaderRowSelected,
@@ -188,6 +245,7 @@ export function GridView({ tableId }: GridViewProps) {
     handleInsertColumnLeft, handleInsertColumnRight,
     doInsertRow, openNewColumnModal,
     toggleCellHighlight, setChartPreselectedColumn,
+    handleEditFormulaColumn, handleDeleteFormulaColumn,
   ])
 
   if (!node) {
@@ -227,7 +285,7 @@ export function GridView({ tableId }: GridViewProps) {
               <code className="mt-2 block max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs text-error-text">{displayError}</code>
             </details>
             <div className="mt-4 flex items-center justify-center gap-2">
-              <button type="button" onClick={() => { setMaterializationError(null); ensureTableMaterialized(tableId).then(() => windowed.invalidate()) }} className="btn btn-primary">
+              <button type="button" onClick={handleRetry} className="btn btn-primary">
                 Try Again
               </button>
             </div>
@@ -265,10 +323,7 @@ export function GridView({ tableId }: GridViewProps) {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={() => {
-                    setMaterializationError(null)
-                    void ensureTableMaterialized(tableId).then(() => windowed.invalidate())
-                  }}
+                  onClick={handleRetry}
                 >
                   Retry
                 </button>
@@ -336,6 +391,13 @@ export function GridView({ tableId }: GridViewProps) {
         <FormulaColumnModal isOpen={newColumnModal.isOpen} columns={columns}
           onConfirm={(name, type, formula) => { doInsertColumn(newColumnModal.insertIndex, name, type, formula); setNewColumnModal({ isOpen: false, insertIndex: 0 }) }}
           onCancel={() => setNewColumnModal({ isOpen: false, insertIndex: 0 })}
+        />
+        <FormulaColumnModal
+          isOpen={Boolean(editingFormulaColumn)}
+          columns={columns}
+          initialColumn={editingFormulaColumn}
+          onConfirm={handleSaveFormula}
+          onCancel={() => setEditingFormulaColumnId(null)}
         />
 
         {chartBuilderOpen && (
