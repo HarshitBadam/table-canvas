@@ -203,7 +203,7 @@ body {
     min-height: 44px;
   }
 
-  .sidebar-delete-action {
+  .sidebar-node-action {
     min-width: 44px;
     min-height: 44px;
   }
@@ -232,7 +232,7 @@ body {
 }
 
 @media (hover: none) {
-  .sidebar-delete-action {
+  .sidebar-node-action {
     opacity: 1;
   }
 }

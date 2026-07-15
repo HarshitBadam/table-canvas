@@ -6,6 +6,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { focusMenuItem } from '@/lib/focusMenuItem'
 import { useNavigation } from './NavigationContext'
 import { ProjectActionsMenu } from './ProjectActionsMenu'
+import { ProjectSwitcher } from './ProjectSwitcher'
 import type { ChartNode, ProjectNode } from '@/types'
 import type { ViewMode } from './App'
 import type { ProjectExportState } from './useProjectExport'
@@ -94,7 +95,7 @@ export function AppHeader({
   }, [])
 
   return (
-    <header className="safe-area-top flex min-h-12 shrink-0 items-center gap-2 border-b border-border bg-surface px-2 sm:gap-4 sm:px-4">
+    <header className="safe-area-top flex min-h-16 shrink-0 items-center gap-2 border-b border-border bg-surface px-2 sm:gap-3 sm:px-3">
       <button
         type="button"
         onClick={onOpenNavigation}
@@ -105,6 +106,9 @@ export function AppHeader({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
+      <div className="flex self-stretch items-center border-r border-border-subtle pr-2 sm:pr-3">
+        <ProjectSwitcher />
+      </div>
       {viewMode === 'grid' && selectedNode && (
         <GridHeaderContent
           selectedNode={selectedNode}

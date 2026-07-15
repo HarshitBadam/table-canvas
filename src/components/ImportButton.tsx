@@ -218,7 +218,7 @@ export function ImportButton() {
       <button
         onClick={handleClick}
         disabled={isImporting}
-        className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-accent-green hover:bg-accent-green-hover rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="btn btn-primary w-full gap-2"
       >
         {isImporting ? (
           <>
@@ -253,12 +253,12 @@ export function ImportButton() {
               </Dialog.Description>
             </div>
 
-            <div className="px-3 pb-3">
-              <div className="bg-surface-secondary rounded-lg overflow-hidden divide-y divide-border-subtle">
+            <div className="max-h-[min(60vh,30rem)] overflow-y-auto px-3 pb-3">
+              <div className="space-y-2">
                 {sheets.map((sheet, index) => (
                   <label
                     key={sheet.name}
-                    className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-surface-tertiary transition-colors"
+                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-border-subtle bg-surface-secondary px-3 py-2.5 transition-[background-color,border-color,box-shadow] hover:border-border hover:bg-surface-tertiary focus-within:border-accent-green focus-within:ring-2 focus-within:ring-accent-green/20"
                   >
                     <div className={`w-[22px] h-[22px] rounded-full flex items-center justify-center transition-colors ${
                       sheet.selected

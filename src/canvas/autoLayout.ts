@@ -36,6 +36,28 @@ export function getLayoutedNodes(
   const { direction = 'LR', spacing = 1 } = options
   const isVertical = direction === 'TB' || direction === 'BT'
 
+  if (edges.length === 0) {
+    const orderedNodes = direction === 'RL' || direction === 'BT'
+      ? [...nodes].reverse()
+      : nodes
+    let offset = isVertical ? LAYOUT_CONFIG.marginy : LAYOUT_CONFIG.marginx
+    const positions = new Map<string, { x: number; y: number }>()
+
+    orderedNodes.forEach((node) => {
+      positions.set(node.id, isVertical
+        ? { x: LAYOUT_CONFIG.marginx, y: offset }
+        : { x: offset, y: LAYOUT_CONFIG.marginy })
+      offset += (
+        isVertical ? getNodeHeight(node) : NODE_WIDTH
+      ) + LAYOUT_CONFIG.ranksep * spacing
+    })
+
+    return nodes.map(node => ({
+      ...node,
+      position: positions.get(node.id) ?? node.position,
+    }))
+  }
+
   const hasDataPreviewNodes = nodes.some(node => node.data?.ui?.viewMode === 'data')
 
   const dagreGraph = new dagre.graphlib.Graph()

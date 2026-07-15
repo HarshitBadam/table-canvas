@@ -8,9 +8,9 @@ import ReactFlow, {
   useEdgesState,
   NodeTypes,
   NodeMouseHandler,
-  NodeDragHandler,
   ConnectionLineType,
   type NodeProps,
+  type ReactFlowInstance,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 
@@ -75,9 +75,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   
   const [cycleWarning, setCycleWarning] = useState<string | null>(null)
   
-  const lastDragUpdate = useRef(0)
-  const DRAG_THROTTLE_MS = 16
-
   const { handleSetViewMode } = useCanvasViewMode()
 
   const requestConnection = useCallback((sourceId: string, targetId: string) => {
@@ -120,13 +117,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
           ? patches[node.id]
           : undefined,
         onSetViewMode: handleSetViewMode,
-        connectableTargets: (Object.values(projectNodes) as ProjectNode[])
-          .filter(target =>
-            target.id !== node.id
-            && (target.kind === 'source_table' || target.kind === 'derived_table'),
-          )
-          .map(target => ({ id: target.id, name: target.name })),
-        onConnectTo: requestConnection,
       },
       selected: node.id === selectedNodeId,
     }))
@@ -137,7 +127,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     profilesLoading,
     patches,
     handleSetViewMode,
-    requestConnection,
   ])
 
   const baseEdges: Edge[] = useMemo(() => {
@@ -185,6 +174,8 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null)
+  const fittedNodeKeyRef = useRef('')
 
   useEffect(() => {
     setNodes(initialNodes)
@@ -194,20 +185,23 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     setEdges(initialEdges)
   }, [initialEdges, setEdges])
 
-  const onNodeDrag: NodeDragHandler = useCallback(
-    (_, node) => {
-      const now = Date.now()
-      if (now - lastDragUpdate.current < DRAG_THROTTLE_MS) return
-      lastDragUpdate.current = now
-      
-      setNodes(currentNodes => {
-        return currentNodes.map(n =>
-          n.id === node.id ? { ...n, position: node.position } : n
-        )
+  useEffect(() => {
+    if (!flowInstance || nodes.length === 0) return
+
+    const nodeKey = nodes.map(node => node.id).sort().join('|')
+    if (fittedNodeKeyRef.current === nodeKey) return
+    fittedNodeKeyRef.current = nodeKey
+
+    const timeout = window.setTimeout(() => {
+      void flowInstance.fitView({
+        padding: 0.08,
+        maxZoom: 1.1,
+        duration: 0,
       })
-    },
-    [setNodes]
-  )
+    }, 60)
+
+    return () => window.clearTimeout(timeout)
+  }, [flowInstance, nodes])
 
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -287,14 +281,14 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={handleNodeDoubleClick}
         onPaneClick={onPaneClick}
+        onInit={setFlowInstance}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={{ padding: 0.08, maxZoom: 1.1 }}
         defaultEdgeOptions={{
           type: 'smoothstep',
           style: {
@@ -304,10 +298,9 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         }}
         connectionLineType={ConnectionLineType.SmoothStep}
         connectionLineComponent={CustomConnectionLine}
-        snapToGrid
-        snapGrid={[20, 20]}
         minZoom={0.2}
         maxZoom={2}
+        elevateNodesOnSelect={false}
         proOptions={{ hideAttribution: true }}
         className="!bg-transparent"
       >
@@ -319,7 +312,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
           showInteractive={false}
           position="bottom-left"
           style={{ marginLeft: 12, marginBottom: 12 }}
-          className="!bg-surface !border !border-border !rounded-lg !shadow-md [&>button]:!bg-surface [&>button]:!border-0 [&>button]:!text-text-secondary [&>button:hover]:!bg-surface-secondary"
+          className="!z-sticky !bg-surface !border !border-border !rounded-lg !shadow-md [&>button]:!bg-surface [&>button]:!border-0 [&>button]:!text-text-secondary [&>button:hover]:!bg-surface-secondary"
         />
         
         {Object.keys(projectNodes).length === 0 && (

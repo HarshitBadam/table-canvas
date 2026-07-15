@@ -209,19 +209,30 @@ test.describe('@ux keyboard contract', () => {
     await expect(page.getByRole('gridcell', { name: /^Name, row 2:/ })).not.toContainText('(empty)')
   })
 
-  test('tables can be connected without pointer dragging', async ({ page }) => {
+  test('table wiring opens and dismisses an accessible combine dialog', async ({ page }) => {
     await bootApp(page)
     await createManualTable(page, 'Source Table')
     await createManualTable(page, 'Target Table')
     await page.locator('aside').getByRole('button', { name: 'Canvas', exact: true }).click()
 
-    const connectSelect = page.getByLabel('Connect Source Table to another table')
-    await connectSelect.selectOption({ label: 'Target Table' })
+    await expect(page.getByText('Connect to a table…')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Arrange tables left to right' }).click()
+    const nodes = page.locator('.react-flow__node')
+    const source = nodes.filter({
+      has: page.getByRole('heading', { name: 'Source Table', exact: true }),
+    })
+    const target = nodes.filter({
+      has: page.getByRole('heading', { name: 'Target Table', exact: true }),
+    })
+    await source.locator('.table-handle-right').first().dragTo(
+      target.locator('.table-handle-left').first(),
+      { force: true },
+    )
+
     const dialog = page.getByRole('dialog', { name: 'Combine Tables' })
     await expect(dialog).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
-    await expect(connectSelect).toBeFocused()
   })
 
   test('suggestion tabs use arrow-key navigation', async ({ page }) => {
