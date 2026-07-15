@@ -136,6 +136,43 @@ describe('getFilteredSlice SQL builder', () => {
     const dataSql = mockQuery.mock.calls[1][0] as string
     expect(dataSql).toContain('"Name" IS NULL')
   })
+
+  it('ignores an incomplete date filter instead of casting an empty value', async () => {
+    await getFilteredSlice(
+      mockConn, 'test_table',
+      [{ column: 'Date', operator: 'equals', value: '', columnType: 'date' }],
+      undefined, undefined, 0, 50
+    )
+
+    expect(mockQuery).toHaveBeenCalledTimes(2)
+    for (const [sql] of mockQuery.mock.calls) {
+      expect(sql).not.toContain('WHERE')
+      expect(sql).not.toContain("CAST('' AS DATE)")
+    }
+  })
+
+  it('uses non-throwing date casts for persisted malformed values', async () => {
+    await getFilteredSlice(
+      mockConn, 'test_table',
+      [{ column: 'Date', operator: 'equals', value: 'not-a-date', columnType: 'date' }],
+      undefined, undefined, 0, 50
+    )
+
+    const dataSql = mockQuery.mock.calls[1][0] as string
+    expect(dataSql).toContain('TRY_CAST')
+    expect(dataSql).toContain("'not-a-date'")
+  })
+
+  it('ignores a partial between filter', async () => {
+    await getFilteredSlice(
+      mockConn, 'test_table',
+      [{ column: 'Date', operator: 'between', value: '2026-01-01', value2: '', columnType: 'date' }],
+      undefined, undefined, 0, 50
+    )
+
+    const dataSql = mockQuery.mock.calls[1][0] as string
+    expect(dataSql).not.toContain('WHERE')
+  })
 })
 
 describe('updateCell', () => {

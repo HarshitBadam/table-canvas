@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import ReactFlow, {
   Controls,
   Node,
@@ -55,6 +55,7 @@ interface CanvasViewProps {
 }
 
 export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasViewProps) {
+  const projectId = useProjectStore((state) => state.projectId)
   const projectNodes = useProjectStore((state) => state.nodes)
   const projectEdges = useProjectStore((state) => state.edges)
   const patches = useProjectStore((state) => state.patches)
@@ -177,31 +178,24 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null)
   const fittedNodeKeyRef = useRef('')
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setNodes(initialNodes)
-  }, [initialNodes, setNodes])
-
-  useEffect(() => {
     setEdges(initialEdges)
-  }, [initialEdges, setEdges])
+  }, [initialEdges, initialNodes, setEdges, setNodes])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!flowInstance || nodes.length === 0) return
 
-    const nodeKey = nodes.map(node => node.id).sort().join('|')
+    const nodeKey = `${projectId}:${nodes.map(node => node.id).sort().join('|')}`
     if (fittedNodeKeyRef.current === nodeKey) return
     fittedNodeKeyRef.current = nodeKey
 
-    const timeout = window.setTimeout(() => {
-      void flowInstance.fitView({
-        padding: 0.08,
-        maxZoom: 1.1,
-        duration: 0,
-      })
-    }, 60)
-
-    return () => window.clearTimeout(timeout)
-  }, [flowInstance, nodes])
+    void flowInstance.fitView({
+      padding: 0.08,
+      maxZoom: 1.1,
+      duration: 0,
+    })
+  }, [flowInstance, nodes, projectId])
 
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {

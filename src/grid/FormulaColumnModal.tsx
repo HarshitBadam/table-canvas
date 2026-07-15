@@ -147,7 +147,7 @@ export function FormulaColumnModal({
               type="text"
               value={columnName}
               onChange={(e) => setColumnName(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-colors"
+              className="input rounded-lg px-3 py-2"
               placeholder="Enter column name..."
               autoFocus
             />
@@ -206,27 +206,27 @@ export function FormulaColumnModal({
                     aria-pressed={staticType === type.value}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
                       staticType === type.value
-                        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                        ? 'border border-accent-green/30 bg-accent-green/10'
                         : 'bg-gray-50 dark:bg-gray-800 border border-transparent hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold ${
                       staticType === type.value
-                        ? 'bg-green-500 text-white'
+                        ? 'bg-accent-green text-white'
                         : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                     }`}>
                       {type.value === 'string' ? 'T' : type.value === 'number' ? '#' : type.value === 'boolean' ? '?' : 'D'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className={`text-sm font-medium ${
-                        staticType === type.value ? 'text-green-700 dark:text-green-400' : 'text-gray-900 dark:text-gray-100'
+                        staticType === type.value ? 'text-accent-text' : 'text-gray-900 dark:text-gray-100'
                       }`}>
                         {type.label}
                       </div>
                       <div className="text-xs text-gray-500">{type.desc}</div>
                     </div>
                     {staticType === type.value && (
-                      <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-5 h-5 text-accent-green" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     )}
@@ -239,8 +239,8 @@ export function FormulaColumnModal({
           {isFormula && (
             <>
               {formulaSuggestions.length > 0 && (
-                <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800">
-                  <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide mb-2">
+                <div className="rounded-lg border border-accent-green/20 bg-accent-green/10 p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-accent-text">
                     Suggested Formula
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -251,8 +251,8 @@ export function FormulaColumnModal({
                         onClick={() => handleSuggestionClick(s)}
                         className={`px-2.5 py-1.5 rounded-md text-xs font-mono transition-all ${
                           formula === s.formula
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-white dark:bg-gray-800 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700 hover:border-emerald-400'
+                            ? 'bg-accent-green text-white'
+                            : 'border border-accent-green/30 bg-surface text-accent-text hover:border-accent-green'
                         }`}
                       >
                         {s.formula}
@@ -266,7 +266,7 @@ export function FormulaColumnModal({
                 <div className="flex items-center justify-between mb-1.5">
                   <label htmlFor="formula-column-expression" className="text-xs font-medium text-gray-700 dark:text-gray-300">Formula</label>
                   {formula && !formulaErrors.length && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">
+                    <span className="rounded-full bg-accent-green/10 px-2 py-0.5 text-xs font-medium text-accent-text">
                       Returns {inferredType}
                     </span>
                   )}
@@ -276,10 +276,10 @@ export function FormulaColumnModal({
                   value={formula}
                   onChange={(e) => setFormula(e.target.value)}
                   placeholder='e.g., [unit_price] * [quantity]'
-                  className={`w-full px-3 py-2.5 rounded-lg border text-sm font-mono focus:outline-none focus:ring-2 transition-all resize-none ${
+                  className={`w-full resize-none rounded-lg border px-3 py-2.5 font-mono text-sm transition-colors ${
                     formulaErrors.length 
-                      ? 'border-red-300 bg-red-50 dark:bg-red-900/10 focus:ring-red-500/20 focus:border-red-500' 
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-green-500/20 focus:border-green-500'
+                      ? 'border-red-300 bg-red-50 dark:bg-red-900/10'
+                      : 'border-border bg-surface'
                   }`}
                   rows={3}
                   spellCheck={false}
@@ -336,7 +336,7 @@ export function FormulaColumnModal({
                               onClick={() => insertIntoFormula(`${fn.name}(`)}
                               className="w-full px-3 py-1.5 text-left hover:bg-white dark:hover:bg-gray-700 transition-colors"
                             >
-                              <div className="text-xs font-mono font-semibold text-green-600 dark:text-green-500">
+                              <div className="font-mono text-xs font-semibold text-accent-text">
                                 {fn.name}
                               </div>
                               <div className="text-xs text-gray-500 leading-tight">

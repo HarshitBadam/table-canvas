@@ -25,6 +25,7 @@ import { useDataStore } from './dataStore'
 import { useAuthState } from './useAuthState'
 import {
   clearProjectRuntime,
+  hasProjectTables,
   initializeEngine,
   loadOrCreateProject,
   materializeProjectTables,
@@ -34,17 +35,14 @@ import {
   type AppContextValue,
   type AppPhase,
 } from './appContextValue'
-
 const PHASE_MESSAGES: Record<AppPhase, string> = {
   idle: 'Starting...',
   initializing_engine: 'Starting data engine...',
   checking_auth: 'Checking authentication...',
   loading_project: 'Loading your project...',
-  materializing: 'Preparing tables...',
   ready: 'Ready',
   error: 'Something went wrong',
 }
-
 type AppState = Pick<
   AppContextValue,
   | 'phase'
@@ -58,7 +56,6 @@ type AppState = Pick<
   | 'isSaving'
   | 'error'
 >
-
 export function AppProvider({ children }: { children: ReactNode }) {
   const {
     user,
@@ -131,7 +128,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const flushProjectSave = useCallback(async () => {
     await saveLatestProject()
     const projectId = useProjectStore.getState().projectId
-    if (projectId) await flushProjectSaveWithSync(projectId)
+    if (!projectId) return
+    try {
+      await flushProjectSaveWithSync(projectId)
+    } catch (error) {
+      console.warn('[AppContext] Remote save deferred:', error)
+    }
   }, [saveLatestProject])
 
   const setPhase = useCallback((phase: AppPhase, error?: string) => {
@@ -151,13 +153,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       nodes: project.nodes,
       edges: project.edges,
       patches: project.patches,
+      selectedNodeId: null,
+      history: { past: [], future: [] },
     })
     await useReportStore.getState().initializeProject(project.id)
-    if (hasTables(project.nodes)) {
-      setPhase('materializing')
+    if (hasProjectTables(project.nodes)) {
       await materializeProjectTables(project.nodes)
     }
-  }, [setPhase])
+  }, [])
 
   useEffect(() => {
     setState(previous => ({ ...previous, user, isAuthenticated }))
@@ -291,27 +294,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await flushProjectSave()
     await useReportStore.getState().flushSaves()
     setPhase('loading_project')
-    const project = await createProjectWithSync(name || 'Untitled Project')
-    await prepareProject(project)
-    setState(previous => ({
-      ...previous,
-      projectId: project.id,
-      projectName: project.name,
-      projects: [{
-        id: project.id,
-        name: project.name,
-        updatedAt: new Date(),
-        createdAt: new Date(),
-      }, ...previous.projects],
-    }))
-    setPhase('ready')
+    try {
+      const project = await createProjectWithSync(name || 'Untitled Project')
+      await prepareProject(project)
+      setState(previous => ({
+        ...previous,
+        projectId: project.id,
+        projectName: project.name,
+        projects: [{
+          id: project.id,
+          name: project.name,
+          updatedAt: new Date(),
+          createdAt: new Date(),
+        }, ...previous.projects],
+      }))
+      setPhase('ready')
+    } catch (error) {
+      setPhase('ready')
+      throw error
+    }
   }, [flushProjectSave, prepareProject, setPhase, state.projects.length, user?.tier])
 
   const loadProject = useCallback(async (projectId: string) => {
     try {
       await flushProjectSave()
       await useReportStore.getState().flushSaves()
-      setPhase('loading_project')
       const project = await loadProjectWithSync(projectId)
       if (!project) throw new Error('Project not found')
       await prepareProject(project)
@@ -322,7 +329,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }))
       setPhase('ready')
     } catch (error) {
-      setPhase('error', error instanceof Error ? error.message : 'Failed to load project')
+      console.error('[AppContext] Failed to load project:', error)
     }
   }, [flushProjectSave, prepareProject, setPhase])
 
@@ -386,10 +393,4 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProjectLimitViolation,
   }
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
-}
-
-function hasTables(nodes: Record<string, { kind: string }>): boolean {
-  return Object.values(nodes).some(
-    node => node.kind === 'source_table' || node.kind === 'derived_table',
-  )
 }

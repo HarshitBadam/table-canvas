@@ -4,24 +4,27 @@ export { setToastHandler } from './types'
 export { setRecipeWizardCallback, executeRecipeTransform } from './utilityCommands'
 
 import type { Suggestion } from '@/types'
-import type { SuggestionCommand, CommandResult } from './types'
+import type { SuggestionCommand, CommandResult, CommandExecutionOptions } from './types'
 import { CreateDerivedTableCommand, ApplyPatchCommand } from './tableCommands'
 import { CreateChartCommand } from './chartCommand'
 import { HighlightCellsCommand, LaunchRecipeCommand } from './utilityCommands'
 import { useSuggestionsStore } from '../suggestionsStore'
 
-function createCommand(suggestion: Suggestion): SuggestionCommand | null {
+function createCommand(
+  suggestion: Suggestion,
+  options: CommandExecutionOptions,
+): SuggestionCommand | null {
   const action = suggestion.action
 
   switch (action.kind) {
     case 'createDerivedTable':
-      return new CreateDerivedTableCommand(suggestion, action)
+      return new CreateDerivedTableCommand(suggestion, action, options)
 
     case 'createChart':
-      return new CreateChartCommand(suggestion, action)
+      return new CreateChartCommand(suggestion, action, options)
 
     case 'applyPatch':
-      return new ApplyPatchCommand(suggestion, action)
+      return new ApplyPatchCommand(suggestion, action, options)
 
     case 'launchRecipe':
       return new LaunchRecipeCommand(suggestion, action)
@@ -34,7 +37,10 @@ function createCommand(suggestion: Suggestion): SuggestionCommand | null {
   }
 }
 
-export async function applySuggestion(suggestion: Suggestion): Promise<CommandResult> {
+export async function applySuggestion(
+  suggestion: Suggestion,
+  options: CommandExecutionOptions = {},
+): Promise<CommandResult> {
   if (suggestion.category === 'cleaning' && suggestion.context.cleaningOperation) {
     return {
       success: false,
@@ -43,7 +49,7 @@ export async function applySuggestion(suggestion: Suggestion): Promise<CommandRe
     }
   }
 
-  const command = createCommand(suggestion)
+  const command = createCommand(suggestion, options)
 
   if (!command) {
     return {

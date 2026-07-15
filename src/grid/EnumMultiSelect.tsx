@@ -51,13 +51,13 @@ export function EnumMultiSelect({
               bg-white dark:bg-gray-800
               border border-gray-200 dark:border-gray-700 rounded-md
               text-gray-900 dark:text-gray-100 placeholder:text-gray-400
-              focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
+              focus:border-accent-green
               transition-all duration-150"
           />
         </div>
         <button
           onClick={selectAll}
-          className="px-2 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded"
+          className="rounded px-2 py-1 text-xs font-medium text-accent-text hover:bg-accent-green/10"
         >
           All
         </button>
@@ -75,12 +75,12 @@ export function EnumMultiSelect({
             <span
               key={val}
               className="inline-flex items-center gap-1 px-2 py-0.5
-                bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-xs font-medium rounded-full"
+                bg-accent-green/10 text-accent-text text-xs font-medium rounded-full"
             >
               {val}
               <button
                 onClick={() => toggleValue(val)}
-                className="hover:bg-emerald-200 dark:hover:bg-emerald-800 rounded-full p-0.5 transition-colors"
+                className="rounded-full p-0.5 transition-colors hover:bg-accent-green/15"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -112,7 +112,7 @@ export function EnumMultiSelect({
                   className={`
                     flex items-center gap-2.5 px-3 py-2 cursor-pointer
                     transition-colors duration-100
-                    ${isSelected ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}
+                    ${isSelected ? 'bg-accent-green/10' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}
                   `}
                 >
                   <input
@@ -120,7 +120,7 @@ export function EnumMultiSelect({
                     checked={isSelected}
                     onChange={() => toggleValue(strVal)}
                     className="w-4 h-4 rounded border-gray-300 dark:border-gray-600
-                      text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0
+                      text-accent-green
                       cursor-pointer"
                   />
                   <span className={`text-sm ${isSelected ? 'font-medium text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400'}`}>

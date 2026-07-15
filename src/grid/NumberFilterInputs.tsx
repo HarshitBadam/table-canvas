@@ -17,7 +17,7 @@ export function NumberInput({
         bg-white dark:bg-gray-800
         border border-gray-200 dark:border-gray-700 rounded-lg
         text-gray-900 dark:text-gray-100
-        focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
+        focus:border-accent-green
         transition-all duration-150"
     />
   )
@@ -45,7 +45,7 @@ export function NumberRangeInput({
           bg-white dark:bg-gray-800
           border border-gray-200 dark:border-gray-700 rounded-lg
           text-gray-900 dark:text-gray-100
-          focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
+          focus:border-accent-green
           transition-all duration-150"
       />
       <span className="text-gray-400 text-sm shrink-0">to</span>
@@ -58,7 +58,7 @@ export function NumberRangeInput({
           bg-white dark:bg-gray-800
           border border-gray-200 dark:border-gray-700 rounded-lg
           text-gray-900 dark:text-gray-100
-          focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
+          focus:border-accent-green
           transition-all duration-150"
       />
     </div>

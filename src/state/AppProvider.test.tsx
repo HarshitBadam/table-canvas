@@ -10,6 +10,7 @@ const loadOrCreateProject = vi.hoisted(() => vi.fn())
 const initializeEngine = vi.hoisted(() => vi.fn())
 const clearProjectRuntime = vi.hoisted(() => vi.fn())
 const materializeProjectTables = vi.hoisted(() => vi.fn())
+const hasProjectTables = vi.hoisted(() => vi.fn())
 const initializeReports = vi.hoisted(() => vi.fn())
 const flushReportSaves = vi.hoisted(() => vi.fn())
 
@@ -41,6 +42,7 @@ vi.mock('@/persistence/syncService', () => ({
 }))
 vi.mock('./projectLifecycle', () => ({
   clearProjectRuntime,
+  hasProjectTables,
   initializeEngine,
   loadOrCreateProject,
   materializeProjectTables,
@@ -74,10 +76,12 @@ function project(id: string, name: string) {
 
 function Harness() {
   const app = useApp()
+  const storeProjectId = useProjectStore(state => state.projectId)
   return (
     <div>
       <span data-testid="phase">{app.phase}</span>
       <span data-testid="project">{app.projectId}</span>
+      <span data-testid="store-project">{storeProjectId}</span>
       <span data-testid="project-name">{app.projectName}</span>
       <button onClick={() => void app.loadProject('next-project')}>Load next</button>
       <button onClick={() => app.renameProject('Renamed project')}>Rename</button>
@@ -100,6 +104,7 @@ beforeEach(() => {
   })
   initializeEngine.mockResolvedValue(undefined)
   clearProjectRuntime.mockResolvedValue(undefined)
+  hasProjectTables.mockReturnValue(false)
   materializeProjectTables.mockResolvedValue({ completedTableIds: [], failures: [] })
   initializeReports.mockResolvedValue(undefined)
   flushReportSaves.mockResolvedValue(undefined)
@@ -186,5 +191,80 @@ describe('AppProvider project lifecycle', () => {
       .toBeLessThan(loadProjectWithSync.mock.invocationCallOrder[0])
     expect(flushReportSaves.mock.invocationCallOrder[0])
       .toBeLessThan(loadProjectWithSync.mock.invocationCallOrder[0])
+  })
+
+  it('still switches from the local save when the remote flush is unavailable', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    flushProjectSaveWithSync.mockRejectedValueOnce(new Error('Load failed'))
+    render(
+      <AppProvider>
+        <Harness />
+      </AppProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load next' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('project')).toHaveTextContent('next-project')
+      expect(screen.getByTestId('phase')).toHaveTextContent('ready')
+    })
+    expect(saveProjectWithSync).toHaveBeenCalled()
+    expect(loadProjectWithSync).toHaveBeenCalledWith('next-project')
+    expect(warning).toHaveBeenCalledWith(
+      '[AppContext] Remote save deferred:',
+      expect.any(Error),
+    )
+    warning.mockRestore()
+  })
+
+  it('keeps the current workspace ready while the next project loads', async () => {
+    const next = project('next-project', 'Next')
+    let resolveLoad!: (value: typeof next) => void
+    loadProjectWithSync.mockReturnValueOnce(new Promise((resolve) => {
+      resolveLoad = resolve
+    }))
+    render(
+      <AppProvider>
+        <Harness />
+      </AppProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load next' }))
+    await waitFor(() => expect(loadProjectWithSync).toHaveBeenCalledWith('next-project'))
+
+    expect(screen.getByTestId('phase')).toHaveTextContent('ready')
+    expect(screen.getByTestId('project')).toHaveTextContent('current-project')
+
+    resolveLoad(next)
+    await waitFor(() => {
+      expect(screen.getByTestId('project')).toHaveTextContent('next-project')
+    })
+  })
+
+  it('keeps the app mounted while tables materialize during a switch', async () => {
+    let resolveMaterialization!: () => void
+    hasProjectTables.mockReturnValueOnce(false).mockReturnValue(true)
+    materializeProjectTables.mockReturnValueOnce(new Promise((resolve) => {
+      resolveMaterialization = () => resolve({ completedTableIds: [], failures: [] })
+    }))
+    render(
+      <AppProvider>
+        <Harness />
+      </AppProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load next' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('store-project')).toHaveTextContent('next-project')
+    })
+
+    expect(screen.getByTestId('phase')).toHaveTextContent('ready')
+    resolveMaterialization()
+    await waitFor(() => {
+      expect(screen.getByTestId('project')).toHaveTextContent('next-project')
+    })
   })
 })
