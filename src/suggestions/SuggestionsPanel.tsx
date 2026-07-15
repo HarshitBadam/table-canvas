@@ -11,6 +11,7 @@ import { SuggestionsPanelHeader } from './SuggestionsPanelHeader'
 import { CategoryTabs } from './CategoryTabs'
 import { useSuggestionsStore } from './suggestionsStore'
 import { useSuggestionsPanel } from './useSuggestionsPanel'
+import { useNavigation } from '@/layout/NavigationContext'
 import type { Suggestion, TransformDef } from '@/types'
 
 interface SuggestionsPanelProps {
@@ -26,6 +27,7 @@ export function SuggestionsPanel({
   tableId,
   selectedColumnId,
 }: SuggestionsPanelProps) {
+  const { openTable, openChart } = useNavigation()
   const {
     node,
     filteredSuggestions,
@@ -46,6 +48,14 @@ export function SuggestionsPanel({
   const [applyingId, setApplyingId] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastNotification | null>(null)
   const [recipeWizardSuggestion, setRecipeWizardSuggestion] = useState<Suggestion | null>(null)
+  const navigateToNode = useCallback((nodeId: string, kind: 'table' | 'chart') => {
+    onClose()
+    if (kind === 'chart') {
+      openChart(nodeId)
+    } else {
+      openTable(nodeId)
+    }
+  }, [onClose, openChart, openTable])
 
   useEffect(() => {
     setToastHandler((notification) => {
@@ -70,7 +80,7 @@ export function SuggestionsPanel({
 
     setApplyingId(suggestion.id)
     try {
-      const result = await applySuggestion(suggestion)
+      const result = await applySuggestion(suggestion, { navigateToNode })
       if (!result.success) {
         setToast({
           type: 'error',
@@ -86,7 +96,7 @@ export function SuggestionsPanel({
     } finally {
       setApplyingId(null)
     }
-  }, [setActiveCategory])
+  }, [navigateToNode, setActiveCategory])
 
   if (!isOpen) return null
 
@@ -199,7 +209,12 @@ export function SuggestionsPanel({
         onExecute={async (transform: TransformDef, tableName: string) => {
           if (recipeWizardSuggestion) {
             const sourceTableId = recipeWizardSuggestion.context.tableId
-            const result = await executeRecipeTransform(transform, tableName, sourceTableId)
+            const result = await executeRecipeTransform(
+              transform,
+              tableName,
+              sourceTableId,
+              { navigateToNode },
+            )
             if (result.success) {
               useSuggestionsStore.getState().consumeSuggestion(recipeWizardSuggestion.id)
             } else {

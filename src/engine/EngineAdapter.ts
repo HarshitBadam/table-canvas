@@ -36,6 +36,7 @@ function remapRowsToColumnIds(
 class EngineAdapter {
   private rpc: WorkerRPC
   private initialized = false
+  private initPromise: Promise<void> | null = null
 
   private constructor() {
     const worker = new EngineWorker()
@@ -51,10 +52,19 @@ class EngineAdapter {
 
   async init(): Promise<void> {
     if (this.initialized) return
-    
-    await this.rpc.waitForReady()
-    await this.rpc.call('init', {})
-    this.initialized = true
+    if (!this.initPromise) {
+      this.initPromise = (async () => {
+        await this.rpc.waitForReady()
+        await this.rpc.call('init', {})
+        this.initialized = true
+      })()
+    }
+    try {
+      await this.initPromise
+    } catch (error) {
+      this.initPromise = null
+      throw error
+    }
   }
 
   async loadTable(

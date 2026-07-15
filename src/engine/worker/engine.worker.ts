@@ -11,35 +11,50 @@ import { executeTransform } from './transforms'
 
 let db: duckdb.AsyncDuckDB | null = null
 let conn: duckdb.AsyncDuckDBConnection | null = null
+let initPromise: Promise<void> | null = null
 
 async function initDuckDB(): Promise<void> {
-  if (db) return
+  if (db && conn) return
+  if (initPromise) return initPromise
 
-  const LOCAL_BUNDLES: duckdb.DuckDBBundles = {
-    mvp: {
-      mainModule: '/duckdb/duckdb-mvp.wasm',
-      mainWorker: '/duckdb/duckdb-browser-mvp.worker.js',
-    },
-    eh: {
-      mainModule: '/duckdb/duckdb-eh.wasm',
-      mainWorker: '/duckdb/duckdb-browser-eh.worker.js',
-    },
-    coi: {
-      mainModule: '/duckdb/duckdb-coi.wasm',
-      mainWorker: '/duckdb/duckdb-browser-coi.worker.js',
-      pthreadWorker: '/duckdb/duckdb-browser-coi.pthread.worker.js',
-    },
+  initPromise = (async () => {
+    const LOCAL_BUNDLES: duckdb.DuckDBBundles = {
+      mvp: {
+        mainModule: '/duckdb/duckdb-mvp.wasm',
+        mainWorker: '/duckdb/duckdb-browser-mvp.worker.js',
+      },
+      eh: {
+        mainModule: '/duckdb/duckdb-eh.wasm',
+        mainWorker: '/duckdb/duckdb-browser-eh.worker.js',
+      },
+      coi: {
+        mainModule: '/duckdb/duckdb-coi.wasm',
+        mainWorker: '/duckdb/duckdb-browser-coi.worker.js',
+        pthreadWorker: '/duckdb/duckdb-browser-coi.pthread.worker.js',
+      },
+    }
+
+    const bundle = await duckdb.selectBundle(LOCAL_BUNDLES)
+    const worker = new Worker(bundle.mainWorker!)
+    const logger = new duckdb.ConsoleLogger()
+    const nextDb = new duckdb.AsyncDuckDB(logger, worker)
+
+    try {
+      await nextDb.instantiate(bundle.mainModule, bundle.pthreadWorker)
+      await nextDb.open({ path: ':memory:' })
+      const nextConn = await nextDb.connect()
+      db = nextDb
+      conn = nextConn
+    } catch (error) {
+      await nextDb.terminate().catch(() => undefined)
+      throw error
+    }
+  })()
+  try {
+    await initPromise
+  } finally {
+    initPromise = null
   }
-
-  const bundle = await duckdb.selectBundle(LOCAL_BUNDLES)
-
-  const worker = new Worker(bundle.mainWorker!)
-  const logger = new duckdb.ConsoleLogger()
-  db = new duckdb.AsyncDuckDB(logger, worker)
-
-  await db.instantiate(bundle.mainModule, bundle.pthreadWorker)
-
-  conn = await db.connect()
 }
 
 function requireConn(): duckdb.AsyncDuckDBConnection {
@@ -47,8 +62,8 @@ function requireConn(): duckdb.AsyncDuckDBConnection {
   return conn
 }
 
-self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
-  const { id, type, payload } = event.data
+async function handleRequest(request: WorkerRequest): Promise<void> {
+  const { id, type, payload } = request
 
   try {
     let result: unknown
@@ -146,6 +161,13 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     }
     self.postMessage(response)
   }
+}
+
+let requestQueue = Promise.resolve()
+
+self.onmessage = (event: MessageEvent<WorkerRequest>) => {
+  const request = event.data
+  requestQueue = requestQueue.then(() => handleRequest(request))
 }
 
 self.postMessage({ type: 'ready' })

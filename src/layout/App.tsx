@@ -1,4 +1,4 @@
-import { useState, useCallback, lazy, Suspense, useMemo } from 'react'
+import { useState, useCallback, lazy, Suspense, useEffect, useMemo } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { AppHeader } from './AppHeader'
@@ -76,6 +76,7 @@ function MainApp() {
   const [navigationOpen, setNavigationOpen] = useState(false)
 
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
+  const activeProjectId = useProjectStore((state) => state.projectId)
   const selectedNode = useProjectStore((state) =>
     state.selectedNodeId ? state.nodes[state.selectedNodeId] : null
   )
@@ -85,6 +86,14 @@ function MainApp() {
   const selectedReportId = useReportStore((state) => state.selectedReportId)
 
   const reportId = selectedReportId || Object.keys(reports)[0] || null
+  const visibleViewMode = !selectedNodeId && (viewMode === 'grid' || viewMode === 'chart')
+    ? 'canvas'
+    : viewMode
+
+  useEffect(() => {
+    setViewMode('canvas')
+    setNavigationOpen(false)
+  }, [activeProjectId])
 
   const handleBackToCanvas = useCallback(() => {
     setViewMode('canvas')
@@ -142,7 +151,7 @@ function MainApp() {
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <AppHeader
-            viewMode={viewMode}
+            viewMode={visibleViewMode}
             selectedNode={selectedNode}
             exportState={exportState}
             onBackToCanvas={handleBackToCanvas}
@@ -155,27 +164,27 @@ function MainApp() {
                 <LoadingSpinner />
               </div>
             }>
-              {viewMode === 'canvas' && (
+              {visibleViewMode === 'canvas' && (
                 <ErrorBoundary name="CanvasView">
                   <CanvasView onNodeDoubleClick={handleNodeDoubleClick} />
                 </ErrorBoundary>
               )}
-              {viewMode === 'grid' && selectedNodeId && (
+              {visibleViewMode === 'grid' && selectedNodeId && (
                 <ErrorBoundary name="GridView">
                   <GridView tableId={selectedNodeId} />
                 </ErrorBoundary>
               )}
-              {viewMode === 'chart' && selectedNodeId && (
+              {visibleViewMode === 'chart' && selectedNodeId && (
                 <ErrorBoundary name="ChartView">
                   <ChartView chartId={selectedNodeId} />
                 </ErrorBoundary>
               )}
-              {viewMode === 'dashboard' && (
+              {visibleViewMode === 'dashboard' && (
                 <ErrorBoundary name="Dashboard">
                   <Dashboard />
                 </ErrorBoundary>
               )}
-              {viewMode === 'report' && (
+              {visibleViewMode === 'report' && (
                 <ErrorBoundary name="ReportView">
                   <ReportView reportId={reportId} onOpenTable={handleOpenTable} />
                 </ErrorBoundary>
@@ -183,7 +192,7 @@ function MainApp() {
             </Suspense>
           </div>
           <MobileBottomNav
-            viewMode={viewMode}
+            viewMode={visibleViewMode}
             onOpenCanvas={handleBackToCanvas}
             onOpenDashboard={handleOpenDashboard}
             onOpenReport={handleOpenReport}

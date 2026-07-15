@@ -11,6 +11,7 @@ import { generateId } from '@/lib/utils'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
 import { createInitialPatches } from './patchesSlice'
 import { createColumnOps } from './nodesColumnOps'
+import { createChartOps } from './nodesChartOps'
 import { applyNodeDuplicate, prepareNodeDuplicate } from './duplicateNode'
 
 export const createNodesSlice: StateCreator<
@@ -238,6 +239,8 @@ export const createNodesSlice: StateCreator<
 
     return id
   },
+
+  ...createChartOps(set, get),
 
   updateTableSchema: (tableId, schema) => {
     set((state) => {

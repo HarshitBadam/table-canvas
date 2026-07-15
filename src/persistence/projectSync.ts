@@ -181,7 +181,7 @@ export async function createProjectWithSync(name = 'Untitled Project'): Promise<
     }
   }
   const project: ProjectWithSync = {
-    id: `local_${Date.now()}`,
+    id: createLocalId('local'),
     name,
     nodes: {},
     edges: {},
@@ -219,14 +219,21 @@ export async function flushProjectSaveWithSync(projectId: string): Promise<void>
 
   const pending = pendingBackendSaves.get(projectId)
   if (!pending) return
-  pendingBackendSaves.delete(projectId)
-  await saveToBackend(
-    projectId,
-    pending.name,
-    pending.nodes,
-    pending.edges,
-    pending.patches,
-  )
+  try {
+    await saveToBackend(
+      projectId,
+      pending.name,
+      pending.nodes,
+      pending.edges,
+      pending.patches,
+    )
+    if (pendingBackendSaves.get(projectId) === pending) {
+      pendingBackendSaves.delete(projectId)
+    }
+  } catch (error) {
+    pendingBackendSaves.set(projectId, pending)
+    throw error
+  }
 }
 
 export async function saveProjectWithSync(
@@ -314,7 +321,7 @@ export async function importProjectWithSync(project: Omit<ProjectWithSync, 'id' 
       }
     }
   }
-  const result = { ...project, id: `local_${Date.now()}`, isLocalOnly: true, needsSync: true }
+  const result = { ...project, id: createLocalId('local'), isLocalOnly: true, needsSync: true }
   await saveProjectLocal(result.id, result.name, result.nodes, result.edges, result.patches)
   return result
 }
@@ -326,17 +333,11 @@ export async function syncLocalProjectsToBackend(): Promise<void> {
     const project = await loadProjectLocal(summary.id)
     if (!project) continue
     let createdProjectId: string | undefined
+    let promotionCommitted = false
     try {
       const created = await createProject({ name: project.name })
       createdProjectId = created.id
       const nodes = await promoteLocalFileRefs(created.id, project.nodes)
-      await updateProject(created.id, {
-        name: project.name,
-        nodes,
-        edges: project.edges,
-        patches: project.patches,
-      })
-      await deleteProjectLocal(summary.id)
       await saveProjectLocal(
         created.id,
         project.name,
@@ -344,9 +345,17 @@ export async function syncLocalProjectsToBackend(): Promise<void> {
         project.edges,
         deserializePatches(project.patches),
       )
+      await deleteProjectLocal(summary.id)
+      promotionCommitted = true
+      await updateProject(created.id, {
+        name: project.name,
+        nodes,
+        edges: project.edges,
+        patches: project.patches,
+      })
     } catch (error) {
       console.error('[syncService] Failed to sync local project to backend:', error)
-      if (createdProjectId) {
+      if (createdProjectId && !promotionCommitted) {
         try {
           await deleteProjectRemote(createdProjectId)
         } catch (cleanupError) {
@@ -355,4 +364,11 @@ export async function syncLocalProjectsToBackend(): Promise<void> {
       }
     }
   }
+}
+
+function createLocalId(prefix: 'local'): string {
+  const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}_${Math.random().toString(36).slice(2)}`
+  return `${prefix}_${suffix}`
 }

@@ -175,7 +175,7 @@ export function ProjectSwitcher() {
               focusProjectOption(event.key === 'ArrowDown' ? 'active' : 'last')
             }
           }}
-          className="group flex h-12 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left outline-none transition-colors hover:bg-surface-tertiary focus-visible:ring-2 focus-visible:ring-accent-green/30 disabled:cursor-not-allowed disabled:opacity-60"
+          className="group flex h-12 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left transition-colors hover:bg-surface-tertiary disabled:cursor-not-allowed disabled:opacity-60"
         >
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-green/10 text-accent-text">
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
@@ -209,34 +209,29 @@ export function ProjectSwitcher() {
               {projects.map(project => {
                 const active = project.id === projectId
                 return (
-                  <div key={project.id} className={`flex items-center rounded-md transition-colors ${
-                    active ? 'bg-accent-green/10 hover:bg-accent-green/15' : 'hover:bg-surface-tertiary'
-                  }`}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      onClick={() => {
-                        setMenuOpen(false)
-                        setIsRenaming(false)
-                        if (!active) void loadProject(project.id)
-                      }}
-                      className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-green ${
-                        active ? 'font-medium text-accent-text' : 'text-text-primary'
-                      }`}
-                    >
-                      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                        active ? 'bg-accent-green text-white' : 'border border-border bg-surface'
-                      }`}>
-                        {active && (
-                          <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate">{project.name}</span>
-                    </button>
-                  </div>
+                  <button
+                    key={project.id}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setIsRenaming(false)
+                      if (!active) void loadProject(project.id)
+                    }}
+                    className={`flex w-full min-w-0 items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors ${
+                      active
+                        ? 'bg-accent-green/10 font-medium text-accent-text hover:bg-accent-green/15'
+                        : 'text-text-primary hover:bg-surface-tertiary'
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                    {active && (
+                      <svg className="h-4 w-4 shrink-0 text-accent-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
                 )
               })}
             </div>
@@ -286,7 +281,7 @@ export function ProjectSwitcher() {
                     setRenameName(projectName)
                     setIsRenaming(true)
                   }}
-                  className="flex items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium text-text-secondary outline-none transition-colors hover:bg-surface-tertiary hover:text-text-primary focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-green"
+                  className="flex items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-tertiary hover:text-text-primary"
                 >
                   <svg className="h-4 w-4 text-text-tertiary" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12.5 4.5l3 3M4 16l.75-3 8.5-8.5a1.4 1.4 0 012 2L6.75 15 4 16z" />
@@ -299,7 +294,7 @@ export function ProjectSwitcher() {
                     setMenuOpen(false)
                     setCreateOpen(true)
                   }}
-                  className="flex items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium text-text-secondary outline-none transition-colors hover:bg-surface-tertiary hover:text-text-primary focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-green"
+                  className="flex items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-tertiary hover:text-text-primary"
                 >
                   <svg className="h-4 w-4 text-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 5v14m7-7H5" />
@@ -332,7 +327,7 @@ export function ProjectSwitcher() {
               onKeyDown={event => {
                 if (event.key === 'Enter') void handleCreate()
               }}
-              className="mt-2 w-full rounded-lg border border-border bg-surface-secondary px-3 py-2 text-sm text-text-primary"
+              className="input mt-2 bg-surface-secondary px-3 py-2"
               autoFocus
               maxLength={100}
             />

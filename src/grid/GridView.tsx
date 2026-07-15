@@ -16,7 +16,6 @@ import { useGridEditing } from './useGridEditing'
 import { useGridOperations } from './useGridOperations'
 import { GridProvider, type GridContextValue } from './GridContext'
 import { GridViewport } from './GridViewport'
-import { useNavigation } from '@/layout/NavigationContext'
 import { GridFeedback, type GridFeedbackMessage } from './GridFeedback'
 
 const SuggestionsPanel = lazy(() => import('@/suggestions/SuggestionsPanel').then(m => ({ default: m.SuggestionsPanel })))
@@ -27,7 +26,6 @@ interface GridViewProps {
 }
 
 export function GridView({ tableId }: GridViewProps) {
-  const { openCanvas } = useNavigation()
   const toggleCellHighlight = useProjectStore((state) => state.toggleCellHighlight)
   const clearHighlights = useProjectStore((state) => state.clearHighlights)
 
@@ -229,9 +227,6 @@ export function GridView({ tableId }: GridViewProps) {
               <code className="mt-2 block max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs text-error-text">{displayError}</code>
             </details>
             <div className="mt-4 flex items-center justify-center gap-2">
-              <button type="button" onClick={openCanvas} className="btn btn-secondary">
-                Back to Canvas
-              </button>
               <button type="button" onClick={() => { setMaterializationError(null); ensureTableMaterialized(tableId).then(() => windowed.invalidate()) }} className="btn btn-primary">
                 Try Again
               </button>
@@ -253,8 +248,8 @@ export function GridView({ tableId }: GridViewProps) {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md px-6" role="status" aria-live="polite">
             <div className="w-16 h-16 mx-auto mb-4 relative">
-              <div className="absolute inset-0 rounded-full border-4 border-green-200 dark:border-green-800" />
-              <div className="absolute inset-0 rounded-full border-4 border-green-500 border-t-transparent animate-spin" />
+              <div className="absolute inset-0 rounded-full border-4 border-accent-green/20" />
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-accent-green border-t-transparent" />
             </div>
             <h3 className="text-lg font-semibold text-text-primary mb-2">{node.kind === 'derived_table' ? 'Computing Table' : 'Loading Table'}</h3>
             <p className="text-sm text-text-secondary">
@@ -265,11 +260,8 @@ export function GridView({ tableId }: GridViewProps) {
                 This is taking longer than expected. Your table and edits are still safe.
               </p>
             )}
-            <div className="flex items-center justify-center gap-2 mt-5">
-              <button type="button" className="btn btn-secondary" onClick={openCanvas}>
-                Back to Canvas
-              </button>
-              {loadingElapsedSeconds >= 8 && (
+            {loadingElapsedSeconds >= 8 && (
+              <div className="mt-5 flex items-center justify-center">
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -280,8 +272,8 @@ export function GridView({ tableId }: GridViewProps) {
                 >
                   Retry
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

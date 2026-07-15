@@ -107,27 +107,21 @@ export function AppHeader({
         </svg>
       </button>
       <div className="flex self-stretch items-center border-r border-border-subtle pr-2 sm:pr-3">
-        <ProjectSwitcher />
+        {viewMode === 'canvas'
+          ? <ProjectSwitcher />
+          : <BackToCanvasButton onClick={onBackToCanvas} />}
       </div>
       {viewMode === 'grid' && selectedNode && (
-        <GridHeaderContent
-          selectedNode={selectedNode}
-          onBackToCanvas={onBackToCanvas}
-        />
+        <GridHeaderContent selectedNode={selectedNode} />
       )}
       {viewMode === 'chart' && selectedNode && (
-        <ChartHeaderContent
-          selectedNode={selectedNode}
-          onBackToCanvas={onBackToCanvas}
-        />
+        <ChartHeaderContent selectedNode={selectedNode} />
       )}
       {viewMode === 'dashboard' && (
-        <SimpleHeaderContent label="Dashboard" onBackToCanvas={onBackToCanvas} />
+        <SimpleHeaderContent label="Dashboard" />
       )}
       {viewMode === 'report' && (
         <>
-          <BackToCanvasButton onClick={onBackToCanvas} />
-          <div className="hidden h-6 w-px bg-border sm:block" />
           <svg className="hidden w-4 h-4 text-text-tertiary sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
@@ -288,16 +282,14 @@ function BackToCanvasButton({ onClick }: { onClick: () => void }) {
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
       </svg>
-      <span className="hidden sm:inline">Canvas</span>
+      <span className="hidden sm:inline">Back to Canvas</span>
     </button>
   )
 }
 
-function GridHeaderContent({ selectedNode, onBackToCanvas }: { selectedNode: ProjectNode; onBackToCanvas: () => void }) {
+function GridHeaderContent({ selectedNode }: { selectedNode: ProjectNode }) {
   return (
     <>
-      <BackToCanvasButton onClick={onBackToCanvas} />
-      <div className="hidden h-6 w-px bg-border sm:block" />
       <span className="min-w-0 max-w-36 truncate text-sm font-medium sm:max-w-56">{selectedNode.name}</span>
       <span className={`badge hidden md:inline-flex ${selectedNode.kind === 'source_table' ? 'badge-accent' : 'badge-purple'}`}>
         {selectedNode.kind === 'source_table' ? 'Source - Editable' : 'Derived - View Only'}
@@ -309,10 +301,8 @@ function GridHeaderContent({ selectedNode, onBackToCanvas }: { selectedNode: Pro
 
 function ChartHeaderContent({
   selectedNode,
-  onBackToCanvas,
 }: {
   selectedNode: ProjectNode
-  onBackToCanvas: () => void
 }) {
   const { openTable } = useNavigation()
   const chartNode = selectedNode as ChartNode
@@ -322,8 +312,6 @@ function ChartHeaderContent({
 
   return (
     <>
-      <BackToCanvasButton onClick={onBackToCanvas} />
-      <div className="hidden h-6 w-px bg-border sm:block" />
       <span className="min-w-0 max-w-36 truncate text-sm font-medium sm:max-w-56">{selectedNode.name}</span>
       {chartNode.plan.sourceTableId && (
         <button
@@ -338,11 +326,9 @@ function ChartHeaderContent({
   )
 }
 
-function SimpleHeaderContent({ label, onBackToCanvas }: { label: string; onBackToCanvas: () => void }) {
+function SimpleHeaderContent({ label }: { label: string }) {
   return (
     <>
-      <BackToCanvasButton onClick={onBackToCanvas} />
-      <div className="hidden h-6 w-px bg-border sm:block" />
       <span className="min-w-0 truncate text-sm font-medium">{label}</span>
       <div className="flex-1" />
     </>
