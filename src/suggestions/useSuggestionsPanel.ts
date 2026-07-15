@@ -177,8 +177,13 @@ export function useSuggestionsPanel(
 
   const cachedSuggestions = useMemo(() => {
     if (!contextKey) return []
-    return suggestionsCache.get(contextKey) ?? []
-  }, [contextKey, suggestionsCache])
+    const suggestions = suggestionsCache.get(contextKey) ?? []
+    if (node?.kind === 'source_table') return suggestions
+
+    // Cleaning applies patches to editable source rows. Derived tables are
+    // view-only, so do not advertise cleaning actions that cannot be opened.
+    return suggestions.filter((suggestion) => suggestion.category !== 'cleaning')
+  }, [contextKey, suggestionsCache, node?.kind])
 
   const filteredSuggestions = useMemo(() => {
     let suggestions = cachedSuggestions

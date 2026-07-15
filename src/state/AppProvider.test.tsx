@@ -78,7 +78,9 @@ function Harness() {
     <div>
       <span data-testid="phase">{app.phase}</span>
       <span data-testid="project">{app.projectId}</span>
+      <span data-testid="project-name">{app.projectName}</span>
       <button onClick={() => void app.loadProject('next-project')}>Load next</button>
+      <button onClick={() => app.renameProject('Renamed project')}>Rename</button>
     </div>
   )
 }
@@ -108,6 +110,29 @@ beforeEach(() => {
 })
 
 describe('AppProvider project lifecycle', () => {
+  it('renames the active project and persists the new name', async () => {
+    render(
+      <AppProvider>
+        <Harness />
+      </AppProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
+    saveProjectWithSync.mockClear()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }))
+
+    expect(screen.getByTestId('project-name')).toHaveTextContent('Renamed project')
+    await waitFor(() => {
+      expect(saveProjectWithSync).toHaveBeenCalledWith(
+        'current-project',
+        'Renamed project',
+        {},
+        {},
+        {},
+      )
+    })
+  })
+
   it('persists project mutations immediately so a reload cannot beat local saving', async () => {
     render(
       <AppProvider>

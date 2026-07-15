@@ -326,6 +326,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [flushProjectSave, prepareProject, setPhase])
 
+  const renameProject = useCallback((name: string) => {
+    const nextName = name.trim()
+    if (!nextName || !state.projectId) return
+
+    useProjectStore.setState({ projectName: nextName })
+    setState(previous => ({
+      ...previous,
+      projectName: nextName,
+      projects: previous.projects.map(project => (
+        project.id === previous.projectId
+          ? { ...project, name: nextName, updatedAt: new Date() }
+          : project
+      )),
+    }))
+  }, [state.projectId])
+
   const refreshProjects = useCallback(async () => {
     try {
       const projects = await fetchProjects()
@@ -363,6 +379,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     logout,
     createNewProject,
     loadProject,
+    renameProject,
     refreshProjects,
     deleteNodeWithSync,
     projectLimitViolation,

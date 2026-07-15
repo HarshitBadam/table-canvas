@@ -1,0 +1,20 @@
+.tiptap-editor-content {
+  caret-color: var(--color-accent-green);
+}
+
+.tiptap-editor-content:focus,
+.tiptap-editor-content:focus-visible {
+  /*
+   * The text caret or selected block is the editor's local focus indicator.
+   * Suppress the app-wide focus ring that otherwise outlines the whole page.
+   */
+  outline: none !important;
+}
+
+.tiptap-editor-content mark {
+  background-color: color-mix(in srgb, var(--color-accent-green) 18%, transparent);
+}
+
+[data-theme="dark"] .tiptap-editor-content mark {
+  background-color: color-mix(in srgb, var(--color-accent-green) 28%, transparent);
+}

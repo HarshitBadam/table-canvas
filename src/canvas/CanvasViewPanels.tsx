@@ -8,7 +8,7 @@ interface AutoArrangePanelProps {
 
 export function CanvasAutoArrangePanel({ onArrange }: AutoArrangePanelProps) {
   return (
-    <Panel position="top-left" className="ml-3 mt-3">
+    <Panel position="top-left" className="!z-sticky ml-3 mt-3">
       <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1 shadow-md">
         <span className="px-2 text-xs font-medium text-text-secondary">Arrange tables</span>
         <div className="h-5 w-px bg-border" />

@@ -28,6 +28,7 @@ export interface AppContextValue {
   logout: () => Promise<void>
   createNewProject: (name?: string) => Promise<void>
   loadProject: (projectId: string) => Promise<void>
+  renameProject: (name: string) => void
   refreshProjects: () => Promise<void>
   deleteNodeWithSync: (nodeId: string) => Promise<void>
   projectLimitViolation: LimitExceeded | null

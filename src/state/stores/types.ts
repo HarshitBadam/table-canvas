@@ -29,6 +29,7 @@ export interface NodesSliceState {
   
   addNode: (node: ProjectNode) => void
   updateNode: (id: string, updates: Partial<ProjectNode>) => void
+  duplicateNode: (id: string) => string | undefined
   deleteNode: (id: string) => void
   updateNodePosition: (id: string, position: Position) => void
   updateNodeUI: (id: string, updates: { viewMode?: NodeViewMode }) => void

@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { addSource, resetStore } from '@/engine/integrationTestUtils'
+import { addFilter, addSource, resetStore } from '@/engine/integrationTestUtils'
+import { useProjectStore } from '@/state/projectStore'
 import { useSuggestionsStore } from './suggestionsStore'
 
 const loadProfile = vi.hoisted(() => vi.fn())
@@ -58,5 +59,27 @@ describe('useSuggestionsPanel', () => {
     })
     expect(result.current.showLoading).toBe(false)
     expect(loadProfile).toHaveBeenCalled()
+  })
+
+  it('does not advertise unsupported cleaning suggestions for derived tables', async () => {
+    const sourceId = addSource('Source')
+    const tableId = addFilter(sourceId, 'Derived')
+    const sourceSchema = useProjectStore.getState().getTableNode(sourceId)?.schema
+    if (!sourceSchema) throw new Error('Source schema was not created')
+    useProjectStore.getState().updateTableSchema(tableId, sourceSchema)
+
+    const { result } = renderHook(() => useSuggestionsPanel(tableId, undefined, true))
+
+    await waitFor(() => {
+      expect(useSuggestionsStore.getState().suggestionsCache.size).toBeGreaterThan(0)
+      expect(loadProfile).toHaveBeenCalled()
+    })
+
+    const generatedSuggestions = [...useSuggestionsStore.getState().suggestionsCache.values()].flat()
+    expect(generatedSuggestions.some(item => item.category === 'cleaning')).toBe(true)
+    expect(result.current.cachedSuggestions.every(item => item.category !== 'cleaning')).toBe(true)
+    expect(result.current.filteredSuggestions).toEqual([])
+    expect(result.current.categoryCounts.cleaning).toBe(0)
+    expect(result.current.categoryCounts.all).toBe(result.current.cachedSuggestions.length)
   })
 })

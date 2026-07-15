@@ -174,13 +174,14 @@ export const MiniTableView = memo(({
   return (
     <div 
       ref={containerRef}
-      className="flex flex-col overflow-hidden rounded-b-2xl"
+      className="flex flex-col overflow-hidden rounded-b-2xl ring-1 ring-inset ring-border"
       style={{ height: maxHeight }}
     >
       {/* Scrollable table area - hide scrollbars but keep functionality */}
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-auto nowheel scrollbar-hide"
+        className="flex-1 overflow-auto overscroll-none nowheel scrollbar-hide"
+        style={{ overscrollBehavior: 'none' }}
         onScroll={handleScroll}
         onWheelCapture={(e) => e.stopPropagation()}
       >
@@ -192,7 +193,7 @@ export const MiniTableView = memo(({
           }}
         >
           <div 
-            className="sticky top-0 z-10 flex border-b border-border table-header-bg"
+            className="table-header-bg sticky top-0 z-10 flex border-b border-border-subtle"
             style={{ height: HEADER_HEIGHT }}
           >
             {columns.map((col, idx) => (
@@ -210,16 +211,11 @@ export const MiniTableView = memo(({
           </div>
 
           <div style={{ marginTop: startIndex * CELL_HEIGHT }}>
-            {virtualRows.map((row, idx) => {
-              const actualIndex = startIndex + idx
+            {virtualRows.map((row) => {
               return (
                 <div
                   key={row.__rowId}
-                  className={`flex border-b border-border-subtle ${
-                    actualIndex % 2 === 0 
-                      ? 'bg-surface' 
-                      : 'bg-gray-50 dark:bg-gray-800/30'
-                  }`}
+                className="flex border-b border-border-subtle bg-surface"
                   style={{ height: CELL_HEIGHT }}
                 >
                   {columns.map((col, idx) => {
@@ -230,7 +226,7 @@ export const MiniTableView = memo(({
                       <div
                         key={col.id}
                         className={`flex items-center px-1.5 text-xs overflow-hidden ${
-                          !isLastColumn ? 'border-r border-border-subtle' : ''
+                          !isLastColumn ? 'border-r border-border' : ''
                         } ${
                           col.type === 'number' ? 'justify-end font-mono text-text-primary' : 'text-text-primary'
                         }`}
@@ -251,19 +247,20 @@ export const MiniTableView = memo(({
       </div>
 
       <div 
-        className="flex-shrink-0 px-3 flex items-center text-xs text-text-tertiary bg-gray-50 dark:bg-gray-800/80 border-t border-border rounded-b-2xl"
+        className="flex shrink-0 items-center gap-3 border-t border-border-subtle bg-surface-secondary px-3 text-xs text-text-secondary"
         style={{ height: FOOTER_HEIGHT }}
       >
         {filtersActive ? (
-          <>
-            <span className="text-text-primary font-medium">{formatNumber(totalRows)}</span>
-            <span className="mx-1">of</span>
-            <span>{formatNumber(Math.max(unfilteredRowCount, engineTotalRows))}</span>
-            <span className="mx-1">rows</span>
-            <span className="text-accent-green ml-1">●</span>
-          </>
+          <span>
+            Showing <span className="font-medium text-text-primary">{formatNumber(totalRows)}</span>
+            {' of '}
+            {formatNumber(Math.max(unfilteredRowCount, engineTotalRows))} rows
+          </span>
         ) : (
-          <>{formatNumber(engineTotalRows)} rows × {columns.length} columns</>
+          <>
+            <span>{columns.length} columns</span>
+            <span>{formatNumber(engineTotalRows)} rows</span>
+          </>
         )}
       </div>
     </div>

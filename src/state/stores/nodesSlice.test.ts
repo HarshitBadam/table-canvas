@@ -26,3 +26,24 @@ describe('node cache metadata', () => {
     expect(useProjectStore.getState().nodes[tableId].updatedAt).toBe(originalUpdatedAt)
   })
 })
+
+describe('duplicateNode', () => {
+  it('creates an offset copy with a unique name and independent patches', () => {
+    const tableId = addSource('Sales')
+    const store = useProjectStore.getState()
+    store.setCellValue(tableId, 'row-1', 'col1', 'edited')
+
+    const duplicateId = store.duplicateNode(tableId)
+    expect(duplicateId).toBeDefined()
+
+    const nextState = useProjectStore.getState()
+    const duplicate = nextState.nodes[duplicateId!]
+    expect(duplicate).toMatchObject({
+      name: 'Sales copy',
+      ui: { position: { x: 132, y: 132 } },
+    })
+    expect(nextState.selectedNodeId).toBe(duplicateId)
+    expect(nextState.patches[duplicateId!]).toEqual(nextState.patches[tableId])
+    expect(nextState.patches[duplicateId!]).not.toBe(nextState.patches[tableId])
+  })
+})

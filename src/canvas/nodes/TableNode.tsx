@@ -21,8 +21,6 @@ interface TableNodeData {
   }
   viewFilters?: ViewFilterConfig
   onSetViewMode: (nodeId: string, mode: NodeViewMode) => void
-  connectableTargets: Array<{ id: string; name: string }>
-  onConnectTo: (sourceId: string, targetId: string) => void
 }
 
 
@@ -35,7 +33,7 @@ const VIEW_MODE_LABELS: Record<NodeViewMode, string> = {
   data: 'Data',
 }
 
-function ViewModeDropdown({ 
+function ViewModeControl({
   currentMode, 
   onSelect,
   isSource 
@@ -45,19 +43,28 @@ function ViewModeDropdown({
   isSource: boolean
 }) {
   return (
-    <select
-      value={currentMode}
-      onClick={event => event.stopPropagation()}
-      onChange={event => onSelect(event.target.value as NodeViewMode)}
+    <div
+      role="group"
       aria-label="Table view"
-      className={`rounded-lg border-0 bg-transparent px-2 py-1 text-xs font-medium outline-none transition-colors hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-accent-green dark:hover:bg-white/10 ${
-        isSource ? 'text-accent-text' : 'text-node-derived-text'
-      }`}
+      className="grid w-32 shrink-0 grid-cols-2 items-center rounded-full bg-black/5 p-0.5 dark:bg-white/10"
+      onClick={event => event.stopPropagation()}
     >
       {(Object.keys(VIEW_MODE_LABELS) as NodeViewMode[]).map(mode => (
-        <option key={mode} value={mode}>{VIEW_MODE_LABELS[mode]}</option>
+        <button
+          key={mode}
+          type="button"
+          aria-pressed={currentMode === mode}
+          onClick={() => onSelect(mode)}
+          className={`rounded-full px-2 py-1 text-xs font-medium outline-none transition-[color,background-color,box-shadow] focus-visible:ring-2 focus-visible:ring-accent-green ${
+            currentMode === mode
+              ? `bg-surface shadow-sm ${isSource ? 'text-accent-text' : 'text-node-derived-text'}`
+              : 'text-text-tertiary hover:text-text-primary'
+          }`}
+        >
+          {VIEW_MODE_LABELS[mode]}
+        </button>
       ))}
-    </select>
+    </div>
   )
 }
 
@@ -67,7 +74,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
   const rowCount = data.cacheInfo?.lastRowCount ?? schema?.rowCount ?? 0
   const colCount = schema?.columns.length ?? 0
   const viewMode = getViewMode(data.ui)
-  const hasFilters = data.viewFilters && data.viewFilters.conditions.length > 0
 
   const handleSetViewMode = useCallback((mode: NodeViewMode) => {
     data.onSetViewMode(data.id, mode)
@@ -75,15 +81,15 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
 
   return (
     <div
-      className="rounded-2xl bg-surface transition-all duration-200 ease-out"
+      className="overflow-hidden rounded-2xl bg-surface transition-shadow duration-200 ease-out"
       style={{
         width: NODE_WIDTH,
         boxShadow: selected
-          ? `0 0 0 2px ${isSource ? 'var(--color-node-source-border)' : 'var(--color-node-derived-border)'}, 0 12px 40px -8px rgba(0,0,0,0.25), 0 4px 16px -4px rgba(0,0,0,0.15)`
+          ? '0 14px 40px -10px rgba(0,0,0,0.24), 0 5px 18px -5px rgba(0,0,0,0.16), 0 0 0 1px var(--color-border-elevation)'
           : '0 4px 16px -4px rgba(0,0,0,0.15), 0 12px 32px -8px rgba(0,0,0,0.12), 0 0 0 1px var(--color-border-elevation)',
       }}
     >
-      <div className="px-4 py-3.5 bg-surface-secondary/80 rounded-t-2xl">
+      <div className="bg-surface-secondary px-4 py-3.5">
         <div className="flex items-center gap-3">
           <div className={`
             w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0
@@ -103,24 +109,17 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             )}
           </div>
           
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-text-primary truncate tracking-tight">
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-sm font-semibold tracking-tight text-text-primary">
               {data.name}
             </h3>
-            <p className="text-xs text-text-secondary mt-0.5 flex items-center gap-1.5">
-              {formatNumber(rowCount)} rows · {colCount} columns
-              {hasFilters && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent-green/10 text-accent-text text-xs font-medium">
-                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                  </svg>
-                  Filtered
-                </span>
-              )}
-            </p>
+            <div className="mt-0.5 flex items-center gap-3 text-xs text-text-secondary">
+              <span>{formatNumber(colCount)} columns</span>
+              <span>{formatNumber(rowCount)} rows</span>
+            </div>
           </div>
           
-          <ViewModeDropdown 
+          <ViewModeControl 
             currentMode={viewMode} 
             onSelect={handleSetViewMode}
             isSource={isSource}
@@ -142,7 +141,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
               })}
             </div>
             {schema.columns.length > 4 && (
-              <div className="text-xs text-text-tertiary mt-3 pt-2 border-t border-border-subtle">
+              <div className="mt-3 text-xs text-text-tertiary">
                 +{schema.columns.length - 4} more columns
               </div>
             )}
@@ -188,30 +187,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
           </div>
         )}
 
-        {data.connectableTargets.length > 0 && (
-          <div className="px-4 py-3 border-t border-border-subtle">
-            <label className="sr-only" htmlFor={`connect-${data.id}`}>
-              Connect {data.name} to another table
-            </label>
-            <select
-              id={`connect-${data.id}`}
-              value=""
-              onClick={(event) => event.stopPropagation()}
-              onChange={(event) => {
-                event.stopPropagation()
-                if (event.target.value) data.onConnectTo(data.id, event.target.value)
-              }}
-              className="input w-full text-xs"
-            >
-              <option value="">Connect to a table…</option>
-              {data.connectableTargets.map(target => (
-                <option key={target.id} value={target.id}>
-                  {target.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
 
       <Handle
