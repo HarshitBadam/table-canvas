@@ -15,6 +15,7 @@ import { EditableTableNode } from './nodes/EditableTableNode';
 import { ToggleNode } from './nodes/ToggleNode';
 import { CalloutNode } from './nodes/CalloutNode';
 import { SlashCommands } from './extensions/SlashCommands';
+import { AtomicBlockNavigation } from './extensions/AtomicBlockNavigation';
 import {
   isMarkdownContent,
   isTabularData,
@@ -76,7 +77,7 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
           showOnlyCurrent: true,
           includeChildren: false,
         }),
-        Highlight.configure({ multicolor: true }),
+        Highlight,
         Typography,
         Underline,
         Link.configure({ openOnClick: false }),
@@ -86,6 +87,7 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
         EditableTableNode.configure({ reportId }),
         ToggleNode,
         CalloutNode,
+        AtomicBlockNavigation,
         SlashCommands.configure({ reportId, onOpenTable }),
       ],
       content: content || {
@@ -143,7 +145,7 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
       focus: () => editor?.commands.focus('end'),
       getHTML: () => editor?.getHTML() || '',
       getJSON: () => editor?.getJSON() || { type: 'doc', content: [] },
-      toggleHighlight: () => editor?.chain().focus().toggleHighlight({ color: '#d1fae5' }).run(),
+      toggleHighlight: () => editor?.chain().focus().toggleHighlight().run(),
       insertTable: () => editor?.chain().focus().insertContent({
         type: 'editableTable',
         attrs: { headers: [], rows: [], initialized: false },

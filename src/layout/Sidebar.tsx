@@ -4,12 +4,12 @@ import { useApp } from '@/state/AppContext'
 import { ImportButton } from '@/components/ImportButton'
 import { NewTableModal } from '@/canvas/modals/NewTableModal'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { ProjectSwitcher } from './ProjectSwitcher'
 import { useNavigation } from './NavigationContext'
 import { WORKSPACE_NAV_ITEMS } from './viewNavigation'
 import type { ProjectNode, TableNode, ChartNode } from '@/types'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
 import { useDialogFocus } from '@/components/useDialogFocus'
+import { SidebarNodeItem } from './SidebarNodeItem'
 
 interface SidebarProps {
   isOpen?: boolean
@@ -53,8 +53,7 @@ export function Sidebar({ isOpen = false, onClose = () => undefined }: SidebarPr
     onClose()
   }, [onClose, openChart])
 
-  const handleDeleteTable = useCallback((nodeId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleDeleteNode = useCallback((nodeId: string) => {
     setDeleteConfirmId(nodeId)
   }, [])
 
@@ -90,7 +89,7 @@ export function Sidebar({ isOpen = false, onClose = () => undefined }: SidebarPr
           isOpen ? 'visible translate-x-0' : 'invisible -translate-x-full'
         }`}
       >
-        <div className="h-14 border-b border-border flex items-center px-4">
+        <div className="flex h-16 items-center border-b border-border px-4">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="w-9 h-9 rounded bg-accent-green flex items-center justify-center">
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -111,27 +110,28 @@ export function Sidebar({ isOpen = false, onClose = () => undefined }: SidebarPr
           </button>
         </div>
 
-        <ProjectSwitcher />
+        <div className="space-y-2 border-b border-border p-4">
+          <ImportButton />
+          <button
+            onClick={handleNewTable}
+            type="button"
+            className="btn btn-secondary w-full gap-2"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Table
+          </button>
+        </div>
 
-        <div className="p-4 space-y-2 border-b border-border">
-        <ImportButton />
-        <button
-          onClick={handleNewTable}
-          type="button"
-          className="btn btn-secondary w-full gap-2 justify-center"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Table
-        </button>
-      </div>
-
-        <div className="flex-1 overflow-y-auto scrollbar-hide p-4">
-        <div className="mb-3">
-          <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">
+        <div className="scrollbar-hide flex-1 overflow-y-auto p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
             Tables
-          </div>
+          </h2>
+          <span className="text-xs tabular-nums text-text-tertiary">
+            {tableNodes.length} {tableNodes.length === 1 ? 'table' : 'tables'}
+          </span>
         </div>
         {tableNodes.length === 0 ? (
           <div className="text-center py-8 px-4">
@@ -146,86 +146,36 @@ export function Sidebar({ isOpen = false, onClose = () => undefined }: SidebarPr
         ) : (
           <ul className="space-y-1">
             {tableNodes.map((node) => (
-              <li key={node.id} className="group flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => handleTableClick(node.id)}
-                  aria-current={selectedNodeId === node.id ? 'page' : undefined}
-                  className={`min-w-0 flex-1 text-left px-3 py-2.5 rounded-lg text-sm transition-all ${
-                    selectedNodeId === node.id
-                      ? 'bg-accent-green/10 text-accent-green'
-                      : 'hover:bg-surface-secondary text-text-primary'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <TableIcon kind={node.kind} />
-                    <span className="truncate flex-1 font-medium">{node.name}</span>
-                  </div>
-                  {node.schema && (
-                    <div className={`ml-7 mt-1 text-xs ${
-                      selectedNodeId === node.id ? 'text-accent-text' : 'text-text-tertiary'
-                    }`}>
-                      {node.cacheInfo?.lastRowCount ?? node.schema.rowCount ?? 0} rows · {node.schema.columns.length} columns
-                    </div>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => handleDeleteTable(node.id, e)}
-                  className="sidebar-delete-action p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-text-tertiary hover:text-red-500 transition-all"
-                  title="Delete table"
-                  aria-label={`Delete ${node.name}`}
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </li>
+              <SidebarNodeItem
+                key={node.id}
+                node={node}
+                selected={selectedNodeId === node.id}
+                onOpen={handleTableClick}
+                onDelete={handleDeleteNode}
+              />
             ))}
           </ul>
         )}
 
         {chartNodes.length > 0 && (
           <>
-            <div className="mb-2 mt-6">
-              <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">
+            <div className="mb-3 mt-6 flex items-center justify-between">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
                 Charts
-              </div>
+              </h2>
+              <span className="text-xs tabular-nums text-text-tertiary">
+                {chartNodes.length} {chartNodes.length === 1 ? 'chart' : 'charts'}
+              </span>
             </div>
             <ul className="space-y-1">
               {chartNodes.map((node) => (
-                <li key={node.id} className="group flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleChartClick(node.id)}
-                    aria-current={selectedNodeId === node.id ? 'page' : undefined}
-                    className={`min-w-0 flex-1 text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
-                      selectedNodeId === node.id
-                        ? 'bg-accent-green/10 text-accent-green'
-                        : 'hover:bg-surface-secondary text-text-primary'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-4 h-4 rounded bg-node-chart flex items-center justify-center text-node-chart-border">
-                        <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z" />
-                        </svg>
-                      </div>
-                      <span className="truncate flex-1 font-medium">{node.name}</span>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => handleDeleteTable(node.id, e)}
-                    className="sidebar-delete-action p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-text-tertiary hover:text-red-500 transition-all"
-                    title="Delete chart"
-                    aria-label={`Delete ${node.name}`}
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </li>
+                <SidebarNodeItem
+                  key={node.id}
+                  node={node}
+                  selected={selectedNodeId === node.id}
+                  onOpen={handleChartClick}
+                  onDelete={handleDeleteNode}
+                />
               ))}
             </ul>
           </>
@@ -316,20 +266,5 @@ export function Sidebar({ isOpen = false, onClose = () => undefined }: SidebarPr
 
       </aside>
     </>
-  )
-}
-
-function TableIcon({ kind }: { kind: string }) {
-  const isSource = kind === 'source_table'
-  return (
-    <div
-      className={`w-4 h-4 rounded flex items-center justify-center ${
-        isSource ? 'bg-node-source text-node-source-border' : 'bg-node-derived text-node-derived-border'
-      }`}
-    >
-      <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2zm2 0h14v4H5V5zm0 6h4v8H5v-8zm6 0h8v8h-8v-8z" />
-      </svg>
-    </div>
   )
 }

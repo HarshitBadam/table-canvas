@@ -11,6 +11,7 @@ import { generateId } from '@/lib/utils'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
 import { createInitialPatches } from './patchesSlice'
 import { createColumnOps } from './nodesColumnOps'
+import { applyNodeDuplicate, prepareNodeDuplicate } from './duplicateNode'
 
 export const createNodesSlice: StateCreator<
   ProjectStoreState,
@@ -33,6 +34,18 @@ export const createNodesSlice: StateCreator<
         Object.assign(node, updates, { updatedAt: new Date().toISOString() })
       }
     })
+  },
+
+  duplicateNode: (id) => {
+    const state = get()
+    const sourceNode = state.nodes[id]
+    if (!sourceNode) return undefined
+
+    const duplicate = prepareNodeDuplicate(state, id)
+    if (!duplicate) return undefined
+    state.saveSnapshot(`Duplicate node ${sourceNode.name}`)
+    set(draft => applyNodeDuplicate(draft, duplicate))
+    return duplicate.id
   },
 
   deleteNode: (id) => {

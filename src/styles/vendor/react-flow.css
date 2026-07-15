@@ -6,6 +6,15 @@
   cursor: grabbing;
 }
 
+.react-flow__node:focus,
+.react-flow__node:focus-visible {
+  outline: none;
+}
+
+.react-flow__node.dragging {
+  will-change: transform;
+}
+
 .react-flow__node .react-flow__handle {
   z-index: 10 !important;
 }
@@ -206,4 +215,13 @@
 
 [data-theme="dark"] .react-flow__controls-button {
   border-color: var(--color-border) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__node > div:first-child,
+  .react-flow__handle,
+  .table-handle,
+  .react-flow__edge-path {
+    transition: none !important;
+  }
 }

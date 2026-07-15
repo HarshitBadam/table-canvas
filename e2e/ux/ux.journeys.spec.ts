@@ -14,6 +14,25 @@ async function importCsv(page: Page, name: string, rows: string[]) {
   })).toBeVisible({ timeout: 30_000 })
 }
 
+async function connectTables(
+  page: Page,
+  sourceName: string,
+  targetName: string,
+  targetHandle = '.table-handle-left',
+) {
+  const nodes = page.locator('.react-flow__node')
+  const source = nodes.filter({
+    has: page.getByRole('heading', { name: sourceName, exact: true }),
+  })
+  const target = nodes.filter({
+    has: page.getByRole('heading', { name: targetName, exact: true }),
+  })
+  await source.locator('.table-handle-right').first().dragTo(
+    target.locator(targetHandle).first(),
+    { force: true },
+  )
+}
+
 test.describe('@ux critical journey contract', () => {
   test('canvas join creates, persists, and reopens a correct derived result', async ({ page }) => {
     test.setTimeout(90_000)
@@ -34,10 +53,7 @@ test.describe('@ux critical journey contract', () => {
     const nodes = page.locator('.react-flow__node')
     await expect(nodes).toHaveCount(2)
     await page.getByRole('button', { name: 'Arrange tables left to right' }).click()
-    const customers = nodes.filter({ hasText: 'Customers' })
-    await customers.getByRole('combobox', {
-      name: 'Connect Customers to another table',
-    }).selectOption({ label: 'Orders' })
+    await connectTables(page, 'Customers', 'Orders')
 
     const dialog = page.getByRole('dialog', { name: 'Combine Tables' })
     await expect(dialog).toBeVisible()
@@ -82,23 +98,32 @@ test.describe('@ux critical journey contract', () => {
     await createDialog.getByLabel('Project name').fill('Second Workspace')
     await createDialog.getByRole('button', { name: 'Create project' }).click()
     await expect(createDialog).toBeHidden({ timeout: 20_000 })
-    await expect(page.locator('aside').getByLabel('Current project')).toHaveValue(
-      'sample-project-2',
-    )
+    const projectSwitcher = page.locator('aside').getByRole('button', { name: 'Current project' })
+    await expect(projectSwitcher).toContainText('Second Workspace')
     await expect(page.locator('aside').getByText('No tables yet')).toBeVisible()
 
     await createManualTable(page, 'Second Workspace Table')
-    await page.locator('aside').getByLabel('Current project').selectOption('sample-project')
+    await projectSwitcher.click()
+    await page.getByRole('option', { name: 'Sample Workbook Project', exact: true }).click()
     await expect(page.locator('aside').getByRole('button', {
       name: /^First Workspace Table 5 rows/,
     })).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('aside').getByText('Second Workspace Table')).toHaveCount(0)
 
-    await page.locator('aside').getByLabel('Current project').selectOption('sample-project-2')
+    await projectSwitcher.click()
+    await page.getByRole('option', { name: 'Second Workspace', exact: true }).click()
     await expect(page.locator('aside').getByRole('button', {
       name: /^Second Workspace Table 5 rows/,
     })).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('aside').getByText('First Workspace Table')).toHaveCount(0)
+
+    await projectSwitcher.click()
+    await page.getByRole('button', { name: 'Rename current project' }).click()
+    const renameDialog = page.getByRole('dialog', { name: 'Rename project' })
+    await renameDialog.getByLabel('Project name').fill('Operations Workspace')
+    await renameDialog.getByRole('button', { name: 'Save name' }).click()
+    await expect(renameDialog).toBeHidden()
+    await expect(projectSwitcher).toContainText('Operations Workspace')
   })
 })
 
@@ -121,10 +146,9 @@ test.describe('@ux narrow viewport contract', () => {
 
     const nodes = page.locator('.react-flow__node')
     await page.locator('aside').getByRole('button', { name: 'Close navigation' }).click()
-    const customers = nodes.filter({ hasText: 'Narrow Customers' })
-    await customers.getByRole('combobox', {
-      name: 'Connect Narrow Customers to another table',
-    }).selectOption({ label: 'Narrow Orders' })
+    await expect(nodes).toHaveCount(2)
+    await page.getByRole('button', { name: 'Arrange tables top to bottom' }).click()
+    await connectTables(page, 'Narrow Customers', 'Narrow Orders', '.table-handle-top')
 
     const dialog = page.getByRole('dialog', { name: 'Combine Tables' })
     await expect(dialog).toBeVisible()
