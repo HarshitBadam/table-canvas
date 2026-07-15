@@ -44,7 +44,7 @@
   .input {
     @apply w-full border border-border bg-surface px-2 py-1.5 text-sm rounded;
     @apply placeholder:text-text-tertiary;
-    @apply focus:border-accent-green focus:outline-none;
+    @apply focus:border-accent-green;
     @apply disabled:cursor-not-allowed disabled:opacity-50;
     @apply transition-colors;
   }
@@ -105,23 +105,11 @@
   }
 
   [data-theme="dark"] .table-header-bg {
-    background-color: var(--color-accent-soft);
-  }
-
-  [data-theme="dark"] .table-header-bg .text-green-700,
-  [data-theme="dark"] .table-header-bg [class*="text-green"] {
-    color: var(--color-accent-text) !important;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) .table-header-bg {
-      background-color: var(--color-accent-soft);
-    }
-
-    :root:not([data-theme="light"]) .table-header-bg .text-green-700,
-    :root:not([data-theme="light"]) .table-header-bg [class*="text-green"] {
-      color: var(--color-accent-text) !important;
-    }
+    background-color: color-mix(
+      in srgb,
+      var(--color-surface) 84%,
+      var(--color-accent) 16%
+    );
   }
 
   .type-badge-number,

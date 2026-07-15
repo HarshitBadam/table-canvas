@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ColumnSchema, type UserColumnType } from '@/types'
 import {
   suggestFormulasFromName,
@@ -13,11 +13,7 @@ interface FormulaColumnModalProps {
   isOpen: boolean
   columns: ColumnSchema[]
   initialColumn?: ColumnSchema
-  onConfirm: (
-    name: string,
-    type: UserColumnType,
-    formula?: string
-  ) => void | string
+  onConfirm: (name: string, type: UserColumnType, formula?: string) => void | string
   onCancel: () => void
 }
 
@@ -34,7 +30,6 @@ export function FormulaColumnModal({
   const [formula, setFormula] = useState('')
   const [staticType, setStaticType] = useState<UserColumnType>('string')
   const [submissionError, setSubmissionError] = useState('')
-  
   const [formulaSuggestions, setFormulaSuggestions] = useState<FormulaSuggestion[]>([])
 
   const columnInfo = useMemo(() => 
@@ -151,7 +146,6 @@ export function FormulaColumnModal({
             {initialColumn ? `Update the formula for ${initialColumn.name}` : 'Add a new column to your table'}
           </p>
         </div>
-        
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           <div>
             <label htmlFor="formula-column-name" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
@@ -381,7 +375,6 @@ export function FormulaColumnModal({
             </>
           )}
         </div>
-        
         <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex gap-2 bg-gray-50 dark:bg-gray-800/50">
           <button
             type="button"

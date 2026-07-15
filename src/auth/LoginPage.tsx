@@ -201,7 +201,7 @@ export function LoginPage() {
                   setEmail(e.target.value);
                   clearFormError();
                 }}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-surface-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
+                className="w-full px-3 py-2 rounded-lg border border-border bg-surface-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-green"
                 placeholder="Enter your email"
                 required
                 maxLength={254}
@@ -224,7 +224,7 @@ export function LoginPage() {
                   setPassword(e.target.value);
                   clearFormError();
                 }}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-surface-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:border-accent-green"
+                className="w-full px-3 py-2 rounded-lg border border-border bg-surface-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-green"
                 placeholder="Enter your password"
                 required
                 maxLength={1024}
@@ -235,7 +235,7 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 px-4 rounded-lg bg-accent-green text-white font-medium hover:bg-accent-green/90 focus:outline-none focus:ring-2 focus:ring-accent-green/50 focus:ring-offset-2 focus:ring-offset-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full py-2.5 px-4 rounded-lg bg-accent-green text-white font-medium hover:bg-accent-green/90 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">

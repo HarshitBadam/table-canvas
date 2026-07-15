@@ -7,7 +7,7 @@
   background: var(--color-surface);
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .join-name-input:hover {
@@ -15,9 +15,7 @@
 }
 
 .join-name-input:focus {
-  outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgb(var(--color-accent-rgb) / 0.18);
 }
 
 .join-name-input::placeholder {

@@ -249,7 +249,11 @@ input[type="number"] {
 
 :focus-visible {
   outline: 2px solid var(--color-border-focus) !important;
-  outline-offset: 2px !important;
+  /*
+   * Keep one focus stroke. Drawing it inside the control replaces its border
+   * visually instead of stacking an outer outline on a focused border/ring.
+   */
+  outline-offset: -2px !important;
   --tw-ring-offset-shadow: 0 0 #0000 !important;
   --tw-ring-shadow: 0 0 #0000 !important;
 }

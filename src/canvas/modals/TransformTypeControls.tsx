@@ -9,7 +9,8 @@ const JOIN_TYPES: { value: JoinType; label: string; description: string }[] = [
   { value: 'full', label: 'Full', description: 'All rows from both' },
 ]
 
-const TYPE_BUTTON_FOCUS = 'canvas-touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 focus-visible:ring-offset-surface'
+const TYPE_BUTTON_FOCUS = 'canvas-touch-target'
+const ACTIVE_TYPE_BUTTON = 'active !shadow-none'
 
 interface TransformTypeControlsProps {
   operation: Operation
@@ -35,7 +36,7 @@ export function TransformTypeControls({
             type="button"
             onClick={() => onOperationChange('join')}
             aria-pressed={operation === 'join'}
-            className={`join-type-card ${TYPE_BUTTON_FOCUS} ${operation === 'join' ? 'active' : ''}`}
+            className={`join-type-card ${TYPE_BUTTON_FOCUS} ${operation === 'join' ? ACTIVE_TYPE_BUTTON : ''}`}
           >
             <span className="join-type-name">Join</span>
             <span className="join-type-desc">Match rows by column values</span>
@@ -44,7 +45,7 @@ export function TransformTypeControls({
             type="button"
             onClick={() => onOperationChange('union')}
             aria-pressed={operation === 'union'}
-            className={`join-type-card ${TYPE_BUTTON_FOCUS} ${operation === 'union' ? 'active' : ''}`}
+            className={`join-type-card ${TYPE_BUTTON_FOCUS} ${operation === 'union' ? ACTIVE_TYPE_BUTTON : ''}`}
           >
             <span className="join-type-name">Append</span>
             <span className="join-type-desc">Add one table&apos;s rows after the other</span>
@@ -67,7 +68,7 @@ export function TransformTypeControls({
                 type="button"
                 onClick={() => onJoinTypeChange(type.value)}
                 aria-pressed={joinType === type.value}
-                className={`join-type-card ${TYPE_BUTTON_FOCUS} ${joinType === type.value ? 'active' : ''}`}
+                className={`join-type-card ${TYPE_BUTTON_FOCUS} ${joinType === type.value ? ACTIVE_TYPE_BUTTON : ''}`}
               >
                 <span className="join-type-name">{type.label}</span>
                 <span className="join-type-desc">{type.description}</span>

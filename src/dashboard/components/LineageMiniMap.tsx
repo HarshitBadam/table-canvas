@@ -223,10 +223,10 @@ function LineageVisualization({
         const isChart = node.kind === 'chart'
 
         const borderClass = isSource 
-          ? 'border-[#217346]/30 hover:border-[#217346] focus:ring-[#217346]'
+          ? 'border-[#217346]/30 hover:border-[#217346]'
           : isChart
-          ? 'border-blue-500/30 hover:border-blue-500 focus:ring-blue-500'
-          : 'border-violet-500/30 hover:border-violet-500 focus:ring-violet-500'
+          ? 'border-blue-500/30 hover:border-blue-500'
+          : 'border-violet-500/30 hover:border-violet-500'
         
         const iconBgClass = isSource 
           ? 'bg-accent-green text-white'
@@ -251,7 +251,7 @@ function LineageVisualization({
               px-4 py-2.5
               transition-all duration-200
               hover:scale-105 hover:-translate-y-[calc(50%+4px)]
-              focus:outline-none focus:ring-2 focus:ring-offset-2
+              focus:outline-none
               group lineage-node
               ${borderClass}
             `}

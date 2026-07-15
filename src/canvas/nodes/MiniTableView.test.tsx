@@ -83,4 +83,35 @@ describe('MiniTableView engine preview', () => {
     )
     await waitFor(() => expect(mocks.getTableData).toHaveBeenCalledTimes(3))
   })
+
+  it('fills the preview width and sizes short tables to their content', async () => {
+    const twoColumns: ColumnSchema[] = [
+      columns[0],
+      { id: 'value', name: 'Value', type: 'number', nullable: true },
+    ]
+    mocks.getTableData.mockResolvedValue({
+      rows: Array.from({ length: 4 }, (_, index) => ({
+        __rowId: `row-${index}`,
+        name: null,
+        value: 0,
+      })),
+      totalRows: 4,
+    })
+
+    render(<MiniTableView tableId="table-1" columns={twoColumns} maxHeight={240} />)
+
+    const table = await screen.findByRole('table')
+    expect(table).toHaveStyle({ height: '188px' })
+    expect(table).toHaveAttribute('aria-colcount', '2')
+    expect(table).toHaveAttribute('aria-rowcount', '4')
+
+    const headerRow = screen.getAllByRole('row')[0]
+    expect(headerRow).toHaveStyle({
+      gridTemplateColumns: 'repeat(2, minmax(65px, 1fr))',
+    })
+    expect(headerRow.parentElement).toHaveStyle({
+      width: '130px',
+      minWidth: '100%',
+    })
+  })
 })

@@ -47,4 +47,62 @@ describe('FormulaColumnModal', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Unclosed column reference')
     expect(onConfirm).not.toHaveBeenCalled()
   })
+
+  it('reuses the formula editor for an existing computed column', () => {
+    const computed: ColumnSchema = {
+      id: 'total',
+      name: 'Total',
+      type: 'number',
+      nullable: true,
+      isComputed: true,
+      formula: '[Value] * 2',
+      canonicalFormula: '[value] * 2',
+    }
+    const onConfirm = vi.fn()
+    render(
+      <FormulaColumnModal
+        isOpen
+        columns={[...columns, computed]}
+        initialColumn={computed}
+        onConfirm={onConfirm}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('dialog', { name: 'Edit Formula' })).toBeVisible()
+    expect(screen.getByLabelText('Column Name')).toBeDisabled()
+    const formula = screen.getByRole('textbox', { name: 'Formula' })
+    expect(formula).toHaveValue('[Value] * 2')
+    fireEvent.change(formula, { target: { value: '[Value] > 10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save Formula' }))
+
+    expect(onConfirm).toHaveBeenCalledWith('Total', 'boolean', '[Value] > 10')
+  })
+
+  it('shows a state-level dependency error without closing', () => {
+    const computed: ColumnSchema = {
+      id: 'total',
+      name: 'Total',
+      type: 'number',
+      nullable: true,
+      isComputed: true,
+      formula: '[Value] * 2',
+    }
+    render(
+      <FormulaColumnModal
+        isOpen
+        columns={[...columns, computed]}
+        initialColumn={computed}
+        onConfirm={() => 'Formula for "Total" cannot reference itself.'}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Formula' }), {
+      target: { value: '[Total] + 1' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save Formula' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('cannot reference itself')
+  })
 })
