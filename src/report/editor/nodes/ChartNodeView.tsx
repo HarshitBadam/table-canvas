@@ -176,7 +176,7 @@ export const ChartNodeView = memo(function ChartNodeView({
       <NodeViewWrapper className="chart-block">
         <div className={`flex flex-col items-center justify-center text-center transition-all p-10 rounded-xl border border-dashed ${
           selected
-            ? 'border-accent-green bg-accent-green/5 ring-2 ring-accent-green ring-offset-2'
+            ? 'border-accent-green bg-accent-green/5'
             : 'border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50 to-white dark:from-gray-800/50 dark:to-gray-900/50'
         }`}>
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-green/15 to-accent-green/5 flex items-center justify-center mb-3 text-accent-green">

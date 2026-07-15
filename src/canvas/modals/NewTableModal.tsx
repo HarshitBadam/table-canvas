@@ -4,7 +4,7 @@ import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
 import { useAppAuth } from '@/state/AppContext'
 import { generateId } from '@/lib/utils'
-import { ColumnType, ColumnSchema, TableSchema, CellValue } from '@/types'
+import { ColumnType, ColumnSchema, TableSchema } from '@/types'
 import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
@@ -110,7 +110,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
     const rows: TableRow[] = Array.from({ length: rowCount }, (_, rowIndex) => {
       const row: TableRow = { __rowId: `row_${rowIndex}` }
       schemaColumns.forEach(col => {
-        row[col.id] = col.type === 'number' ? 0 : '' as CellValue
+        row[col.id] = null
       })
       return row
     })

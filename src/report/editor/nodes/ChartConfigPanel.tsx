@@ -113,7 +113,7 @@ export function ChartConfigPanel({
           value={config.title || ''}
           onChange={event => onConfigChange({ title: event.target.value })}
           placeholder="Chart title"
-          className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-accent-green focus:ring-1 focus:ring-accent-green transition-colors"
+          className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-accent-green transition-colors"
         />
       </div>
 

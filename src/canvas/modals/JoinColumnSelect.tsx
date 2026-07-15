@@ -199,7 +199,7 @@ export function JoinColumnSelect({
                 onClick={() => selectOption(option.value)}
                 onMouseEnter={() => setActiveIndex(index)}
                 onKeyDown={handleListKeyDown}
-                className={`join-select-option focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-green ${value === option.value ? 'selected' : ''} ${index === activeIndex ? 'bg-surface-secondary outline outline-2 -outline-offset-2 outline-accent-green' : ''}`}
+                className={`join-select-option ${value === option.value ? 'selected' : ''} ${index === activeIndex ? 'bg-surface-secondary' : ''}`}
               >
                 <span className="join-select-option-name">{option.label}</span>
                 <span className="join-select-option-type">{option.type}</span>

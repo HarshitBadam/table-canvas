@@ -1,4 +1,4 @@
-import { memo, useRef, useState, useCallback, useEffect, useMemo } from 'react'
+import { memo, useState, useCallback, useEffect, useMemo } from 'react'
 import { TableRow } from '@/state/dataStore'
 import { ColumnSchema, CellValue, ViewFilterConfig } from '@/types'
 import { formatNumber } from '@/lib/utils'
@@ -38,11 +38,7 @@ export const MiniTableView = memo(({
   versionHash,
   dataRevision,
 }: MiniTableViewProps) => {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
-  const [containerHeight, setContainerHeight] = useState(maxHeight - FOOTER_HEIGHT)
-  const [containerWidth, setContainerWidth] = useState(0)
 
   // Data now lives in the engine (DuckDB), not the data store. Fetch a bounded
   // preview slice (already remapped to column ids by getTableData) for display.
@@ -115,37 +111,21 @@ export const MiniTableView = memo(({
   }, [rows, patches?.deletedRows])
 
   const totalRows = visibleRows.length
+  const previewHeight = Math.min(
+    maxHeight,
+    HEADER_HEIGHT + totalRows * CELL_HEIGHT + FOOTER_HEIGHT,
+  )
+  const viewportHeight = previewHeight - FOOTER_HEIGHT
   const startIndex = Math.max(0, Math.floor(scrollTop / CELL_HEIGHT) - BUFFER_ROWS)
   const endIndex = Math.min(
     totalRows,
-    Math.ceil((scrollTop + containerHeight) / CELL_HEIGHT) + BUFFER_ROWS
+    Math.ceil((scrollTop + viewportHeight) / CELL_HEIGHT) + BUFFER_ROWS
   )
   const virtualRows = visibleRows.slice(startIndex, endIndex)
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setScrollTop(e.currentTarget.scrollTop)
   }, [])
-
-  useEffect(() => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const observer = new ResizeObserver((entries) => {
-      setContainerHeight(entries[0].contentRect.height)
-      setContainerWidth(entries[0].contentRect.width)
-    })
-    observer.observe(container)
-    setContainerHeight(container.clientHeight)
-    setContainerWidth(container.clientWidth)
-
-    return () => observer.disconnect()
-  }, [])
-
-  const cellWidth = useMemo(() => {
-    if (columns.length === 0 || containerWidth === 0) return MIN_CELL_WIDTH
-    const calculatedWidth = Math.floor(containerWidth / columns.length)
-    return Math.max(MIN_CELL_WIDTH, calculatedWidth)
-  }, [columns.length, containerWidth])
 
   const formatCellValue = useCallback((value: CellValue, type: string): string => {
     if (value === null || value === undefined || value === '') return ''
@@ -159,7 +139,8 @@ export const MiniTableView = memo(({
     return String(value)
   }, [])
 
-  const totalWidth = Math.max(columns.length * cellWidth, containerWidth)
+  const tableMinWidth = columns.length * MIN_CELL_WIDTH
+  const gridTemplateColumns = `repeat(${columns.length}, minmax(${MIN_CELL_WIDTH}px, 1fr))`
 
   if (!isLoaded) {
     return (
@@ -194,13 +175,14 @@ export const MiniTableView = memo(({
 
   return (
     <div 
-      ref={containerRef}
-      className="flex flex-col overflow-hidden rounded-b-2xl ring-1 ring-inset ring-border"
-      style={{ height: maxHeight }}
+      className="flex flex-col overflow-hidden rounded-b-2xl"
+      style={{ height: previewHeight }}
+      role="table"
+      aria-colcount={columns.length}
+      aria-rowcount={engineTotalRows}
     >
       {/* Scrollable table area - hide scrollbars but keep functionality */}
       <div 
-        ref={scrollContainerRef}
         className="flex-1 overflow-auto overscroll-none nowheel scrollbar-hide"
         style={{ overscrollBehavior: 'none' }}
         onScroll={handleScroll}
@@ -208,36 +190,39 @@ export const MiniTableView = memo(({
       >
         <div 
           style={{ 
-            width: totalWidth,
+            width: tableMinWidth,
+            minWidth: '100%',
             height: totalRows * CELL_HEIGHT + HEADER_HEIGHT,
             position: 'relative'
           }}
         >
           <div 
-            className="table-header-bg sticky top-0 z-10 flex border-b border-border-subtle"
-            style={{ height: HEADER_HEIGHT }}
+            className="table-header-bg sticky top-0 z-10 grid border-b border-border"
+            style={{ height: HEADER_HEIGHT, gridTemplateColumns }}
+            role="row"
           >
             {columns.map((col, idx) => (
               <div
                 key={col.id}
-                className={`flex items-center px-1.5 text-xs font-medium text-accent-green truncate ${
+                className={`flex items-center px-1.5 text-xs font-medium text-accent-green dark:text-accent-text truncate ${
                   idx < columns.length - 1 ? 'border-r border-border' : ''
                 }`}
-                style={{ width: cellWidth, minWidth: MIN_CELL_WIDTH, flex: idx === columns.length - 1 ? 1 : undefined }}
                 title={col.name}
+                role="columnheader"
               >
                 <span className="truncate">{col.name}</span>
               </div>
             ))}
           </div>
 
-          <div style={{ marginTop: startIndex * CELL_HEIGHT }}>
+          <div style={{ marginTop: startIndex * CELL_HEIGHT }} role="rowgroup">
             {virtualRows.map((row) => {
               return (
                 <div
                   key={row.__rowId}
-                className="flex border-b border-border-subtle bg-surface"
-                  style={{ height: CELL_HEIGHT }}
+                  className="grid border-b border-border-subtle bg-surface"
+                  style={{ height: CELL_HEIGHT, gridTemplateColumns }}
+                  role="row"
                 >
                   {columns.map((col, idx) => {
                     const value = getDisplayValue(row.__rowId, col.id, row[col.id], row)
@@ -251,11 +236,11 @@ export const MiniTableView = memo(({
                         } ${
                           col.type === 'number' ? 'justify-end font-mono text-text-primary' : 'text-text-primary'
                         }`}
-                        style={{ width: cellWidth, minWidth: MIN_CELL_WIDTH, flex: isLastColumn ? 1 : undefined }}
                         title={displayValue}
+                        role="cell"
                       >
                         <span className="truncate">
-                          {displayValue || <span className="text-text-tertiary italic">—</span>}
+                          {displayValue || <span className="sr-only">Empty cell</span>}
                         </span>
                       </div>
                     )
