@@ -91,7 +91,9 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
         ${headerStateClass}
       `}
       style={{ width, minWidth: width, maxWidth: width, height: HEADER_HEIGHT }}
-      title={isEditable ? `"${column.name}" - Double-click to rename, drag edge to resize` : `"${column.name}"`}
+      title={isEditable
+        ? `"${column.name}" - ${column.isComputed ? 'Right-click to edit formula, ' : 'Double-click to rename, '}drag edge to resize`
+        : `"${column.name}"`}
     >
       {isEditing ? (
         <input

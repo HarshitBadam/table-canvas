@@ -5,18 +5,21 @@ import { useDataStore, TableRow } from '@/state/dataStore'
 import { loadFileWithSync } from '@/persistence/syncService'
 import {
   computePatchesVersion,
+  computeSchemaFingerprint,
   computeSourceVersionHash,
+  copyPatches,
+  copySchema,
   getEngineTableRowCount,
+  simpleHash,
 } from './cacheUtils'
 import { computeDerivedTable } from './derivedTableComputation'
 import { loadEngineTable } from './loadTableIntoEngine'
 import type {
   SourceTableNode,
   CellValue,
+  Patches,
   TableSchema,
 } from '@/types'
-
-
 type MaterializationStatus =
   | 'cached'
   | 'computed'
@@ -32,73 +35,139 @@ export interface MaterializationResult {
 }
 
 const inProgressMaterializations = new Map<string, Promise<MaterializationResult>>()
-
 let materializationQueue = Promise.resolve()
 
+interface SourceSnapshot {
+  generation: string
+  node: SourceTableNode
+  schema?: TableSchema
+  patches?: Patches
+  currentVersionHash: string
+}
+
+function captureSourceSnapshot(tableId: string): SourceSnapshot | undefined {
+  const state = useProjectStore.getState()
+  const node = state.getTableNode(tableId)
+  if (!node || node.kind !== 'source_table') return undefined
+
+  const schema = copySchema(node.schema)
+  const patches = copyPatches(state.patches[tableId])
+  const patchVersion = computePatchesVersion(patches)
+  const schemaFingerprint = computeSchemaFingerprint(schema)
+  const currentVersionHash = computeSourceVersionHash(
+    tableId,
+    node.plan.fileRef,
+    patchVersion,
+    schemaFingerprint,
+  )
+  const generation = simpleHash(JSON.stringify({
+    version: currentVersionHash,
+    revision: node.cacheInfo?.dataRevision ?? 0,
+    updatedAt: node.updatedAt,
+    fileType: node.plan.fileType,
+    sheetName: node.plan.sheetName ?? null,
+    initialRows: node.plan.initialRows ?? null,
+  }))
+
+  return {
+    generation,
+    node: {
+      ...node,
+      plan: {
+        ...node.plan,
+        initialRows: node.plan.initialRows?.map((row) => ({ ...row })),
+      },
+      schema,
+      cacheInfo: node.cacheInfo ? { ...node.cacheInfo } : undefined,
+    },
+    schema,
+    patches,
+    currentVersionHash,
+  }
+}
+
+function sourceGenerationIsCurrent(tableId: string, generation: string): boolean {
+  return captureSourceSnapshot(tableId)?.generation === generation
+}
+
+function staleMaterialization(tableId: string): MaterializationResult {
+  return { status: 'loading', tableId }
+}
+
+function captureTableRequestGeneration(tableId: string): string | undefined {
+  const node = useProjectStore.getState().getTableNode(tableId)
+  if (!node) return undefined
+  return simpleHash(JSON.stringify({
+    kind: node.kind,
+    plan: node.plan,
+    schema: computeSchemaFingerprint(node.schema),
+    revision: node.cacheInfo?.dataRevision ?? 0,
+    updatedAt: node.updatedAt,
+  }))
+}
 
 async function loadSourceTable(tableId: string): Promise<MaterializationResult> {
-  const projectStore = useProjectStore.getState()
-  const dataStore = useDataStore.getState()
-  const node = projectStore.getTableNode(tableId) as SourceTableNode | undefined
-
-  if (!node || node.kind !== 'source_table') {
+  let snapshot = captureSourceSnapshot(tableId)
+  if (!snapshot) {
     return {
       status: 'error',
       tableId,
       error: 'Source table not found',
     }
   }
-
-  projectStore.updateCacheInfo(tableId, { isComputing: true, error: undefined })
-
+  useProjectStore.getState().updateCacheInfo(tableId, { isComputing: true })
   try {
-    const existingData = dataStore.tableData[tableId]
-    const patches = projectStore.patches[tableId]
-
-    const patchVersion = computePatchesVersion(patches)
-
-    const currentVersionHash = computeSourceVersionHash(
-      tableId,
-      node.plan.fileRef,
-      patchVersion
-    )
-
     const engineRowCount = await getEngineTableRowCount(tableId)
+    if (!sourceGenerationIsCurrent(tableId, snapshot.generation)) {
+      return staleMaterialization(tableId)
+    }
     const existsInEngine = engineRowCount >= 0
-    const expectedRows = node.cacheInfo?.lastRowCount
+    const expectedRows = snapshot.node.cacheInfo?.lastRowCount
     const engineHasExpectedData =
       expectedRows !== undefined && engineRowCount === expectedRows
-
     if (
       existsInEngine &&
       engineHasExpectedData &&
-      node.cacheInfo?.currentVersionHash === currentVersionHash &&
-      !node.cacheInfo?.isDirty
+      snapshot.node.cacheInfo?.currentVersionHash === snapshot.currentVersionHash &&
+      !snapshot.node.cacheInfo?.isDirty
     ) {
-      projectStore.updateCacheInfo(tableId, { isComputing: false })
+      useProjectStore.getState().updateCacheInfo(tableId, {
+        isComputing: false,
+        error: undefined,
+      })
       return {
         status: 'cached',
         tableId,
-        rowCount: node.cacheInfo?.lastRowCount ?? 0,
+        rowCount: snapshot.node.cacheInfo?.lastRowCount ?? 0,
+        schema: snapshot.schema,
       }
     }
-
     let rows: TableRow[] = []
-
-    if (node.plan.fileRef) {
-      const fileData = await loadFileWithSync(node.plan.fileRef)
+    if (snapshot.node.plan.fileRef) {
+      const fileData = await loadFileWithSync(snapshot.node.plan.fileRef)
+      if (!sourceGenerationIsCurrent(tableId, snapshot.generation)) {
+        return staleMaterialization(tableId)
+      }
+      snapshot = captureSourceSnapshot(tableId)!
       if (fileData) {
         const { parseFileData } = await import('./fileParsers')
-        rows = await parseFileData(fileData, node.plan.fileType, node.plan.sheetName, node.schema)
-
+        rows = await parseFileData(
+          fileData,
+          snapshot.node.plan.fileType,
+          snapshot.node.plan.sheetName,
+          snapshot.schema,
+        )
+        if (!sourceGenerationIsCurrent(tableId, snapshot.generation)) {
+          return staleMaterialization(tableId)
+        }
         rows = rows.map((row, idx) => ({
           ...row,
           __rowId: row.__rowId || `row_${idx}`,
         }))
-
-        dataStore.setTableData(tableId, [])
+        useDataStore.getState().setTableData(tableId, [])
       } else {
-        projectStore.updateCacheInfo(tableId, {
+        useProjectStore.getState().updateCacheInfo(tableId, {
+          isDirty: true,
           isComputing: false,
           error: 'Data file not found. Please re-import the file.',
         })
@@ -110,47 +179,66 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
         }
       }
     } else {
-      const initialRows = node.plan.initialRows as TableRow[] | undefined
-      const runtimeRows = existingData?.rows
+      snapshot = captureSourceSnapshot(tableId)!
+      const initialRows = snapshot.node.plan.initialRows as TableRow[] | undefined
+      const runtimeRows = useDataStore.getState().tableData[tableId]?.rows
       rows = initialRows
-        ?? (runtimeRows?.length ? runtimeRows : Array.from(
-          { length: node.schema?.rowCount ?? 0 },
+        ?? (runtimeRows?.length ? runtimeRows.map((row) => ({ ...row })) : Array.from(
+          { length: snapshot.schema?.rowCount ?? 0 },
           (_, index) => ({ __rowId: `row_${index}` }),
         ))
       if (!initialRows && !runtimeRows?.length) {
-        dataStore.setTableData(tableId, [])
+        useDataStore.getState().setTableData(tableId, [])
       }
     }
 
-    if (node.schema) {
-      await loadEngineTable(tableId, node.schema, rows as Record<string, CellValue>[], patches)
+    if (!snapshot.schema) {
+      throw new Error('Source table schema is missing')
     }
+
+    const loadResult = await loadEngineTable(
+      tableId,
+      snapshot.schema,
+      rows as Record<string, CellValue>[],
+      snapshot.patches,
+    )
+    if (!sourceGenerationIsCurrent(tableId, snapshot.generation)) {
+      return staleMaterialization(tableId)
+    }
+
     const loadedRowCount = await getEngineTableRowCount(tableId)
+    if (!sourceGenerationIsCurrent(tableId, snapshot.generation)) {
+      return staleMaterialization(tableId)
+    }
     const rowCount = loadedRowCount >= 0 ? loadedRowCount : rows.length
 
-    projectStore.updateCacheInfo(tableId, {
+    useProjectStore.getState().updateCacheInfo(tableId, {
       isDirty: false,
       isComputing: false,
       lastComputedAt: new Date().toISOString(),
-      currentVersionHash,
+      currentVersionHash: snapshot.currentVersionHash,
       lastRowCount: rowCount,
       error: undefined,
+      warnings: loadResult?.warnings,
     })
 
     return {
       status: 'computed',
       tableId,
       rowCount,
-      schema: node.schema,
+      schema: snapshot.schema,
     }
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
 
-    projectStore.updateCacheInfo(tableId, {
-      isComputing: false,
-      error: errorMessage,
-    })
+    if (sourceGenerationIsCurrent(tableId, snapshot.generation)) {
+      useProjectStore.getState().updateCacheInfo(tableId, {
+        isDirty: true,
+        isComputing: false,
+        error: errorMessage,
+      })
+    }
 
     return {
       status: 'error',
@@ -169,7 +257,11 @@ export async function ensureTableMaterialized(tableId: string): Promise<Material
 
   const materializationPromise = (async () => {
     const queuePromise = materializationQueue.then(async () => {
-      return await materializeTableInternal(tableId)
+      let result = await materializeTableInternal(tableId)
+      while (result.status === 'loading') {
+        result = await materializeTableInternal(tableId)
+      }
+      return result
     })
 
     materializationQueue = queuePromise.then(() => {}).catch(() => {})
@@ -190,6 +282,7 @@ export async function ensureTableMaterialized(tableId: string): Promise<Material
 async function materializeTableInternal(tableId: string): Promise<MaterializationResult> {
   const projectStore = useProjectStore.getState()
   const node = projectStore.getTableNode(tableId)
+  const requestGeneration = captureTableRequestGeneration(tableId)
 
   if (!node) {
     return {
@@ -217,10 +310,13 @@ async function materializeTableInternal(tableId: string): Promise<Materializatio
       const result = await loadSourceTable(nodeToCompute)
       if (result.status === 'error') {
         if (nodeToCompute !== tableId) {
-          projectStore.updateCacheInfo(tableId, {
-            isComputing: false,
-            error: `Upstream table "${tableNode.name}" failed: ${result.error}`,
-          })
+          if (captureTableRequestGeneration(tableId) === requestGeneration) {
+            useProjectStore.getState().updateCacheInfo(tableId, {
+              isDirty: true,
+              isComputing: false,
+              error: `Upstream table "${tableNode.name}" failed: ${result.error}`,
+            })
+          }
           return {
             status: 'error',
             tableId,
@@ -233,10 +329,13 @@ async function materializeTableInternal(tableId: string): Promise<Materializatio
       const result = await computeDerivedTable(nodeToCompute)
       if (result.status === 'error') {
         if (nodeToCompute !== tableId) {
-          projectStore.updateCacheInfo(tableId, {
-            isComputing: false,
-            error: `Upstream table "${tableNode.name}" failed: ${result.error}`,
-          })
+          if (captureTableRequestGeneration(tableId) === requestGeneration) {
+            useProjectStore.getState().updateCacheInfo(tableId, {
+              isDirty: true,
+              isComputing: false,
+              error: `Upstream table "${tableNode.name}" failed: ${result.error}`,
+            })
+          }
           return {
             status: 'error',
             tableId,

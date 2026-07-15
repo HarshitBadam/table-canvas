@@ -12,17 +12,19 @@ import { useDialogFocus } from '@/components/useDialogFocus'
 interface FormulaColumnModalProps {
   isOpen: boolean
   columns: ColumnSchema[]
+  initialColumn?: ColumnSchema
   onConfirm: (
     name: string,
     type: UserColumnType,
     formula?: string
-  ) => void
+  ) => void | string
   onCancel: () => void
 }
 
 export function FormulaColumnModal({
   isOpen,
   columns,
+  initialColumn,
   onConfirm,
   onCancel,
 }: FormulaColumnModalProps) {
@@ -31,9 +33,9 @@ export function FormulaColumnModal({
   const [isFormula, setIsFormula] = useState(false)
   const [formula, setFormula] = useState('')
   const [staticType, setStaticType] = useState<UserColumnType>('string')
+  const [submissionError, setSubmissionError] = useState('')
   
   const [formulaSuggestions, setFormulaSuggestions] = useState<FormulaSuggestion[]>([])
-  const [formulaErrors, setFormulaErrors] = useState<string[]>([])
 
   const columnInfo = useMemo(() => 
     columns.map(c => ({ id: c.id, name: c.name, type: c.type })),
@@ -44,14 +46,20 @@ export function FormulaColumnModal({
 
   useEffect(() => {
     if (isOpen) {
-      setColumnName(`Column ${columns.length + 1}`)
-      setIsFormula(false)
-      setFormula('')
-      setStaticType('string')
+      setColumnName(initialColumn?.name ?? `Column ${columns.length + 1}`)
+      setIsFormula(Boolean(initialColumn?.isComputed))
+      setFormula(initialColumn?.formula ?? '')
+      setStaticType(
+        initialColumn?.type === 'number' ||
+        initialColumn?.type === 'boolean' ||
+        initialColumn?.type === 'date'
+          ? initialColumn.type
+          : 'string',
+      )
       setFormulaSuggestions([])
-      setFormulaErrors([])
+      setSubmissionError('')
     }
-  }, [isOpen, columns.length])
+  }, [isOpen, columns.length, initialColumn])
 
   useEffect(() => {
     if (columnName.trim()) {
@@ -65,21 +73,22 @@ export function FormulaColumnModal({
     }
   }, [columnName, columnInfo])
 
-  useEffect(() => {
-    if (!isFormula || !formula.trim()) {
-      setFormulaErrors([])
-      return
-    }
-    
-    setFormulaErrors([])
-    
-    const timeout = setTimeout(() => {
-      const errors = validateFormulaWithColumns(formula, columnInfo)
-      setFormulaErrors(errors.map(e => e.message))
-    }, 800)
-    
-    return () => clearTimeout(timeout)
-  }, [isFormula, formula, columnInfo])
+  const formulaErrors = useMemo(
+    () => isFormula && formula.trim()
+      ? validateFormulaWithColumns(formula, columnInfo).map(error => error.message)
+      : [],
+    [isFormula, formula, columnInfo],
+  )
+
+  const columnNameError = useMemo(() => {
+    const name = columnName.trim().toLowerCase()
+    if (!name) return ''
+    return columns.some(
+      column => column.id !== initialColumn?.id && column.name.trim().toLowerCase() === name,
+    )
+      ? `A column named "${columnName.trim()}" already exists.`
+      : ''
+  }, [columnName, columns, initialColumn?.id])
 
   const inferredType = useMemo(() => {
     if (!isFormula || !formula.trim()) return staticType
@@ -93,20 +102,22 @@ export function FormulaColumnModal({
   }, [])
 
   const handleConfirm = useCallback(() => {
-    if (!columnName.trim()) return
+    if (!columnName.trim() || columnNameError) return
     if (isFormula && formula.trim()) {
-      onConfirm(columnName.trim(), inferredType, formula.trim())
+      const currentErrors = validateFormulaWithColumns(formula, columnInfo)
+      if (currentErrors.length > 0) return
+      setSubmissionError(onConfirm(columnName.trim(), inferredType, formula.trim()) ?? '')
     } else {
-      onConfirm(columnName.trim(), staticType, undefined)
+      setSubmissionError(onConfirm(columnName.trim(), staticType, undefined) ?? '')
     }
-  }, [columnName, isFormula, formula, inferredType, staticType, onConfirm])
+  }, [columnName, columnNameError, isFormula, formula, columnInfo, inferredType, staticType, onConfirm])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey && columnName.trim() && (!isFormula || !formulaErrors.length)) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleConfirm()
     }
-  }, [columnName, isFormula, formulaErrors, handleConfirm])
+  }, [handleConfirm])
 
   const insertIntoFormula = useCallback((text: string) => {
     setFormula(prev => prev + text)
@@ -123,8 +134,8 @@ export function FormulaColumnModal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="new-column-title"
-        aria-describedby="new-column-description"
+        aria-labelledby="formula-column-title"
+        aria-describedby="formula-column-description"
         tabIndex={-1}
         className={`flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-xl bg-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${
           isFormula ? 'w-[520px] max-w-full' : 'w-[380px] max-w-full'
@@ -133,8 +144,12 @@ export function FormulaColumnModal({
         onKeyDown={handleKeyDown}
       >
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-          <h3 id="new-column-title" className="text-base font-semibold text-gray-900 dark:text-gray-100">New Column</h3>
-          <p id="new-column-description" className="text-xs text-gray-500 mt-0.5">Add a new column to your table</p>
+          <h3 id="formula-column-title" className="text-base font-semibold text-gray-900 dark:text-gray-100">
+            {initialColumn ? 'Edit Formula' : 'New Column'}
+          </h3>
+          <p id="formula-column-description" className="text-xs text-gray-500 mt-0.5">
+            {initialColumn ? `Update the formula for ${initialColumn.name}` : 'Add a new column to your table'}
+          </p>
         </div>
         
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -147,13 +162,21 @@ export function FormulaColumnModal({
               type="text"
               value={columnName}
               onChange={(e) => setColumnName(e.target.value)}
-              className="input rounded-lg px-3 py-2"
+              disabled={Boolean(initialColumn)}
+              className={`input rounded-lg px-3 py-2 ${columnNameError ? 'border-red-300 bg-red-50 dark:bg-red-900/10' : ''}`}
               placeholder="Enter column name..."
               autoFocus
+              aria-invalid={Boolean(columnNameError)}
+              aria-describedby={columnNameError ? 'formula-column-name-error' : undefined}
             />
+            {columnNameError && (
+              <p id="formula-column-name-error" role="alert" className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+                {columnNameError}
+              </p>
+            )}
           </div>
 
-          <div>
+          {!initialColumn && <div>
             <span className="block text-xs font-medium text-text-secondary mb-1.5">
               Column Type
             </span>
@@ -161,6 +184,7 @@ export function FormulaColumnModal({
               <button
                 type="button"
                 onClick={() => setIsFormula(false)}
+                aria-label="Static"
                 aria-pressed={!isFormula}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
                   !isFormula
@@ -174,6 +198,7 @@ export function FormulaColumnModal({
               <button
                 type="button"
                 onClick={() => setIsFormula(true)}
+                aria-label="Formula"
                 aria-pressed={isFormula}
                 className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
                   isFormula
@@ -185,7 +210,7 @@ export function FormulaColumnModal({
                 Formula
               </button>
             </div>
-          </div>
+          </div>}
 
           {!isFormula && (
             <div>
@@ -289,6 +314,9 @@ export function FormulaColumnModal({
                 {formulaErrors.length > 0 && (
                   <p id="formula-column-error" role="alert" className="mt-1.5 text-xs text-red-600 dark:text-red-400">{formulaErrors[0]}</p>
                 )}
+                {submissionError && (
+                  <p role="alert" className="mt-1.5 text-xs text-red-600 dark:text-red-400">{submissionError}</p>
+                )}
               </div>
 
               <div className="flex gap-3" style={{ height: '200px' }}>
@@ -365,10 +393,10 @@ export function FormulaColumnModal({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={!columnName.trim() || (isFormula && formulaErrors.length > 0)}
+            disabled={!columnName.trim() || Boolean(columnNameError) || (isFormula && formulaErrors.length > 0)}
             className="flex-1 px-4 py-2 text-sm font-medium text-white bg-accent-green hover:bg-accent-green-hover rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            Add Column
+            {initialColumn ? 'Save Formula' : 'Add Column'}
           </button>
         </div>
       </div>

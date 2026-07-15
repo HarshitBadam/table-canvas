@@ -109,7 +109,10 @@ class FormulaTokenizer {
         continue
       }
 
-      this.position++
+      throw new FormulaTokenizeError(
+        `Unexpected character: ${char}`,
+        this.position,
+      )
     }
 
     this.tokens.push({
@@ -205,9 +208,10 @@ class FormulaTokenizer {
       this.position++
     }
 
-    if (this.position < this.input.length) {
-      this.position++
+    if (this.position >= this.input.length) {
+      throw new FormulaTokenizeError('Unclosed column reference', start, this.position - start)
     }
+    this.position++
 
     this.tokens.push({
       type: 'COLUMN_REF',
@@ -222,6 +226,7 @@ class FormulaTokenizer {
     this.position++
 
     let value = ''
+    let closed = false
     while (this.position < this.input.length) {
       const char = this.input[this.position]
       
@@ -233,11 +238,16 @@ class FormulaTokenizer {
 
       if (char === quote) {
         this.position++
+        closed = true
         break
       }
 
       value += char
       this.position++
+    }
+
+    if (!closed) {
+      throw new FormulaTokenizeError('Unclosed string literal', start, this.position - start)
     }
 
     this.tokens.push({
@@ -342,6 +352,17 @@ class FormulaTokenizer {
       position: start,
       length: identifier.length,
     })
+  }
+}
+
+export class FormulaTokenizeError extends Error {
+  constructor(
+    message: string,
+    readonly position: number,
+    readonly length: number = 1,
+  ) {
+    super(message)
+    this.name = 'FormulaTokenizeError'
   }
 }
 
