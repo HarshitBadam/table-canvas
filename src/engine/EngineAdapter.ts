@@ -11,8 +11,63 @@ import type {
 import type { TransformDef, CellValue, TableSchema, Patches, ColumnSchema } from '@/types'
 import EngineWorker from './worker/engine.worker?worker'
 import { INTERNAL_ROW_ID_COLUMN } from './internalColumns'
+import { evaluateComputedColumns } from '@/formula/computedColumns'
+import { extractColumnReferences } from '@/formula/parser'
 
 let engineInstance: EngineAdapter | null = null
+
+export interface LoadTableResult {
+  warnings: string[]
+}
+
+export function validateComputedColumnSchema(columns: ColumnSchema[]): void {
+  const seenIds = new Set<string>()
+  const byReference = new Map<string, ColumnSchema>()
+  for (const column of columns) {
+    if (seenIds.has(column.id)) {
+      throw new Error(`Invalid table schema: duplicate column id "${column.id}"`)
+    }
+    seenIds.add(column.id)
+    byReference.set(column.id, column)
+    byReference.set(column.name.trim().toLowerCase(), column)
+
+    if (column.isComputed && !column.formula?.trim()) {
+      throw new Error(`Invalid computed column "${column.name}": formula is required`)
+    }
+  }
+
+  const computed = columns.filter((column) => column.isComputed && column.formula)
+  const dependencies = new Map<string, ColumnSchema[]>()
+  for (const column of computed) {
+    const references = extractColumnReferences(
+      column.canonicalFormula ?? column.formula!,
+    )
+    dependencies.set(column.id, references.map((reference) => {
+      const dependency = byReference.get(reference)
+        ?? byReference.get(reference.trim().toLowerCase())
+      if (!dependency) {
+        throw new Error(
+          `Invalid computed column "${column.name}": unknown column "${reference}"`,
+        )
+      }
+      return dependency
+    }).filter((dependency) => dependency.isComputed))
+  }
+
+  const visiting = new Set<string>()
+  const visited = new Set<string>()
+  const visit = (column: ColumnSchema): void => {
+    if (visited.has(column.id)) return
+    if (visiting.has(column.id)) {
+      throw new Error(`Circular formula dependency involving "${column.name}"`)
+    }
+    visiting.add(column.id)
+    for (const dependency of dependencies.get(column.id) ?? []) visit(dependency)
+    visiting.delete(column.id)
+    visited.add(column.id)
+  }
+  for (const column of computed) visit(column)
+}
 
 function remapRowsToColumnIds(
   rows: Record<string, CellValue>[],
@@ -72,15 +127,17 @@ class EngineAdapter {
     schema: TableSchema,
     rows: Record<string, CellValue>[],
     patches?: Patches
-  ): Promise<void> {
+  ): Promise<LoadTableResult> {
     await this.ensureInitialized()
+    validateComputedColumnSchema(schema.columns)
 
     const columns = [...schema.columns.map(c => c.name), INTERNAL_ROW_ID_COLUMN]
     const dataColumnIds = schema.columns.map(c => c.id)
     const columnIds = [...dataColumnIds, INTERNAL_ROW_ID_COLUMN]
     const types = [...schema.columns.map(c => c.type), 'string']
     
-    const processedRows = rows.map((row, rowIndex) => {
+    type ProcessedRow = Record<string, CellValue> & { __rowId: string }
+    const processedRows: ProcessedRow[] = rows.map<ProcessedRow | null>((row, rowIndex) => {
       const rowId = row.__rowId as string || `row_${rowIndex}`
       
       if (patches?.deletedRows?.has(rowId)) {
@@ -93,8 +150,8 @@ class EngineAdapter {
         }
         return row[colId] ?? null
       })
-      return [...values, rowId]
-    }).filter(row => row !== null) as CellValue[][]
+      return { ...Object.fromEntries(dataColumnIds.map((colId, index) => [colId, values[index]])), __rowId: rowId }
+    }).filter((row): row is ProcessedRow => row !== null)
 
     if (patches?.insertedRows) {
       for (const inserted of patches.insertedRows) {
@@ -102,9 +159,29 @@ class EngineAdapter {
         const rowValues = dataColumnIds.map((colId) =>
           patches.cellPatches?.[colId]?.[inserted.rowId] ?? inserted.values[colId] ?? null
         )
-        processedRows.push([...rowValues, inserted.rowId])
+        processedRows.push({
+          ...Object.fromEntries(dataColumnIds.map((colId, index) => [colId, rowValues[index]])),
+          __rowId: inserted.rowId,
+        })
       }
     }
+
+    const computed = evaluateComputedColumns(
+      processedRows,
+      schema.columns,
+    )
+    const warnings = computed.errors.length === 0
+      ? []
+      : [
+          `${computed.errors.length} computed value${computed.errors.length === 1 ? '' : 's'} could not be evaluated and were stored as null. `
+          + computed.errors.slice(0, 3).map((error) =>
+            `Row "${error.rowId}", column "${error.columnId}": ${error.message}`
+          ).join('; '),
+        ]
+    const rowsWithComputedValues = computed.rows.map((row) => [
+      ...dataColumnIds.map((columnId) => row[columnId] ?? null),
+      row.__rowId,
+    ])
 
     const request: LoadTableRequest = {
       tableId,
@@ -112,11 +189,12 @@ class EngineAdapter {
         columns,
         columnIds,
         types,
-        rows: processedRows,
+        rows: rowsWithComputedValues,
       },
     }
 
     await this.rpc.call('loadTable', request)
+    return { warnings }
   }
 
   async executeTransform(

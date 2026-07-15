@@ -1,6 +1,10 @@
 import { useMemo, useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
-import { useProfilingStore, loadProfileForTable } from '@/lib/profiling'
+import {
+  getTableProfileVersionForNode,
+  loadProfileForTable,
+  useProfilingStore,
+} from '@/lib/profiling'
 import { formatNumber, getTableNodes } from '@/lib/utils'
 import type {
   TableNode,
@@ -239,20 +243,39 @@ export function useChartNodes(): ChartNode[] {
 
 export function useAllProfiles() {
   const tableNodes = useTableNodes()
-  const profiles = useProfilingStore((state) => state.profiles)
+  const cachedProfiles = useProfilingStore((state) => state.profiles)
+  const profileVersions = useProfilingStore((state) => state.profileVersions)
   const loading = useProfilingStore((state) => state.loading)
+  const loadingVersions = useProfilingStore((state) => state.loadingVersions)
+  const profiles = useMemo(() => Object.fromEntries(
+    tableNodes.flatMap((table) => {
+      const version = getTableProfileVersionForNode(table)
+      const profile = cachedProfiles[table.id]
+      return profile && profileVersions[table.id] === version
+        ? [[table.id, profile]]
+        : []
+    }),
+  ), [tableNodes, cachedProfiles, profileVersions])
 
   useEffect(() => {
     for (const table of tableNodes) {
-      if (!profiles[table.id] && !loading[table.id]) {
+      const version = getTableProfileVersionForNode(table)
+      const isLoadingCurrent = loading[table.id] && loadingVersions[table.id] === version
+      if (!profiles[table.id] && !isLoadingCurrent) {
         loadProfileForTable(table.id)
       }
     }
-  }, [tableNodes, profiles, loading])
+  }, [tableNodes, profiles, loading, loadingVersions])
 
   const isLoading = useMemo(() => {
-    return tableNodes.some(t => loading[t.id] || !profiles[t.id])
-  }, [tableNodes, profiles, loading])
+    return tableNodes.some((table) => {
+      const version = getTableProfileVersionForNode(table)
+      return (
+        (loading[table.id] && loadingVersions[table.id] === version)
+        || !profiles[table.id]
+      )
+    })
+  }, [tableNodes, profiles, loading, loadingVersions])
 
   return { profiles, isLoading }
 }

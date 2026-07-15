@@ -74,6 +74,8 @@ export interface GridContextValue {
   onInsertColumnAtBeginning: () => void
   onToggleCellHighlight: (tableId: string, rowId: string, columnId: string) => void
   onCreateChart: (columnId: string) => void
+  onEditFormulaColumn: (columnId: string) => void
+  onDeleteFormulaColumn: (columnId: string) => void
 
   autofillDragging: boolean
   autofillEndRow: number | null

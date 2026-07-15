@@ -29,6 +29,8 @@ export interface ColumnSchema {
   nullable: boolean
   semanticHints?: SemanticHint[]
   formula?: string
+  /** Stable-ID formula used for evaluation; formula remains readable source text. */
+  canonicalFormula?: string
   isComputed?: boolean
   duckDbName?: string
 }

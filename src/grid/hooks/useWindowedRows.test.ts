@@ -4,20 +4,23 @@ import { useWindowedRows } from './useWindowedRows'
 import type { ColumnSchema } from '@/types'
 import type { GridRow } from '../types'
 
-const mockGetSlice = vi.fn()
-const mockGetFilteredSlice = vi.fn()
-const mockInit = vi.fn()
+const mocks = vi.hoisted(() => ({
+  getSlice: vi.fn(),
+  getFilteredSlice: vi.fn(),
+  init: vi.fn(),
+  ensureTableMaterialized: vi.fn(),
+}))
 
 vi.mock('@/engine/EngineAdapter', () => ({
   getEngine: () => ({
-    getSlice: mockGetSlice,
-    getFilteredSlice: mockGetFilteredSlice,
-    init: mockInit,
+    getSlice: mocks.getSlice,
+    getFilteredSlice: mocks.getFilteredSlice,
+    init: mocks.init,
   }),
 }))
 
 vi.mock('@/engine/materializationService', () => ({
-  ensureTableMaterialized: vi.fn().mockResolvedValue({ status: 'computed' }),
+  ensureTableMaterialized: mocks.ensureTableMaterialized,
 }))
 
 const testColumns: ColumnSchema[] = [
@@ -28,7 +31,8 @@ const testColumns: ColumnSchema[] = [
 describe('useWindowedRows', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockGetSlice.mockResolvedValue({
+    mocks.ensureTableMaterialized.mockResolvedValue({ status: 'computed' })
+    mocks.getSlice.mockResolvedValue({
       tableId: 'test_table',
       offset: 0,
       limit: 100,
@@ -50,7 +54,7 @@ describe('useWindowedRows', () => {
       await new Promise(r => setTimeout(r, 50))
     })
 
-    expect(mockGetSlice).toHaveBeenCalledWith('test_table', 0, 100, testColumns)
+    expect(mocks.getSlice).toHaveBeenCalledWith('test_table', 0, 100, testColumns)
     expect(result.current.totalRows).toBe(500000)
   })
 
@@ -86,7 +90,7 @@ describe('useWindowedRows', () => {
   })
 
   it('retains adjacent rows while keeping the cache bounded', async () => {
-    mockGetSlice.mockImplementation(async (_tableId, offset: number, limit: number) => ({
+    mocks.getSlice.mockImplementation(async (_tableId, offset: number, limit: number) => ({
       tableId: 'test_table',
       offset,
       limit,
@@ -113,7 +117,7 @@ describe('useWindowedRows', () => {
   })
 
   it('uses getFilteredSlice when filters are provided', async () => {
-    mockGetFilteredSlice.mockResolvedValue({
+    mocks.getFilteredSlice.mockResolvedValue({
       tableId: 'test_table',
       offset: 0,
       limit: 100,
@@ -134,7 +138,7 @@ describe('useWindowedRows', () => {
       await new Promise(r => setTimeout(r, 50))
     })
 
-    expect(mockGetFilteredSlice).toHaveBeenCalled()
+    expect(mocks.getFilteredSlice).toHaveBeenCalled()
     expect(result.current.totalRows).toBe(1)
   })
 
@@ -147,14 +151,62 @@ describe('useWindowedRows', () => {
       await new Promise(r => setTimeout(r, 50))
     })
 
-    const callsBefore = mockGetSlice.mock.calls.length
+    const callsBefore = mocks.getSlice.mock.calls.length
 
     await act(async () => {
       result.current.invalidate()
       await new Promise(r => setTimeout(r, 50))
     })
 
-    expect(mockGetSlice.mock.calls.length).toBeGreaterThan(callsBefore)
+    expect(mocks.getSlice.mock.calls.length).toBeGreaterThan(callsBefore)
+  })
+
+  it('does not query a stale engine table when materialization fails', async () => {
+    mocks.ensureTableMaterialized.mockResolvedValue({
+      status: 'error',
+      error: 'Source file is unavailable. Re-import it.',
+    })
+
+    const { result } = renderHook(() =>
+      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+    )
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 50))
+    })
+
+    expect(mocks.getSlice).not.toHaveBeenCalled()
+    expect(mocks.getFilteredSlice).not.toHaveBeenCalled()
+    expect(result.current.error).toBe('Source file is unavailable. Re-import it.')
+  })
+
+  it('clears stale rows and error state before a clean retry', async () => {
+    const { result } = renderHook(() =>
+      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+    )
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 50))
+    })
+    expect(result.current.getRowAtIndex(0)?.__rowId).toBe('row_0')
+
+    mocks.ensureTableMaterialized.mockResolvedValueOnce({
+      status: 'error',
+      error: 'Temporary materialization failure',
+    })
+    await act(async () => {
+      result.current.invalidate()
+      await new Promise(resolve => setTimeout(resolve, 50))
+    })
+    expect(result.current.getLoadedRows().size).toBe(0)
+    expect(result.current.error).toBe('Temporary materialization failure')
+
+    mocks.ensureTableMaterialized.mockResolvedValueOnce({ status: 'computed' })
+    await act(async () => {
+      result.current.invalidate()
+      await new Promise(resolve => setTimeout(resolve, 50))
+    })
+    expect(result.current.error).toBeNull()
+    expect(result.current.getRowAtIndex(0)?.__rowId).toBe('row_0')
   })
 
   it('generation guard: new fetch after invalidate uses latest generation', async () => {
@@ -168,7 +220,7 @@ describe('useWindowedRows', () => {
 
     expect(result.current.totalRows).toBe(500000)
 
-    mockGetSlice.mockResolvedValueOnce({
+    mocks.getSlice.mockResolvedValueOnce({
       tableId: 'test_table', offset: 0, limit: 100,
       rows: [{ __rowId: 'row_new', Name: 'Fresh', Age: 1 }],
       totalRows: 42,
@@ -191,7 +243,7 @@ describe('useWindowedRows', () => {
       await new Promise(r => setTimeout(r, 50))
     })
 
-    const calls = mockGetSlice.mock.calls
+    const calls = mocks.getSlice.mock.calls
     for (const call of calls) {
       expect(call[2]).toBeLessThanOrEqual(100)
     }

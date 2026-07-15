@@ -78,7 +78,13 @@ export function useWindowedRows(
     const gen = generationRef.current
 
     try {
-      await ensureTableMaterialized(tableId)
+      const materialization = await ensureTableMaterialized(tableId)
+      if (materialization.status === 'error') {
+        throw new Error(materialization.error || 'Failed to materialize table')
+      }
+      if (materialization.status === 'loading') {
+        throw new Error('Table data changed while loading. Please try again.')
+      }
       const engine = getEngine()
 
       const filterDefs = buildFilterDefs()
@@ -190,7 +196,11 @@ export function useWindowedRows(
   const invalidate = useCallback(() => {
     generationRef.current++
     windowRef.current = { start: 0, end: 0, rows: new Map() }
-    fetchWindow(0, WINDOW_SIZE)
+    pendingFetchRef.current = null
+    setTotalRows(0)
+    setError(null)
+    setVersion(v => v + 1)
+    void fetchWindow(0, WINDOW_SIZE)
   }, [fetchWindow])
 
   return { totalRows, getRowAtIndex, getLoadedRows, ensureRange, version, isLoading, error, invalidate }

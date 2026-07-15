@@ -6,6 +6,7 @@ import { MINI_ROW_HEIGHT as CELL_HEIGHT, MINI_HEADER_HEIGHT as HEADER_HEIGHT, MI
 import { computeDisplayValue } from '@/grid/displayUtils'
 import { applyFilters, hasActiveFilters } from '@/grid/filterUtils'
 import { getTableData } from '@/engine/materializationService'
+import { useProjectStore } from '@/state/projectStore'
 
 interface MiniTableViewProps {
   tableId: string
@@ -18,6 +19,8 @@ interface MiniTableViewProps {
   viewFilters?: ViewFilterConfig
   /** Current table version hash; changes trigger a preview refetch from the engine. */
   versionHash?: string
+  /** Monotonic data revision; changes trigger a preview refetch even if the hash is unchanged. */
+  dataRevision?: number
 }
 
 // Column width: minimum width, will expand to fill container
@@ -32,7 +35,8 @@ export const MiniTableView = memo(({
   maxHeight = 220,
   patches,
   viewFilters,
-  versionHash
+  versionHash,
+  dataRevision,
 }: MiniTableViewProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -45,24 +49,35 @@ export const MiniTableView = memo(({
   const [rows, setRows] = useState<TableRow[]>([])
   const [engineTotalRows, setEngineTotalRows] = useState(0)
   const [isLoaded, setIsLoaded] = useState(false)
-  const [loadError, setLoadError] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const updateCacheInfo = useProjectStore((state) => state.updateCacheInfo)
+  const schemaKey = useMemo(
+    () => columns.map(column => `${column.id}:${column.name}:${column.type}`).join('|'),
+    [columns],
+  )
 
   useEffect(() => {
     let cancelled = false
     setIsLoaded(false)
-    setLoadError(false)
+    setLoadError(null)
     getTableData(tableId, 0, PREVIEW_LIMIT)
-      .then(({ rows: fetched, totalRows }) => {
+      .then(({ rows: fetched, totalRows, error }) => {
         if (cancelled) return
+        if (error) {
+          setRows([])
+          setEngineTotalRows(0)
+          setLoadError(error)
+          return
+        }
         setRows(fetched as TableRow[])
         setEngineTotalRows(totalRows)
       })
-      .catch(() => {
+      .catch((error) => {
         if (cancelled) return
         setRows([])
         setEngineTotalRows(0)
-        setLoadError(true)
+        setLoadError(error instanceof Error ? error.message : String(error))
       })
       .finally(() => {
         if (!cancelled) setIsLoaded(true)
@@ -70,7 +85,13 @@ export const MiniTableView = memo(({
     return () => {
       cancelled = true
     }
-  }, [tableId, versionHash, reloadKey])
+  }, [tableId, versionHash, dataRevision, schemaKey, reloadKey])
+
+  const handleRetry = useCallback(() => {
+    updateCacheInfo(tableId, { error: undefined, isDirty: true, isComputing: false })
+    setLoadError(null)
+    setReloadKey(key => key + 1)
+  }, [tableId, updateCacheInfo])
 
   const getDisplayValue = useCallback((rowId: string, columnId: string, baseValue: CellValue, row?: TableRow): CellValue => {
     return computeDisplayValue(rowId, columnId, baseValue, row, columns, patches?.cellPatches)
@@ -151,11 +172,11 @@ export const MiniTableView = memo(({
   if (loadError) {
     return (
       <div className="flex h-[100px] flex-col items-center justify-center gap-2 px-4 text-center text-xs text-text-secondary" role="alert">
-        <span>Could not load the table preview.</span>
+        <span>{loadError}</span>
         <button
           type="button"
           className="font-medium text-accent-green hover:underline"
-          onClick={() => setReloadKey((key) => key + 1)}
+          onClick={handleRetry}
         >
           Try again
         </button>

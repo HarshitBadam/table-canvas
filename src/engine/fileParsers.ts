@@ -36,7 +36,11 @@ export function parseCsvBuffer(
         if (results.errors?.length > 0) {
           console.warn('CSV parsing warnings:', results.errors)
         }
-        resolve(processTabularData(results.data, results.meta.fields ?? [], schema))
+        try {
+          resolve(processTabularData(results.data, results.meta.fields ?? [], schema))
+        } catch (error) {
+          reject(error)
+        }
       },
       error: reject,
     })
@@ -57,6 +61,7 @@ export function parseWorkbookSheet(
 
   const data = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 })
   if (data.length === 0) {
+    if (schema) validateSourceHeaders(schema.columns, [])
     return {
       schema: schema ?? { columns: [], rowCount: 0 },
       rows: [],
@@ -82,6 +87,7 @@ function processTabularData(
   existingSchema?: TableSchema,
 ): ParsedTableData {
   const columns = existingSchema?.columns ?? inferColumns(data, fields)
+  validateSourceHeaders(columns, fields)
   const columnsByName = new Map(
     columns.map((column) => [column.sourceName ?? column.name, column]),
   )
@@ -105,6 +111,29 @@ function processTabularData(
   }
 }
 
+function validateSourceHeaders(columns: ColumnSchema[], fields: string[]): void {
+  const availableHeaders = new Set(fields)
+  const missingHeaders = [
+    ...new Set(
+      columns
+        .map((column) => column.sourceName)
+        .filter((sourceName): sourceName is string =>
+          sourceName !== undefined && !availableHeaders.has(sourceName),
+        ),
+    ),
+  ]
+  if (missingHeaders.length === 0) return
+
+  const available = fields.length > 0
+    ? fields.map((field) => `"${field}"`).join(', ')
+    : '(none)'
+  throw new Error(
+    `Source file headers changed. Missing persisted header${missingHeaders.length === 1 ? '' : 's'}: `
+    + `${missingHeaders.map((header) => `"${header}"`).join(', ')}. Available headers: ${available}. `
+    + 'Restore the missing header or re-import the source file.',
+  )
+}
+
 function inferColumns(data: Record<string, string>[], fields: string[]): ColumnSchema[] {
   return fields.map((field, index) => ({
     id: `col_${index}_${field.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
@@ -116,7 +145,6 @@ function inferColumns(data: Record<string, string>[], fields: string[]): ColumnS
     nullable: data.some(
       (row) => row[field] === '' || row[field] === null || row[field] === undefined,
     ),
-    duckDbName: `col_${index}_${field.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
   }))
 }
 

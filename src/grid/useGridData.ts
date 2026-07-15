@@ -11,16 +11,9 @@ import type { GridRow } from './types'
 export function useGridData(tableId: string) {
   const node = useProjectStore((state) => state.getTableNode(tableId))
   const patches = useProjectStore((state) => state.patches[tableId])
-  const patchVersion = useProjectStore((state) => {
-    const p = state.patches[tableId]
-    if (!p) return '0-0-0-0'
-    const cellPatchCount = Object.values(p.cellPatches || {}).reduce(
-      (sum, colPatches) => sum + Object.keys(colPatches).length,
-      0
-    )
-    const highlightCount = p.highlightedCells?.size || 0
-    return `${p.insertedRows?.length || 0}-${cellPatchCount}-${p.deletedRows?.size || 0}-${highlightCount}`
-  })
+  const dataRevision = useProjectStore(
+    (state) => state.getTableNode(tableId)?.cacheInfo?.dataRevision ?? 0
+  )
   const setTableFilters = useProjectStore((state) => state.setTableFilters)
 
   const highlightedCells = patches?.highlightedCells
@@ -59,13 +52,13 @@ export function useGridData(tableId: string) {
   )
   const { getLoadedRows, invalidate, totalRows: windowedTotalRows, version: windowedVersion } = windowed
 
-  const prevPatchVersion = useRef(patchVersion)
+  const prevDataRevision = useRef(dataRevision)
   useEffect(() => {
-    if (prevPatchVersion.current !== patchVersion && prevPatchVersion.current !== '0-0-0-0') {
+    if (prevDataRevision.current !== dataRevision) {
       invalidate()
     }
-    prevPatchVersion.current = patchVersion
-  }, [invalidate, patchVersion])
+    prevDataRevision.current = dataRevision
+  }, [dataRevision, invalidate])
 
   const getDisplayValue = useCallback((rowId: string, columnId: string, baseValue: CellValue, row?: GridRow): CellValue => {
     return computeDisplayValue(rowId, columnId, baseValue, row, columns, patches?.cellPatches)
