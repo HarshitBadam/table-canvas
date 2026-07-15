@@ -1,7 +1,7 @@
 import { expect, test } from './e2e.fixture'
 import { bootApp } from './app.support'
 
-test('formula columns materialize and survive reload', async ({ page }) => {
+test('formula columns can be created, edited, deleted, and reloaded', async ({ page }) => {
   await bootApp(page)
 
   const csv = [
@@ -32,10 +32,26 @@ test('formula columns materialize and survive reload', async ({ page }) => {
   await expect(page.getByRole('gridcell', { name: /23,750/ })).toBeVisible()
   await expect(page.getByRole('gridcell', { name: /2,250/ })).toBeVisible()
 
+  const totalHeader = page.getByRole('columnheader', { name: /total/ })
+  await totalHeader.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Edit Formula' }).click()
+  const editDialog = page.getByRole('dialog', { name: 'Edit Formula' })
+  await editDialog.getByRole('textbox', { name: 'Formula' }).fill('[price] * 2')
+  await editDialog.getByRole('button', { name: 'Save Formula' }).click()
+  await expect(page.getByRole('gridcell', { name: /1,900/ })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('gridcell', { name: /total, row 2: 30/ })).toBeVisible()
+
+  await totalHeader.click({ button: 'right' })
+  page.once('dialog', dialog => dialog.accept())
+  await page.getByRole('menuitem', { name: 'Delete Formula Column' }).click()
+  await expect(page.getByText('2 rows × 3 columns')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('columnheader', { name: /total/ })).toHaveCount(0)
+  await page.waitForTimeout(250)
+  await expect(page.getByText('Saving...')).toBeHidden({ timeout: 20_000 })
+
   await page.reload()
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
-  await page.locator('aside').getByRole('button', { name: /^Formula Regression 4 columns 2 rows/ }).click()
-  await expect(page.getByRole('columnheader', { name: /total/ })).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByRole('gridcell', { name: /23,750/ })).toBeVisible()
-  await expect(page.getByRole('gridcell', { name: /2,250/ })).toBeVisible()
+  await page.locator('aside').getByRole('button', { name: /^Formula Regression 3 columns 2 rows/ }).click()
+  await expect(page.getByRole('gridcell').first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('columnheader', { name: /total/ })).toHaveCount(0)
 })

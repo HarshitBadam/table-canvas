@@ -128,6 +128,24 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
       </div>
 
       <div>
+        {schema && schema.columns.length === 0 && (
+          <div className="flex flex-col items-center justify-center px-6 py-6 text-center">
+            <svg
+              className="mb-2 h-5 w-5 text-text-tertiary"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              aria-hidden="true"
+            >
+              <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+              <path d="M3.5 9.5h17M9 9.5v10" />
+            </svg>
+            <p className="text-xs font-medium text-text-secondary">No columns to preview</p>
+            <p className="mt-1 text-xs text-text-tertiary">Add a column to see table data here.</p>
+          </div>
+        )}
+
         {viewMode === 'collapsed' && schema && schema.columns.length > 0 && (
           <div className="px-4 py-3">
             <div className="space-y-2">
