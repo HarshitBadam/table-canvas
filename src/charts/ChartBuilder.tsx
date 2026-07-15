@@ -97,27 +97,30 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
         <Dialog.Content 
-          className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-1rem)] w-[480px] max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-lg"
+          aria-describedby="create-chart-description"
+          className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-1rem)] w-[520px] max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-lg"
         >
-          <div className="px-5 py-4 border-b border-border-subtle">
+          <div className="border-b border-border-subtle px-5 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-accent-green flex-shrink-0">
-                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-surface-secondary text-text-secondary">
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z" />
                   </svg>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <Dialog.Title className="text-base font-semibold text-text-primary">
                     Create Chart
                   </Dialog.Title>
-                  {selectedTable && (
-                    <p className="text-xs mt-0.5 text-text-secondary">
-                      {selectedTable.name} • {(selectedTable.cacheInfo?.lastRowCount
+                  <p id="create-chart-description" className="mt-0.5 truncate text-xs text-text-secondary">
+                    {selectedTable ? (
+                      <>
+                        {selectedTable.name} - {(selectedTable.cacheInfo?.lastRowCount
                         ?? selectedTable.schema?.rowCount
                         ?? 0).toLocaleString()} rows
-                    </p>
-                  )}
+                      </>
+                    ) : 'Choose a source and map its fields'}
+                  </p>
                 </div>
               </div>
               <Dialog.Close 
@@ -133,11 +136,11 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
           
           <div className="flex min-h-0 flex-1 flex-col">
           <div className="space-y-5 overflow-y-auto p-4 sm:p-5">
-            <div>
-              <label className="mb-3 block text-sm font-medium text-text-secondary">
-                Chart Type
-              </label>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+            <fieldset>
+              <legend className="mb-2 block text-xs font-semibold text-text-primary">
+                Chart type
+              </legend>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
                   { type: 'bar' as ChartType, label: 'Bar' },
                   { type: 'line' as ChartType, label: 'Line' },
@@ -145,19 +148,21 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                   { type: 'scatter' as ChartType, label: 'Scatter' },
                 ].map((ct) => (
                   <button
+                    type="button"
                     key={ct.type}
                     onClick={() => { setChartType(ct.type); setXAxis(''); setYAxis(''); }}
+                    aria-pressed={chartType === ct.type}
                     className={`
-                      flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-colors
+                      flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left transition-colors
                       ${chartType === ct.type
                         ? 'border-accent-green bg-accent-green/5 dark:bg-accent-green/10'
-                        : 'border-border hover:border-text-tertiary'
+                        : 'border-border bg-surface hover:border-text-tertiary hover:bg-surface-secondary'
                       }
                     `}
                   >
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-md ${
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
                       chartType === ct.type 
-                        ? 'bg-accent-green text-white' 
+                        ? 'bg-accent-green text-white'
                         : 'bg-surface-secondary text-text-tertiary'
                     }`}>
                       <ChartTypeIcon type={ct.type} className="w-4 h-4" />
@@ -170,76 +175,83 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                   </button>
                 ))}
               </div>
-            </div>
+            </fieldset>
 
             {selectedTable && (
               <div className="space-y-4">
-                <div className="bg-surface-secondary rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-medium text-text-secondary">
-                      {chartType === 'pie' ? 'Category (Slices)' : chartType === 'scatter' ? 'X-Axis (Horizontal)' : 'Category (X-Axis)'}
-                    </label>
-                    <span className="rounded bg-surface-tertiary px-2 py-0.5 text-xs text-text-tertiary">
-                      {chartType === 'scatter' ? 'Numeric' : 'Text/Date'}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
+                <fieldset className="divide-y divide-border-subtle rounded-lg border border-border">
+                  <legend className="sr-only">Chart fields</legend>
+                  <div className="p-3">
+                    <div className="mb-2 flex items-baseline justify-between gap-3">
+                      <span className="text-xs font-semibold text-text-primary">
+                        {chartType === 'pie' ? 'Category' : chartType === 'scatter' ? 'X axis' : 'Category'}
+                      </span>
+                      <span className="text-xs text-text-tertiary">
+                        {chartType === 'scatter' ? 'Numeric' : 'Text or date'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
                     {(chartType === 'scatter' ? numericColumns : categoricalColumns.length > 0 ? categoricalColumns : columns)
                       .slice(0, 8)
                       .map((col) => (
                         <button
+                          type="button"
                           key={col.id}
                           onClick={() => setXAxis(col.id)}
+                          aria-pressed={xAxis === col.id}
                           className={`
-                            px-3 py-1.5 text-xs font-medium rounded-lg transition-all
+                            rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors
                             ${xAxis === col.id
-                              ? 'bg-accent-green text-white shadow-sm'
-                              : 'bg-surface text-text-secondary border border-border hover:border-accent-green/50'
+                              ? 'border-accent-green bg-accent-green text-white'
+                              : 'border-border bg-surface text-text-secondary hover:border-text-tertiary hover:bg-surface-secondary'
                             }
                           `}
                         >
                           {col.name}
                         </button>
                       ))}
+                    </div>
                   </div>
-                </div>
 
-                <div className="bg-surface-secondary rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-medium text-text-secondary">
-                      {chartType === 'pie' ? 'Value (Size)' : 'Value (Y-Axis)'}
-                    </label>
-                    <span className="rounded bg-surface-tertiary px-2 py-0.5 text-xs text-text-tertiary">
+                  <div className="p-3">
+                    <div className="mb-2 flex items-baseline justify-between gap-3">
+                      <span className="text-xs font-semibold text-text-primary">
+                        {chartType === 'pie' ? 'Value' : 'Y axis'}
+                      </span>
+                      <span className="text-xs text-text-tertiary">
                       Numeric
                     </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
                     {numericColumns.length > 0 ? numericColumns.slice(0, 8).map((col) => (
                       <button
+                        type="button"
                         key={col.id}
                         onClick={() => setYAxis(col.id)}
+                        aria-pressed={yAxis === col.id}
                         className={`
-                          px-3 py-1.5 text-xs font-medium rounded-lg transition-all
+                          rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors
                           ${yAxis === col.id
-                            ? 'bg-accent-green text-white shadow-sm'
-                            : 'bg-surface text-text-secondary border border-border hover:border-accent-green/50'
+                            ? 'border-accent-green bg-accent-green text-white'
+                            : 'border-border bg-surface text-text-secondary hover:border-text-tertiary hover:bg-surface-secondary'
                           }
                         `}
                       >
                         {col.name}
                       </button>
                     )) : (
-                      <span className="text-xs text-text-tertiary italic">No numeric columns available</span>
+                      <span className="text-xs text-text-tertiary">No numeric columns available</span>
                     )}
+                    </div>
                   </div>
-                </div>
+                </fieldset>
 
                 {chartType !== 'scatter' && (
-                  <div>
-                    <label className="mb-3 block text-sm font-medium text-text-secondary">
-                      Aggregation Method
-                    </label>
-                    <div className="flex flex-wrap gap-2">
+                  <fieldset>
+                    <legend className="mb-2 block text-xs font-semibold text-text-primary">
+                      Aggregation
+                    </legend>
+                    <div className="flex flex-wrap gap-1.5 rounded-lg bg-surface-secondary p-1">
                       {[
                         { value: 'sum', label: 'Sum' },
                         { value: 'avg', label: 'Average' },
@@ -249,13 +261,15 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                         { value: 'max', label: 'Max' },
                       ].map((agg) => (
                         <button
+                          type="button"
                           key={agg.value}
                           onClick={() => setAggregation(agg.value as AggregationType)}
+                          aria-pressed={aggregation === agg.value}
                           className={`
-                            min-w-16 flex-1 rounded-lg py-2 text-xs font-medium transition-colors
+                            min-w-16 flex-1 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors
                             ${aggregation === agg.value
-                              ? 'bg-accent-green text-white shadow-sm'
-                              : 'bg-surface-secondary text-text-secondary hover:bg-surface-tertiary'
+                              ? 'border-accent-green bg-surface text-accent-text shadow-sm'
+                              : 'border-transparent text-text-secondary hover:bg-surface-tertiary'
                             }
                           `}
                         >
@@ -263,21 +277,19 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                         </button>
                       ))}
                     </div>
-                  </div>
+                  </fieldset>
                 )}
               </div>
             )}
           </div>
 
           <div 
-            className="shrink-0 border-t border-border-subtle bg-surface-secondary px-4 py-3 sm:px-5 sm:py-4"
+            className="shrink-0 border-t border-border-subtle bg-surface px-4 py-3 sm:px-5"
           >
             <div className="flex items-center justify-between gap-3">
-              <div className="hidden items-center gap-2 text-sm text-text-secondary sm:flex">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="truncate max-w-[200px]">{chartName}</span>
+              <div className="hidden min-w-0 sm:block">
+                <p className="text-xs text-text-tertiary">Chart name</p>
+                <p className="max-w-[230px] truncate text-xs font-medium text-text-primary">{chartName}</p>
               </div>
               <div className="ml-auto flex gap-2">
                 <Dialog.Close asChild>

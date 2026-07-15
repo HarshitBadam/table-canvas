@@ -217,7 +217,7 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
             <span>{tableNode?.name || 'Table'}</span>
             {attrs.caption && (
               <span style={{ fontWeight: 400, color: 'var(--color-text-tertiary)' }}>
-                — {attrs.caption}
+                - {attrs.caption}
               </span>
             )}
           </div>

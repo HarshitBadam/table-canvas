@@ -25,14 +25,14 @@ export async function createManualTable(
   await dialog.getByRole('button', { name: 'Create Table' }).click()
   await expect(dialog).toBeHidden({ timeout: 20_000 })
   await expect(page.locator('aside').getByRole('button', {
-    name: new RegExp(`^${name} ${rowCount} rows`),
+    name: new RegExp(`^${name} .*${rowCount} rows`),
     includeHidden: true,
   })).toBeAttached()
 }
 
 export async function openManualTable(page: Page, name = 'UX Contract Table', rowCount = 5) {
   await page.locator('aside').getByRole('button', {
-    name: new RegExp(`^${name} ${rowCount} rows`),
+    name: new RegExp(`^${name} .*${rowCount} rows`),
   }).click()
   await expect(page.locator('.cursor-cell').first()).toBeVisible({ timeout: 20_000 })
 }

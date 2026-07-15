@@ -319,7 +319,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
                     </button>
                   </>
                 ) : match.rate > 0 ? (
-                  <>{match.rate}% match · {match.rows} rows</>
+                  <>{match.rate}% match - {match.rows} rows</>
                 ) : (
                   <>No values match. Try different columns.</>
                 )}

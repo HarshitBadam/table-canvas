@@ -6,6 +6,7 @@ import type { GridClipboardData } from './types'
 import type { GridFeedbackMessage } from './GridFeedback'
 import { useProjectStore } from '@/state/projectStore'
 import { createGridPastePlan, describePasteSkips } from './gridPaste'
+import { getEditableCellsInSelection, getNavigationTarget } from './gridNavigation'
 
 interface UseGridKeyboardOptions {
   editingCell: { rowIndex: number; columnId: string } | null
@@ -16,9 +17,15 @@ interface UseGridKeyboardOptions {
   isEditable: boolean
   cellRangeSelection: CellRangeSelection | null
   setSelection: (sel: SelectionType) => void
-  commitEdit: () => void
+  selectCell: (rowIndex: number, columnId: string, options?: { extend?: boolean }) => void
+  commitEdit: () => boolean
   cancelEdit: () => void
-  startEditing: (rowIndex: number, columnId: string, currentValue: CellValue) => void
+  startEditing: (
+    rowIndex: number,
+    columnId: string,
+    currentValue: CellValue,
+    options?: { initialValue?: string; selectValue?: boolean },
+  ) => void
   getDisplayValue: (rowId: string, columnId: string, baseValue: CellValue, row?: GridRow) => CellValue
   saveSnapshot: (label: string) => void
   setCellValue: (tableId: string, rowId: string, columnId: string, value: CellValue) => void
@@ -37,6 +44,7 @@ export function useGridKeyboard({
   isEditable,
   cellRangeSelection,
   setSelection,
+  selectCell,
   commitEdit,
   cancelEdit,
   startEditing,
@@ -56,23 +64,30 @@ export function useGridKeyboard({
       if (!target?.closest('[role="grid"]')) return
 
       if (editingCell) {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault()
-          commitEdit()
+          const committed = commitEdit()
+          if (!committed) return
+
+          if (e.key === 'Enter') {
+            selectCell(editingCell.rowIndex, editingCell.columnId)
+            return
+          }
+
+          const colIndex = columns.findIndex(c => c.id === editingCell.columnId)
+          if (colIndex < 0) return
+          const targetCell = getNavigationTarget(
+            { rowIndex: editingCell.rowIndex, colIndex },
+            e.key,
+            rows.length,
+            columns.length,
+            e.shiftKey,
+          )
+          const targetColumn = columns[targetCell.colIndex]
+          if (targetColumn) selectCell(targetCell.rowIndex, targetColumn.id)
         } else if (e.key === 'Escape') {
           e.preventDefault()
           cancelEdit()
-        } else if (e.key === 'Tab') {
-          e.preventDefault()
-          commitEdit()
-          const colIndex = columns.findIndex(c => c.id === editingCell.columnId)
-          if (colIndex < columns.length - 1) {
-            const nextCol = columns[colIndex + 1]
-            const row = rows[editingCell.rowIndex]
-            if (row && nextCol) {
-              startEditing(editingCell.rowIndex, nextCol.id, getDisplayValue(row.__rowId, nextCol.id, row[nextCol.id], row))
-            }
-          }
         }
         return
       }
@@ -97,39 +112,91 @@ export function useGridKeyboard({
       if (selectedCell) {
         const { rowIndex, columnId } = selectedCell
         const colIndex = columns.findIndex(c => c.id === columnId)
+        if (colIndex < 0) return
 
-        if (e.key === 'ArrowUp') {
+        if (
+          (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+          && !e.metaKey
+          && !e.ctrlKey
+          && !e.altKey
+        ) {
           e.preventDefault()
-          if (rowIndex > 0) {
-            setSelection({ type: 'cell', rowIndex: rowIndex - 1, columnId })
-          } else {
-            setSelection({ type: 'header-row' })
+          const targetCell = getNavigationTarget(
+            { rowIndex, colIndex },
+            e.key,
+            rows.length,
+            columns.length,
+          )
+          const targetColumn = columns[targetCell.colIndex]
+          if (targetColumn) {
+            selectCell(targetCell.rowIndex, targetColumn.id, { extend: e.shiftKey })
           }
-        } else if (e.key === 'ArrowDown' && rowIndex < rows.length - 1) {
-          e.preventDefault()
-          setSelection({ type: 'cell', rowIndex: rowIndex + 1, columnId })
-        } else if (e.key === 'ArrowLeft') {
-          e.preventDefault()
-          if (colIndex > 0) {
-            setSelection({ type: 'cell', rowIndex, columnId: columns[colIndex - 1].id })
-          } else {
-            setSelection({ type: 'row', rowIndex })
-          }
-        } else if (e.key === 'ArrowRight' && colIndex < columns.length - 1) {
-          e.preventDefault()
-          setSelection({ type: 'cell', rowIndex, columnId: columns[colIndex + 1].id })
-        } else if ((e.key === 'Enter' || e.key === 'F2') && isEditable) {
+        } else if (e.key === 'Enter' && isEditable) {
           e.preventDefault()
           const row = rows[rowIndex]
           if (row) {
-            startEditing(rowIndex, columnId, getDisplayValue(row.__rowId, columnId, row[columnId], row))
+            startEditing(
+              rowIndex,
+              columnId,
+              getDisplayValue(row.__rowId, columnId, row[columnId], row),
+              { selectValue: true },
+            )
           }
-        } else if (e.key === 'Delete' && isEditable) {
+        } else if (e.key === 'Tab') {
+          e.preventDefault()
+          const targetCell = getNavigationTarget(
+            { rowIndex, colIndex },
+            e.key,
+            rows.length,
+            columns.length,
+            e.shiftKey,
+          )
+          const targetColumn = columns[targetCell.colIndex]
+          if (targetColumn) selectCell(targetCell.rowIndex, targetColumn.id)
+        } else if (e.key === 'F2' && isEditable) {
           e.preventDefault()
           const row = rows[rowIndex]
           if (row) {
-            saveSnapshot('Clear cell')
-            setCellValue(tableId, row.__rowId, columnId, '')
+            startEditing(
+              rowIndex,
+              columnId,
+              getDisplayValue(row.__rowId, columnId, row[columnId], row),
+              { selectValue: false },
+            )
+          }
+        } else if ((e.key === 'Delete' || e.key === 'Backspace') && isEditable) {
+          e.preventDefault()
+          const cells = getEditableCellsInSelection(
+            rowIndex,
+            colIndex,
+            cellRangeSelection,
+            rows,
+            columns,
+          )
+          if (cells.length) {
+            saveSnapshot(cells.length === 1 ? 'Clear cell' : 'Clear cells')
+            cells.forEach(cell => setCellValue(tableId, cell.rowId, cell.columnId, ''))
+          }
+        } else if (e.key === 'Escape' && cellRangeSelection) {
+          e.preventDefault()
+          selectCell(rowIndex, columnId)
+        } else if (
+          isEditable
+          && e.key.length === 1
+          && !e.metaKey
+          && !e.ctrlKey
+          && !e.altKey
+          && !e.isComposing
+        ) {
+          e.preventDefault()
+          const row = rows[rowIndex]
+          if (row) {
+            startEditing(
+              rowIndex,
+              columnId,
+              getDisplayValue(row.__rowId, columnId, row[columnId], row),
+              { initialValue: e.key, selectValue: false },
+            )
           }
         }
       } else if (selection?.type === 'header-row' && e.key === 'ArrowDown' && rows.length > 0) {
@@ -143,7 +210,7 @@ export function useGridKeyboard({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [editingCell, selectedCell, selection, columns, rows, isEditable, setSelection, commitEdit, cancelEdit, startEditing, getDisplayValue, saveSnapshot, setCellValue, tableId, cellRangeSelection, getSelectedCellData, formatClipboardText, onFeedback])
+  }, [editingCell, selectedCell, selection, columns, rows, isEditable, setSelection, selectCell, commitEdit, cancelEdit, startEditing, getDisplayValue, saveSnapshot, setCellValue, tableId, cellRangeSelection, getSelectedCellData, formatClipboardText, onFeedback])
 
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {

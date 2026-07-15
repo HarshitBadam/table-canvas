@@ -53,7 +53,7 @@ export function GridView({ tableId }: GridViewProps) {
   }, [gridFeedback])
 
   const {
-    editingCell, editValue, editError, setEditValue,
+    editingCell, editValue, editError, selectEditValue, setEditValue,
     startEditing, commitEdit, cancelEdit, handleCellDoubleClick,
     editingColumnId, editColumnName, setEditColumnName,
     handleColumnDoubleClick, commitColumnNameEdit, cancelColumnNameEdit,
@@ -63,7 +63,7 @@ export function GridView({ tableId }: GridViewProps) {
   const {
     selection, setSelection,
     selectedCell, selectedColumn, isHeaderRowSelected, isIndexColumnSelected, isCornerSelected,
-    cellRangeSelection, isDraggingSelectionRef,
+    cellRangeSelection, isDraggingSelectionRef, selectCell,
     handleCellMouseDown, handleCellMouseEnter,
     handleColumnClick, handleRowClick, handleCornerClick,
     getRowInsertionIndex, getColumnInsertionIndex,
@@ -82,7 +82,7 @@ export function GridView({ tableId }: GridViewProps) {
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
     handleAutofillStart, handleAutofillMove, handleAutofillOneRow,
   } = useGridAutofill({
-    isEditable, columns, rows: filteredRows, selection, cellRangeSelection,
+    isEditable, columns, rows: filteredRows, cellRangeSelection,
     getDisplayValue, saveSnapshot, setCellValue, tableId,
   })
 
@@ -92,7 +92,7 @@ export function GridView({ tableId }: GridViewProps) {
 
   useGridKeyboard({
     editingCell, selectedCell, selection, columns, rows: filteredRows, isEditable,
-    cellRangeSelection, setSelection, commitEdit, cancelEdit, startEditing,
+    cellRangeSelection, setSelection, selectCell, commitEdit, cancelEdit, startEditing,
     getDisplayValue, saveSnapshot, setCellValue, tableId,
     getSelectedCellData, formatClipboardText,
     onFeedback: showGridFeedback,
@@ -143,12 +143,12 @@ export function GridView({ tableId }: GridViewProps) {
     tableId, isEditable, columns, getDisplayValue, getColumnWidth,
     selection, selectedCell, selectedColumn, isHeaderRowSelected,
     isIndexColumnSelected, isCornerSelected, cellRangeSelection,
-    setSelection, handleCellMouseDown, handleCellMouseEnter,
+    setSelection, selectCell, handleCellMouseDown, handleCellMouseEnter,
     handleColumnClick, handleRowClick, handleCornerClick,
     toggleHighlightForSelection, isDraggingSelectionRef,
     editingColumnId, editColumnName, setEditColumnName,
     commitColumnNameEdit, cancelColumnNameEdit, handleColumnDoubleClick,
-    editingCell, editValue, editError, setEditValue,
+    editingCell, editValue, editError, selectEditValue, setEditValue,
     startEditing, commitEdit, cancelEdit, handleContextMenu, openContextMenu,
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
     handleAutofillStart, handleAutofillMove, handleAutofillOneRow,
@@ -171,12 +171,12 @@ export function GridView({ tableId }: GridViewProps) {
     tableId, isEditable, columns, getDisplayValue, getColumnWidth,
     selection, selectedCell, selectedColumn, isHeaderRowSelected,
     isIndexColumnSelected, isCornerSelected, cellRangeSelection,
-    setSelection, handleCellMouseDown, handleCellMouseEnter,
+    setSelection, selectCell, handleCellMouseDown, handleCellMouseEnter,
     handleColumnClick, handleRowClick, handleCornerClick,
     toggleHighlightForSelection, isDraggingSelectionRef,
     editingColumnId, editColumnName, setEditColumnName,
     commitColumnNameEdit, cancelColumnNameEdit, handleColumnDoubleClick,
-    editingCell, editValue, editError, setEditValue,
+    editingCell, editValue, editError, selectEditValue, setEditValue,
     startEditing, commitEdit, cancelEdit, handleContextMenu, openContextMenu,
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
     handleAutofillStart, handleAutofillMove, handleAutofillOneRow,

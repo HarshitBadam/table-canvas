@@ -254,6 +254,12 @@ input[type="number"] {
   --tw-ring-shadow: 0 0 #0000 !important;
 }
 
+.grid-cell:focus-visible,
+.grid-cell input:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
 
 * {
   -ms-overflow-style: none;

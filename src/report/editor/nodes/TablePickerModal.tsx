@@ -79,7 +79,7 @@ export const TablePickerModal = memo(function TablePickerModal({
                     <span className="table-picker-item-meta">
                       {(table.cacheInfo?.lastRowCount
                         ?? table.schema?.rowCount
-                        ?? 0).toLocaleString()} rows ·{' '}
+                        ?? 0).toLocaleString()} rows -{' '}
                       {table.schema?.columns?.length ?? 0} columns
                     </span>
                   </div>

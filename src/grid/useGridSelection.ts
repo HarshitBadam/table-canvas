@@ -24,6 +24,9 @@ export function useGridSelection(
 
   const isDraggingSelectionRef = useRef(false)
   const dragSelectionStart = useRef<{ rowIndex: number; colIndex: number } | null>(null)
+  const rangeAnchorRef = useRef<{ rowIndex: number; colIndex: number } | null>(null)
+  const pendingDragRangeRef = useRef<CellRangeSelection | null>(null)
+  const dragFrameRef = useRef<number | null>(null)
 
   const selectedCell = selection?.type === 'cell' ? { rowIndex: selection.rowIndex, columnId: selection.columnId } : null
   const selectedColumn = selection?.type === 'column' ? selection.columnId : (selection?.type === 'cell' ? selection.columnId : null)
@@ -31,15 +34,52 @@ export function useGridSelection(
   const isIndexColumnSelected = selection?.type === 'index-column' || selection?.type === 'corner'
   const isCornerSelected = selection?.type === 'corner'
 
-  const handleCellMouseDown = useCallback((rowIndex: number, columnId: string, e: React.MouseEvent) => {
-    if (e.button !== 0) return
-
+  const selectCell = useCallback((
+    rowIndex: number,
+    columnId: string,
+    options?: { extend?: boolean },
+  ) => {
     const colIndex = columns.findIndex(c => c.id === columnId)
-    isDraggingSelectionRef.current = true
-    dragSelectionStart.current = { rowIndex, colIndex }
+    if (colIndex < 0) return
+
+    if (options?.extend && selection?.type === 'cell') {
+      const anchor = rangeAnchorRef.current ?? {
+        rowIndex: selection.rowIndex,
+        colIndex: columns.findIndex(c => c.id === selection.columnId),
+      }
+      if (anchor.colIndex < 0) return
+      rangeAnchorRef.current = anchor
+      setSelection({ type: 'cell', rowIndex, columnId })
+      setCellRangeSelection({
+        startRow: Math.min(anchor.rowIndex, rowIndex),
+        endRow: Math.max(anchor.rowIndex, rowIndex),
+        startColIndex: Math.min(anchor.colIndex, colIndex),
+        endColIndex: Math.max(anchor.colIndex, colIndex),
+      })
+      return
+    }
+
+    rangeAnchorRef.current = { rowIndex, colIndex }
     setSelection({ type: 'cell', rowIndex, columnId })
     setCellRangeSelection(null)
-  }, [columns])
+  }, [columns, selection])
+
+  const handleCellMouseDown = useCallback((rowIndex: number, columnId: string, e: React.MouseEvent) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+
+    const colIndex = columns.findIndex(c => c.id === columnId)
+    if (colIndex < 0) return
+
+    if (e.shiftKey && selection?.type === 'cell') {
+      selectCell(rowIndex, columnId, { extend: true })
+      return
+    }
+
+    isDraggingSelectionRef.current = true
+    dragSelectionStart.current = { rowIndex, colIndex }
+    selectCell(rowIndex, columnId)
+  }, [columns, selectCell, selection])
 
   const handleCellMouseEnter = useCallback((rowIndex: number, columnId: string) => {
     if (isDraggingSelectionRef.current && dragSelectionStart.current) {
@@ -49,29 +89,46 @@ export function useGridSelection(
       const startColIndex = Math.min(dragSelectionStart.current.colIndex, colIndex)
       const endColIndex = Math.max(dragSelectionStart.current.colIndex, colIndex)
 
-      if (startRow !== endRow || startColIndex !== endColIndex) {
-        setCellRangeSelection({ startRow, endRow, startColIndex, endColIndex })
-      } else {
-        setCellRangeSelection(null)
+      pendingDragRangeRef.current = startRow !== endRow || startColIndex !== endColIndex
+        ? { startRow, endRow, startColIndex, endColIndex }
+        : null
+
+      if (dragFrameRef.current === null) {
+        dragFrameRef.current = requestAnimationFrame(() => {
+          dragFrameRef.current = null
+          setCellRangeSelection(pendingDragRangeRef.current)
+        })
       }
     }
   }, [columns])
 
   const handleSelectionMouseUp = useCallback(() => {
+    if (dragFrameRef.current !== null) {
+      cancelAnimationFrame(dragFrameRef.current)
+      dragFrameRef.current = null
+      setCellRangeSelection(pendingDragRangeRef.current)
+    }
     isDraggingSelectionRef.current = false
     dragSelectionStart.current = null
+    pendingDragRangeRef.current = null
   }, [])
 
   const handleColumnClick = useCallback((columnId: string) => {
     setSelection({ type: 'column', columnId })
+    setCellRangeSelection(null)
+    rangeAnchorRef.current = null
   }, [])
 
   const handleRowClick = useCallback((rowIndex: number) => {
     setSelection({ type: 'row', rowIndex })
+    setCellRangeSelection(null)
+    rangeAnchorRef.current = null
   }, [])
 
   const handleCornerClick = useCallback(() => {
     setSelection({ type: 'corner' })
+    setCellRangeSelection(null)
+    rangeAnchorRef.current = null
   }, [])
 
   const getRowInsertionIndex = useCallback((): number => {
@@ -175,7 +232,9 @@ export function useGridSelection(
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+      const target = e.target instanceof HTMLElement ? e.target : null
+      if (!target?.closest('[role="grid"]') || target.matches('input, textarea, [contenteditable="true"]')) return
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'h') {
         e.preventDefault()
         toggleHighlightForSelection()
       }
@@ -185,14 +244,19 @@ export function useGridSelection(
   }, [toggleHighlightForSelection])
 
   useEffect(() => {
-    const handleMouseUp = () => {
+    const endDrag = () => {
       if (isDraggingSelectionRef.current) {
         handleSelectionMouseUp()
       }
     }
 
-    document.addEventListener('mouseup', handleMouseUp)
-    return () => document.removeEventListener('mouseup', handleMouseUp)
+    document.addEventListener('mouseup', endDrag)
+    window.addEventListener('blur', endDrag)
+    return () => {
+      document.removeEventListener('mouseup', endDrag)
+      window.removeEventListener('blur', endDrag)
+      if (dragFrameRef.current !== null) cancelAnimationFrame(dragFrameRef.current)
+    }
   }, [handleSelectionMouseUp])
 
   return {
@@ -205,6 +269,7 @@ export function useGridSelection(
     isCornerSelected,
     cellRangeSelection,
     setCellRangeSelection,
+    selectCell,
     isDraggingSelectionRef,
     handleCellMouseDown,
     handleCellMouseEnter,

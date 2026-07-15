@@ -10,7 +10,7 @@ function ConfidenceBadge({ confidence }: { confidence: SuggestionConfidence }) {
   }
 
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${colors[confidence]}`}>
+    <span className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium ${colors[confidence]}`}>
       {confidence.charAt(0).toUpperCase() + confidence.slice(1)}
     </span>
   )
@@ -18,7 +18,7 @@ function ConfidenceBadge({ confidence }: { confidence: SuggestionConfidence }) {
 
 const categoryColors: Record<SuggestionCategory, string> = {
   cleaning: 'bg-accent-orange/10 text-accent-orange',
-  analysis: 'bg-accent-green/10 text-accent-green',
+  analysis: 'bg-surface-tertiary text-text-secondary',
   recipe: 'bg-accent-purple/10 text-accent-purple',
 }
 
@@ -104,7 +104,6 @@ export function SuggestionCard({
   suggestion,
   isExpanded,
   isApplying,
-  animationDelay,
   onToggle,
   onApply,
   onDismiss,
@@ -112,7 +111,6 @@ export function SuggestionCard({
   suggestion: Suggestion
   isExpanded: boolean
   isApplying: boolean
-  animationDelay: number
   onToggle: () => void
   onApply: () => void
   onDismiss: () => void
@@ -123,34 +121,31 @@ export function SuggestionCard({
   const detailsId = `suggestion-details-${suggestion.id}`
 
   return (
-    <div 
-      className="bg-surface rounded-lg border border-border overflow-hidden transition-all duration-200 hover:shadow-md animate-fade-in-up"
-      style={{ animationDelay: `${animationDelay}ms` }}
-    >
+    <div className={`overflow-hidden rounded-lg transition-colors ${isExpanded ? 'bg-surface-secondary' : 'bg-surface hover:bg-surface-secondary/60'}`}>
       <button
         onClick={onToggle}
         aria-label={`${suggestion.title}: ${isExpanded ? 'Collapse' : 'Expand'} details`}
         aria-expanded={isExpanded}
         aria-controls={detailsId}
-        className="w-full flex items-start gap-3 p-4 text-left hover:bg-surface-secondary/30 transition-colors"
+        className="flex w-full items-start gap-3 px-3 py-3 text-left transition-colors"
       >
-        <div className={`p-2 rounded-lg shrink-0 ${categoryColors[suggestion.category]}`}>
+        <div className={`mt-0.5 shrink-0 rounded-md p-1.5 ${categoryColors[suggestion.category]}`}>
           {categoryIcons[suggestion.category]}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <h3 className="text-sm font-medium text-text-primary truncate">
+          <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
+            <h3 className="min-w-0 flex-1 text-sm font-medium leading-5 text-text-primary">
               {suggestion.title}
             </h3>
             <ConfidenceBadge confidence={suggestion.confidence} />
           </div>
           {suggestion.description && (
-            <p className="text-xs text-text-secondary line-clamp-2">
+            <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-text-secondary">
               {suggestion.description}
             </p>
           )}
           {suggestion.impact && (
-            <p className="text-[11px] text-text-tertiary mt-1 flex items-center gap-1">
+            <p className="mt-1.5 flex items-center gap-1.5 text-xs text-text-tertiary">
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
@@ -169,9 +164,9 @@ export function SuggestionCard({
       </button>
 
       {isExpanded && (
-        <div id={detailsId} className="px-4 pb-4 border-t border-border pt-3 animate-expand-down">
+        <div id={detailsId} className="px-3 pb-3 pl-12">
           {suggestion.why && suggestion.why.length > 0 && (
-            <div className="mb-3">
+            <div className="mb-3 rounded-md bg-surface px-3 py-2.5">
               <button 
                 onClick={() => setShowWhy(!showWhy)}
                 className="text-xs text-accent-green hover:text-accent-green/80 flex items-center gap-1 transition-colors"
@@ -182,10 +177,10 @@ export function SuggestionCard({
                 Why this suggestion?
               </button>
               {showWhy && (
-                <ul className="mt-2 space-y-1 pl-4">
+                <ul className="mt-2 space-y-1.5">
                   {suggestion.why.map((reason, i) => (
-                    <li key={i} className="text-xs text-text-tertiary flex items-start gap-2">
-                      <span className="text-accent-green mt-1">•</span>
+                    <li key={i} className="flex items-start gap-2 text-xs leading-5 text-text-secondary">
+                      <span className="text-text-tertiary" aria-hidden="true">-</span>
                       {reason}
                     </li>
                   ))}

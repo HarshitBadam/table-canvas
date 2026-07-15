@@ -26,6 +26,7 @@ export function GridCell({
     editingCell,
     editValue,
     editError,
+    selectEditValue,
     setEditValue,
     commitEdit,
     handleCellMouseDown,
@@ -52,6 +53,7 @@ export function GridCell({
   const [editErrorPosition, setEditErrorPosition] = useState<{ left: number; top: number; width: number } | null>(null)
   const width = getColumnWidth(column.id)
   const value = getDisplayValue(row.__rowId, column.id, row[column.id], row)
+  const isFormulaColumn = column.isComputed
 
   const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.columnId === column.id
   const isCellSelected = selectedCell?.rowIndex === rowIndex && selectedCell?.columnId === column.id
@@ -93,7 +95,7 @@ export function GridCell({
   const showFillHandle = isEditable && !isEditing && (
     (isCellSelected && !cellRangeSelection) ||
     isLastCellOfRange
-  )
+  ) && !isFormulaColumn
 
   const isCellHighlighted = highlightedCells?.has(`${row.__rowId}:${column.id}`) ?? false
   const isSelected = isCellSelected || isInCellRange
@@ -101,16 +103,18 @@ export function GridCell({
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus()
-      inputRef.current.select()
+      if (selectEditValue) {
+        inputRef.current.select()
+      } else {
+        const end = inputRef.current.value.length
+        inputRef.current.setSelectionRange(end, end)
+      }
     }
-  }, [isEditing])
+  }, [isEditing, selectEditValue])
 
   useEffect(() => {
-    if (
-      isCellSelected
-      && !isEditing
-      && document.activeElement?.closest('[role="grid"]')
-    ) {
+    if (isCellSelected && !isEditing) {
+      cellRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
       cellRef.current?.focus()
     }
   }, [isCellSelected, isEditing])
@@ -139,7 +143,6 @@ export function GridCell({
     return String(autofillPreviewValue)
   }, [autofillPreviewValue, column.type])
 
-  const isFormulaColumn = column.isComputed
   const currentEditError = isEditing ? editError : null
   const isEmptyValue = value === null || value === undefined || value === ''
 
@@ -183,7 +186,10 @@ export function GridCell({
             setSelection({ type: 'cell', rowIndex, columnId: column.id })
           }
         }}
-        onMouseDown={(e) => handleCellMouseDown(rowIndex, column.id, e)}
+        onMouseDown={(e) => {
+          handleCellMouseDown(rowIndex, column.id, e)
+          if (e.button === 0) cellRef.current?.focus({ preventScroll: true })
+        }}
         onDoubleClick={() => handleCellDoubleClick(rowIndex, column.id, value)}
         onContextMenu={(e) => handleContextMenu(e, 'cell', rowIndex, column.id)}
         onKeyDown={(event) => {
@@ -198,26 +204,37 @@ export function GridCell({
           if (isDraggingSelectionRef.current) handleCellMouseEnter(rowIndex, column.id)
         }}
         className={`
-          relative flex items-center px-2 text-sm overflow-hidden box-border
+          grid-cell relative flex items-center px-2 text-sm box-border
+          ${isSelected || isCellHighlighted || currentEditError ? 'z-10' : ''}
           ${isEditable && !isFormulaColumn ? 'cursor-cell' : 'cursor-default'}
-          ${isCellHighlighted && !isSelected ? 'bg-accent-green/10 outline outline-2 outline-accent-green' : ''}
-          ${isSelected && !isInCellRange && !currentEditError ? 'bg-accent-green/20 dark:bg-accent-green/30 outline outline-2 outline-accent-green' : ''}
+          ${isCellHighlighted && !isSelected ? 'bg-accent-green/10' : ''}
+          ${isSelected && !isInCellRange && !currentEditError ? 'bg-accent-green/20 dark:bg-accent-green/30' : ''}
           ${isInCellRange ? 'bg-accent-green/20 dark:bg-accent-green/30' : ''}
-          ${currentEditError ? 'bg-error-light outline outline-2 outline-error' : ''}
+          ${currentEditError ? 'bg-error-light' : ''}
           ${isInAutofillRange ? 'bg-accent-green/10 dark:bg-accent-green/20' : ''}
           ${(isColumnHighlighted || isRowSelected || isCellInRowSelected) && !isSelected && !isInAutofillRange && !isInCellRange && !isCellHighlighted ? 'bg-accent-green/5 dark:bg-accent-green/10' : ''}
           ${column.type === 'number' ? 'justify-end font-mono' : ''}
           ${isFormulaColumn && !isSelected && !isInCellRange && !isCellHighlighted ? 'bg-purple-50/30 dark:bg-purple-900/10' : ''}
           ${isEditable && !isEditing && !isSelected && !isInCellRange && !isFormulaColumn && !isCellHighlighted ? 'hover:bg-surface-secondary' : ''}
           ${!isInCellRange && !isSelected && !isCellHighlighted ? 'border-r border-border-subtle' : ''}
-          ${isSelectionTopEdge ? 'border-t-2 border-t-accent-green' : ''}
-          ${isSelectionBottomEdge ? 'border-b-2 border-b-accent-green' : ''}
-          ${isSelectionLeftEdge ? 'border-l-2 border-l-accent-green' : ''}
-          ${isSelectionRightEdge ? 'border-r-2 border-r-accent-green' : ''}
         `}
         style={{ width, minWidth: width, maxWidth: width }}
         title={isFormulaColumn ? `Computed: ${column.formula}` : undefined}
       >
+      {(isSelected || isCellHighlighted || currentEditError) && (
+        <span
+          aria-hidden="true"
+          className={`
+            pointer-events-none absolute inset-0 z-10
+            ${currentEditError ? 'border-2 border-error' : ''}
+            ${!currentEditError && (isCellSelected || isCellHighlighted) && !isInCellRange ? 'border-2 border-accent-green' : ''}
+            ${!currentEditError && isSelectionTopEdge ? 'border-t-2 border-t-accent-green' : ''}
+            ${!currentEditError && isSelectionBottomEdge ? 'border-b-2 border-b-accent-green' : ''}
+            ${!currentEditError && isSelectionLeftEdge ? 'border-l-2 border-l-accent-green' : ''}
+            ${!currentEditError && isSelectionRightEdge ? 'border-r-2 border-r-accent-green' : ''}
+          `}
+        />
+      )}
       {isEditing ? (
         <div className="absolute inset-0 flex items-center">
           <input
@@ -228,7 +245,12 @@ export function GridCell({
             aria-describedby={currentEditError ? editErrorId : undefined}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            onBlur={commitEdit}
+            onBlur={() => {
+              if (!commitEdit()) {
+                requestAnimationFrame(() => inputRef.current?.focus())
+              }
+            }}
+            onMouseDown={(event) => event.stopPropagation()}
             className={`w-full h-full px-2 border-none outline-none text-sm bg-transparent ${
               column.type === 'number' ? 'text-right font-mono' : ''
             } ${currentEditError ? 'text-error-text' : 'text-text-primary'}`}
@@ -261,13 +283,13 @@ export function GridCell({
                 event.stopPropagation()
                 handleAutofillOneRow(rowIndex, column.id)
               }}
-              className="grid-autofill-handle group absolute bottom-0 right-0 z-10 h-3 w-3 cursor-crosshair bg-transparent p-0"
+              className="grid-autofill-handle group absolute bottom-0 right-0 z-20 h-3 w-3 cursor-crosshair bg-transparent p-0"
               style={{ transform: 'translate(50%, 50%)' }}
               title="Drag to fill cells below, or press Enter to fill one row"
             >
               <span
                 aria-hidden="true"
-                className="absolute bottom-0 right-0 h-3 w-3 bg-accent-green transition-colors group-hover:bg-accent-green-hover"
+                className="absolute bottom-0 right-0 h-2.5 w-2.5 border border-surface bg-accent-green transition-colors group-hover:bg-accent-green-hover"
               />
             </button>
           )}
