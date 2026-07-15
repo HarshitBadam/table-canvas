@@ -153,7 +153,7 @@ export function GridContextMenu() {
                 className={`w-full px-3 py-2 text-sm text-left flex items-center gap-2 ${
                   isCurrentlyHighlighted 
                     ? 'hover:bg-surface-secondary text-text-secondary' 
-                    : 'hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+                    : 'text-accent-text hover:bg-accent-green/10'
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

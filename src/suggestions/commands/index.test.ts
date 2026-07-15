@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Suggestion } from '@/types'
 import { addSource, resetStore } from '@/engine/integrationTestUtils'
 import { useProjectStore } from '@/state/projectStore'
 import { useSuggestionsStore } from '../suggestionsStore'
-import { applySuggestion } from './index'
+import { applySuggestion, setToastHandler, type ToastNotification } from './index'
 
 function baseSuggestion(
   id: string,
@@ -26,6 +26,7 @@ function baseSuggestion(
 
 beforeEach(() => {
   resetStore()
+  setToastHandler(null)
   useSuggestionsStore.setState({
     suggestionsCache: new Map(),
     dismissed: new Map(),
@@ -53,7 +54,11 @@ describe('applySuggestion', () => {
     expect(useProjectStore.getState().nodes[result.createdNodeId!]).toMatchObject({
       kind: 'chart',
       name: 'Sales by category',
-      plan: { sourceTableId: tableId },
+      plan: {
+        chartType: 'bar',
+        sourceTableId: tableId,
+        config: { xAxis: 'col1', yAxis: 'col2', aggregation: 'sum' },
+      },
     })
     expect(Object.values(useProjectStore.getState().edges)).toContainEqual(
       expect.objectContaining({
@@ -63,6 +68,43 @@ describe('applySuggestion', () => {
       }),
     )
     expect(useSuggestionsStore.getState().isConsumed(suggestion.id)).toBe(true)
+  })
+
+  it('navigates View through the app callback and keeps a complete chart workflow', async () => {
+    const tableId = addSource('Sales')
+    const suggestion = baseSuggestion('chart-navigation', tableId, {
+      kind: 'createChart',
+      chart: {
+        chartType: 'histogram',
+        sourceTableId: tableId,
+        title: 'Value distribution',
+        config: { xAxis: 'Value' },
+      },
+    })
+    let toast: ToastNotification | undefined
+    setToastHandler((notification) => { toast = notification })
+    const navigateToNode = vi.fn()
+
+    const result = await applySuggestion(suggestion, { navigateToNode })
+    const state = useProjectStore.getState()
+
+    expect(result.success).toBe(true)
+    expect(state.nodes[result.createdNodeId!]).toMatchObject({
+      kind: 'chart',
+      plan: {
+        chartType: 'bar',
+        sourceTableId: tableId,
+        config: { xAxis: 'col2', aggregation: 'count' },
+      },
+    })
+    expect(state.getUpstreamNodes(result.createdNodeId!)).toEqual([
+      expect.objectContaining({ id: tableId }),
+    ])
+    expect(toast?.action?.label).toBe('View')
+
+    toast?.action?.onClick()
+
+    expect(navigateToNode).toHaveBeenCalledWith(result.createdNodeId, 'chart')
   })
 
   it('creates a derived table from the transform sources', async () => {
@@ -90,6 +132,31 @@ describe('applySuggestion', () => {
       },
     })
     expect(useSuggestionsStore.getState().isConsumed(suggestion.id)).toBe(true)
+  })
+
+  it('routes a newly created table from its View action', async () => {
+    const tableId = addSource('Sales')
+    const suggestion = baseSuggestion('derived-navigation', tableId, {
+      kind: 'createDerivedTable',
+      tableName: 'Large sales',
+      openAfterApply: true,
+      transform: {
+        type: 'filter',
+        sourceTableId: tableId,
+        conditions: [],
+        logic: 'and',
+      },
+    })
+    let toast: ToastNotification | undefined
+    setToastHandler((notification) => { toast = notification })
+    const navigateToNode = vi.fn()
+
+    const result = await applySuggestion(suggestion, { navigateToNode })
+    expect(toast?.action?.label).toBe('View')
+
+    toast?.action?.onClick()
+
+    expect(navigateToNode).toHaveBeenCalledWith(result.createdNodeId, 'table')
   })
 
   it('requires cleaning suggestions to pass through the review workflow', async () => {

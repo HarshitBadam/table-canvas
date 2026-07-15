@@ -4,6 +4,12 @@ import { createProjectWithSync, fetchProjects, loadProjectWithSync } from '@/per
 import type { ProjectNode } from '@/types'
 import { useDataStore } from './dataStore'
 
+export function hasProjectTables(nodes: Record<string, { kind: string }>): boolean {
+  return Object.values(nodes).some(
+    node => node.kind === 'source_table' || node.kind === 'derived_table',
+  )
+}
+
 export async function clearProjectRuntime(nodes: Record<string, ProjectNode>): Promise<void> {
   useDataStore.setState({ tableData: {} })
   const tableIds = Object.values(nodes)
@@ -56,9 +62,23 @@ export async function initializeEngine(): Promise<void> {
 
 export async function loadOrCreateProject() {
   const projects = await fetchProjects()
-  const project = projects.length > 0
-    ? await loadProjectWithSync(projects[0].id)
-    : await createProjectWithSync('Untitled Project')
-  const resolvedProject = project ?? await createProjectWithSync('Untitled Project')
-  return { project: resolvedProject, projectList: projects }
+  if (projects.length === 0) {
+    const project = await createProjectWithSync('Untitled Project')
+    const now = new Date()
+    return {
+      project,
+      projectList: [{
+        id: project.id,
+        name: project.name,
+        createdAt: now,
+        updatedAt: now,
+      }],
+    }
+  }
+
+  const project = await loadProjectWithSync(projects[0].id)
+  if (!project) {
+    throw new Error(`Project "${projects[0].name}" is unavailable`)
+  }
+  return { project, projectList: projects }
 }

@@ -19,7 +19,7 @@ export function DateInput({
         bg-white dark:bg-gray-800
         border border-gray-200 dark:border-gray-700 rounded-lg
         text-gray-900 dark:text-gray-100
-        focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
+        focus:border-accent-green
         transition-all duration-150
         [&::-webkit-calendar-picker-indicator]:dark:invert"
     />
@@ -47,7 +47,7 @@ export function DateRangeInput({
           bg-white dark:bg-gray-800
           border border-gray-200 dark:border-gray-700 rounded-lg
           text-gray-900 dark:text-gray-100
-          focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
+          focus:border-accent-green
           transition-all duration-150
           [&::-webkit-calendar-picker-indicator]:dark:invert"
       />
@@ -60,7 +60,7 @@ export function DateRangeInput({
           bg-white dark:bg-gray-800
           border border-gray-200 dark:border-gray-700 rounded-lg
           text-gray-900 dark:text-gray-100
-          focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500
+          focus:border-accent-green
           transition-all duration-150
           [&::-webkit-calendar-picker-indicator]:dark:invert"
       />
@@ -87,7 +87,7 @@ export function QuickDateFilters({
             px-2.5 py-1 text-xs font-medium rounded-md
             transition-all duration-150
             ${selectedQuickFilter === option.id
-              ? 'bg-emerald-500 text-white'
+              ? 'bg-accent-green text-white'
               : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
             }
           `}

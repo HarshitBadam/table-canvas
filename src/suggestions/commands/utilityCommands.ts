@@ -4,7 +4,7 @@ import type {
   SuggestionAction,
   TransformDef,
 } from '@/types'
-import type { SuggestionCommand, CommandResult } from './types'
+import type { SuggestionCommand, CommandResult, CommandExecutionOptions } from './types'
 import { showToast } from './types'
 
 export class HighlightCellsCommand implements SuggestionCommand {
@@ -110,7 +110,8 @@ export class LaunchRecipeCommand implements SuggestionCommand {
 export async function executeRecipeTransform(
   transform: TransformDef,
   tableName: string,
-  sourceTableId: string
+  sourceTableId: string,
+  options: CommandExecutionOptions = {},
 ): Promise<CommandResult> {
   const store = useProjectStore.getState()
 
@@ -133,9 +134,13 @@ export async function executeRecipeTransform(
       type: 'success',
       message: `Created "${tableName}"`,
       action: {
-        label: 'Open',
+        label: 'View',
         onClick: () => {
-          store.selectNode(nodeId)
+          if (options.navigateToNode) {
+            options.navigateToNode(nodeId, 'table')
+          } else {
+            useProjectStore.getState().selectNode(nodeId)
+          }
         },
       },
     })

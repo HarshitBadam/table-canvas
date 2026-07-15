@@ -4,10 +4,26 @@ import type { CellValue } from '@/types'
 import { escapeLiteral, quoteIdentifier, sanitizeTableName } from './sqlHelpers'
 import { INTERNAL_ROW_ID_COLUMN } from '../internalColumns'
 
+function isMissingFilterValue(value: unknown): boolean {
+  return value === null
+    || value === undefined
+    || (typeof value === 'string' && value.trim() === '')
+}
+
 function buildFilterClause(filter: FilterConditionDef): string | null {
   const column = quoteIdentifier(filter.column)
   const dateValue = (operator: string, value: unknown) =>
-    `${column} ${operator} CAST(${escapeLiteral(String(value))} AS DATE)`
+    `${column} ${operator} TRY_CAST(${escapeLiteral(String(value))} AS DATE)`
+
+  if (filter.operator === 'between') {
+    if (isMissingFilterValue(filter.value) || isMissingFilterValue(filter.value2)) return null
+  } else if (
+    filter.operator !== 'is_null'
+    && filter.operator !== 'is_not_null'
+    && isMissingFilterValue(filter.value)
+  ) {
+    return null
+  }
 
   switch (filter.operator) {
     case 'is_null': return `${column} IS NULL OR CAST(${column} AS VARCHAR) = ''`
@@ -16,11 +32,17 @@ function buildFilterClause(filter: FilterConditionDef): string | null {
       if (filter.columnType === 'boolean') {
         return `${column} = ${['true', '1', 'yes'].includes(String(filter.value).toLowerCase()) ? 'TRUE' : 'FALSE'}`
       }
-      if (filter.columnType === 'number') return `${column} = ${Number(filter.value)}`
+      if (filter.columnType === 'number') {
+        const value = Number(filter.value)
+        return Number.isFinite(value) ? `${column} = ${value}` : null
+      }
       if (filter.columnType === 'date' || filter.columnType === 'datetime') return dateValue('=', filter.value)
       return `LOWER(CAST(${column} AS VARCHAR)) = ${escapeLiteral(String(filter.value ?? '').toLowerCase())}`
     case 'not_equals':
-      if (filter.columnType === 'number') return `${column} != ${Number(filter.value)}`
+      if (filter.columnType === 'number') {
+        const value = Number(filter.value)
+        return Number.isFinite(value) ? `${column} != ${value}` : null
+      }
       return `LOWER(CAST(${column} AS VARCHAR)) != ${escapeLiteral(String(filter.value ?? '').toLowerCase())}`
     case 'contains': {
       const value = String(filter.value ?? '')
@@ -38,22 +60,22 @@ function buildFilterClause(filter: FilterConditionDef): string | null {
     case 'ends_with':
       return `LOWER(CAST(${column} AS VARCHAR)) LIKE '%' || ${escapeLiteral(String(filter.value ?? '').toLowerCase())}`
     case 'greater_than':
-      return filter.columnType === 'date' || filter.columnType === 'datetime'
-        ? dateValue('>', filter.value) : `${column} > ${Number(filter.value)}`
+      if (filter.columnType === 'date' || filter.columnType === 'datetime') return dateValue('>', filter.value)
+      return Number.isFinite(Number(filter.value)) ? `${column} > ${Number(filter.value)}` : null
     case 'less_than':
-      return filter.columnType === 'date' || filter.columnType === 'datetime'
-        ? dateValue('<', filter.value) : `${column} < ${Number(filter.value)}`
+      if (filter.columnType === 'date' || filter.columnType === 'datetime') return dateValue('<', filter.value)
+      return Number.isFinite(Number(filter.value)) ? `${column} < ${Number(filter.value)}` : null
     case 'greater_equal':
-      return filter.columnType === 'date' || filter.columnType === 'datetime'
-        ? dateValue('>=', filter.value) : `${column} >= ${Number(filter.value)}`
+      if (filter.columnType === 'date' || filter.columnType === 'datetime') return dateValue('>=', filter.value)
+      return Number.isFinite(Number(filter.value)) ? `${column} >= ${Number(filter.value)}` : null
     case 'less_equal':
-      return filter.columnType === 'date' || filter.columnType === 'datetime'
-        ? dateValue('<=', filter.value) : `${column} <= ${Number(filter.value)}`
+      if (filter.columnType === 'date' || filter.columnType === 'datetime') return dateValue('<=', filter.value)
+      return Number.isFinite(Number(filter.value)) ? `${column} <= ${Number(filter.value)}` : null
     case 'between':
-      if (filter.value === undefined || filter.value2 === undefined) return null
       if (filter.columnType === 'date' || filter.columnType === 'datetime') {
         return `${dateValue('>=', filter.value)} AND ${dateValue('<=', filter.value2)}`
       }
+      if (!Number.isFinite(Number(filter.value)) || !Number.isFinite(Number(filter.value2))) return null
       return `${column} >= ${Number(filter.value)} AND ${column} <= ${Number(filter.value2)}`
     default: return null
   }

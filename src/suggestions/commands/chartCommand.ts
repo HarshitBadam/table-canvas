@@ -2,24 +2,27 @@ import { useProjectStore } from '@/state/projectStore'
 import type {
   Suggestion,
   SuggestionAction,
-  ChartNode,
+  ChartConfig,
   ChartPlan,
+  ColumnSchema,
   Position,
 } from '@/types'
-import { generateId } from '@/lib/utils'
-import type { SuggestionCommand, CommandResult } from './types'
+import type { SuggestionCommand, CommandResult, CommandExecutionOptions } from './types'
 import { showToast } from './types'
 
 export class CreateChartCommand implements SuggestionCommand {
   private suggestion: Suggestion
   private action: Extract<SuggestionAction, { kind: 'createChart' }>
+  private options: CommandExecutionOptions
 
   constructor(
     suggestion: Suggestion,
-    action: Extract<SuggestionAction, { kind: 'createChart' }>
+    action: Extract<SuggestionAction, { kind: 'createChart' }>,
+    options: CommandExecutionOptions = {},
   ) {
     this.suggestion = suggestion
     this.action = action
+    this.options = options
   }
 
   async execute(): Promise<CommandResult> {
@@ -38,32 +41,15 @@ export class CreateChartCommand implements SuggestionCommand {
     const chartTitle = this.action.chart.title ?? this.suggestion.title
 
     try {
-      const nodeId = generateId()
-      const now = new Date().toISOString()
-
-      const chartNode: ChartNode = {
-        id: nodeId,
-        kind: 'chart',
-        name: chartTitle,
-        ui: {
-          position: this.calculatePosition(sourceTable.ui.position),
-        },
-        plan: {
-          chartType: this.action.chart.chartType === 'histogram' ? 'bar' : this.action.chart.chartType,
-          sourceTableId: sourceTableId,
-          config: this.action.chart.config,
-        } as ChartPlan,
-        createdAt: now,
-        updatedAt: now,
+      const plan: ChartPlan = {
+        chartType: this.action.chart.chartType === 'histogram' ? 'bar' : this.action.chart.chartType,
+        sourceTableId,
+        config: this.buildConfig(sourceTable.schema?.columns ?? []),
       }
-
-      store.saveSnapshot(`Create chart "${chartTitle}"`)
-      store.addNode(chartNode)
-
-      store.addEdge({
-        fromNodeId: sourceTableId,
-        toNodeId: nodeId,
-        transformType: 'reference',
+      const nodeId = store.addChart({
+        name: chartTitle,
+        plan,
+        position: this.calculatePosition(sourceTable.ui.position),
       })
 
       showToast({
@@ -72,7 +58,11 @@ export class CreateChartCommand implements SuggestionCommand {
         action: {
           label: 'View',
           onClick: () => {
-            store.selectNode(nodeId)
+            if (this.options.navigateToNode) {
+              this.options.navigateToNode(nodeId, 'chart')
+            } else {
+              useProjectStore.getState().selectNode(nodeId)
+            }
           },
         },
       })
@@ -105,6 +95,41 @@ export class CreateChartCommand implements SuggestionCommand {
     return {
       x: sourcePosition.x + 350,
       y: sourcePosition.y + 50,
+    }
+  }
+
+  private buildConfig(columns: ColumnSchema[]): ChartConfig {
+    const requested = this.action.chart.config
+    const resolveColumn = (reference: string | undefined, label: string): string | undefined => {
+      if (!reference) return undefined
+      const column = columns.find((candidate) =>
+        candidate.id === reference || candidate.name === reference
+      )
+      if (!column) throw new Error(`${label} column "${reference}" not found`)
+      return column.id
+    }
+
+    const xAxis = resolveColumn(requested.xAxis, 'X-axis')
+    if (!xAxis) throw new Error('Chart requires an X-axis column')
+
+    const yAxis = resolveColumn(requested.yAxis, 'Y-axis')
+    const groupBy = resolveColumn(requested.groupBy, 'Group-by')
+    const aggregation = requested.aggregation ?? (yAxis ? 'sum' : 'count')
+    if (!yAxis && aggregation !== 'count' && aggregation !== 'count_distinct') {
+      throw new Error(`Chart aggregation "${aggregation}" requires a Y-axis column`)
+    }
+
+    return {
+      ...requested,
+      xAxis,
+      yAxis,
+      groupBy,
+      aggregation,
+      series: requested.series?.map((reference) => {
+        const resolved = resolveColumn(reference, 'Series')
+        if (!resolved) throw new Error('Chart series column is missing')
+        return resolved
+      }),
     }
   }
 }

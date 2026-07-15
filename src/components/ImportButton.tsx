@@ -254,28 +254,28 @@ export function ImportButton() {
             </div>
 
             <div className="max-h-[min(60vh,30rem)] overflow-y-auto px-3 pb-3">
-              <div className="space-y-2">
+              <div className="divide-y divide-border-subtle overflow-hidden rounded-lg border border-border-subtle bg-surface">
                 {sheets.map((sheet, index) => (
                   <label
                     key={sheet.name}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-border-subtle bg-surface-secondary px-3 py-2.5 transition-[background-color,border-color,box-shadow] hover:border-border hover:bg-surface-tertiary focus-within:border-accent-green focus-within:ring-2 focus-within:ring-accent-green/20"
+                    className="flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-surface-secondary focus-within:relative focus-within:z-10 focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-accent-green"
                   >
-                    <div className={`w-[22px] h-[22px] rounded-full flex items-center justify-center transition-colors ${
+                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
                       sheet.selected
-                        ? 'bg-accent-green'
-                        : 'border-2 border-border'
+                        ? 'border-accent-green bg-accent-green'
+                        : 'border-border bg-surface'
                     }`}>
                       {sheet.selected && (
                         <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                       )}
-                    </div>
+                    </span>
                     <input
                       type="checkbox"
                       checked={sheet.selected}
                       onChange={() => toggleSheet(index)}
-                      className="sr-only"
+                      className="sr-only focus-visible:!outline-none"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-text-primary truncate">
@@ -303,7 +303,7 @@ export function ImportButton() {
                 <button
                   onClick={handleImportSelectedSheets}
                   disabled={selectedCount === 0}
-                  className="px-4 py-1.5 text-sm font-medium text-white bg-accent-green hover:bg-accent-green/90 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="btn btn-primary px-4"
                 >
                   Import
                 </button>

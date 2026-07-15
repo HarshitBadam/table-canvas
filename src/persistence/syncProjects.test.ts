@@ -249,13 +249,17 @@ describe('saveProjectWithSync', () => {
     )
   })
 
-  it('flushes a pending backend save immediately and surfaces remote failures', async () => {
+  it('retains a pending backend save after a remote failure so it can retry', async () => {
     await saveProjectWithSync('proj_1', 'Important edit', {}, {}, {})
     mockUpdateProject.mockRejectedValueOnce(new Error('Remote save failed'))
 
     await expect(flushProjectSaveWithSync('proj_1')).rejects.toThrow(
       'Remote save failed',
     )
+    mockUpdateProject.mockResolvedValueOnce(undefined)
+    await flushProjectSaveWithSync('proj_1')
+
+    expect(mockUpdateProject).toHaveBeenCalledTimes(2)
     expect(mockUpdateProject).toHaveBeenCalledWith(
       'proj_1',
       expect.objectContaining({ name: 'Important edit' }),
@@ -356,6 +360,10 @@ describe('syncLocalProjectsToBackend', () => {
       {},
       {},
     )
+    expect(mockSaveProjectLocal.mock.invocationCallOrder[0])
+      .toBeLessThan(mockUpdateProject.mock.invocationCallOrder[0])
+    expect(mockDeleteProjectLocal.mock.invocationCallOrder[0])
+      .toBeLessThan(mockUpdateProject.mock.invocationCallOrder[0])
   })
 })
 

@@ -11,6 +11,10 @@ export interface CommandResult {
   error?: string
 }
 
+export interface CommandExecutionOptions {
+  navigateToNode?: (nodeId: string, kind: 'table' | 'chart') => void
+}
+
 type ToastType = 'success' | 'error' | 'info'
 
 export interface ToastNotification {

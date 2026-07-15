@@ -7,6 +7,7 @@ import type {
   NodeViewMode,
   ViewFilterConfig,
   ChartConfig,
+  ChartPlan,
   Patches,
   CellValue,
   UserColumnType,
@@ -50,6 +51,11 @@ export interface NodesSliceState {
     upstreamNodeIds: string[]
     schema?: TableSchema
     position?: Position
+  }) => string
+  addChart: (params: {
+    name: string
+    plan: ChartPlan
+    position: Position
   }) => string
   updateTableSchema: (tableId: string, schema: TableSchema) => void
   addColumn: (tableId: string, columnName: string, columnType?: UserColumnType) => void

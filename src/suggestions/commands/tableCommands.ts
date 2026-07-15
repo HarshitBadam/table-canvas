@@ -7,20 +7,23 @@ import type {
   CleaningOperation,
 } from '@/types'
 import { PLACEHOLDER_VALUES } from '../cleaningConstants'
-import type { SuggestionCommand, CommandResult } from './types'
+import type { SuggestionCommand, CommandResult, CommandExecutionOptions } from './types'
 import { showToast } from './types'
 import { getTransformSourceTableIds } from '@/engine/workflowGraph'
 
 export class CreateDerivedTableCommand implements SuggestionCommand {
   private suggestion: Suggestion
   private action: Extract<SuggestionAction, { kind: 'createDerivedTable' }>
+  private options: CommandExecutionOptions
 
   constructor(
     suggestion: Suggestion,
-    action: Extract<SuggestionAction, { kind: 'createDerivedTable' }>
+    action: Extract<SuggestionAction, { kind: 'createDerivedTable' }>,
+    options: CommandExecutionOptions = {},
   ) {
     this.suggestion = suggestion
     this.action = action
+    this.options = options
   }
 
   async execute(): Promise<CommandResult> {
@@ -60,15 +63,23 @@ export class CreateDerivedTableCommand implements SuggestionCommand {
         type: 'success',
         message: `Created "${tableName}"`,
         action: this.action.openAfterApply ? {
-          label: 'Open',
+          label: 'View',
           onClick: () => {
-            store.selectNode(nodeId)
+            if (this.options.navigateToNode) {
+              this.options.navigateToNode(nodeId, 'table')
+            } else {
+              useProjectStore.getState().selectNode(nodeId)
+            }
           },
         } : undefined,
       })
 
       if (this.action.openAfterApply) {
-        store.selectNode(nodeId)
+        if (this.options.navigateToNode) {
+          this.options.navigateToNode(nodeId, 'table')
+        } else {
+          useProjectStore.getState().selectNode(nodeId)
+        }
       }
 
       return {
@@ -187,13 +198,16 @@ function getCleaningTableSuffix(operation: CleaningOperation): string {
 export class ApplyPatchCommand implements SuggestionCommand {
   private suggestion: Suggestion
   private action: Extract<SuggestionAction, { kind: 'applyPatch' }>
+  private options: CommandExecutionOptions
 
   constructor(
     suggestion: Suggestion,
-    action: Extract<SuggestionAction, { kind: 'applyPatch' }>
+    action: Extract<SuggestionAction, { kind: 'applyPatch' }>,
+    options: CommandExecutionOptions = {},
   ) {
     this.suggestion = suggestion
     this.action = action
+    this.options = options
   }
 
   async execute(): Promise<CommandResult> {
@@ -253,9 +267,13 @@ export class ApplyPatchCommand implements SuggestionCommand {
           type: 'success',
           message: `Created "${tableName}"`,
           action: {
-            label: 'Open',
+            label: 'View',
             onClick: () => {
-              store.selectNode(nodeId)
+              if (this.options.navigateToNode) {
+                this.options.navigateToNode(nodeId, 'table')
+              } else {
+                useProjectStore.getState().selectNode(nodeId)
+              }
             },
           },
         })

@@ -8,7 +8,6 @@ export type AppPhase =
   | 'initializing_engine'
   | 'checking_auth'
   | 'loading_project'
-  | 'materializing'
   | 'ready'
   | 'error'
 
