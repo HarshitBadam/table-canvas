@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockProject } from './syncServiceTestSupport'
+import { ApiError } from '@/api/client'
 
 const mocks = vi.hoisted(() => ({
   listProjects: vi.fn(),
@@ -16,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/api/projects.api', () => ({
   listProjects: () => mocks.listProjects(),
   getProject: (id: string) => mocks.getProject(id),
-  createProject: (data: unknown) => mocks.createProject(data),
+  createProject: (data: unknown, operationId?: string) => mocks.createProject(data, operationId),
   updateProject: (id: string, data: unknown) => mocks.updateProject(id, data),
   deleteProject: (id: string) => mocks.deleteProject(id),
 }))
@@ -29,7 +30,6 @@ vi.mock('./db', () => ({
 }))
 
 import {
-  createProjectWithSync,
   deleteProjectWithSync,
   fetchProjects,
   flushProjectSaveWithSync,
@@ -76,7 +76,7 @@ describe('fetchProjects', () => {
   })
 
   it('falls back to local storage when API fails', async () => {
-    mockListProjects.mockRejectedValue(new Error('Network error'))
+    mockListProjects.mockRejectedValue(new TypeError('Network error'))
     mockListProjectsLocal.mockResolvedValue([
       { id: 'local_1', name: 'Local Project', updatedAt: new Date().toISOString() },
     ])
@@ -85,7 +85,10 @@ describe('fetchProjects', () => {
     expect(result).toHaveLength(1)
     expect(result[0].name).toBe('Local Project')
   })
-
+  it('does not hide an authorization failure behind cached projects', async () => {
+    mockListProjects.mockRejectedValue(new ApiError('Sign in required', 401))
+    await expect(fetchProjects()).rejects.toMatchObject({ statusCode: 401 })
+  })
   it('keeps newer cached metadata and includes unsynced local projects', async () => {
     const remote = createMockProject('proj_1', 'Remote name')
     remote.updatedAt = new Date('2026-01-01T00:00:00.000Z')
@@ -121,7 +124,7 @@ describe('loadProjectWithSync', () => {
   })
 
   it('falls back to local when API fails', async () => {
-    mockGetProject.mockRejectedValue(new Error('Not found'))
+    mockGetProject.mockRejectedValue(new TypeError('Network error'))
     mockLoadProjectLocal.mockResolvedValue({
       id: 'proj_123',
       name: 'Local Cached Project',
@@ -134,9 +137,12 @@ describe('loadProjectWithSync', () => {
     expect(result?.name).toBe('Local Cached Project')
     expect(result).not.toBeNull()
   })
-
+  it('does not load stale local data after an authorization failure', async () => {
+    mockGetProject.mockRejectedValue(new ApiError('Forbidden', 403))
+    await expect(loadProjectWithSync('proj_123')).rejects.toMatchObject({ statusCode: 403 })
+  })
   it('returns null when project not found anywhere', async () => {
-    mockGetProject.mockRejectedValue(new Error('Not found'))
+    mockGetProject.mockRejectedValue(new TypeError('Network error'))
     mockLoadProjectLocal.mockResolvedValue(null)
     expect(await loadProjectWithSync('nonexistent')).toBeNull()
   })
@@ -185,39 +191,6 @@ describe('loadProjectWithSync', () => {
   })
 })
 
-describe('createProjectWithSync', () => {
-  it('creates on server and caches locally when online', async () => {
-    mockCreateProject.mockResolvedValue(createMockProject('server_123', 'New Project'))
-    const result = await createProjectWithSync('New Project')
-    expect(mockCreateProject).toHaveBeenCalledWith({ name: 'New Project' })
-    expect(mockSaveProjectLocal).toHaveBeenCalled()
-    expect(result.id).toBe('server_123')
-    expect(result.isLocalOnly).toBe(false)
-  })
-
-  it('creates locally with local_ prefix when server fails', async () => {
-    mockCreateProject.mockRejectedValue(new Error('Network unavailable'))
-    const result = await createProjectWithSync('Offline Project')
-    expect(mockSaveProjectLocal).toHaveBeenCalled()
-    expect(result.id).toMatch(/^local_/)
-    expect(result.isLocalOnly).toBe(true)
-    expect(result.needsSync).toBe(true)
-  })
-
-  it('falls back to local when server fails', async () => {
-    mockCreateProject.mockRejectedValue(new Error('Server error'))
-    const result = await createProjectWithSync('Fallback Project')
-    expect(mockSaveProjectLocal).toHaveBeenCalled()
-    expect(result.id).toMatch(/^local_/)
-    expect(result.isLocalOnly).toBe(true)
-  })
-
-  it('uses default name when none provided', async () => {
-    mockCreateProject.mockRejectedValue(new Error('Server unavailable'))
-    expect((await createProjectWithSync()).name).toBe('Untitled Project')
-  })
-})
-
 describe('saveProjectWithSync', () => {
   it('saves locally immediately and debounces backend save', async () => {
     await saveProjectWithSync('proj_1', 'Test', {}, {}, {})
@@ -229,7 +202,6 @@ describe('saveProjectWithSync', () => {
       expect.objectContaining({ name: 'Test' }),
     )
   })
-
   it('does not sync local-only projects to backend', async () => {
     await saveProjectWithSync('local_123', 'Local Project', {}, {}, {})
     expect(mockSaveProjectLocal).toHaveBeenCalled()
@@ -301,30 +273,27 @@ describe('importProjectWithSync', () => {
     })
   })
 
-  it('cleans up a partial remote project and preserves a local fallback', async () => {
+  it('cleans up a partial remote project without claiming local success', async () => {
     mockCreateProject.mockResolvedValue(createMockProject(
       'partial-import',
       importedProject.name,
     ))
-    mockUpdateProject.mockRejectedValueOnce(new Error('Upload failed'))
+    mockUpdateProject.mockRejectedValueOnce(new TypeError('Upload failed'))
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const result = await importProjectWithSync(importedProject)
+    await expect(importProjectWithSync({
+      ...importedProject,
+      reports: [{ id: 'report', name: 'Report' }],
+    } as typeof importedProject)).rejects.toThrow('Upload failed')
 
     expect(mockDeleteProject).toHaveBeenCalledWith('partial-import')
-    expect(result).toMatchObject({
+    expect(mockSaveProjectLocal).not.toHaveBeenCalled()
+    expect(mockUpdateProject).toHaveBeenCalledWith('partial-import', {
       name: importedProject.name,
-      isLocalOnly: true,
-      needsSync: true,
+      nodes: {},
+      edges: {},
+      patches: {},
     })
-    expect(result.id).toMatch(/^local_/)
-    expect(mockSaveProjectLocal).toHaveBeenLastCalledWith(
-      result.id,
-      importedProject.name,
-      {},
-      {},
-      {},
-    )
     errorSpy.mockRestore()
   })
 })
@@ -347,7 +316,10 @@ describe('syncLocalProjectsToBackend', () => {
 
     await syncLocalProjectsToBackend()
 
-    expect(mockCreateProject).toHaveBeenCalledWith({ name: 'Offline project' })
+    expect(mockCreateProject).toHaveBeenCalledWith(
+      { name: 'Offline project' },
+      expect.stringMatching(/^project_/),
+    )
     expect(mockUpdateProject).toHaveBeenCalledWith(
       'server_123',
       expect.objectContaining({ name: 'Offline project' }),
@@ -380,9 +352,29 @@ describe('deleteProjectWithSync', () => {
     expect(mockDeleteProject).not.toHaveBeenCalled()
   })
 
-  it('continues even if backend delete fails', async () => {
+  it('preserves the local project if backend deletion fails', async () => {
+    mockLoadProjectLocal.mockResolvedValue({
+      id: 'proj_123',
+      name: 'Project',
+      nodes: {},
+      edges: {},
+      patches: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    })
     mockDeleteProject.mockRejectedValue(new Error('Server error'))
-    await expect(deleteProjectWithSync('proj_123')).resolves.not.toThrow()
-    expect(mockDeleteProjectLocal).toHaveBeenCalled()
+    await expect(deleteProjectWithSync('proj_123')).rejects.toThrow('Server error')
+    expect(mockDeleteProjectLocal).toHaveBeenCalledWith('proj_123')
+    expect(mockSaveProjectLocal).toHaveBeenCalledWith(
+      'proj_123',
+      'Project',
+      {},
+      {},
+      {},
+      {
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+      },
+    )
   })
 })

@@ -3,6 +3,8 @@ import { IProject, ProjectNode, Edge, SerializedPatches } from '../types/index.j
 
 export interface IProjectDocument extends Omit<IProject, '_id'>, Document {
   deletedAt: Date | null;
+  clientOperationId?: string;
+  quotaSlot?: number;
   
   toPublic(): {
     id: string;
@@ -75,6 +77,14 @@ const ProjectSchema = new Schema<IProjectDocument, IProjectModel>(
       type: Date,
       default: null,
     },
+    clientOperationId: {
+      type: String,
+      maxlength: 200,
+    },
+    quotaSlot: {
+      type: Number,
+      min: 0,
+    },
   },
   {
     timestamps: true,
@@ -90,6 +100,26 @@ ProjectSchema.index({ userId: 1, deletedAt: 1, updatedAt: -1 });
 ProjectSchema.index({ userId: 1, name: 1 });
 
 ProjectSchema.index({ deletedAt: 1 }, { sparse: true });
+
+// These unique indexes are the cross-process synchronization boundary for
+// idempotent creation and per-user capacity.
+ProjectSchema.index(
+  { userId: 1, clientOperationId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clientOperationId: { $type: 'string' } },
+  },
+);
+ProjectSchema.index(
+  { userId: 1, quotaSlot: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      deletedAt: null,
+      quotaSlot: { $type: 'number' },
+    },
+  },
+);
 
 ProjectSchema.methods.toPublic = function () {
   return {

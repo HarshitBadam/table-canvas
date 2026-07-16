@@ -1,4 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog'
+import { useState } from 'react'
 import type { LimitExceeded } from '@/shared/enforce'
 
 interface UpgradePromptProps {
@@ -8,6 +9,7 @@ interface UpgradePromptProps {
 }
 
 export function UpgradePrompt({ open, onOpenChange, violation }: UpgradePromptProps) {
+  const [signInError, setSignInError] = useState<string | null>(null)
   if (!violation) return null
 
   const isGuest = violation.tier === 'guest'
@@ -17,9 +19,11 @@ export function UpgradePrompt({ open, onOpenChange, violation }: UpgradePromptPr
       | { accounts?: { id?: { prompt: () => void } } }
       | undefined
     if (g?.accounts?.id) {
+      setSignInError(null)
       g.accounts.id.prompt()
+      return
     }
-    onOpenChange(false)
+    setSignInError('Google sign-in is unavailable. Try again after the page finishes loading.')
   }
 
   return (
@@ -55,6 +59,7 @@ export function UpgradePrompt({ open, onOpenChange, violation }: UpgradePromptPr
                 You've reached the free plan limit. We're working on expanded plans — stay tuned!
               </div>
             )}
+            {signInError && <p className="mt-3 text-sm text-red-700" role="alert">{signInError}</p>}
           </div>
 
           <div className="px-5 py-3 border-t border-border-subtle flex items-center justify-end gap-2 bg-surface-secondary/50">

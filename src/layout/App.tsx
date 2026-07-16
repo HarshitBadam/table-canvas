@@ -16,6 +16,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { StorageWarningBanner } from '@/persistence/StorageWarningBanner'
+import { NodeDeletionProvider } from '@/components/NodeDeletionAlertDialog'
 
 const GridView = lazy(() => import('@/grid/GridView').then(m => ({ default: m.GridView })))
 const ChartView = lazy(() => import('@/charts/ChartView').then(m => ({ default: m.ChartView })))
@@ -145,18 +146,19 @@ function MainApp() {
 
   return (
     <NavigationProvider value={navigationValue}>
-      <StorageWarningBanner />
-      <div className="relative flex h-full min-h-0 bg-canvas">
-        <Sidebar isOpen={navigationOpen} onClose={() => setNavigationOpen(false)} />
+      <NodeDeletionProvider>
+        <StorageWarningBanner />
+        <div className="relative flex h-full min-h-0 bg-canvas">
+          <Sidebar isOpen={navigationOpen} onClose={() => setNavigationOpen(false)} />
 
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <AppHeader
-            viewMode={visibleViewMode}
-            selectedNode={selectedNode}
-            exportState={exportState}
-            onBackToCanvas={handleBackToCanvas}
-            onOpenNavigation={() => setNavigationOpen(true)}
-          />
+          <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <AppHeader
+              viewMode={visibleViewMode}
+              selectedNode={selectedNode}
+              exportState={exportState}
+              onBackToCanvas={handleBackToCanvas}
+              onOpenNavigation={() => setNavigationOpen(true)}
+            />
 
           <div className="min-h-0 flex-1 overflow-hidden">
             <Suspense fallback={
@@ -197,14 +199,15 @@ function MainApp() {
             onOpenDashboard={handleOpenDashboard}
             onOpenReport={handleOpenReport}
           />
-        </main>
-      </div>
+          </main>
+        </div>
 
-      <UpgradePrompt
-        open={!!projectLimitViolation}
-        onOpenChange={(open) => { if (!open) setProjectLimitViolation(null) }}
-        violation={projectLimitViolation}
-      />
+        <UpgradePrompt
+          open={!!projectLimitViolation}
+          onOpenChange={(open) => { if (!open) setProjectLimitViolation(null) }}
+          violation={projectLimitViolation}
+        />
+      </NodeDeletionProvider>
     </NavigationProvider>
   )
 }

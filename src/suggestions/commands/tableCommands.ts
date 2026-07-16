@@ -19,7 +19,7 @@ export class CreateDerivedTableCommand implements SuggestionCommand {
   constructor(
     suggestion: Suggestion,
     action: Extract<SuggestionAction, { kind: 'createDerivedTable' }>,
-    options: CommandExecutionOptions = {},
+    options: CommandExecutionOptions,
   ) {
     this.suggestion = suggestion
     this.action = action
@@ -64,22 +64,12 @@ export class CreateDerivedTableCommand implements SuggestionCommand {
         message: `Created "${tableName}"`,
         action: this.action.openAfterApply ? {
           label: 'View',
-          onClick: () => {
-            if (this.options.navigateToNode) {
-              this.options.navigateToNode(nodeId, 'table')
-            } else {
-              useProjectStore.getState().selectNode(nodeId)
-            }
-          },
+          onClick: () => this.options.navigateToNode(nodeId, 'table'),
         } : undefined,
       })
 
       if (this.action.openAfterApply) {
-        if (this.options.navigateToNode) {
-          this.options.navigateToNode(nodeId, 'table')
-        } else {
-          useProjectStore.getState().selectNode(nodeId)
-        }
+        this.options.navigateToNode(nodeId, 'table')
       }
 
       return {
@@ -203,7 +193,7 @@ export class ApplyPatchCommand implements SuggestionCommand {
   constructor(
     suggestion: Suggestion,
     action: Extract<SuggestionAction, { kind: 'applyPatch' }>,
-    options: CommandExecutionOptions = {},
+    options: CommandExecutionOptions,
   ) {
     this.suggestion = suggestion
     this.action = action
@@ -268,13 +258,7 @@ export class ApplyPatchCommand implements SuggestionCommand {
           message: `Created "${tableName}"`,
           action: {
             label: 'View',
-            onClick: () => {
-              if (this.options.navigateToNode) {
-                this.options.navigateToNode(nodeId, 'table')
-              } else {
-                useProjectStore.getState().selectNode(nodeId)
-              }
-            },
+            onClick: () => this.options.navigateToNode(nodeId, 'table'),
           },
         })
 

@@ -1,6 +1,7 @@
 import type { ProjectNode, Edge, Patches } from '@/types'
 import { getDB } from './dbCore'
 import { serializePatches, type SerializedPatches } from './patchSerialization'
+import { withoutTransientComputeState } from '@/state/transientProjectState'
 
 export interface StoredProject {
   id: string
@@ -32,7 +33,7 @@ export async function saveProject(
   const project = {
     id,
     name,
-    nodes,
+    nodes: withoutTransientComputeState(nodes),
     edges,
     patches: serializePatches(patches),
     createdAt:
@@ -49,7 +50,8 @@ export async function loadProject(id: string): Promise<StoredProject | null> {
   const db = await getDB()
   const project = await db.get('projects', id)
   if (!project) return null
-  return project as unknown as StoredProject
+  const stored = project as unknown as StoredProject
+  return { ...stored, nodes: withoutTransientComputeState(stored.nodes) }
 }
 
 export async function listProjects(): Promise<Array<{ id: string; name: string; updatedAt: string }>> {

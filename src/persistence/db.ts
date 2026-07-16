@@ -14,6 +14,7 @@ export {
   loadReportsForProject,
   listReports,
   deleteReport,
+  deleteReportsForProject,
   saveAllReports,
 } from './reportStorage'
 

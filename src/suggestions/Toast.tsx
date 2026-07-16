@@ -1,10 +1,10 @@
-import { useEffect } from 'react'
+import { forwardRef, useEffect } from 'react'
 import type { ToastNotification } from './commands'
 
-export function Toast({ notification, onDismiss }: { 
+export const Toast = forwardRef<HTMLDivElement, {
   notification: ToastNotification
   onDismiss: () => void 
-}) {
+}>(function Toast({ notification, onDismiss }, ref) {
   useEffect(() => {
     const timer = setTimeout(onDismiss, 4000)
     return () => clearTimeout(timer)
@@ -15,9 +15,10 @@ export function Toast({ notification, onDismiss }: {
 
   return (
     <div
+      ref={ref}
       role={notification.type === 'error' ? 'alert' : 'status'}
       aria-live={notification.type === 'error' ? 'assertive' : 'polite'}
-      className={`fixed bottom-4 right-4 ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg z-[100] flex items-center gap-3 animate-slide-up`}
+      className={`fixed bottom-4 right-4 ${bgColor} z-toast flex items-center gap-3 rounded-lg px-4 py-3 text-white shadow-lg animate-slide-up`}
     >
       <span className="text-sm">{notification.message}</span>
       {notification.action && (
@@ -38,4 +39,4 @@ export function Toast({ notification, onDismiss }: {
       </button>
     </div>
   )
-}
+})

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import * as Dialog from '@radix-ui/react-dialog'
 import { useApp } from '@/state/AppContext'
+import { CreateProjectDialog, DeleteProjectDialog } from './ProjectDialogs'
+import { ProjectSwitcherActions } from './ProjectSwitcherActions'
 
 interface MenuPosition {
   left: number
@@ -15,21 +16,34 @@ export function ProjectSwitcher() {
     projectName,
     projects,
     isSaving,
+    isProjectOperationPending,
+    user,
     createNewProject,
+    duplicateActiveProject,
+    deleteProject,
     loadProject,
     renameProject,
+    setProjectLimitViolation,
   } = useApp()
   const switcherRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [name, setName] = useState('')
   const [renameName, setRenameName] = useState('')
   const [isRenaming, setIsRenaming] = useState(false)
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [isDuplicating, setIsDuplicating] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showCapacityFeedback, setShowCapacityFeedback] = useState(false)
+  const createLockRef = useRef(false)
+  const duplicateLockRef = useRef(false)
+  const deleteLockRef = useRef(false)
+  const [menuActionError, setMenuActionError] = useState<string | null>(null)
 
   const updateMenuPosition = useCallback(() => {
     const trigger = triggerRef.current
@@ -89,18 +103,71 @@ export function ProjectSwitcher() {
 
   const handleCreate = async () => {
     const nextName = name.trim()
-    if (!nextName) return
+    if (!nextName || createLockRef.current) return
+    createLockRef.current = true
     setIsCreating(true)
     setError(null)
+    setShowCapacityFeedback(false)
     try {
       await createNewProject(nextName)
       setName('')
       setCreateOpen(false)
     } catch (cause) {
+      setProjectLimitViolation(null)
+      setShowCapacityFeedback(
+        typeof cause === 'object' && cause !== null && 'code' in cause
+          && cause.code === 'limit',
+      )
       setError(cause instanceof Error ? cause.message : 'Could not create project')
     } finally {
+      createLockRef.current = false
       setIsCreating(false)
     }
+  }
+
+  const handleDuplicate = async () => {
+    if (duplicateLockRef.current) return
+    duplicateLockRef.current = true
+    setIsDuplicating(true)
+    setMenuActionError(null)
+    try {
+      await duplicateActiveProject()
+      setMenuOpen(false)
+    } catch (cause) {
+      setProjectLimitViolation(null)
+      setMenuActionError(cause instanceof Error ? cause.message : 'Could not duplicate project')
+    } finally {
+      duplicateLockRef.current = false
+      setIsDuplicating(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!projectId || deleteLockRef.current) return
+    deleteLockRef.current = true
+    setIsDeleting(true)
+    setError(null)
+    try {
+      await deleteProject(projectId)
+      setDeleteOpen(false)
+      requestAnimationFrame(() => triggerRef.current?.focus())
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not delete project')
+    } finally {
+      deleteLockRef.current = false
+      setIsDeleting(false)
+    }
+  }
+
+  const handleSignIn = () => {
+    const google = (window as unknown as {
+      google?: { accounts?: { id?: { prompt: () => void } } }
+    }).google
+    if (!google?.accounts?.id) {
+      setError('Google sign-in is unavailable. Try again after the page finishes loading.')
+      return
+    }
+    google.accounts.id.prompt()
   }
 
   const handleRename = () => {
@@ -159,7 +226,7 @@ export function ProjectSwitcher() {
           aria-label="Current project"
           aria-haspopup="listbox"
           aria-expanded={menuOpen}
-          disabled={isSaving || projects.length === 0}
+          disabled={isSaving || isProjectOperationPending || projects.length === 0}
           onClick={() => {
             if (menuOpen) {
               setMenuOpen(false)
@@ -215,9 +282,20 @@ export function ProjectSwitcher() {
                     role="option"
                     aria-selected={active}
                     onClick={() => {
-                      setMenuOpen(false)
-                      setIsRenaming(false)
-                      if (!active) void loadProject(project.id)
+                      if (active) {
+                        setMenuOpen(false)
+                        setIsRenaming(false)
+                        return
+                      }
+                      setMenuActionError(null)
+                      void loadProject(project.id).then(() => {
+                        setMenuOpen(false)
+                        setIsRenaming(false)
+                      }).catch(cause => {
+                        setMenuActionError(
+                          cause instanceof Error ? cause.message : 'Could not switch projects',
+                        )
+                      })
                     }}
                     className={`flex w-full min-w-0 items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors ${
                       active
@@ -236,118 +314,77 @@ export function ProjectSwitcher() {
               })}
             </div>
 
-            {isRenaming ? (
-              <form
-                className="bg-surface-secondary/70 p-3"
-                onSubmit={event => {
-                  event.preventDefault()
-                  handleRename()
-                }}
-              >
-                <label htmlFor="rename-project-name" className="block text-xs font-medium text-text-secondary">
-                  Rename project
-                </label>
-                <div className="mt-2 flex items-center gap-1.5">
-                  <input
-                    id="rename-project-name"
-                    value={renameName}
-                    onChange={event => setRenameName(event.target.value)}
-                    className="input h-9 min-w-0 flex-1 bg-surface px-2.5"
-                    autoFocus
-                    maxLength={100}
-                    onFocus={event => event.currentTarget.select()}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsRenaming(false)}
-                    className="btn btn-ghost h-9 px-2.5"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!renameName.trim() || renameName.trim() === projectName}
-                    className="btn btn-primary h-9 px-2.5"
-                  >
-                    Save
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="grid grid-cols-2 gap-1 bg-surface-secondary/70 p-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRenameName(projectName)
-                    setIsRenaming(true)
-                  }}
-                  className="flex items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-tertiary hover:text-text-primary"
-                >
-                  <svg className="h-4 w-4 text-text-tertiary" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12.5 4.5l3 3M4 16l.75-3 8.5-8.5a1.4 1.4 0 012 2L6.75 15 4 16z" />
-                  </svg>
-                  Rename
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false)
-                    setCreateOpen(true)
-                  }}
-                  className="flex items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-tertiary hover:text-text-primary"
-                >
-                  <svg className="h-4 w-4 text-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 5v14m7-7H5" />
-                  </svg>
-                  New project
-                </button>
-              </div>
+            {menuActionError && (
+              <p className="border-t border-border-subtle px-3 py-2 text-xs text-red-700" role="alert">
+                {menuActionError}
+              </p>
             )}
+
+            <ProjectSwitcherActions
+              isRenaming={isRenaming}
+              renameName={renameName}
+              projectName={projectName}
+              isDuplicating={isDuplicating}
+              isPending={isProjectOperationPending}
+              canDelete={projects.length > 1}
+              onRenameNameChange={setRenameName}
+              onRenameStart={() => {
+                setRenameName(projectName)
+                setIsRenaming(true)
+              }}
+              onRenameCancel={() => setIsRenaming(false)}
+              onRenameSubmit={handleRename}
+              onCreate={() => {
+                setMenuOpen(false)
+                setCreateOpen(true)
+              }}
+              onDuplicate={() => void handleDuplicate()}
+              onDelete={() => {
+                setError(null)
+                setMenuOpen(false)
+                setDeleteOpen(true)
+              }}
+            />
           </div>
           , document.body)}
       </div>
 
-      <Dialog.Root open={createOpen} onOpenChange={setCreateOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/40 motion-safe:animate-fade-in" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-modal w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-surface p-5 shadow-2xl motion-safe:animate-scale-in">
-            <Dialog.Title className="text-base font-semibold text-text-primary">
-              Create project
-            </Dialog.Title>
-            <Dialog.Description className="mt-1 text-sm text-text-secondary">
-              Start a separate workspace. Pending changes in this project will be saved first.
-            </Dialog.Description>
-            <label htmlFor="new-project-name" className="mt-5 block text-xs font-medium text-text-primary">
-              Project name
-            </label>
-            <input
-              id="new-project-name"
-              value={name}
-              onChange={event => setName(event.target.value)}
-              onKeyDown={event => {
-                if (event.key === 'Enter') void handleCreate()
-              }}
-              className="input mt-2 bg-surface-secondary px-3 py-2"
-              autoFocus
-              maxLength={100}
-            />
-            {error && <p className="mt-2 text-xs text-red-700" role="alert">{error}</p>}
-            <div className="mt-5 flex justify-end gap-2">
-              <Dialog.Close asChild>
-                <button type="button" className="btn btn-ghost">Cancel</button>
-              </Dialog.Close>
-              <button
-                type="button"
-                onClick={() => void handleCreate()}
-                disabled={!name.trim() || isCreating}
-                className="btn btn-primary"
-              >
-                {isCreating ? 'Creating…' : 'Create project'}
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+      <CreateProjectDialog
+        open={createOpen}
+        name={name}
+        error={error}
+        isCreating={isCreating}
+        showCapacityFeedback={showCapacityFeedback}
+        tier={user?.tier ?? 'guest'}
+        onNameChange={setName}
+        onSubmit={() => void handleCreate()}
+        onSignIn={handleSignIn}
+        onOpenChange={(open) => {
+          if (isCreating) return
+          setCreateOpen(open)
+          if (!open) {
+            setError(null)
+            setShowCapacityFeedback(false)
+            requestAnimationFrame(() => triggerRef.current?.focus())
+          }
+        }}
+      />
+
+      <DeleteProjectDialog
+        open={deleteOpen}
+        projectName={projectName}
+        error={error}
+        isDeleting={isDeleting}
+        onDelete={() => void handleDelete()}
+        onOpenChange={(open) => {
+          if (isDeleting) return
+          setDeleteOpen(open)
+          if (!open) {
+            setError(null)
+            requestAnimationFrame(() => triggerRef.current?.focus())
+          }
+        }}
+      />
     </div>
   )
 }

@@ -2,6 +2,8 @@ import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, HistorySliceState, HistoryEntry } from './types'
 import type { Patches, ProjectNode } from '@/types'
 import { useDataStore } from '@/state/dataStore'
+import { invalidateMaterializations } from '@/engine/materializationCoordinator'
+import { withoutTransientComputeState } from '@/state/transientProjectState'
 const MAX_UNDO_HISTORY = 50
 
 function invalidateAllTableCaches(nodes: Record<string, ProjectNode>) {
@@ -31,7 +33,7 @@ export const createHistorySlice: StateCreator<
   saveSnapshot: (description) => {
     set((state) => {
       const snapshot: HistoryEntry = {
-        nodes: JSON.parse(JSON.stringify(state.nodes)),
+        nodes: JSON.parse(JSON.stringify(withoutTransientComputeState(state.nodes))),
         edges: JSON.parse(JSON.stringify(state.edges)),
         patches: JSON.parse(JSON.stringify(state.patches, (_, v) =>
           v instanceof Set ? [...v] : v
@@ -51,10 +53,11 @@ export const createHistorySlice: StateCreator<
   undo: () => {
     const state = get()
     if (state.history.past.length === 0) return
+    invalidateMaterializations()
 
     set((state) => {
       const current: HistoryEntry = {
-        nodes: JSON.parse(JSON.stringify(state.nodes)),
+        nodes: JSON.parse(JSON.stringify(withoutTransientComputeState(state.nodes))),
         edges: JSON.parse(JSON.stringify(state.edges)),
         patches: JSON.parse(JSON.stringify(state.patches, (_, v) =>
           v instanceof Set ? [...v] : v
@@ -85,10 +88,11 @@ export const createHistorySlice: StateCreator<
   redo: () => {
     const state = get()
     if (state.history.future.length === 0) return
+    invalidateMaterializations()
 
     set((state) => {
       const current: HistoryEntry = {
-        nodes: JSON.parse(JSON.stringify(state.nodes)),
+        nodes: JSON.parse(JSON.stringify(withoutTransientComputeState(state.nodes))),
         edges: JSON.parse(JSON.stringify(state.edges)),
         patches: JSON.parse(JSON.stringify(state.patches, (_, v) =>
           v instanceof Set ? [...v] : v

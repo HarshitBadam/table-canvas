@@ -1,5 +1,7 @@
 import { getEngine } from '@/engine'
 import { ensureTableMaterialized } from '@/engine/materializationService'
+import { dropEngineTables } from '@/engine/engineTableCleanup'
+import { invalidateMaterializations } from '@/engine/materializationCoordinator'
 import { createProjectWithSync, fetchProjects, loadProjectWithSync } from '@/persistence/syncService'
 import type { ProjectNode } from '@/types'
 import { useDataStore } from './dataStore'
@@ -11,11 +13,12 @@ export function hasProjectTables(nodes: Record<string, { kind: string }>): boole
 }
 
 export async function clearProjectRuntime(nodes: Record<string, ProjectNode>): Promise<void> {
-  useDataStore.setState({ tableData: {} })
   const tableIds = Object.values(nodes)
     .filter((node) => node.kind === 'source_table' || node.kind === 'derived_table')
     .map((node) => node.id)
-  await Promise.allSettled(tableIds.map((tableId) => getEngine().dropTable(tableId)))
+  await dropEngineTables(tableIds)
+  invalidateMaterializations()
+  useDataStore.setState({ tableData: {} })
 }
 
 export interface ProjectMaterializationSummary {

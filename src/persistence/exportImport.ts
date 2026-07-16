@@ -7,7 +7,8 @@ import { loadReportsForProject } from './reportStorage'
 import { generateId, readFileAsArrayBuffer } from '@/lib/utils'
 import { detectCycles } from '@/engine/dependencyGraph'
 import { getTransformSourceTableIds } from '@/engine/workflowGraph'
-import { uploadFileWithSync } from './fileSync'
+import { deleteFileWithSync, uploadFileWithSync } from './fileSync'
+import { withoutTransientComputeState } from '@/state/transientProjectState'
 
 const EXPORT_VERSION = '2.0.0'
 const EXPORT_FORMAT_TYPE = 'tablecanvas-full'
@@ -51,6 +52,43 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
     bytes[i] = binary.charCodeAt(i)
   }
   return bytes.buffer
+}
+
+function validateImportedWorkflow(nodes: Record<string, ProjectNode>): void {
+  const edges: Record<string, Edge> = {}
+  for (const node of Object.values(nodes)) {
+    if (node.kind === 'derived_table') {
+      const upstreamNodeIds = getTransformSourceTableIds(node.plan.transformDef)
+      const missingUpstream = upstreamNodeIds.find(id => !nodes[id])
+      if (missingUpstream) {
+        throw new Error(`Invalid workflow: "${node.name}" references a missing upstream table`)
+      }
+      for (const sourceId of upstreamNodeIds) {
+        const edgeId = generateId()
+        edges[edgeId] = {
+          id: edgeId,
+          fromNodeId: sourceId,
+          toNodeId: node.id,
+          transformType: node.plan.transformDef.type,
+        }
+      }
+    } else if (node.kind === 'chart') {
+      const source = nodes[node.plan.sourceTableId]
+      if (!source || source.kind === 'chart') {
+        throw new Error(`Invalid workflow: chart "${node.name}" references a missing table`)
+      }
+      const edgeId = generateId()
+      edges[edgeId] = {
+        id: edgeId,
+        fromNodeId: source.id,
+        toNodeId: node.id,
+        transformType: 'reference',
+      }
+    }
+  }
+  if (detectCycles(nodes, edges).length > 0) {
+    throw new Error('Invalid workflow: the imported graph contains a circular dependency')
+  }
 }
 
 async function readImportText(file: File): Promise<string> {
@@ -120,7 +158,7 @@ export async function exportProjectFile(projectId: string): Promise<Blob> {
     project: {
       id: project.id,
       name: project.name,
-      nodes: project.nodes,
+      nodes: withoutTransientComputeState(project.nodes),
       edges: project.edges,
       patches: project.patches,
     },
@@ -147,6 +185,16 @@ export interface ParsedImportData {
   filesRestored: number
   reportsRestored: number
   reports: Report[]
+}
+
+export class ImportFileRollbackError extends Error {
+  constructor(
+    message: string,
+    public readonly failures: unknown[],
+  ) {
+    super(message)
+    this.name = 'ImportFileRollbackError'
+  }
 }
 
 export async function parseImportFile(
@@ -197,8 +245,10 @@ export async function parseImportFile(
       `Project archive is incomplete. Missing source data for: ${missingFileNames.join(', ')}`,
     )
   }
+  validateImportedWorkflow(project.nodes)
 
   const fileIdMap = new Map<string, string>()
+  const createdFileIds: string[] = []
 
   for (const [oldFileId, exportedFile] of Object.entries(exportedFiles)) {
     try {
@@ -207,11 +257,29 @@ export async function parseImportFile(
         new File([fileData], exportedFile.name, { type: exportedFile.type }),
       )
       fileIdMap.set(oldFileId, restored.id)
+      createdFileIds.push(restored.id)
 
       console.log(`[Import] Restored file: ${exportedFile.name} (${oldFileId} -> ${restored.id})`)
     } catch (err) {
       console.error(`[Import] Failed to restore file ${exportedFile.name}:`, err)
-      throw new Error(`Failed to restore file "${exportedFile.name}": ${err instanceof Error ? err.message : 'Unknown error'}`)
+      const cleanupResults = await Promise.allSettled(
+        createdFileIds.map(fileId => deleteFileWithSync(fileId, { strictRemote: true })),
+      )
+      const cleanupErrors = cleanupResults
+        .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+        .map(result => result.reason)
+      const importError = new Error(
+        `Failed to restore file "${exportedFile.name}": ${
+          err instanceof Error ? err.message : 'Unknown error'
+        }`,
+      )
+      if (cleanupErrors.length > 0) {
+        throw new ImportFileRollbackError(
+          'Import failed and newly created files could not be fully cleaned up.',
+          [importError, ...cleanupErrors],
+        )
+      }
+      throw importError
     }
   }
 
@@ -232,12 +300,13 @@ export async function parseImportFile(
 
     remappedNodes[nodeId] = clonedNode
   }
+  const normalizedNodes = withoutTransientComputeState(remappedNodes)
 
   const normalizedEdges: Record<string, Edge> = {}
-  for (const node of Object.values(remappedNodes)) {
+  for (const node of Object.values(normalizedNodes)) {
     if (node.kind === 'derived_table') {
       const upstreamNodeIds = getTransformSourceTableIds(node.plan.transformDef)
-      const missingUpstream = upstreamNodeIds.find((id) => !remappedNodes[id])
+      const missingUpstream = upstreamNodeIds.find((id) => !normalizedNodes[id])
       if (missingUpstream) {
         throw new Error(`Invalid workflow: "${node.name}" references a missing upstream table`)
       }
@@ -252,7 +321,7 @@ export async function parseImportFile(
         }
       }
     } else if (node.kind === 'chart') {
-      const source = remappedNodes[node.plan.sourceTableId]
+      const source = normalizedNodes[node.plan.sourceTableId]
       if (!source || source.kind === 'chart') {
         throw new Error(`Invalid workflow: chart "${node.name}" references a missing table`)
       }
@@ -265,7 +334,7 @@ export async function parseImportFile(
       }
     }
   }
-  if (detectCycles(remappedNodes, normalizedEdges).length > 0) {
+  if (detectCycles(normalizedNodes, normalizedEdges).length > 0) {
     throw new Error('Invalid workflow: the imported graph contains a circular dependency')
   }
 
@@ -299,7 +368,7 @@ export async function parseImportFile(
   }
 
   console.log(`[Import] Parsed project "${project.name}":`, {
-    nodes: Object.keys(remappedNodes).length,
+    nodes: Object.keys(normalizedNodes).length,
     edges: Object.keys(project.edges).length,
     filesRestored: fileIdMap.size,
     reportsRestored,
@@ -307,7 +376,7 @@ export async function parseImportFile(
 
   return {
     name: project.name,
-    nodes: remappedNodes,
+    nodes: normalizedNodes,
     edges: normalizedEdges,
     patches,
     filesRestored: fileIdMap.size,

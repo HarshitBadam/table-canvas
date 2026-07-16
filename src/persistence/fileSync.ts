@@ -56,7 +56,15 @@ export async function uploadFileWithSync(file: File, projectId?: string): Promis
   return { id, name: file.name, contentType: file.type }
 }
 
-export async function deleteFileWithSync(fileId: string): Promise<void> {
+export async function deleteFileWithSync(
+  fileId: string,
+  options?: { strictRemote?: boolean },
+): Promise<void> {
+  if (options?.strictRemote && isNetworkOnline() && !fileId.startsWith('local_file_')) {
+    await deleteFileRemote(fileId)
+    await deleteFileLocal(fileId)
+    return
+  }
   await deleteFileLocal(fileId)
   if (isNetworkOnline() && !fileId.startsWith('local_file_')) {
     try {

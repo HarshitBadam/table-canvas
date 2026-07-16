@@ -68,7 +68,7 @@ function SuggestionPreview({ suggestion }: { suggestion: Suggestion }) {
 
   const data = preview.data
   return (
-    <div className="mb-3 rounded-lg bg-surface-secondary p-3 text-xs text-text-secondary">
+    <div className="mb-3 border-t border-border-subtle pt-3 text-xs text-text-secondary">
       <p className="mb-2 font-medium text-text-primary">Preview</p>
       {data.kind === 'beforeAfter' && (
         <div className="space-y-1">
@@ -119,10 +119,14 @@ export function SuggestionCard({
 
   const actionLabel = getActionLabel(suggestion)
   const detailsId = `suggestion-details-${suggestion.id}`
+  const summaryId = `suggestion-summary-${suggestion.id}`
+  const whyId = `suggestion-why-${suggestion.id}`
 
   return (
-    <div className={`overflow-hidden rounded-lg transition-colors ${isExpanded ? 'bg-surface-secondary' : 'bg-surface hover:bg-surface-secondary/60'}`}>
+    <li className={`transition-colors ${isExpanded ? 'bg-surface-secondary/60' : 'bg-surface hover:bg-surface-secondary/40'}`}>
       <button
+        id={summaryId}
+        type="button"
         onClick={onToggle}
         aria-label={`${suggestion.title}: ${isExpanded ? 'Collapse' : 'Expand'} details`}
         aria-expanded={isExpanded}
@@ -164,11 +168,19 @@ export function SuggestionCard({
       </button>
 
       {isExpanded && (
-        <div id={detailsId} className="px-3 pb-3 pl-12">
+        <div
+          id={detailsId}
+          role="region"
+          aria-labelledby={summaryId}
+          className="mx-3 border-t border-border-subtle pb-3 pl-9 pt-3"
+        >
           {suggestion.why && suggestion.why.length > 0 && (
-            <div className="mb-3 rounded-md bg-surface px-3 py-2.5">
+            <div className="mb-3">
               <button 
+                type="button"
                 onClick={() => setShowWhy(!showWhy)}
+                aria-expanded={showWhy}
+                aria-controls={whyId}
                 className="text-xs text-accent-green hover:text-accent-green/80 flex items-center gap-1 transition-colors"
               >
                 <svg className={`w-3 h-3 transition-transform ${showWhy ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -177,7 +189,7 @@ export function SuggestionCard({
                 Why this suggestion?
               </button>
               {showWhy && (
-                <ul className="mt-2 space-y-1.5">
+                <ul id={whyId} className="mt-2 space-y-1.5">
                   {suggestion.why.map((reason, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs leading-5 text-text-secondary">
                       <span className="text-text-tertiary" aria-hidden="true">-</span>
@@ -193,6 +205,7 @@ export function SuggestionCard({
 
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={onApply}
               disabled={isApplying}
               className="btn btn-primary flex-1 text-xs py-2 flex items-center justify-center gap-2 disabled:opacity-50"
@@ -207,6 +220,7 @@ export function SuggestionCard({
               )}
             </button>
             <button
+              type="button"
               onClick={onDismiss}
               disabled={isApplying}
               className="btn btn-ghost text-xs py-2"
@@ -216,6 +230,6 @@ export function SuggestionCard({
           </div>
         </div>
       )}
-    </div>
+    </li>
   )
 }

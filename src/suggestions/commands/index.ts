@@ -39,7 +39,7 @@ function createCommand(
 
 export async function applySuggestion(
   suggestion: Suggestion,
-  options: CommandExecutionOptions = {},
+  options: CommandExecutionOptions,
 ): Promise<CommandResult> {
   if (suggestion.category === 'cleaning' && suggestion.context.cleaningOperation) {
     return {

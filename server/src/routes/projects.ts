@@ -7,11 +7,13 @@ import {
   asyncHandler,
   ValidationError,
   NotFoundError,
-  AppError,
 } from '../middleware/errorHandler.js';
 import { User } from '../models/User.js';
-import { checkProjectCount } from '../config/enforce.js';
 import type { Tier } from '../config/limits.js';
+import {
+  createProjectWithinCapacity,
+  restoreProjectWithinCapacity,
+} from '../services/projectCapacity.js';
 
 const router = Router();
 
@@ -54,27 +56,22 @@ router.post(
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const { name, nodes, edges, patches } = req.body;
+    const operationId = req.get('Idempotency-Key')?.trim();
+    if (operationId && operationId.length > 200) {
+      throw new ValidationError(['Idempotency key cannot exceed 200 characters']);
+    }
 
     const userDoc = await User.findById(userId);
     const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
-    const activeProjects = await Project.countDocuments({
-      userId: new Types.ObjectId(userId),
-      deletedAt: null,
+    const project = await createProjectWithinCapacity({
+      userId,
+      tier,
+      operationId,
+      name,
+      nodes,
+      edges,
+      patches,
     });
-    const projectCheck = checkProjectCount(activeProjects, tier);
-    if (!projectCheck.ok) {
-      throw new AppError(projectCheck.reason, 403);
-    }
-
-    const project = new Project({
-      userId: new Types.ObjectId(userId),
-      name: name || 'Untitled Project',
-      nodes: nodes || {},
-      edges: edges || {},
-      patches: patches || {},
-    });
-
-    await project.save();
 
     const response: ApiResponse<{ project: IProjectPublic }> = {
       success: true,
@@ -227,15 +224,17 @@ router.delete(
       throw new ValidationError(['Invalid project ID format']);
     }
 
-    // Find project first to verify ownership
-    const project = await Project.findByIdAndUser(projectId, userId);
+    // Include already-deleted projects so retries are idempotent.
+    const project = await Project.findOne({
+      _id: new Types.ObjectId(projectId),
+      userId: new Types.ObjectId(userId),
+    });
 
     if (!project) {
       throw new NotFoundError('Project');
     }
 
-    // Soft delete the project
-    await project.softDelete();
+    if (!project.isDeleted()) await project.softDelete();
 
     const response: ApiResponse = {
       success: true,
@@ -272,13 +271,14 @@ router.post(
       throw new NotFoundError('Deleted project');
     }
 
-    // Restore the project
-    await project.restore();
+    const userDoc = await User.findById(userId);
+    const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
+    const restored = await restoreProjectWithinCapacity(project, userId, tier);
 
     const response: ApiResponse<{ project: IProjectPublic }> = {
       success: true,
       data: {
-        project: project.toPublic(),
+        project: restored.toPublic(),
       },
       message: 'Project restored successfully',
     };

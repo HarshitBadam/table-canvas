@@ -1,9 +1,9 @@
 import {
-  createProject,
   deleteProject as deleteProjectRemote,
   getProject,
   listProjects,
   updateProject,
+  type ProjectPayload,
   type ProjectSummary,
 } from '@/api/projects.api'
 import type { Edge, Patches, ProjectNode } from '@/types'
@@ -15,8 +15,19 @@ import {
 } from './db'
 import { deserializePatches, serializePatches } from './patchSerialization'
 import { isNetworkOnline } from './syncState'
-import { loadFileRecord } from './fileStorage'
-import { uploadFileWithSync } from './fileSync'
+import { withoutTransientComputeState } from '@/state/transientProjectState'
+import {
+  createRemoteProject,
+  ProjectCleanupError,
+  isRetryableRemoteDeferral,
+} from './projectCreateReconciliation'
+import { promoteLocalFileRefs } from './projectFilePromotion'
+export {
+  AmbiguousProjectCreateError,
+  ProjectCleanupError,
+  isRetryableRemoteDeferral,
+} from './projectCreateReconciliation'
+export { syncLocalProjectsToBackend } from './localProjectPromotion'
 
 export interface ProjectWithSync {
   id: string
@@ -32,7 +43,7 @@ function fromRemote(project: Awaited<ReturnType<typeof getProject>>): ProjectWit
   return {
     id: project.id,
     name: project.name,
-    nodes: project.nodes,
+    nodes: withoutTransientComputeState(project.nodes),
     edges: project.edges,
     patches: deserializePatches(project.patches),
     isLocalOnly: false,
@@ -79,6 +90,7 @@ export async function fetchProjects(): Promise<ProjectSummary[]> {
       )
     } catch (error) {
       console.error('[syncService] Failed to fetch projects from backend:', error)
+      if (!isRetryableRemoteDeferral(error)) throw error
     }
   }
   return (await listProjectsLocal()).map(project => ({
@@ -124,6 +136,7 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
           }
         } catch (error) {
           console.error('[syncService] Failed to upload newer local project:', error)
+          if (!isRetryableRemoteDeferral(error)) throw error
           return {
             ...localProject,
             patches,
@@ -148,6 +161,7 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
       return loaded
     } catch (error) {
       console.error('[syncService] Failed to load project from backend:', error)
+      if (!isRetryableRemoteDeferral(error)) throw error
     }
   }
   if (!localProject) return null
@@ -161,24 +175,20 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
 
 export async function createProjectWithSync(name = 'Untitled Project'): Promise<ProjectWithSync> {
   if (isNetworkOnline()) {
-    try {
-      const remoteProject = await createProject({ name })
-      const project = fromRemote(remoteProject)
-      await saveProjectLocal(
-        project.id,
-        project.name,
-        project.nodes,
-        project.edges,
-        project.patches,
-        {
-          createdAt: remoteProject.createdAt,
-          updatedAt: remoteProject.updatedAt,
-        },
-      )
-      return project
-    } catch (error) {
-      console.error('[syncService] Failed to create project on backend:', error)
-    }
+    const remoteProject = await createRemoteProject({ name }, `create:${name}`)
+    const project = fromRemote(remoteProject)
+    await saveProjectLocal(
+      project.id,
+      project.name,
+      project.nodes,
+      project.edges,
+      project.patches,
+      {
+        createdAt: remoteProject.createdAt,
+        updatedAt: remoteProject.updatedAt,
+      },
+    )
+    return project
   }
   const project: ProjectWithSync = {
     id: createLocalId('local'),
@@ -209,7 +219,12 @@ async function saveToBackend(
   patches: Record<string, Patches>,
 ): Promise<void> {
   if (!isNetworkOnline() || projectId.startsWith('local_')) return
-  await updateProject(projectId, { name, nodes, edges, patches: serializePatches(patches) })
+  await updateProject(projectId, {
+    name,
+    nodes: withoutTransientComputeState(nodes),
+    edges,
+    patches: serializePatches(patches),
+  })
 }
 
 export async function flushProjectSaveWithSync(projectId: string): Promise<void> {
@@ -243,8 +258,9 @@ export async function saveProjectWithSync(
   edges: Record<string, Edge>,
   patches: Record<string, Patches>,
 ): Promise<void> {
-  await saveProjectLocal(projectId, name, nodes, edges, patches)
-  pendingBackendSaves.set(projectId, { name, nodes, edges, patches })
+  const persistedNodes = withoutTransientComputeState(nodes)
+  await saveProjectLocal(projectId, name, persistedNodes, edges, patches)
+  pendingBackendSaves.set(projectId, { name, nodes: persistedNodes, edges, patches })
   const existingTimeout = saveTimeouts.get(projectId)
   if (existingTimeout) clearTimeout(existingTimeout)
   const timeout = setTimeout(() => {
@@ -256,51 +272,57 @@ export async function saveProjectWithSync(
 }
 
 export async function deleteProjectWithSync(projectId: string): Promise<void> {
+  const localProject = await loadProjectLocal(projectId)
   await deleteProjectLocal(projectId)
   if (isNetworkOnline() && !projectId.startsWith('local_')) {
     try {
+      await flushProjectSaveWithSync(projectId)
       await deleteProjectRemote(projectId)
     } catch (error) {
-      console.error('[syncService] Failed to delete project from backend:', error)
+      if (localProject) {
+        try {
+          await saveProjectLocal(
+            localProject.id,
+            localProject.name,
+            localProject.nodes,
+            localProject.edges,
+            deserializePatches(localProject.patches),
+            {
+              createdAt: localProject.createdAt,
+              updatedAt: localProject.updatedAt,
+            },
+          )
+        } catch (restoreError) {
+          throw new ProjectCleanupError(
+            'Project deletion failed and the local restoration also failed.',
+            { deleteError: error, restoreError },
+          )
+        }
+      }
+      throw error
     }
   }
-}
-
-async function promoteLocalFileRefs(
-  projectId: string,
-  sourceNodes: Record<string, ProjectNode>,
-): Promise<Record<string, ProjectNode>> {
-  const nodes = structuredClone(sourceNodes)
-  for (const node of Object.values(nodes)) {
-    if (node.kind !== 'source_table' || !node.plan.fileRef.startsWith('local_file_')) {
-      continue
-    }
-    const file = await loadFileRecord(node.plan.fileRef)
-    if (!file) throw new Error(`Local data file for "${node.name}" is missing`)
-    const uploaded = await uploadFileWithSync(
-      new File([file.data], file.name, { type: file.type }),
-      projectId,
-    )
-    if (uploaded.id.startsWith('local_file_')) {
-      throw new Error(`Could not upload data file for "${node.name}"`)
-    }
-    node.plan.fileRef = uploaded.id
-  }
-  return nodes
+  const timeout = saveTimeouts.get(projectId)
+  if (timeout) clearTimeout(timeout)
+  saveTimeouts.delete(projectId)
+  pendingBackendSaves.delete(projectId)
 }
 
 export async function importProjectWithSync(project: Omit<ProjectWithSync, 'id' | 'isLocalOnly' | 'needsSync'>): Promise<ProjectWithSync> {
   let createdProjectId: string | undefined
   if (isNetworkOnline()) {
     try {
-      const created = await createProject({ name: project.name })
+      const recoveryKey = `import:${project.name}:${Object.keys(project.nodes).sort().join(',')}`
+      const created = await createRemoteProject({ name: project.name }, recoveryKey)
       createdProjectId = created.id
       const nodes = await promoteLocalFileRefs(created.id, project.nodes)
-      await updateProject(created.id, {
-        ...project,
+      const payload: ProjectPayload = {
+        name: project.name,
         nodes,
+        edges: project.edges,
         patches: serializePatches(project.patches),
-      })
+      }
+      await updateProject(created.id, payload)
       const result = {
         ...project,
         nodes,
@@ -316,54 +338,18 @@ export async function importProjectWithSync(project: Omit<ProjectWithSync, 'id' 
         try {
           await deleteProjectRemote(createdProjectId)
         } catch (cleanupError) {
-          console.error('[Sync] Failed to clean up partial imported project:', cleanupError)
+          throw new ProjectCleanupError(
+            'Import failed and the partial server project could not be cleaned up.',
+            cleanupError,
+          )
         }
       }
+      throw error
     }
   }
   const result = { ...project, id: createLocalId('local'), isLocalOnly: true, needsSync: true }
   await saveProjectLocal(result.id, result.name, result.nodes, result.edges, result.patches)
   return result
-}
-
-export async function syncLocalProjectsToBackend(): Promise<void> {
-  if (!isNetworkOnline()) return
-  for (const summary of await listProjectsLocal()) {
-    if (!summary.id.startsWith('local_')) continue
-    const project = await loadProjectLocal(summary.id)
-    if (!project) continue
-    let createdProjectId: string | undefined
-    let promotionCommitted = false
-    try {
-      const created = await createProject({ name: project.name })
-      createdProjectId = created.id
-      const nodes = await promoteLocalFileRefs(created.id, project.nodes)
-      await saveProjectLocal(
-        created.id,
-        project.name,
-        nodes,
-        project.edges,
-        deserializePatches(project.patches),
-      )
-      await deleteProjectLocal(summary.id)
-      promotionCommitted = true
-      await updateProject(created.id, {
-        name: project.name,
-        nodes,
-        edges: project.edges,
-        patches: project.patches,
-      })
-    } catch (error) {
-      console.error('[syncService] Failed to sync local project to backend:', error)
-      if (createdProjectId && !promotionCommitted) {
-        try {
-          await deleteProjectRemote(createdProjectId)
-        } catch (cleanupError) {
-          console.error('[syncService] Failed to clean up partial remote project:', cleanupError)
-        }
-      }
-    }
-  }
 }
 
 function createLocalId(prefix: 'local'): string {

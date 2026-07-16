@@ -1,13 +1,12 @@
 import { useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
-import { useApp } from '@/state/AppContext'
-import { getDependentNodeIds } from '@/engine/workflowGraph'
+import { useNodeDeletion } from '@/components/nodeDeletionContext'
 
 export function useCanvasKeyboard() {
   const undo = useProjectStore((state) => state.undo)
   const redo = useProjectStore((state) => state.redo)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
-  const { deleteNodeWithSync } = useApp()
+  const { requestNodeDeletion, deletionPending } = useNodeDeletion()
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -15,24 +14,17 @@ export function useCanvasKeyboard() {
       const isEditing = Boolean(
         target?.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]'),
       )
-      const isInDialog = Boolean(target?.closest('[role="dialog"]'))
+      const isInDialog = Boolean(target?.closest('[role="dialog"], [role="alertdialog"]'))
 
-      if ((e.key === 'Delete' || e.key === 'Backspace') && !isEditing && !isInDialog) {
+      if (
+        (e.key === 'Delete' || e.key === 'Backspace')
+        && !isEditing
+        && !isInDialog
+        && !deletionPending
+      ) {
         if (selectedNodeId) {
           e.preventDefault()
-          const project = useProjectStore.getState()
-          const node = project.nodes[selectedNodeId]
-          const dependents = getDependentNodeIds(
-            project.nodes,
-            project.edges,
-            selectedNodeId,
-          )
-          const dependentMessage = dependents.size > 0
-            ? ` This will also delete ${dependents.size} dependent node${dependents.size === 1 ? '' : 's'}.`
-            : ''
-          if (window.confirm(`Delete "${node?.name ?? 'this node'}"?${dependentMessage}`)) {
-            void deleteNodeWithSync(selectedNodeId)
-          }
+          requestNodeDeletion(selectedNodeId)
         }
       }
 
@@ -59,5 +51,5 @@ export function useCanvasKeyboard() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [undo, redo, selectedNodeId, deleteNodeWithSync])
+  }, [deletionPending, redo, requestNodeDeletion, selectedNodeId, undo])
 }

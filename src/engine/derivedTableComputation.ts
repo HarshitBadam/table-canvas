@@ -9,6 +9,11 @@ import {
 } from './cacheUtils'
 import type { DerivedTableNode } from '@/types'
 import type { MaterializationResult } from './materializationService'
+import {
+  captureMaterializationScope,
+  isMaterializationScopeCurrent,
+  type MaterializationScope,
+} from './materializationCoordinator'
 
 interface DerivedSnapshot {
   generation: string
@@ -60,11 +65,22 @@ function captureDerivedSnapshot(tableId: string): DerivedSnapshot | undefined {
   }
 }
 
-function derivedGenerationIsCurrent(tableId: string, generation: string): boolean {
-  return captureDerivedSnapshot(tableId)?.generation === generation
+function derivedGenerationIsCurrent(
+  tableId: string,
+  generation: string,
+  scope: MaterializationScope,
+): boolean {
+  const state = useProjectStore.getState()
+  return isMaterializationScopeCurrent(scope, state.projectId)
+    && captureDerivedSnapshot(tableId)?.generation === generation
 }
 
-export async function computeDerivedTable(tableId: string): Promise<MaterializationResult> {
+export async function computeDerivedTable(
+  tableId: string,
+  scope: MaterializationScope = captureMaterializationScope(
+    useProjectStore.getState().projectId,
+  ),
+): Promise<MaterializationResult> {
   const snapshot = captureDerivedSnapshot(tableId)
 
   if (!snapshot) {
@@ -80,12 +96,12 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
   try {
     const engine = getEngine()
     await engine.init()
-    if (!derivedGenerationIsCurrent(tableId, snapshot.generation)) {
+    if (!derivedGenerationIsCurrent(tableId, snapshot.generation, scope)) {
       return { status: 'loading', tableId }
     }
 
     const engineRowCount = await getEngineTableRowCount(tableId)
-    if (!derivedGenerationIsCurrent(tableId, snapshot.generation)) {
+    if (!derivedGenerationIsCurrent(tableId, snapshot.generation, scope)) {
       return { status: 'loading', tableId }
     }
     const existsInEngine = engineRowCount >= 0
@@ -136,7 +152,7 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
       tableId,
       columnIdToName,
     )
-    if (!derivedGenerationIsCurrent(tableId, snapshot.generation)) {
+    if (!derivedGenerationIsCurrent(tableId, snapshot.generation, scope)) {
       return { status: 'loading', tableId }
     }
 
@@ -156,7 +172,7 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
         }),
       }
 
-      useProjectStore.getState().updateTableSchema(tableId, schemaWithIds)
+      useProjectStore.getState().setMaterializedTableSchema(tableId, schemaWithIds)
     }
 
     useDataStore.getState().setTableData(tableId, [])
@@ -183,7 +199,7 @@ export async function computeDerivedTable(tableId: string): Promise<Materializat
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error(`[MaterializationService] Error computing derived table ${tableId}:`, error)
 
-    if (derivedGenerationIsCurrent(tableId, snapshot.generation)) {
+    if (derivedGenerationIsCurrent(tableId, snapshot.generation, scope)) {
       useProjectStore.getState().updateCacheInfo(tableId, {
         isDirty: true,
         isComputing: false,
