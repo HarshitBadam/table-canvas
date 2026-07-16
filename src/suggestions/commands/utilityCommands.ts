@@ -111,7 +111,7 @@ export async function executeRecipeTransform(
   transform: TransformDef,
   tableName: string,
   sourceTableId: string,
-  options: CommandExecutionOptions = {},
+  options: CommandExecutionOptions,
 ): Promise<CommandResult> {
   const store = useProjectStore.getState()
 
@@ -135,13 +135,7 @@ export async function executeRecipeTransform(
       message: `Created "${tableName}"`,
       action: {
         label: 'View',
-        onClick: () => {
-          if (options.navigateToNode) {
-            options.navigateToNode(nodeId, 'table')
-          } else {
-            useProjectStore.getState().selectNode(nodeId)
-          }
-        },
+        onClick: () => options.navigateToNode(nodeId, 'table'),
       },
     })
 

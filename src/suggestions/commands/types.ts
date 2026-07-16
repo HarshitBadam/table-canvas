@@ -12,7 +12,7 @@ export interface CommandResult {
 }
 
 export interface CommandExecutionOptions {
-  navigateToNode?: (nodeId: string, kind: 'table' | 'chart') => void
+  navigateToNode: (nodeId: string, kind: 'table' | 'chart') => void
 }
 
 type ToastType = 'success' | 'error' | 'info'

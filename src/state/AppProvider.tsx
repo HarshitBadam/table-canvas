@@ -1,28 +1,25 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react'
-import { getEngine } from '@/engine'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LoginCredentials } from '@/api/auth.api'
 import {
-  createProjectWithSync,
   fetchProjects,
   flushProjectSaveWithSync,
-  loadProjectWithSync,
   saveProjectWithSync,
   syncLocalProjectsToBackend,
 } from '@/persistence/syncService'
-import type { ProjectWithSync } from '@/persistence/projectSync'
+import {
+  isRetryableRemoteDeferral,
+  type ProjectWithSync,
+} from '@/persistence/projectSync'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
+import { dropEngineTables } from '@/engine/engineTableCleanup'
 import { useReportStore } from '@/report/reportStore'
-import { checkProjectCount, type LimitExceeded } from '@/shared/enforce'
+import { loadReportsForProject } from '@/persistence/reportStorage'
+import type { LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import { useProjectStore } from './projectStore'
 import { useDataStore } from './dataStore'
 import { useAuthState } from './useAuthState'
+import { withoutTransientComputeState } from './transientProjectState'
 import {
   clearProjectRuntime,
   hasProjectTables,
@@ -31,10 +28,10 @@ import {
   materializeProjectTables,
 } from './projectLifecycle'
 import {
-  AppContext,
-  type AppContextValue,
-  type AppPhase,
+  AppContext, type AppContextValue, type AppProviderState, type AppPhase,
 } from './appContextValue'
+import { useProjectActions } from './useProjectActions'
+import { ProjectActionError } from './projectOperations'
 const PHASE_MESSAGES: Record<AppPhase, string> = {
   idle: 'Starting...',
   initializing_engine: 'Starting data engine...',
@@ -43,19 +40,6 @@ const PHASE_MESSAGES: Record<AppPhase, string> = {
   ready: 'Ready',
   error: 'Something went wrong',
 }
-type AppState = Pick<
-  AppContextValue,
-  | 'phase'
-  | 'phaseMessage'
-  | 'engineReady'
-  | 'user'
-  | 'isAuthenticated'
-  | 'projectId'
-  | 'projectName'
-  | 'projects'
-  | 'isSaving'
-  | 'error'
->
 export function AppProvider({ children }: { children: ReactNode }) {
   const {
     user,
@@ -67,7 +51,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   } = useAuthState()
   const [projectLimitViolation, setProjectLimitViolation] =
     useState<LimitExceeded | null>(null)
-  const [state, setState] = useState<AppState>({
+  const [state, setState] = useState<AppProviderState>({
     phase: 'idle',
     phaseMessage: PHASE_MESSAGES.idle,
     engineReady: false,
@@ -77,6 +61,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     projectName: 'Untitled Project',
     projects: [],
     isSaving: false,
+    isProjectOperationPending: false,
     error: null,
   })
   const initialized = useRef(false)
@@ -109,8 +94,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             project.patches,
           )
         } while (savePending.current)
-      } catch (error) {
-        console.error('[AppContext] Auto-save failed:', error)
       } finally {
         setState(previous => ({ ...previous, isSaving: false }))
       }
@@ -132,7 +115,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await flushProjectSaveWithSync(projectId)
     } catch (error) {
-      console.warn('[AppContext] Remote save deferred:', error)
+      if (!isRetryableRemoteDeferral(error)) throw error
+      console.warn('[AppContext] Retryable remote save deferred:', error)
     }
   }, [saveLatestProject])
 
@@ -146,19 +130,74 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const prepareProject = useCallback(async (project: ProjectWithSync) => {
-    await clearProjectRuntime(useProjectStore.getState().nodes)
-    useProjectStore.setState({
-      projectId: project.id,
-      projectName: project.name,
-      nodes: project.nodes,
-      edges: project.edges,
-      patches: project.patches,
-      selectedNodeId: null,
-      history: { past: [], future: [] },
-    })
-    await useReportStore.getState().initializeProject(project.id)
-    if (hasProjectTables(project.nodes)) {
-      await materializeProjectTables(project.nodes)
+    const nodes = withoutTransientComputeState(project.nodes)
+    const reports = await loadReportsForProject(project.id)
+    const previousProject = useProjectStore.getState()
+    const previousReports = useReportStore.getState()
+    const previousData = useDataStore.getState().tableData
+    const projectSnapshot = {
+      projectId: previousProject.projectId,
+      projectName: previousProject.projectName,
+      nodes: structuredClone(previousProject.nodes),
+      edges: structuredClone(previousProject.edges),
+      patches: structuredClone(previousProject.patches),
+      selectedNodeId: previousProject.selectedNodeId,
+      history: structuredClone(previousProject.history),
+    }
+    const reportSnapshot = {
+      reports: structuredClone(previousReports.reports),
+      selectedReportId: previousReports.selectedReportId,
+      activeProjectId: previousReports.activeProjectId,
+      persistenceStatus: previousReports.persistenceStatus,
+      persistenceError: previousReports.persistenceError,
+    }
+    try {
+      await clearProjectRuntime(previousProject.nodes)
+      useProjectStore.setState({
+        projectId: project.id,
+        projectName: project.name,
+        nodes,
+        edges: project.edges,
+        patches: project.patches,
+        selectedNodeId: null,
+        history: { past: [], future: [] },
+      })
+      const selectedReportId = Object.values(reports)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.id ?? null
+      useReportStore.setState({
+        reports,
+        selectedReportId,
+        activeProjectId: project.id,
+        persistenceStatus: 'idle',
+        persistenceError: null,
+      })
+      if (hasProjectTables(nodes)) {
+        const result = await materializeProjectTables(nodes)
+        if (result.failures.length > 0) {
+          throw new Error(
+            `Could not prepare ${result.failures.length} project table${
+              result.failures.length === 1 ? '' : 's'
+            }: ${result.failures[0].error}`,
+          )
+        }
+      }
+    } catch (error) {
+      try {
+        await clearProjectRuntime(nodes)
+        useProjectStore.setState(projectSnapshot)
+        useReportStore.setState(reportSnapshot)
+        if (hasProjectTables(projectSnapshot.nodes)) {
+          await materializeProjectTables(projectSnapshot.nodes)
+        }
+        useDataStore.setState({ tableData: previousData })
+      } catch (restoreError) {
+        throw new ProjectActionError(
+          'persistence',
+          'Project preparation failed and the previous project could not be fully restored.',
+          { failure: error, restorationFailure: restoreError },
+        )
+      }
+      throw error
     }
   }, [])
 
@@ -212,7 +251,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (state.phase !== 'ready' || !state.isAuthenticated || !state.projectId) return
-    void saveLatestProject()
+    void saveLatestProject().catch((error) => {
+      console.error('[AppContext] Auto-save failed:', error)
+    })
   }, [
     edges,
     nodes,
@@ -258,12 +299,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [performGoogleLogin, postLoginSetup])
 
   const logout = useCallback(async () => {
-    try {
-      await flushProjectSave()
-      await useReportStore.getState().flushSaves()
-    } catch (error) {
-      console.error('[AppContext] Failed to flush saves before logout:', error)
-    }
+    await flushProjectSave()
+    await useReportStore.getState().flushSaves()
     await clearProjectRuntime(useProjectStore.getState().nodes)
     await performLogout()
     setState(previous => ({
@@ -284,54 +321,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     useReportStore.getState().reset()
   }, [flushProjectSave, performLogout])
 
-  const createNewProject = useCallback(async (name?: string) => {
-    const tier: Tier = user?.tier ?? 'guest'
-    const projectCheck = checkProjectCount(state.projects.length, tier)
-    if (!projectCheck.ok) {
-      setProjectLimitViolation(projectCheck)
-      return
-    }
-    await flushProjectSave()
-    await useReportStore.getState().flushSaves()
-    setPhase('loading_project')
-    try {
-      const project = await createProjectWithSync(name || 'Untitled Project')
-      await prepareProject(project)
-      setState(previous => ({
-        ...previous,
-        projectId: project.id,
-        projectName: project.name,
-        projects: [{
-          id: project.id,
-          name: project.name,
-          updatedAt: new Date(),
-          createdAt: new Date(),
-        }, ...previous.projects],
-      }))
-      setPhase('ready')
-    } catch (error) {
-      setPhase('ready')
-      throw error
-    }
-  }, [flushProjectSave, prepareProject, setPhase, state.projects.length, user?.tier])
-
-  const loadProject = useCallback(async (projectId: string) => {
-    try {
-      await flushProjectSave()
-      await useReportStore.getState().flushSaves()
-      const project = await loadProjectWithSync(projectId)
-      if (!project) throw new Error('Project not found')
-      await prepareProject(project)
-      setState(previous => ({
-        ...previous,
-        projectId: project.id,
-        projectName: project.name,
-      }))
-      setPhase('ready')
-    } catch (error) {
-      console.error('[AppContext] Failed to load project:', error)
-    }
-  }, [flushProjectSave, prepareProject, setPhase])
+  const {
+    createNewProject,
+    deleteProject,
+    duplicateActiveProject,
+    importProject,
+    loadProject,
+  } = useProjectActions({
+    state,
+    setState,
+    tier: user?.tier ?? 'guest',
+    flushProjectSave,
+    prepareProject,
+    setProjectLimitViolation,
+  })
 
   const renameProject = useCallback((name: string) => {
     const nextName = name.trim()
@@ -369,12 +372,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     project.deleteNode(nodeId)
     for (const id of nodeIds) {
       useDataStore.getState().clearTableData(id)
-      try {
-        await getEngine().dropTable(id)
-      } catch (error) {
-        console.error('[AppContext] Failed to drop table from engine:', error)
-      }
     }
+    await dropEngineTables(nodeIds, { onlyIfDeleted: true })
   }, [])
 
   const value: AppContextValue = {
@@ -385,6 +384,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     googleLogin,
     logout,
     createNewProject,
+    duplicateActiveProject,
+    deleteProject,
+    importProject,
     loadProject,
     renameProject,
     refreshProjects,

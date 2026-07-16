@@ -1,8 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useApp } from '@/state/AppContext'
-import { saveAllReports } from '@/persistence/reportStorage'
-import { importProjectWithSync, saveProjectWithSync } from '@/persistence/syncService'
+import { saveProjectWithSync } from '@/persistence/syncService'
 import { useReportStore } from '@/report/reportStore'
 
 export interface ProjectExportState {
@@ -22,7 +21,7 @@ export interface ProjectExportState {
 export function useProjectExport(onImportComplete: () => void): ProjectExportState {
   const projectId = useProjectStore((state) => state.projectId)
   const projectName = useProjectStore((state) => state.projectName)
-  const { loadProject } = useApp()
+  const { importProject } = useApp()
 
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -101,21 +100,13 @@ export function useProjectExport(onImportComplete: () => void): ProjectExportSta
     try {
       const { parseImportFile } = await import('@/persistence/exportImport')
       const parsedData = await parseImportFile(file)
-      const importedProject = await importProjectWithSync({
+      await importProject({
         name: parsedData.name,
         nodes: parsedData.nodes,
         edges: parsedData.edges,
         patches: parsedData.patches,
+        reports: parsedData.reports,
       })
-      if (parsedData.reports.length > 0) {
-        await saveAllReports(Object.fromEntries(
-          parsedData.reports.map((report) => [
-            report.id,
-            { ...report, projectId: importedProject.id, schemaVersion: 1 },
-          ]),
-        ))
-      }
-      await loadProject(importedProject.id)
       onImportComplete()
     } catch (err) {
       console.error('[Import] Failed:', err)
@@ -123,7 +114,7 @@ export function useProjectExport(onImportComplete: () => void): ProjectExportSta
     } finally {
       setIsImporting(false)
     }
-  }, [loadProject, onImportComplete])
+  }, [importProject, onImportComplete])
 
   return {
     isExporting,

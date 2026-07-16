@@ -2,7 +2,6 @@ import { useMemo, useCallback, useState, useEffect, useRef } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
 import type { CellValue, ColumnSchema, ViewFilterConfig } from '@/types'
-import { ensureTableMaterialized } from '@/engine/materializationService'
 import { hasActiveFilters, createEmptyFilterConfig } from './filterUtils'
 import { computeDisplayValue } from './displayUtils'
 import { useWindowedRows } from './hooks/useWindowedRows'
@@ -21,8 +20,7 @@ export function useGridData(tableId: string) {
 
   const tableData = useDataStore((state) => state.tableData[tableId])
 
-  const [isMaterializing, setIsMaterializing] = useState(false)
-  const [materializationError, setMaterializationError] = useState<string | null>(null)
+  const [localMaterializationError, setMaterializationError] = useState<string | null>(null)
 
   const cacheInfo = node && (node.kind === 'source_table' || node.kind === 'derived_table')
     ? node.cacheInfo
@@ -51,6 +49,8 @@ export function useGridData(tableId: string) {
     undefined,
   )
   const { getLoadedRows, invalidate, totalRows: windowedTotalRows, version: windowedVersion } = windowed
+  const isMaterializing = windowed.isLoading
+  const materializationError = localMaterializationError ?? windowed.error
 
   const prevDataRevision = useRef(dataRevision)
   useEffect(() => {
@@ -81,36 +81,6 @@ export function useGridData(tableId: string) {
   const filteredRows = rows
 
   const unfilteredTotalRows = windowedTotalRows
-
-  useEffect(() => {
-    if (!node) return
-    if (isComputing || isMaterializing) return
-
-    const hasBeenComputed = cacheInfo?.lastComputedAt && !cacheInfo?.error
-    const needsMat = isDirty || (!tableData && !windowedTotalRows) ||
-      (windowedTotalRows === 0 && !hasBeenComputed && !tableData?.rows?.length)
-
-    if (needsMat && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-      setIsMaterializing(true)
-      setMaterializationError(null)
-
-      ensureTableMaterialized(tableId)
-        .then((result) => {
-          if (result.status === 'error') {
-            setMaterializationError(result.error || 'Unknown error')
-          } else {
-            setMaterializationError(null)
-            invalidate()
-          }
-        })
-        .catch((error) => {
-          setMaterializationError(error instanceof Error ? error.message : String(error))
-        })
-        .finally(() => {
-          setIsMaterializing(false)
-        })
-    }
-  }, [cacheInfo, invalidate, isComputing, isDirty, isMaterializing, node, tableData, tableId, windowedTotalRows])
 
   return {
     node,

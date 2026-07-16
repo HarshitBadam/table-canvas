@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DerivedTableNode, SourceTableNode, TableSchema } from '@/types'
+
 const projectStore = {
+  projectId: 'project_1',
   nodes: {} as Record<string, SourceTableNode | DerivedTableNode>,
   edges: {} as Record<string, { id: string; fromNodeId: string; toNodeId: string }>,
   patches: {} as Record<string, unknown>,
   getTableNode: vi.fn(),
   updateCacheInfo: vi.fn(),
-  updateTableSchema: vi.fn(),
+  setMaterializedTableSchema: vi.fn(),
 }
 const dataStore = {
   tableData: {} as Record<string, { rows: unknown[] }>,
@@ -19,6 +21,7 @@ const engine = {
   getSlice: vi.fn(),
 }
 const loadFile = vi.fn()
+
 vi.mock('@/state/projectStore', () => ({ useProjectStore: { getState: () => projectStore } }))
 vi.mock('@/state/dataStore', () => ({ useDataStore: { getState: () => dataStore } }))
 vi.mock('./EngineAdapter', () => ({ getEngine: () => engine }))
@@ -113,16 +116,24 @@ const csv = (contents = 'ID,Value\n1,100') => new TextEncoder().encode(contents)
 beforeEach(() => {
   vi.clearAllMocks()
   projectStore.nodes = {}
+  projectStore.projectId = 'project_1'
   projectStore.edges = {}
   projectStore.patches = {}
   dataStore.tableData = {}
   projectStore.getTableNode.mockImplementation((id: string) => projectStore.nodes[id])
+  projectStore.setMaterializedTableSchema.mockImplementation(
+    (id: string, nextSchema: TableSchema) => {
+      const node = projectStore.nodes[id]
+      if (node) node.schema = nextSchema
+    },
+  )
   loadFile.mockResolvedValue(null)
   engine.init.mockResolvedValue(undefined)
   engine.loadTable.mockResolvedValue(undefined)
   engine.executeTransform.mockResolvedValue({ schema: { columns: [], rowCount: 10 }, rowCount: 10, preview: [] })
   engine.getSlice.mockResolvedValue({ rows: [], totalRows: 0 })
 })
+
 describe('source table materialization', () => {
   it('returns an error for a missing table', async () => {
     const result = await ensureTableMaterialized('missing')
@@ -144,7 +155,6 @@ describe('source table materialization', () => {
     expect(engine.loadTable).toHaveBeenCalled()
     expect(projectStore.updateCacheInfo).toHaveBeenCalled()
   })
-
   it('updates cache info after successful materialization', async () => {
     projectStore.nodes.table_1 = sourceNode('table_1', { isDirty: true })
     loadFile.mockResolvedValue(csv())
@@ -155,7 +165,6 @@ describe('source table materialization', () => {
       isComputing: false,
     }))
   })
-
   it('reloads a source table when the engine row count is incomplete', async () => {
     const node = sourceNode('table_1', {
       currentVersionHash: computeSourceVersionHash(
@@ -176,7 +185,6 @@ describe('source table materialization', () => {
     expect(result.status).toBe('computed')
     expect(result.rowCount).toBe(2)
   })
-
   it('rehydrates an in-app table from durable initial rows', async () => {
     const node = sourceNode('manual', {
       isDirty: true,
@@ -193,9 +201,7 @@ describe('source table materialization', () => {
     engine.getSlice
       .mockRejectedValueOnce(new Error('Not in engine'))
       .mockResolvedValue({ rows: [], totalRows: 2 })
-
     const result = await ensureTableMaterialized('manual')
-
     expect(engine.loadTable).toHaveBeenCalledWith(
       'manual',
       schema,
@@ -204,7 +210,6 @@ describe('source table materialization', () => {
     )
     expect(result.rowCount).toBe(2)
   })
-
   it('reconstructs legacy manual row IDs so persisted patches remain usable', async () => {
     const node = sourceNode('legacy', {
       isDirty: true,
@@ -223,9 +228,7 @@ describe('source table materialization', () => {
     engine.getSlice
       .mockRejectedValueOnce(new Error('Not in engine'))
       .mockResolvedValue({ rows: [], totalRows: 10 })
-
     const result = await ensureTableMaterialized('legacy')
-
     expect(engine.loadTable).toHaveBeenCalledWith(
       'legacy',
       schema,
@@ -239,7 +242,6 @@ describe('source table materialization', () => {
     expect(result.rowCount).toBe(10)
   })
 })
-
 describe('derived table materialization', () => {
   it('materializes upstream tables first', async () => {
     projectStore.nodes = {
@@ -252,7 +254,6 @@ describe('derived table materialization', () => {
     await ensureTableMaterialized('table_b')
     expect(engine.loadTable).toHaveBeenCalled()
   })
-
   it('checks engine state for an up-to-date derived table', async () => {
     projectStore.nodes = {
       table_a: sourceNode('table_a', { isDirty: false, currentVersionHash: 'hash_a' }),
@@ -302,7 +303,6 @@ describe('derived table materialization', () => {
     expect(result.error).toContain('Upstream table')
   })
 })
-
 describe('getTableData', () => {
   it('returns an empty error result for a missing table', async () => {
     const result = await getTableData('missing')

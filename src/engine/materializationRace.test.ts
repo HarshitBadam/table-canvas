@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SourceTableNode, TableSchema } from '@/types'
 
 const projectStore = {
+  projectId: 'project_1',
   nodes: {} as Record<string, SourceTableNode>,
   edges: {},
   patches: {} as Record<string, unknown>,
@@ -16,6 +17,7 @@ const engine = {
   init: vi.fn(),
   loadTable: vi.fn(),
   getSlice: vi.fn(),
+  dropTable: vi.fn(),
 }
 const loadFile = vi.fn()
 
@@ -57,6 +59,8 @@ vi.mock('xlsx', () => ({
 }))
 
 import { ensureTableMaterialized } from './materializationService'
+import { dropEngineTables } from './engineTableCleanup'
+import { invalidateMaterializations } from './materializationCoordinator'
 import {
   computeSchemaFingerprint,
   computeSourceVersionHash,
@@ -97,6 +101,7 @@ function sourceNode(cacheInfo: Partial<SourceTableNode['cacheInfo']>): SourceTab
 beforeEach(() => {
   vi.clearAllMocks()
   projectStore.nodes = {}
+  projectStore.projectId = 'project_1'
   projectStore.patches = {}
   dataStore.tableData = {}
   projectStore.getTableNode.mockImplementation(
@@ -105,6 +110,7 @@ beforeEach(() => {
   engine.init.mockResolvedValue(undefined)
   engine.loadTable.mockResolvedValue(undefined)
   engine.getSlice.mockRejectedValue(new Error('Not in engine'))
+  engine.dropTable.mockResolvedValue(undefined)
   loadFile.mockResolvedValue(csv())
 })
 
@@ -200,5 +206,74 @@ describe('generation-safe source materialization', () => {
     expect(engine.loadTable.mock.calls[1][3]).toEqual(
       projectStore.patches.table_1,
     )
+  })
+
+  it('does not commit materialization started by a prior project with the same table ID', async () => {
+    let resolveFile!: (value: ArrayBuffer) => void
+    loadFile.mockReturnValueOnce(new Promise<ArrayBuffer>(resolve => {
+      resolveFile = resolve
+    }))
+    projectStore.nodes.table_1 = sourceNode({ dataRevision: 1 })
+
+    const staleRequest = ensureTableMaterialized('table_1')
+    await vi.waitFor(() => expect(loadFile).toHaveBeenCalledOnce())
+
+    projectStore.projectId = 'project_2'
+    projectStore.nodes.table_1 = sourceNode({ dataRevision: 1 })
+    resolveFile(csv())
+
+    expect((await staleRequest).status).toBe('loading')
+    expect(engine.loadTable).not.toHaveBeenCalled()
+    expect(projectStore.updateCacheInfo).not.toHaveBeenCalledWith(
+      'table_1',
+      expect.objectContaining({ isDirty: false }),
+    )
+  })
+
+  it('skips a queued delete cleanup when undo restores the node', async () => {
+    let resolveWrite!: () => void
+    engine.loadTable.mockImplementationOnce(() => new Promise<void>(resolve => {
+      resolveWrite = resolve
+    }))
+    const deletedNode = sourceNode({ dataRevision: 1 })
+    projectStore.nodes.table_1 = deletedNode
+
+    const materialization = ensureTableMaterialized('table_1')
+    await vi.waitFor(() => expect(engine.loadTable).toHaveBeenCalledOnce())
+
+    invalidateMaterializations()
+    delete projectStore.nodes.table_1
+    const cleanup = dropEngineTables(['table_1'], { onlyIfDeleted: true })
+    projectStore.nodes.table_1 = {
+      ...deletedNode,
+      cacheInfo: { ...deletedNode.cacheInfo, isDirty: true, dataRevision: 2 },
+    }
+    resolveWrite()
+
+    await Promise.all([materialization, cleanup])
+    expect(engine.dropTable).not.toHaveBeenCalled()
+  })
+
+  it('rematerializes when undo restores a node during an active engine drop', async () => {
+    let resolveDrop!: () => void
+    engine.dropTable.mockImplementationOnce(() => new Promise<void>(resolve => {
+      resolveDrop = resolve
+    }))
+    const deletedNode = sourceNode({ dataRevision: 1 })
+    projectStore.nodes.table_1 = deletedNode
+
+    invalidateMaterializations()
+    delete projectStore.nodes.table_1
+    const cleanup = dropEngineTables(['table_1'], { onlyIfDeleted: true })
+    await vi.waitFor(() => expect(engine.dropTable).toHaveBeenCalledOnce())
+
+    projectStore.nodes.table_1 = {
+      ...deletedNode,
+      cacheInfo: { ...deletedNode.cacheInfo, isDirty: true, dataRevision: 2 },
+    }
+    resolveDrop()
+    await cleanup
+
+    expect(engine.loadTable).toHaveBeenCalledOnce()
   })
 })

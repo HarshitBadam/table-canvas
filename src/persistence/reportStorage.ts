@@ -57,3 +57,17 @@ export async function saveAllReports(reports: Record<string, Report>): Promise<v
 
   await tx.done
 }
+
+export async function deleteReportsForProject(projectId: string): Promise<void> {
+  const db = await getDB()
+  const reports = await db.getAll('reports')
+  const tx = db.transaction('reports', 'readwrite')
+
+  for (const report of reports) {
+    if (report.projectId === projectId) {
+      await tx.store.delete(report.id)
+    }
+  }
+
+  await tx.done
+}

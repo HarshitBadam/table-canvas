@@ -74,6 +74,7 @@ export interface NodesSliceState {
     position: Position
   }) => string
   updateTableSchema: (tableId: string, schema: TableSchema) => void
+  setMaterializedTableSchema: (tableId: string, schema: TableSchema) => void
   addColumn: (tableId: string, columnName: string, columnType?: UserColumnType) => ColumnOperationResult
   insertColumnAt: (tableId: string, columnName: string, columnType: UserColumnType, index: number, formula?: string) => ColumnOperationResult
   addFormulaColumn: (tableId: string, columnName: string, formula: string, columnType: UserColumnType, index?: number) => ColumnOperationResult

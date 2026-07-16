@@ -35,6 +35,7 @@ export function AppHeader({
   const [isExportingReport, setIsExportingReport] = useState(false)
   const [reportExportError, setReportExportError] = useState<string | null>(null)
   const exportButtonRef = useRef<HTMLButtonElement>(null)
+  const exportMenuModalityRef = useRef<'pointer' | 'keyboard'>('pointer')
 
   const {
     isExporting,
@@ -51,11 +52,12 @@ export function AppHeader({
   } = exportState
 
   useEffect(() => {
-    if (!exportDropdownOpen) return
+    if (!exportDropdownOpen || exportMenuModalityRef.current !== 'keyboard') return
     const frame = requestAnimationFrame(() => {
       dropdownRef.current
         ?.querySelector<HTMLElement>('[role="menuitem"]')
         ?.focus()
+      exportMenuModalityRef.current = 'pointer'
     })
     return () => cancelAnimationFrame(frame)
   }, [dropdownRef, exportDropdownOpen])
@@ -70,6 +72,31 @@ export function AppHeader({
     }
     focusMenuItem(event, dropdownRef.current)
   }, [dropdownRef, exportDropdownOpen, setExportDropdownOpen])
+
+  const handleExportTriggerKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      exportMenuModalityRef.current = 'keyboard'
+      setExportDropdownOpen(true)
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      exportMenuModalityRef.current = 'keyboard'
+    }
+  }, [setExportDropdownOpen])
+
+  const restoreExportTriggerFocus = useCallback(() => {
+    setExportDropdownOpen(false)
+    requestAnimationFrame(() => exportButtonRef.current?.focus())
+  }, [setExportDropdownOpen])
+
+  const handleProjectExport = useCallback(() => {
+    restoreExportTriggerFocus()
+    handleExport()
+  }, [handleExport, restoreExportTriggerFocus])
+
+  const handleProjectImport = useCallback(() => {
+    restoreExportTriggerFocus()
+    handleImportClick()
+  }, [handleImportClick, restoreExportTriggerFocus])
 
   const handleExportPDF = useCallback(async () => {
     const reportContent = document.querySelector('.report-view .tiptap-editor-content')
@@ -172,7 +199,14 @@ export function AppHeader({
           >
             <button
               ref={exportButtonRef}
-              onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+              onPointerDown={() => {
+                exportMenuModalityRef.current = 'pointer'
+              }}
+              onKeyDown={handleExportTriggerKeyDown}
+              onClick={(event) => {
+                if (event.detail > 0) exportMenuModalityRef.current = 'pointer'
+                setExportDropdownOpen(!exportDropdownOpen)
+              }}
               disabled={isExporting || isImporting}
               aria-haspopup="menu"
               aria-expanded={exportDropdownOpen}
@@ -202,8 +236,8 @@ export function AppHeader({
 
             {exportDropdownOpen && (
               <ProjectActionsMenu
-                onExport={handleExport}
-                onImport={handleImportClick}
+                onExport={handleProjectExport}
+                onImport={handleProjectImport}
               />
             )}
           </div>

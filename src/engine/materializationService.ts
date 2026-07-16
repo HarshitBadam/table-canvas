@@ -1,4 +1,3 @@
-import { getEngine } from './EngineAdapter'
 import { getComputationOrder } from './dependencyGraph'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
@@ -14,6 +13,12 @@ import {
 } from './cacheUtils'
 import { computeDerivedTable } from './derivedTableComputation'
 import { loadEngineTable } from './loadTableIntoEngine'
+import {
+  captureMaterializationScope,
+  enqueueEngineMutation,
+  isMaterializationScopeCurrent,
+  type MaterializationScope,
+} from './materializationCoordinator'
 import type {
   SourceTableNode,
   CellValue,
@@ -35,7 +40,6 @@ export interface MaterializationResult {
 }
 
 const inProgressMaterializations = new Map<string, Promise<MaterializationResult>>()
-let materializationQueue = Promise.resolve()
 
 interface SourceSnapshot {
   generation: string
@@ -86,8 +90,16 @@ function captureSourceSnapshot(tableId: string): SourceSnapshot | undefined {
   }
 }
 
-function sourceGenerationIsCurrent(tableId: string, generation: string): boolean {
-  return captureSourceSnapshot(tableId)?.generation === generation
+function scopeIsCurrent(scope: MaterializationScope): boolean {
+  return isMaterializationScopeCurrent(scope, useProjectStore.getState().projectId)
+}
+
+function sourceGenerationIsCurrent(
+  tableId: string,
+  generation: string,
+  scope: MaterializationScope,
+): boolean {
+  return scopeIsCurrent(scope) && captureSourceSnapshot(tableId)?.generation === generation
 }
 
 function staleMaterialization(tableId: string): MaterializationResult {
@@ -106,7 +118,10 @@ function captureTableRequestGeneration(tableId: string): string | undefined {
   }))
 }
 
-async function loadSourceTable(tableId: string): Promise<MaterializationResult> {
+async function loadSourceTable(
+  tableId: string,
+  scope: MaterializationScope,
+): Promise<MaterializationResult> {
   let snapshot = captureSourceSnapshot(tableId)
   if (!snapshot) {
     return {
@@ -118,7 +133,7 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
   useProjectStore.getState().updateCacheInfo(tableId, { isComputing: true })
   try {
     const engineRowCount = await getEngineTableRowCount(tableId)
-    if (!sourceGenerationIsCurrent(tableId, snapshot.generation)) {
+    if (!sourceGenerationIsCurrent(tableId, snapshot.generation, scope)) {
       return staleMaterialization(tableId)
     }
     const existsInEngine = engineRowCount >= 0
@@ -145,7 +160,7 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
     let rows: TableRow[] = []
     if (snapshot.node.plan.fileRef) {
       const fileData = await loadFileWithSync(snapshot.node.plan.fileRef)
-      if (!sourceGenerationIsCurrent(tableId, snapshot.generation)) {
+      if (!sourceGenerationIsCurrent(tableId, snapshot.generation, scope)) {
         return staleMaterialization(tableId)
       }
       snapshot = captureSourceSnapshot(tableId)!
@@ -157,7 +172,7 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
           snapshot.node.plan.sheetName,
           snapshot.schema,
         )
-        if (!sourceGenerationIsCurrent(tableId, snapshot.generation)) {
+        if (!sourceGenerationIsCurrent(tableId, snapshot.generation, scope)) {
           return staleMaterialization(tableId)
         }
         rows = rows.map((row, idx) => ({
@@ -202,12 +217,12 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
       rows as Record<string, CellValue>[],
       snapshot.patches,
     )
-    if (!sourceGenerationIsCurrent(tableId, snapshot.generation)) {
+    if (!sourceGenerationIsCurrent(tableId, snapshot.generation, scope)) {
       return staleMaterialization(tableId)
     }
 
     const loadedRowCount = await getEngineTableRowCount(tableId)
-    if (!sourceGenerationIsCurrent(tableId, snapshot.generation)) {
+    if (!sourceGenerationIsCurrent(tableId, snapshot.generation, scope)) {
       return staleMaterialization(tableId)
     }
     const rowCount = loadedRowCount >= 0 ? loadedRowCount : rows.length
@@ -232,7 +247,7 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
 
-    if (sourceGenerationIsCurrent(tableId, snapshot.generation)) {
+    if (sourceGenerationIsCurrent(tableId, snapshot.generation, scope)) {
       useProjectStore.getState().updateCacheInfo(tableId, {
         isDirty: true,
         isComputing: false,
@@ -250,36 +265,39 @@ async function loadSourceTable(tableId: string): Promise<MaterializationResult> 
 
 
 export async function ensureTableMaterialized(tableId: string): Promise<MaterializationResult> {
-  const existingPromise = inProgressMaterializations.get(tableId)
+  const projectId = useProjectStore.getState().projectId
+  const scope = captureMaterializationScope(projectId)
+  const requestKey = `${scope.projectId}:${scope.generation}:${tableId}`
+  const existingPromise = inProgressMaterializations.get(requestKey)
   if (existingPromise) {
     return existingPromise
   }
 
-  const materializationPromise = (async () => {
-    const queuePromise = materializationQueue.then(async () => {
-      let result = await materializeTableInternal(tableId)
-      while (result.status === 'loading') {
-        result = await materializeTableInternal(tableId)
-      }
-      return result
-    })
+  const materializationPromise = enqueueEngineMutation(async () => {
+    let result = await materializeTableInternal(tableId, scope)
+    while (result.status === 'loading' && scopeIsCurrent(scope)) {
+      result = await materializeTableInternal(tableId, scope)
+    }
+    return result
+  })
 
-    materializationQueue = queuePromise.then(() => {}).catch(() => {})
-
-    return queuePromise
-  })()
-
-  inProgressMaterializations.set(tableId, materializationPromise)
+  inProgressMaterializations.set(requestKey, materializationPromise)
 
   try {
     const result = await materializationPromise
     return result
   } finally {
-    inProgressMaterializations.delete(tableId)
+    if (inProgressMaterializations.get(requestKey) === materializationPromise) {
+      inProgressMaterializations.delete(requestKey)
+    }
   }
 }
 
-async function materializeTableInternal(tableId: string): Promise<MaterializationResult> {
+async function materializeTableInternal(
+  tableId: string,
+  scope: MaterializationScope,
+): Promise<MaterializationResult> {
+  if (!scopeIsCurrent(scope)) return staleMaterialization(tableId)
   const projectStore = useProjectStore.getState()
   const node = projectStore.getTableNode(tableId)
   const requestGeneration = captureTableRequestGeneration(tableId)
@@ -293,7 +311,7 @@ async function materializeTableInternal(tableId: string): Promise<Materializatio
   }
 
   if (node.kind === 'source_table') {
-    return loadSourceTable(tableId)
+    return loadSourceTable(tableId, scope)
   }
 
   const computationOrder = getComputationOrder(
@@ -307,10 +325,10 @@ async function materializeTableInternal(tableId: string): Promise<Materializatio
     if (!tableNode) continue
 
     if (tableNode.kind === 'source_table') {
-      const result = await loadSourceTable(nodeToCompute)
+      const result = await loadSourceTable(nodeToCompute, scope)
       if (result.status === 'error') {
         if (nodeToCompute !== tableId) {
-          if (captureTableRequestGeneration(tableId) === requestGeneration) {
+          if (scopeIsCurrent(scope) && captureTableRequestGeneration(tableId) === requestGeneration) {
             useProjectStore.getState().updateCacheInfo(tableId, {
               isDirty: true,
               isComputing: false,
@@ -326,10 +344,10 @@ async function materializeTableInternal(tableId: string): Promise<Materializatio
         return result
       }
     } else if (tableNode.kind === 'derived_table') {
-      const result = await computeDerivedTable(nodeToCompute)
+      const result = await computeDerivedTable(nodeToCompute, scope)
       if (result.status === 'error') {
         if (nodeToCompute !== tableId) {
-          if (captureTableRequestGeneration(tableId) === requestGeneration) {
+          if (scopeIsCurrent(scope) && captureTableRequestGeneration(tableId) === requestGeneration) {
             useProjectStore.getState().updateCacheInfo(tableId, {
               isDirty: true,
               isComputing: false,
@@ -347,7 +365,8 @@ async function materializeTableInternal(tableId: string): Promise<Materializatio
     }
   }
 
-  const finalNode = projectStore.getTableNode(tableId)
+  if (!scopeIsCurrent(scope)) return staleMaterialization(tableId)
+  const finalNode = useProjectStore.getState().getTableNode(tableId)
   return {
     status: finalNode?.cacheInfo?.error ? 'error' : 'computed',
     tableId,
@@ -357,42 +376,4 @@ async function materializeTableInternal(tableId: string): Promise<Materializatio
   }
 }
 
-
-export async function getTableData(
-  tableId: string,
-  offset: number = 0,
-  limit: number = 1000
-): Promise<{ rows: TableRow[]; totalRows: number; error?: string }> {
-  const result = await ensureTableMaterialized(tableId)
-
-  if (result.status === 'error') {
-    return {
-      rows: [],
-      totalRows: 0,
-      error: result.error,
-    }
-  }
-
-  try {
-    const engine = getEngine()
-    const node = useProjectStore.getState().getTableNode(tableId)
-    const slice = await engine.getSlice(tableId, offset, limit, node?.schema?.columns)
-
-    const rows: TableRow[] = slice.rows.map((row, idx) => ({
-      ...row,
-      __rowId: row.__rowId as string || `row_${offset + idx}`,
-    })) as TableRow[]
-
-    return {
-      rows,
-      totalRows: slice.totalRows,
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    return {
-      rows: [],
-      totalRows: 0,
-      error: errorMessage,
-    }
-  }
-}
+export { getTableData } from './tableDataService'

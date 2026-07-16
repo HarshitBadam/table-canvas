@@ -60,4 +60,15 @@ describe('Report Operations', () => {
     })
     expect(Object.keys(await db.loadAllReports())).toHaveLength(2)
   })
+
+  it('deletes only reports scoped to a deleted project', async () => {
+    const db = await getDB()
+    await db.saveReport({ ...createMockReport('delete-me', 'Delete'), projectId: 'project-1' })
+    await db.saveReport({ ...createMockReport('keep-me', 'Keep'), projectId: 'project-2' })
+
+    await db.deleteReportsForProject('project-1')
+
+    expect(await db.loadReport('delete-me')).toBeNull()
+    expect(await db.loadReport('keep-me')).not.toBeNull()
+  })
 })

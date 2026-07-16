@@ -5,6 +5,8 @@ import { useProjectStore } from '@/state/projectStore'
 import { useSuggestionsStore } from '../suggestionsStore'
 import { applySuggestion, setToastHandler, type ToastNotification } from './index'
 
+const navigationOptions = { navigateToNode: vi.fn() }
+
 function baseSuggestion(
   id: string,
   tableId: string,
@@ -47,7 +49,7 @@ describe('applySuggestion', () => {
       },
     })
 
-    const result = await applySuggestion(suggestion)
+    const result = await applySuggestion(suggestion, navigationOptions)
 
     expect(result.success).toBe(true)
     expect(result.createdNodeId).toBeTruthy()
@@ -120,7 +122,7 @@ describe('applySuggestion', () => {
       },
     })
 
-    const result = await applySuggestion(suggestion)
+    const result = await applySuggestion(suggestion, navigationOptions)
 
     expect(result.success).toBe(true)
     expect(useProjectStore.getState().nodes[result.createdNodeId!]).toMatchObject({
@@ -177,7 +179,7 @@ describe('applySuggestion', () => {
     }
     const nodeCount = Object.keys(useProjectStore.getState().nodes).length
 
-    const result = await applySuggestion(suggestion)
+    const result = await applySuggestion(suggestion, navigationOptions)
 
     expect(result).toMatchObject({
       success: false,

@@ -13,6 +13,7 @@ import { createInitialPatches } from './patchesSlice'
 import { createColumnOps } from './nodesColumnOps'
 import { createChartOps } from './nodesChartOps'
 import { applyNodeDuplicate, prepareNodeDuplicate } from './duplicateNode'
+import { invalidateMaterializations } from '@/engine/materializationCoordinator'
 
 export const createNodesSlice: StateCreator<
   ProjectStoreState,
@@ -53,6 +54,7 @@ export const createNodesSlice: StateCreator<
     const state = get()
     state.saveSnapshot(`Delete node ${state.nodes[id]?.name || id}`)
     const nodeIds = new Set([id, ...getDependentNodeIds(state.nodes, state.edges, id)])
+    invalidateMaterializations()
 
     set((state) => {
       for (const nodeId of nodeIds) {
@@ -241,7 +243,6 @@ export const createNodesSlice: StateCreator<
   },
 
   ...createChartOps(set, get),
-
   updateTableSchema: (tableId, schema) => {
     set((state) => {
       const node = state.nodes[tableId]
@@ -250,12 +251,17 @@ export const createNodesSlice: StateCreator<
         node.updatedAt = new Date().toISOString()
       }
     })
-
     get().markNodeAndDescendantsDirty(tableId)
   },
-
+  setMaterializedTableSchema: (tableId, schema) => {
+    set((state) => {
+      const node = state.nodes[tableId]
+      if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
+        (node as TableNode).schema = schema
+      }
+    })
+  },
   ...createColumnOps(set, get),
-
   setTableFilters: (tableId, filters) => {
     set((state) => {
       const node = state.nodes[tableId]
@@ -321,11 +327,8 @@ export const createNodesSlice: StateCreator<
 
   markNodeAndDescendantsDirty: (nodeId) => {
     const state = get()
-
     state.markNodeDirty(nodeId)
-
     const descendants = getDependentNodeIds(state.nodes, state.edges, nodeId)
-
     set((draft) => {
       for (const descendantId of descendants) {
         const node = draft.nodes[descendantId]
@@ -367,9 +370,7 @@ export const createNodesSlice: StateCreator<
       }
     })
   },
-
   getNode: (id) => get().nodes[id],
-
   getTableNode: (id) => {
     const node = get().nodes[id]
     if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {

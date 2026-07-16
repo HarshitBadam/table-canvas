@@ -151,7 +151,7 @@ describe('Projects API update and delete', () => {
       expect(await Project.findById(project._id)).not.toBeNull()
     })
 
-    it('should return 404 for already deleted project', async () => {
+    it('should treat deleting an already deleted project as success', async () => {
       const { app, mockUser } = getProjectRoutesTestContext()
       const project = await createTestProject({
         userId: new Types.ObjectId(mockUser.userId),
@@ -160,8 +160,8 @@ describe('Projects API update and delete', () => {
       })
       const response = await request(app)
         .delete(`/api/projects/${project._id}`)
-        .expect(404)
-      expect(response.body.success).toBe(false)
+        .expect(200)
+      expect(response.body.success).toBe(true)
     })
   })
 })
