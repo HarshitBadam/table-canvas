@@ -33,6 +33,12 @@ interface UpdateProjectData {
   patches?: Record<string, SerializedPatches>;
 }
 
+export type ProjectPayload = {
+  name: string;
+  nodes: Record<string, ProjectNode>;
+  edges: Record<string, Edge>;
+  patches: Record<string, SerializedPatches>;
+}
 
 export async function listProjects(): Promise<ProjectSummary[]> {
   const { projects } = await api.get<{ projects: ProjectSummary[] }>('/projects');
@@ -44,8 +50,13 @@ export async function getProject(projectId: string): Promise<Project> {
   return project;
 }
 
-export async function createProject(data: CreateProjectData = {}): Promise<Project> {
-  const { project } = await api.post<{ project: Project }>('/projects', data);
+export async function createProject(
+  data: CreateProjectData = {},
+  operationId?: string,
+): Promise<Project> {
+  const { project } = await api.post<{ project: Project }>('/projects', data, {
+    headers: operationId ? { 'Idempotency-Key': operationId } : undefined,
+  });
   return project;
 }
 

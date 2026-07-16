@@ -25,6 +25,35 @@ interface WindowState {
   rows: Map<number, GridRow>
 }
 
+interface WindowRequest {
+  tableId: string
+  columns: ColumnSchema[]
+  filterDefs: FilterConditionDef[] | undefined
+  sorts: SortDef[] | undefined
+  search: string | undefined
+  offset: number
+  limit: number
+  generation: number
+}
+
+function buildFilterDefs(
+  filters: ViewFilterConfig | null,
+  columns: ColumnSchema[],
+): FilterConditionDef[] | undefined {
+  if (!filters || filters.conditions.length === 0) return undefined
+  const colMap = new Map(columns.map(column => [column.id, column]))
+  return filters.conditions.map(condition => {
+    const column = colMap.get(condition.columnId)
+    return {
+      column: column?.name || condition.columnId,
+      operator: condition.operator,
+      value: condition.value,
+      value2: condition.value2,
+      columnType: column?.type,
+    }
+  })
+}
+
 export function useWindowedRows(
   tableId: string,
   columns: ColumnSchema[],
@@ -39,130 +68,150 @@ export function useWindowedRows(
   const windowRef = useRef<WindowState>({ start: 0, end: 0, rows: new Map() })
   const generationRef = useRef(0)
   const fetchInFlightRef = useRef(false)
-  const pendingFetchRef = useRef<{ offset: number; limit: number } | null>(null)
+  const pendingFetchRef = useRef<WindowRequest | null>(null)
+  const replaceOnNextFetchRef = useRef(false)
   const [version, setVersion] = useState(0)
 
   const fingerprintRef = useRef('')
+  const filterStr = filters ? JSON.stringify([filters.conditions, filters.logic]) : ''
+  const sortStr = sorts ? JSON.stringify(sorts) : ''
+  const columnStr = JSON.stringify(columns.map(({ id, name, type }) => ({ id, name, type })))
+  const fingerprint = `${tableId}|${filterStr}|${sortStr}|${search || ''}|${columnStr}`
+  const latestConfigRef = useRef<Omit<WindowRequest, 'offset' | 'limit' | 'generation'>>({
+    tableId,
+    columns,
+    filterDefs: buildFilterDefs(filters, columns),
+    sorts,
+    search,
+  })
+  latestConfigRef.current = {
+    tableId,
+    columns,
+    filterDefs: buildFilterDefs(filters, columns),
+    sorts,
+    search,
+  }
+  const requestPumpRef = useRef<(request: WindowRequest) => void>(() => undefined)
 
-  const getFingerprint = useCallback(() => {
-    const filterStr = filters ? JSON.stringify(filters.conditions) + filters.logic : ''
-    const sortStr = sorts ? JSON.stringify(sorts) : ''
-    return `${tableId}|${filterStr}|${sortStr}|${search || ''}`
-  }, [tableId, filters, sorts, search])
-
-  const buildFilterDefs = useCallback((): FilterConditionDef[] | undefined => {
-    if (!filters || filters.conditions.length === 0) return undefined
-    const colMap = new Map<string, ColumnSchema>()
-    columns.forEach(c => colMap.set(c.id, c))
-
-    return filters.conditions.map(cond => {
-      const col = colMap.get(cond.columnId)
-      return {
-        column: col?.name || cond.columnId,
-        operator: cond.operator,
-        value: cond.value,
-        value2: cond.value2,
-        columnType: col?.type,
-      }
-    })
-  }, [filters, columns])
-
-  const fetchWindow = useCallback(async (offset: number, limit: number) => {
+  const pumpRequest = useCallback((request: WindowRequest) => {
     if (fetchInFlightRef.current) {
-      pendingFetchRef.current = { offset, limit }
+      pendingFetchRef.current = request
       return
     }
     fetchInFlightRef.current = true
     setIsLoading(true)
 
-    const gen = generationRef.current
-
-    try {
-      const materialization = await ensureTableMaterialized(tableId)
-      if (materialization.status === 'error') {
-        throw new Error(materialization.error || 'Failed to materialize table')
-      }
-      if (materialization.status === 'loading') {
-        throw new Error('Table data changed while loading. Please try again.')
-      }
-      const engine = getEngine()
-
-      const filterDefs = buildFilterDefs()
-      let slice: TableSlice
-
-      if (filterDefs || sorts?.length || search) {
-        slice = await engine.getFilteredSlice({
-          tableId,
-          filters: filterDefs,
-          sorts,
-          search,
-          offset,
-          limit,
-          columns,
-        })
-      } else {
-        slice = await engine.getSlice(tableId, offset, limit, columns)
-      }
-
-      if (gen !== generationRef.current) return
-
-      const newRows = new Map<number, GridRow>()
-      slice.rows.forEach((row, idx) => {
-        const gridRow: GridRow = {
-          __rowId: (row.__rowId as string) || `row_${offset + idx}`,
-          ...row,
+    void (async () => {
+      try {
+        const materialization = await ensureTableMaterialized(request.tableId)
+        if (materialization.status === 'error') {
+          throw new Error(materialization.error || 'Failed to materialize table')
         }
-        newRows.set(offset + idx, gridRow)
-      })
+        if (materialization.status === 'loading') {
+          throw new Error('Table data changed while loading. Please try again.')
+        }
+        const engine = getEngine()
+        let slice: TableSlice
 
-      const previous = windowRef.current
-      const nextEnd = offset + slice.rows.length
-      const isAdjacent = offset <= previous.end + PREFETCH_THRESHOLD
-        && nextEnd >= previous.start - PREFETCH_THRESHOLD
-      const mergedRows = isAdjacent ? new Map(previous.rows) : new Map<number, GridRow>()
-      newRows.forEach((row, index) => mergedRows.set(index, row))
+        if (request.filterDefs || request.sorts?.length || request.search) {
+          slice = await engine.getFilteredSlice({
+            tableId: request.tableId,
+            filters: request.filterDefs,
+            sorts: request.sorts,
+            search: request.search,
+            offset: request.offset,
+            limit: request.limit,
+            columns: request.columns,
+          })
+        } else {
+          slice = await engine.getSlice(
+            request.tableId,
+            request.offset,
+            request.limit,
+            request.columns,
+          )
+        }
 
-      const maxCachedRows = WINDOW_SIZE * 3
-      if (mergedRows.size > maxCachedRows) {
-        const center = offset + Math.floor(slice.rows.length / 2)
-        const retained = [...mergedRows.entries()]
-          .sort(([left], [right]) => Math.abs(left - center) - Math.abs(right - center))
-          .slice(0, maxCachedRows)
-        mergedRows.clear()
-        retained.forEach(([index, row]) => mergedRows.set(index, row))
-      }
+        if (request.generation !== generationRef.current) return
 
-      const cachedIndexes = [...mergedRows.keys()]
-      windowRef.current = {
-        start: cachedIndexes.length > 0 ? Math.min(...cachedIndexes) : offset,
-        end: cachedIndexes.length > 0 ? Math.max(...cachedIndexes) + 1 : nextEnd,
-        rows: mergedRows,
-      }
-      setTotalRows(slice.totalRows)
-      setError(null)
-      setVersion(v => v + 1)
-    } catch (e) {
-      if (gen !== generationRef.current) return
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      fetchInFlightRef.current = false
-      setIsLoading(false)
-      const pending = pendingFetchRef.current
-      if (pending) {
+        const newRows = new Map<number, GridRow>()
+        slice.rows.forEach((row, idx) => {
+          const gridRow: GridRow = {
+            __rowId: (row.__rowId as string) || `row_${request.offset + idx}`,
+            ...row,
+          }
+          newRows.set(request.offset + idx, gridRow)
+        })
+
+        const previous = windowRef.current
+        const nextEnd = request.offset + slice.rows.length
+        const isAdjacent = request.offset <= previous.end + PREFETCH_THRESHOLD
+          && nextEnd >= previous.start - PREFETCH_THRESHOLD
+        const shouldReplace = replaceOnNextFetchRef.current
+        replaceOnNextFetchRef.current = false
+        const mergedRows = !shouldReplace && isAdjacent
+          ? new Map(previous.rows)
+          : new Map<number, GridRow>()
+        newRows.forEach((row, index) => mergedRows.set(index, row))
+
+        const maxCachedRows = WINDOW_SIZE * 3
+        if (mergedRows.size > maxCachedRows) {
+          const center = request.offset + Math.floor(slice.rows.length / 2)
+          const retained = [...mergedRows.entries()]
+            .sort(([left], [right]) => Math.abs(left - center) - Math.abs(right - center))
+            .slice(0, maxCachedRows)
+          mergedRows.clear()
+          retained.forEach(([index, row]) => mergedRows.set(index, row))
+        }
+
+        const cachedIndexes = [...mergedRows.keys()]
+        windowRef.current = {
+          start: cachedIndexes.length > 0 ? Math.min(...cachedIndexes) : request.offset,
+          end: cachedIndexes.length > 0 ? Math.max(...cachedIndexes) + 1 : nextEnd,
+          rows: mergedRows,
+        }
+        setTotalRows(slice.totalRows)
+        setError(null)
+        setVersion(v => v + 1)
+      } catch (e) {
+        if (request.generation !== generationRef.current) return
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        fetchInFlightRef.current = false
+        const pending = pendingFetchRef.current
         pendingFetchRef.current = null
-        void fetchWindow(pending.offset, pending.limit)
+        if (pending) {
+          requestPumpRef.current(pending)
+        } else {
+          setIsLoading(false)
+        }
       }
-    }
-  }, [tableId, buildFilterDefs, sorts, search, columns])
+    })()
+  }, [])
+  requestPumpRef.current = pumpRequest
+
+  const fetchWindow = useCallback((offset: number, limit: number) => {
+    requestPumpRef.current({
+      ...latestConfigRef.current,
+      offset,
+      limit,
+      generation: generationRef.current,
+    })
+  }, [])
 
   useEffect(() => {
-    const newFingerprint = getFingerprint()
-    if (newFingerprint === fingerprintRef.current) return
-    fingerprintRef.current = newFingerprint
+    if (fingerprint === fingerprintRef.current) return
+    const previousFingerprint = fingerprintRef.current
+    fingerprintRef.current = fingerprint
     generationRef.current++
-    windowRef.current = { start: 0, end: 0, rows: new Map() }
+    replaceOnNextFetchRef.current = true
+    if (!previousFingerprint || !previousFingerprint.startsWith(`${tableId}|`)) {
+      windowRef.current = { start: 0, end: 0, rows: new Map() }
+      setTotalRows(0)
+      setVersion(v => v + 1)
+    }
     void fetchWindow(0, WINDOW_SIZE)
-  }, [fetchWindow, getFingerprint])
+  }, [fetchWindow, fingerprint, tableId])
 
   const getRowAtIndex = useCallback((index: number): GridRow | null => {
     const win = windowRef.current
@@ -195,11 +244,9 @@ export function useWindowedRows(
 
   const invalidate = useCallback(() => {
     generationRef.current++
-    windowRef.current = { start: 0, end: 0, rows: new Map() }
     pendingFetchRef.current = null
-    setTotalRows(0)
+    replaceOnNextFetchRef.current = true
     setError(null)
-    setVersion(v => v + 1)
     void fetchWindow(0, WINDOW_SIZE)
   }, [fetchWindow])
 

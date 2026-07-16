@@ -2,6 +2,17 @@ import { createContext, useContext } from 'react'
 import type { LoginCredentials, User } from '@/api/auth.api'
 import type { ProjectSummary } from '@/api/projects.api'
 import type { LimitExceeded } from '@/shared/enforce'
+import type { Report } from '@/report/types'
+import type { Edge, Patches, ProjectNode } from '@/types'
+export { ProjectActionError } from './projectOperations'
+
+export interface ProjectImportData {
+  name: string
+  nodes: Record<string, ProjectNode>
+  edges: Record<string, Edge>
+  patches: Record<string, Patches>
+  reports?: Report[]
+}
 
 export type AppPhase =
   | 'idle'
@@ -21,11 +32,15 @@ export interface AppContextValue {
   projectName: string
   projects: ProjectSummary[]
   isSaving: boolean
+  isProjectOperationPending: boolean
   error: string | null
   login: (credentials: LoginCredentials) => Promise<void>
   googleLogin: (credential: string) => Promise<void>
   logout: () => Promise<void>
   createNewProject: (name?: string) => Promise<void>
+  duplicateActiveProject: () => Promise<void>
+  deleteProject: (projectId: string) => Promise<void>
+  importProject: (project: ProjectImportData) => Promise<void>
   loadProject: (projectId: string) => Promise<void>
   renameProject: (name: string) => void
   refreshProjects: () => Promise<void>
@@ -35,6 +50,21 @@ export interface AppContextValue {
   isReady: boolean
   isLoading: boolean
 }
+
+export type AppProviderState = Pick<
+  AppContextValue,
+  | 'phase'
+  | 'phaseMessage'
+  | 'engineReady'
+  | 'user'
+  | 'isAuthenticated'
+  | 'projectId'
+  | 'projectName'
+  | 'projects'
+  | 'isSaving'
+  | 'isProjectOperationPending'
+  | 'error'
+>
 
 export const AppContext = createContext<AppContextValue | null>(null)
 

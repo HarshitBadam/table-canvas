@@ -11,7 +11,7 @@ import { SuggestionsPanelHeader } from './SuggestionsPanelHeader'
 import { CategoryTabs } from './CategoryTabs'
 import { useSuggestionsStore } from './suggestionsStore'
 import { useSuggestionsPanel } from './useSuggestionsPanel'
-import { useNavigation } from '@/layout/NavigationContext'
+import { useSuggestionNavigation } from './useSuggestionNavigation'
 import type { Suggestion, TransformDef } from '@/types'
 
 interface SuggestionsPanelProps {
@@ -27,7 +27,6 @@ export function SuggestionsPanel({
   tableId,
   selectedColumnId,
 }: SuggestionsPanelProps) {
-  const { openTable, openChart } = useNavigation()
   const {
     node,
     filteredSuggestions,
@@ -48,14 +47,7 @@ export function SuggestionsPanel({
   const [applyingId, setApplyingId] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastNotification | null>(null)
   const [recipeWizardSuggestion, setRecipeWizardSuggestion] = useState<Suggestion | null>(null)
-  const navigateToNode = useCallback((nodeId: string, kind: 'table' | 'chart') => {
-    onClose()
-    if (kind === 'chart') {
-      openChart(nodeId)
-    } else {
-      openTable(nodeId)
-    }
-  }, [onClose, openChart, openTable])
+  const navigateToNode = useSuggestionNavigation(onClose)
 
   useEffect(() => {
     setToastHandler((notification) => {
@@ -157,7 +149,7 @@ export function SuggestionsPanel({
                   onCountChange={setEffectiveCleaningCount}
                 />
               ) : !error ? (
-                <div className="flex-1 space-y-1 overflow-y-auto p-3" aria-busy={showLoading}>
+                <div className="flex-1 overflow-y-auto px-3 py-3" aria-busy={showLoading}>
                   {showLoading && (
                     <div className="space-y-3" role="status" aria-label="Analyzing table">
                       {[1, 2, 3, 4].map((i) => (
@@ -174,32 +166,38 @@ export function SuggestionsPanel({
                     />
                   )}
 
-                  {!showLoading && filteredSuggestions.map((suggestion) => (
-                    <SuggestionCard
-                      key={suggestion.id}
-                      suggestion={suggestion}
-                      isExpanded={expandedId === suggestion.id}
-                      isApplying={applyingId === suggestion.id}
-                      onToggle={() => setExpandedId(
-                        expandedId === suggestion.id ? null : suggestion.id
-                      )}
-                      onApply={() => handleApply(suggestion)}
-                      onDismiss={() => dismissSuggestion(suggestion.id)}
-                    />
-                  ))}
+                  {!showLoading && filteredSuggestions.length > 0 && (
+                    <ul
+                      aria-label="Suggestions"
+                      className="divide-y divide-border-subtle border-y border-border-subtle"
+                    >
+                      {filteredSuggestions.map((suggestion) => (
+                        <SuggestionCard
+                          key={suggestion.id}
+                          suggestion={suggestion}
+                          isExpanded={expandedId === suggestion.id}
+                          isApplying={applyingId === suggestion.id}
+                          onToggle={() => setExpandedId(
+                            expandedId === suggestion.id ? null : suggestion.id
+                          )}
+                          onApply={() => handleApply(suggestion)}
+                          onDismiss={() => dismissSuggestion(suggestion.id)}
+                        />
+                      ))}
+                    </ul>
+                  )}
                 </div>
               ) : null}
             </div>
+            {toast && (
+              <Toast
+                notification={toast}
+                onDismiss={() => setToast(null)}
+              />
+            )}
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-
-      {toast && (
-        <Toast 
-          notification={toast} 
-          onDismiss={() => setToast(null)} 
-        />
-      )}
 
       <RecipeWizard
         isOpen={recipeWizardSuggestion !== null}

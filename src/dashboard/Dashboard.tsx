@@ -6,6 +6,7 @@ import { ImportButton } from '@/components/ImportButton'
 import type { Suggestion } from '@/types'
 import { formatNumber } from '@/lib/utils'
 import { useNavigation } from '@/layout/NavigationContext'
+import { useSuggestionNavigation } from '@/suggestions/useSuggestionNavigation'
 
 import { LineageMiniMap } from './components/LineageMiniMap'
 import { TableStatsSection } from './components/TableStatsSection'
@@ -18,6 +19,7 @@ import { useLineageData } from './useLineageData'
 
 export function Dashboard() {
   const { openTable, openChart } = useNavigation()
+  const navigateToNode = useSuggestionNavigation()
   const nodes = useProjectStore((state) => state.nodes)
   
   const healthMetrics = useProjectHealthMetrics()
@@ -47,11 +49,11 @@ export function Dashboard() {
   }, [nodes, openTable, openChart])
 
   const handleApplySuggestion = useCallback(async (suggestion: Suggestion) => {
-    const result = await applySuggestion(suggestion)
+    const result = await applySuggestion(suggestion, { navigateToNode })
     if (!result.success) {
       setToast({ type: 'error', message: result.error || result.message })
     }
-  }, [])
+  }, [navigateToNode])
 
   const hasData = tableMetrics.length > 0
   const { totalTables, totalRows, totalColumns, overallCompleteness } = healthMetrics

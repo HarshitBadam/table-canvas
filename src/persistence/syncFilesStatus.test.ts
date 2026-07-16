@@ -25,6 +25,9 @@ vi.mock('@/api/files.api', () => ({
 }))
 
 vi.mock('./db', () => ({
+  deleteProject: vi.fn(),
+  listProjects: vi.fn().mockResolvedValue([]),
+  loadProject: vi.fn(),
   saveProject: (...args: unknown[]) => mocks.saveProjectLocal(...args),
 }))
 
@@ -53,7 +56,6 @@ afterEach(() => {
 })
 
 const {
-  createProject: mockCreateProject,
   deleteFile: mockDeleteFile,
   deleteFileLocal: mockDeleteFileLocal,
   getFileAsArrayBuffer: mockGetFileAsArrayBuffer,
@@ -147,8 +149,9 @@ describe('sync edge cases', () => {
   })
 
   it('handles special characters in project names', async () => {
-    mockCreateProject.mockRejectedValue(new Error('Server unavailable'))
+    window.dispatchEvent(new Event('offline'))
     const result = await createProjectWithSync('Test "Project" <with> & special chars')
+    window.dispatchEvent(new Event('online'))
     expect(result.name).toBe('Test "Project" <with> & special chars')
   })
 

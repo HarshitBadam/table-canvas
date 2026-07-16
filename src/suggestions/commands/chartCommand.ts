@@ -18,7 +18,7 @@ export class CreateChartCommand implements SuggestionCommand {
   constructor(
     suggestion: Suggestion,
     action: Extract<SuggestionAction, { kind: 'createChart' }>,
-    options: CommandExecutionOptions = {},
+    options: CommandExecutionOptions,
   ) {
     this.suggestion = suggestion
     this.action = action
@@ -57,13 +57,7 @@ export class CreateChartCommand implements SuggestionCommand {
         message: `Created chart "${chartTitle}"`,
         action: {
           label: 'View',
-          onClick: () => {
-            if (this.options.navigateToNode) {
-              this.options.navigateToNode(nodeId, 'chart')
-            } else {
-              useProjectStore.getState().selectNode(nodeId)
-            }
-          },
+          onClick: () => this.options.navigateToNode(nodeId, 'chart'),
         },
       })
 

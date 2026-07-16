@@ -10,6 +10,7 @@ import {
 } from '../test/helpers.js'
 import { setupMongoTestDB } from '../test/setup.js'
 import { getProjectRoutesTestContext } from './projectRoutesTestSupport.js'
+import { createProjectWithinCapacity } from '../services/projectCapacity.js'
 
 setupMongoTestDB()
 
@@ -60,6 +61,77 @@ describe('Projects API limits', () => {
       .send({ name: 'After Deleted' })
       .expect(201)
     expect(response.body.success).toBe(true)
+  })
+
+  it('serializes concurrent creation at the final capacity slot', async () => {
+    const { app, mockUser } = getProjectRoutesTestContext()
+    const userId = new Types.ObjectId(mockUser.userId)
+    await createGoogleUser(userId, mockUser.email)
+    await createTestProjects(userId, LIMITS.google.maxProjects - 1)
+
+    const responses = await Promise.all([
+      request(app).post('/api/projects').send({ name: 'Concurrent A' }),
+      request(app).post('/api/projects').send({ name: 'Concurrent B' }),
+    ])
+
+    expect(responses.map(response => response.status).sort()).toEqual([201, 403])
+  })
+
+  it('enforces the final slot at the database persistence boundary', async () => {
+    const { mockUser } = getProjectRoutesTestContext()
+    const userId = new Types.ObjectId(mockUser.userId)
+    await createGoogleUser(userId, mockUser.email)
+    await createTestProjects(userId, LIMITS.google.maxProjects - 1)
+
+    const results = await Promise.allSettled([
+      createProjectWithinCapacity({
+        userId: userId.toString(),
+        tier: 'google',
+        operationId: 'boundary-a',
+        name: 'Boundary A',
+      }),
+      createProjectWithinCapacity({
+        userId: userId.toString(),
+        tier: 'google',
+        operationId: 'boundary-b',
+        name: 'Boundary B',
+      }),
+    ])
+
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1)
+  })
+
+  it('reconciles retries with the same idempotency key', async () => {
+    const { app } = getProjectRoutesTestContext()
+    const first = await request(app)
+      .post('/api/projects')
+      .set('Idempotency-Key', 'same-create-operation')
+      .send({ name: 'Idempotent' })
+      .expect(201)
+    const retry = await request(app)
+      .post('/api/projects')
+      .set('Idempotency-Key', 'same-create-operation')
+      .send({ name: 'Idempotent' })
+      .expect(201)
+
+    expect(retry.body.data.project.id).toBe(first.body.data.project.id)
+  })
+
+  it('enforces capacity when restoring a legacy deleted project', async () => {
+    const { app, mockUser } = getProjectRoutesTestContext()
+    const userId = new Types.ObjectId(mockUser.userId)
+    await createGoogleUser(userId, mockUser.email)
+    await createTestProjects(userId, LIMITS.google.maxProjects)
+    const deleted = await createTestProject({
+      userId,
+      name: 'Deleted legacy project',
+      deleted: true,
+    })
+
+    await request(app)
+      .post(`/api/projects/${deleted._id.toString()}/restore`)
+      .expect(403)
   })
 })
 

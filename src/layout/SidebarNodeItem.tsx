@@ -9,7 +9,7 @@ interface SidebarNodeItemProps {
   node: ProjectNode
   selected: boolean
   onOpen: (nodeId: string) => void
-  onDelete: (nodeId: string) => void
+  onDelete: (nodeId: string, returnFocus?: HTMLElement | null) => void
 }
 
 interface MenuPosition {
@@ -192,7 +192,7 @@ export function SidebarNodeItem({
             destructive
             onClick={() => {
               setMenuPosition(null)
-              onDelete(node.id)
+              onDelete(node.id, triggerRef.current)
             }}
           />
         </div>,
