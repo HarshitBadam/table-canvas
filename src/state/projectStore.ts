@@ -20,4 +20,3 @@ export const useProjectStore = create<ProjectStoreState>()(
   }))
 )
 
-export type { ColumnOperationResult, ProjectStoreState } from './stores/types'
