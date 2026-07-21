@@ -1,4 +1,5 @@
 import { Types } from 'mongoose';
+import { createHash } from 'crypto';
 import { LIMITS, type Tier } from '../config/limits.js';
 import { checkProjectCount } from '../config/enforce.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -30,6 +31,35 @@ function isDuplicateKey(error: unknown): boolean {
     && 'code' in error
     && error.code === 11000,
   );
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, entry]) => entry !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right));
+    return `{${entries.map(([key, entry]) => (
+      `${JSON.stringify(key)}:${canonicalJson(entry)}`
+    )).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function operationHash(input: Omit<CreateProjectInput, 'userId' | 'tier' | 'operationId'>): string {
+  return createHash('sha256').update(canonicalJson(input)).digest('hex');
+}
+
+function assertOperationMatches(
+  existing: IProjectDocument,
+  hash: string,
+): IProjectDocument {
+  if (existing.clientOperationHash && existing.clientOperationHash !== hash) {
+    throw new AppError('Idempotency key was already used with different project data', 409);
+  }
+  return existing;
 }
 
 async function claimSlotsForLegacyProjects(
@@ -83,12 +113,13 @@ export async function createProjectWithinCapacity({
   reports,
 }: CreateProjectInput): Promise<IProjectDocument> {
   const objectUserId = new Types.ObjectId(userId);
+  const requestHash = operationHash({ name, nodes, edges, patches, reports });
   if (operationId) {
     const existing = await Project.findOne({
       userId: objectUserId,
       clientOperationId: operationId,
     });
-    if (existing) return existing;
+    if (existing) return assertOperationMatches(existing, requestHash);
   }
 
   const maxProjects = LIMITS[tier].maxProjects;
@@ -99,6 +130,7 @@ export async function createProjectWithinCapacity({
       return await new Project({
         userId: objectUserId,
         clientOperationId: operationId,
+        clientOperationHash: operationId ? requestHash : undefined,
         quotaSlot: slot,
         name: name || 'Untitled Project',
         nodes: nodes || {},
@@ -113,7 +145,7 @@ export async function createProjectWithinCapacity({
           userId: objectUserId,
           clientOperationId: operationId,
         });
-        if (existing) return existing;
+        if (existing) return assertOperationMatches(existing, requestHash);
       }
     }
   }
@@ -129,6 +161,7 @@ export async function restoreProjectWithinCapacity(
   project: IProjectDocument,
   userId: string,
   tier: Tier,
+  expectedRevision: number,
 ): Promise<IProjectDocument> {
   if (!project.isDeleted()) return project;
   const objectUserId = new Types.ObjectId(userId);
@@ -142,12 +175,16 @@ export async function restoreProjectWithinCapacity(
           _id: project._id,
           userId: objectUserId,
           deletedAt: { $ne: null },
+          ...(expectedRevision === 0
+            ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] }
+            : { revision: expectedRevision }),
         },
         {
           $set: {
             deletedAt: null,
             quotaSlot: slot,
           },
+          $inc: { revision: 1 },
         },
         { new: true, runValidators: true },
       );
@@ -158,6 +195,17 @@ export async function restoreProjectWithinCapacity(
         deletedAt: null,
       });
       if (active) return active;
+      const stale = await Project.exists({
+        _id: project._id,
+        userId: objectUserId,
+        deletedAt: { $ne: null },
+      });
+      if (stale) {
+        throw new AppError(
+          'Project changed in another session. Reload before restoring it.',
+          409,
+        );
+      }
     } catch (error) {
       if (!isDuplicateKey(error)) throw error;
     }

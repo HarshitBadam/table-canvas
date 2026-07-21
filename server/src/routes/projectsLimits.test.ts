@@ -118,6 +118,20 @@ describe('Projects API limits', () => {
     expect(retry.body.data.project.id).toBe(first.body.data.project.id)
   })
 
+  it('rejects reusing an idempotency key with different project data', async () => {
+    const { app } = getProjectRoutesTestContext()
+    await request(app)
+      .post('/api/projects')
+      .set('Idempotency-Key', 'drifted-create-operation')
+      .send({ name: 'Original' })
+      .expect(201)
+    await request(app)
+      .post('/api/projects')
+      .set('Idempotency-Key', 'drifted-create-operation')
+      .send({ name: 'Different' })
+      .expect(409)
+  })
+
   it('enforces capacity when restoring a legacy deleted project', async () => {
     const { app, mockUser } = getProjectRoutesTestContext()
     const userId = new Types.ObjectId(mockUser.userId)
@@ -131,6 +145,7 @@ describe('Projects API limits', () => {
 
     await request(app)
       .post(`/api/projects/${deleted._id.toString()}/restore`)
+      .send({ expectedRevision: deleted.revision })
       .expect(403)
   })
 })
