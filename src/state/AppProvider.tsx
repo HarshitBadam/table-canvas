@@ -28,6 +28,7 @@ import {
 } from './appContextValue'
 import { useProjectActions } from './useProjectActions'
 import { prepareProjectState } from './projectPreparation'
+import { setBeforeTabRelease } from './tabOwnership'
 const PHASE_MESSAGES: Record<AppPhase, string> = {
   idle: 'Starting...',
   initializing_engine: 'Starting data engine...',
@@ -150,6 +151,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     useDataStore.setState({ tableData: {} })
     useReportStore.getState().reset()
   }, [])
+
+  useEffect(() => {
+    setBeforeTabRelease(async () => {
+      await flushProjectSave()
+      await useReportStore.getState().flushSaves()
+    })
+    return () => setBeforeTabRelease(null)
+  }, [flushProjectSave])
 
   useEffect(() => {
     setState(previous => ({ ...previous, user, isAuthenticated }))

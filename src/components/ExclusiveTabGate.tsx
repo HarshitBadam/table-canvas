@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { prepareForTabRelease } from '@/state/tabOwnership'
 
 const LOCK_NAME = 'table-canvas:active-workspace'
 const CHANNEL_NAME = 'table-canvas:tab-coordination'
@@ -35,7 +36,12 @@ export function ExclusiveTabGate({ children }: { children: ReactNode }) {
     let cancelled = false
     let channel: BroadcastChannel | null = null
 
-    const release = () => {
+    const release = async () => {
+      try {
+        await prepareForTabRelease()
+      } catch (error) {
+        console.error('[TabOwnership] Could not flush before takeover:', error)
+      }
       releaseRef.current?.()
       releaseRef.current = null
       if (!cancelled) setStatus('blocked')
@@ -44,7 +50,7 @@ export function ExclusiveTabGate({ children }: { children: ReactNode }) {
       if (event.key !== TAKEOVER_KEY || !event.newValue) return
       try {
         const requestingTab = JSON.parse(event.newValue) as { tabId?: string }
-        if (requestingTab.tabId !== idRef.current) release()
+        if (requestingTab.tabId !== idRef.current) void release()
       } catch {
         // Ignore malformed coordination messages.
       }
@@ -54,7 +60,7 @@ export function ExclusiveTabGate({ children }: { children: ReactNode }) {
       channel = new BroadcastChannel(CHANNEL_NAME)
       channel.onmessage = (event: MessageEvent<{ type?: string; tabId?: string }>) => {
         if (event.data.type === 'takeover' && event.data.tabId !== idRef.current) {
-          release()
+          void release()
         }
       }
     }
