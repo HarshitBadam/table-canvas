@@ -12,7 +12,11 @@ async function expectAccessible(page: Page, context?: string, include?: string) 
     id: violation.id,
     impact: violation.impact,
     help: violation.help,
-    targets: violation.nodes.map(node => node.target.join(' ')),
+    nodes: violation.nodes.map(node => ({
+      target: node.target.join(' '),
+      html: node.html,
+      failureSummary: node.failureSummary,
+    })),
   }))
   expect(violations, `${context ?? 'Page'} must have no WCAG A/AA violations`).toEqual([])
 }
@@ -85,7 +89,10 @@ test.describe('@ux accessibility contract', () => {
     await page.keyboard.press('Escape')
     await expect(firstCell).toBeFocused()
 
-    await page.locator('aside').getByRole('button', { name: 'Delete UX Contract Table' }).click()
+    await page.locator('aside').getByRole('button', {
+      name: 'Actions for UX Contract Table',
+    }).click()
+    await page.getByRole('menuitem', { name: 'Delete' }).click()
     const deleteDialog = page.getByRole('alertdialog', { name: 'Delete Node' })
     await expect(deleteDialog.getByRole('button', { name: 'Cancel' })).toBeFocused()
     await expectAccessible(page, 'Delete confirmation', '[role="alertdialog"]')
