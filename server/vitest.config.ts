@@ -23,11 +23,7 @@ export default defineConfig({
     // Run sequentially with shared module cache to avoid mongoose model conflicts
     fileParallelism: false,
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-        isolate: false,
-      },
-    },
+    maxWorkers: 1,
+    isolate: false,
   },
 });
