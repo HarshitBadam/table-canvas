@@ -2,7 +2,7 @@
  * API Client with automatic token refresh and error handling
  */
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 
 interface ApiResponse<T = unknown> {
@@ -60,7 +60,7 @@ async function refreshToken(): Promise<boolean> {
   }
 }
 
-async function handleTokenRefresh(): Promise<boolean> {
+export async function refreshSession(): Promise<boolean> {
   if (isRefreshing) {
     return refreshPromise!;
   }
@@ -103,7 +103,7 @@ async function request<T>(
   let response = await fetch(url, config);
 
   if (response.status === 401 && !skipAuth) {
-    const refreshed = await handleTokenRefresh();
+    const refreshed = await refreshSession();
     
     if (refreshed) {
       response = await fetch(url, config);
@@ -187,13 +187,18 @@ export const api = {
     }
 
     const url = `${API_BASE_URL}${endpoint}`;
-    const response = await fetch(url, {
+    const config: RequestInit = {
       method: 'POST',
       body: formData,
       credentials: 'include',
-    });
+    };
+    let response = await fetch(url, config);
+    if (response.status === 401 && await refreshSession()) {
+      response = await fetch(url, config);
+    }
 
     if (!response.ok) {
+      if (response.status === 401) onAuthError?.()
       const errorData: ApiResponse = await response.json().catch(() => ({
         success: false,
         error: 'Upload failed',
@@ -211,12 +216,17 @@ export const api = {
 
   download: async (endpoint: string): Promise<Blob> => {
     const url = `${API_BASE_URL}${endpoint}`;
-    const response = await fetch(url, {
+    const config: RequestInit = {
       method: 'GET',
       credentials: 'include',
-    });
+    };
+    let response = await fetch(url, config);
+    if (response.status === 401 && await refreshSession()) {
+      response = await fetch(url, config);
+    }
 
     if (!response.ok) {
+      if (response.status === 401) onAuthError?.()
       throw new ApiError('Download failed', response.status);
     }
 
