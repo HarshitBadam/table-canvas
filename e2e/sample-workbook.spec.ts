@@ -144,14 +144,16 @@ test('@ux applies a cleaning suggestion and preserves it across reload', async (
   await panel.getByRole('button', { name: /Apply \d+ fix/ }).click()
   await expect(page.getByText(/Applied \d+ cell changes?/)).toBeVisible()
   await panel.getByRole('button', { name: 'Close suggestions panel' }).click()
-  await expect(page.locator('.cursor-cell').first()).toHaveText('(empty)')
+  await expect(page.locator('.cursor-cell').first()).toHaveText('')
+  await expect(page.locator('.cursor-cell').first())
+    .toHaveAccessibleName('Name, row 1: empty')
   await expect(page.locator('.cursor-cell').nth(2)).toHaveText('Alice')
 
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect(page.locator('.cursor-cell').first()).toHaveText('N/A', { timeout: 20_000 })
   await expect(page.getByRole('button', { name: 'Redo' })).toBeEnabled()
   await page.getByRole('button', { name: 'Redo' }).click()
-  await expect(page.locator('.cursor-cell').first()).toHaveText('(empty)', { timeout: 20_000 })
+  await expect(page.locator('.cursor-cell').first()).toHaveText('', { timeout: 20_000 })
   await expect(page.locator('.cursor-cell').nth(2)).toHaveText('Alice')
 
   await expect.poll(() => {
