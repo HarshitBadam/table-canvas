@@ -330,14 +330,13 @@ describe('AppProvider project lifecycle', () => {
     })
   })
 
-  it('restores the active project when report cleanup fails during delete', async () => {
+  it('leaves report cleanup to atomic project deletion finalization', async () => {
     const current = project('current-project', 'Current')
     const next = project('next-project', 'Next')
     loadOrCreateProject.mockResolvedValueOnce({
       project: current,
       projectList: [current, next],
     })
-    deleteReportsForProject.mockRejectedValueOnce(new Error('Report cleanup failed'))
     render(
       <AppProvider>
         <Harness />
@@ -347,10 +346,12 @@ describe('AppProvider project lifecycle', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete current' }))
 
-    await waitFor(() => expect(deleteReportsForProject).toHaveBeenCalledWith('current-project'))
-    expect(deleteProjectWithSync).not.toHaveBeenCalled()
-    expect(screen.getByTestId('project')).toHaveTextContent('current-project')
-    expect(screen.getByTestId('store-project')).toHaveTextContent('current-project')
+    await waitFor(() => {
+      expect(deleteProjectWithSync).toHaveBeenCalledWith('current-project')
+    })
+    expect(deleteReportsForProject).not.toHaveBeenCalled()
+    expect(screen.getByTestId('project')).toHaveTextContent('next-project')
+    expect(screen.getByTestId('store-project')).toHaveTextContent('next-project')
   })
 
   it('restores reports and active stores when local project deletion fails', async () => {
@@ -371,7 +372,8 @@ describe('AppProvider project lifecycle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete current' }))
 
     await waitFor(() => expect(deleteProjectWithSync).toHaveBeenCalledWith('current-project'))
-    expect(saveAllReports).toHaveBeenCalledWith({})
+    expect(saveAllReports).not.toHaveBeenCalled()
+    expect(loadReportsForProject).toHaveBeenCalledWith('current-project')
     expect(screen.getByTestId('project')).toHaveTextContent('current-project')
     expect(screen.getByTestId('store-project')).toHaveTextContent('current-project')
   })
