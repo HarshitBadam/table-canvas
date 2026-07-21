@@ -33,7 +33,7 @@ async function updateOwnedProject(
   body: Record<string, unknown>,
 ) {
   const revision = expectedRevision(body.expectedRevision);
-  const allowedFields = ['name', 'nodes', 'edges', 'patches'] as const;
+  const allowedFields = ['name', 'nodes', 'edges', 'patches', 'reports'] as const;
   const updates: Record<string, unknown> = {};
   for (const field of allowedFields) {
     if (body[field] !== undefined) updates[field] = body[field];
@@ -138,7 +138,7 @@ router.post(
   '/',
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
-    const { name, nodes, edges, patches } = req.body;
+    const { name, nodes, edges, patches, reports } = req.body;
     const operationId = req.get('Idempotency-Key')?.trim();
     if (operationId && operationId.length > 200) {
       throw new ValidationError(['Idempotency key cannot exceed 200 characters']);
@@ -154,6 +154,7 @@ router.post(
       nodes,
       edges,
       patches,
+      reports,
     });
 
     const response: ApiResponse<{ project: IProjectPublic }> = {

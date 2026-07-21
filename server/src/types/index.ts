@@ -91,6 +91,7 @@ export interface IProject extends SoftDeletable, Timestamped {
   nodes: Record<string, ProjectNode>;
   edges: Record<string, Edge>;
   patches: Record<string, SerializedPatches>;
+  reports: Record<string, unknown>;
   revision: number;
 }
 
@@ -100,6 +101,7 @@ export interface IProjectPublic {
   nodes: Record<string, ProjectNode>;
   edges: Record<string, Edge>;
   patches: Record<string, SerializedPatches>;
+  reports: Record<string, unknown>;
   revision: number;
   createdAt: Date;
   updatedAt: Date;
