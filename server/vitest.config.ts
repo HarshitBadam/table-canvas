@@ -24,6 +24,5 @@ export default defineConfig({
     fileParallelism: false,
     pool: 'forks',
     maxWorkers: 1,
-    isolate: false,
   },
 });

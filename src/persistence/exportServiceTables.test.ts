@@ -137,9 +137,9 @@ describe('exportProjectAsZip table edge cases', () => {
     vi.mocked(db.loadProject).mockResolvedValue(project as unknown as StoredProject)
     vi.mocked(db.loadFile).mockResolvedValue(createCSVContent([{ ID: '1', Value: 100 }]))
     vi.mocked(db.loadReportsForProject).mockResolvedValue({})
-    vi.mocked(materializationService.ensureTableMaterialized).mockResolvedValue({
-      status: 'error',
-      tableId: 'table_2',
+    vi.mocked(materializationService.getTableData).mockResolvedValue({
+      rows: [],
+      totalRows: 0,
       error: 'Upstream table not found',
     })
     const blob = await exportProjectAsZip('mat-error', { includeExcel: true })

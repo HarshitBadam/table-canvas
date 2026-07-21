@@ -182,10 +182,6 @@ describe('exportProjectAsZip happy paths', () => {
       { ID: '2', Value: 200 },
     ]))
     vi.mocked(db.loadReportsForProject).mockResolvedValue({})
-    vi.mocked(materializationService.ensureTableMaterialized).mockResolvedValue({
-      status: 'computed',
-      tableId: 'table_2',
-    })
     vi.mocked(materializationService.getTableData).mockResolvedValue({
       rows: [{ __rowId: 'r1', ID: '1', Value: 100 }],
       totalRows: 1,
