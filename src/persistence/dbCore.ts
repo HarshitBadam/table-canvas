@@ -45,7 +45,6 @@ export interface TableCanvasDB extends DBSchema {
       'by-updated': string
       'by-owner': string
     }
-    indexes: { 'by-owner': string }
   }
   files: {
     key: string
@@ -55,6 +54,7 @@ export interface TableCanvasDB extends DBSchema {
       data: ArrayBuffer
       createdAt: string
     }
+    indexes: { 'by-owner': string }
   }
   reports: {
     key: string

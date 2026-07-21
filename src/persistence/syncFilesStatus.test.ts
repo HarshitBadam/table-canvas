@@ -79,7 +79,6 @@ const {
   getFileAsArrayBuffer: mockGetFileAsArrayBuffer,
   loadFileLocal: mockLoadFileLocal,
   saveFileLocal: mockSaveFileLocal,
-  saveProjectLocal: mockSaveProjectLocal,
   uploadFile: mockUploadFile,
 } = mocks
 

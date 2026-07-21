@@ -15,7 +15,7 @@ import {
 } from './projectCreateReconciliation'
 import { deleteUnreferencedLocalFiles } from './fileGarbageCollection'
 import {
-  flushAllProjectSavesWithSync, flushProjectSaveWithSync, reportProjectSyncError,
+  flushProjectSaveWithSync, reportProjectSyncError,
 } from './projectSaveSync'
 import {
   getStorageScope,
@@ -28,6 +28,7 @@ import {
 import {
   clearProjectSyncOperation,
   enqueueProjectDelete,
+  finalizeProjectDelete,
   getProjectSyncOperation,
   listProjectSyncOperations,
 } from './projectSyncQueue'
