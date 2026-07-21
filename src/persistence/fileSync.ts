@@ -9,6 +9,7 @@ import {
   saveFile as saveFileLocal,
 } from './fileStorage'
 import { isNetworkOnline } from './syncState'
+import { isCloudStorageScope } from './storageScope'
 
 export interface FileWithSync {
   id: string
@@ -29,7 +30,11 @@ async function readFileBuffer(file: File): Promise<ArrayBuffer> {
 export async function loadFileWithSync(fileId: string): Promise<ArrayBuffer | null> {
   const localFile = await loadFileLocal(fileId)
   if (localFile) return localFile
-  if (!isNetworkOnline() || fileId.startsWith('local_file_')) return null
+  if (
+    !isNetworkOnline()
+    || !isCloudStorageScope()
+    || fileId.startsWith('local_file_')
+  ) return null
   try {
     const buffer = await getFileAsArrayBuffer(fileId)
     await saveFileLocal(fileId, fileId, 'application/octet-stream', buffer)
@@ -42,7 +47,7 @@ export async function loadFileWithSync(fileId: string): Promise<ArrayBuffer | nu
 
 export async function uploadFileWithSync(file: File, projectId?: string): Promise<FileWithSync> {
   const buffer = await readFileBuffer(file)
-  if (isNetworkOnline()) {
+  if (isNetworkOnline() && isCloudStorageScope()) {
     try {
       const uploaded = await uploadFile(file, projectId)
       await saveFileLocal(uploaded.id, uploaded.filename, uploaded.contentType, buffer)
@@ -60,13 +65,22 @@ export async function deleteFileWithSync(
   fileId: string,
   options?: { strictRemote?: boolean },
 ): Promise<void> {
-  if (options?.strictRemote && isNetworkOnline() && !fileId.startsWith('local_file_')) {
+  if (
+    options?.strictRemote
+    && isNetworkOnline()
+    && isCloudStorageScope()
+    && !fileId.startsWith('local_file_')
+  ) {
     await deleteFileRemote(fileId)
     await deleteFileLocal(fileId)
     return
   }
   await deleteFileLocal(fileId)
-  if (isNetworkOnline() && !fileId.startsWith('local_file_')) {
+  if (
+    isNetworkOnline()
+    && isCloudStorageScope()
+    && !fileId.startsWith('local_file_')
+  ) {
     try {
       await deleteFileRemote(fileId)
     } catch (error) {

@@ -12,6 +12,10 @@ const mocks = vi.hoisted(() => ({
   loadProjectLocal: vi.fn(),
   listProjectsLocal: vi.fn(),
   deleteProjectLocal: vi.fn(),
+  updateProjectRevision: vi.fn(),
+  copyReportsToProject: vi.fn(),
+  deleteReportsForProject: vi.fn(),
+  loadReportsForProject: vi.fn(),
 }))
 
 vi.mock('@/api/projects.api', () => ({
@@ -25,8 +29,15 @@ vi.mock('@/api/projects.api', () => ({
 vi.mock('./db', () => ({
   saveProject: (...args: unknown[]) => mocks.saveProjectLocal(...args),
   loadProject: (id: string) => mocks.loadProjectLocal(id),
-  listProjects: () => mocks.listProjectsLocal(),
-  deleteProject: (id: string) => mocks.deleteProjectLocal(id),
+  listProjects: (scope?: string) => mocks.listProjectsLocal(scope),
+  deleteProject: (...args: unknown[]) => mocks.deleteProjectLocal(...args),
+  updateProjectRevision: (...args: unknown[]) => mocks.updateProjectRevision(...args),
+}))
+vi.mock('./reportStorage', () => ({
+  copyReportsToProject: (...args: unknown[]) => mocks.copyReportsToProject(...args),
+  deleteReportsForProject: (...args: unknown[]) => mocks.deleteReportsForProject(...args),
+  loadReportsForProject: (...args: unknown[]) => mocks.loadReportsForProject(...args),
+  replaceReportsForProject: vi.fn(),
 }))
 
 import {
@@ -38,13 +49,19 @@ import {
   saveProjectWithSync,
   syncLocalProjectsToBackend,
 } from './syncService'
+import { accountStorageScope, setStorageScope } from './storageScope'
 
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
   mocks.listProjectsLocal.mockResolvedValue([])
   mocks.loadProjectLocal.mockResolvedValue(null)
-  mocks.updateProject.mockResolvedValue(undefined)
+  mocks.loadReportsForProject.mockResolvedValue({})
+  mocks.updateProject.mockImplementation((id: string, data: { expectedRevision?: number }) => ({
+    ...createMockProject(id, 'Updated'),
+    revision: (data.expectedRevision ?? 0) + 1,
+  }))
+  setStorageScope(accountStorageScope('test-user'))
 })
 
 afterEach(() => {
@@ -228,7 +245,10 @@ describe('saveProjectWithSync', () => {
     await expect(flushProjectSaveWithSync('proj_1')).rejects.toThrow(
       'Remote save failed',
     )
-    mockUpdateProject.mockResolvedValueOnce(undefined)
+    mockUpdateProject.mockResolvedValueOnce({
+      ...createMockProject('proj_1', 'Important edit'),
+      revision: 1,
+    })
     await flushProjectSaveWithSync('proj_1')
 
     expect(mockUpdateProject).toHaveBeenCalledTimes(2)
@@ -265,6 +285,7 @@ describe('importProjectWithSync', () => {
       {},
       {},
       {},
+      expect.objectContaining({ revision: 1 }),
     )
     expect(result).toMatchObject({
       id: 'remote-import',
@@ -293,6 +314,14 @@ describe('importProjectWithSync', () => {
       nodes: {},
       edges: {},
       patches: {},
+      expectedRevision: 0,
+      reports: {
+        report: {
+          id: 'report',
+          name: 'Report',
+          projectId: 'partial-import',
+        },
+      },
     })
     errorSpy.mockRestore()
   })
@@ -300,9 +329,11 @@ describe('importProjectWithSync', () => {
 
 describe('syncLocalProjectsToBackend', () => {
   it('promotes an offline project when sync is triggered after login', async () => {
-    mockListProjectsLocal.mockResolvedValue([
-      { id: 'local_123', name: 'Offline project', updatedAt: '2026-01-01T00:00:00.000Z' },
-    ])
+    mockListProjectsLocal.mockImplementation((scope?: string) => Promise.resolve(
+      scope === 'guest'
+        ? [{ id: 'local_123', name: 'Offline project', updatedAt: '2026-01-01T00:00:00.000Z' }]
+        : [],
+    ))
     mockLoadProjectLocal.mockResolvedValue({
       id: 'local_123',
       name: 'Offline project',
@@ -318,24 +349,30 @@ describe('syncLocalProjectsToBackend', () => {
 
     expect(mockCreateProject).toHaveBeenCalledWith(
       { name: 'Offline project' },
-      expect.stringMatching(/^project_/),
+      'promote:guest:local_123',
     )
     expect(mockUpdateProject).toHaveBeenCalledWith(
       'server_123',
       expect.objectContaining({ name: 'Offline project' }),
     )
-    expect(mockDeleteProjectLocal).toHaveBeenCalledWith('local_123')
+    expect(mockDeleteProjectLocal).toHaveBeenCalledWith('local_123', 'guest')
     expect(mockSaveProjectLocal).toHaveBeenCalledWith(
       'server_123',
       'Offline project',
       {},
       {},
       {},
+      expect.objectContaining({ revision: 1 }),
     )
-    expect(mockSaveProjectLocal.mock.invocationCallOrder[0])
-      .toBeLessThan(mockUpdateProject.mock.invocationCallOrder[0])
-    expect(mockDeleteProjectLocal.mock.invocationCallOrder[0])
-      .toBeLessThan(mockUpdateProject.mock.invocationCallOrder[0])
+    expect(mockUpdateProject.mock.invocationCallOrder[0])
+      .toBeLessThan(mockDeleteProjectLocal.mock.invocationCallOrder[0])
+    expect(mocks.copyReportsToProject).toHaveBeenCalledWith(
+      'local_123',
+      'server_123',
+      'guest',
+      accountStorageScope('test-user'),
+    )
+    expect(mocks.deleteReportsForProject).toHaveBeenCalledWith('local_123', 'guest')
   })
 })
 

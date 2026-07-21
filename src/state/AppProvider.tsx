@@ -9,30 +9,25 @@ import {
 } from '@/persistence/syncService'
 import {
   isRetryableRemoteDeferral,
-  type ProjectWithSync,
 } from '@/persistence/projectSync'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
 import { dropEngineTables } from '@/engine/engineTableCleanup'
 import { useReportStore } from '@/report/reportStore'
-import { loadReportsForProject } from '@/persistence/reportStorage'
 import type { LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import { useProjectStore } from './projectStore'
 import { useDataStore } from './dataStore'
 import { useAuthState } from './useAuthState'
-import { withoutTransientComputeState } from './transientProjectState'
 import {
   clearProjectRuntime,
-  hasProjectTables,
   initializeEngine,
   loadOrCreateProject,
-  materializeProjectTables,
 } from './projectLifecycle'
 import {
   AppContext, type AppContextValue, type AppProviderState, type AppPhase,
 } from './appContextValue'
 import { useProjectActions } from './useProjectActions'
-import { ProjectActionError } from './projectOperations'
+import { prepareProjectState } from './projectPreparation'
 const PHASE_MESSAGES: Record<AppPhase, string> = {
   idle: 'Starting...',
   initializing_engine: 'Starting data engine...',
@@ -75,6 +70,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const edges = useProjectStore(store => store.edges)
   const patches = useProjectStore(store => store.patches)
   const projectName = useProjectStore(store => store.projectName)
+  const reports = useReportStore(store => store.reports)
 
   const saveLatestProject = useCallback(async () => {
     if (saveInFlight.current) {
@@ -96,6 +92,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             project.nodes,
             project.edges,
             project.patches,
+            useReportStore.getState().reports,
           )
         } while (savePending.current)
       } finally {
@@ -133,77 +130,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
-  const prepareProject = useCallback(async (project: ProjectWithSync) => {
-    const nodes = withoutTransientComputeState(project.nodes)
-    const reports = await loadReportsForProject(project.id)
-    const previousProject = useProjectStore.getState()
-    const previousReports = useReportStore.getState()
-    const previousData = useDataStore.getState().tableData
-    const projectSnapshot = {
-      projectId: previousProject.projectId,
-      projectName: previousProject.projectName,
-      nodes: structuredClone(previousProject.nodes),
-      edges: structuredClone(previousProject.edges),
-      patches: structuredClone(previousProject.patches),
-      selectedNodeId: previousProject.selectedNodeId,
-      history: structuredClone(previousProject.history),
-    }
-    const reportSnapshot = {
-      reports: structuredClone(previousReports.reports),
-      selectedReportId: previousReports.selectedReportId,
-      activeProjectId: previousReports.activeProjectId,
-      persistenceStatus: previousReports.persistenceStatus,
-      persistenceError: previousReports.persistenceError,
-    }
-    try {
-      await clearProjectRuntime(previousProject.nodes)
-      useProjectStore.setState({
-        projectId: project.id,
-        projectName: project.name,
-        nodes,
-        edges: project.edges,
-        patches: project.patches,
-        selectedNodeId: null,
-        history: { past: [], future: [] },
-      })
-      const selectedReportId = Object.values(reports)
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.id ?? null
-      useReportStore.setState({
-        reports,
-        selectedReportId,
-        activeProjectId: project.id,
-        persistenceStatus: 'idle',
-        persistenceError: null,
-      })
-      if (hasProjectTables(nodes)) {
-        const result = await materializeProjectTables(nodes)
-        if (result.failures.length > 0) {
-          throw new Error(
-            `Could not prepare ${result.failures.length} project table${
-              result.failures.length === 1 ? '' : 's'
-            }: ${result.failures[0].error}`,
-          )
-        }
-      }
-    } catch (error) {
-      try {
-        await clearProjectRuntime(nodes)
-        useProjectStore.setState(projectSnapshot)
-        useReportStore.setState(reportSnapshot)
-        if (hasProjectTables(projectSnapshot.nodes)) {
-          await materializeProjectTables(projectSnapshot.nodes)
-        }
-        useDataStore.setState({ tableData: previousData })
-      } catch (restoreError) {
-        throw new ProjectActionError(
-          'persistence',
-          'Project preparation failed and the previous project could not be fully restored.',
-          { failure: error, restorationFailure: restoreError },
-        )
-      }
-      throw error
-    }
-  }, [])
+  const prepareProject = useCallback(prepareProjectState, [])
 
   const resetWorkspace = useCallback(async () => {
     await clearProjectRuntime(useProjectStore.getState().nodes)
@@ -293,6 +220,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     nodes,
     patches,
     projectName,
+    reports,
     state.isAuthenticated,
     state.phase,
     state.projectId,

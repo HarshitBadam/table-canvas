@@ -7,12 +7,20 @@ const TAKEOVER_KEY = 'table-canvas:tab-takeover'
 type GateStatus = 'checking' | 'active' | 'blocked'
 
 function tabId(): string {
-  const existing = sessionStorage.getItem('table-canvas:tab-id')
-  if (existing) return existing
+  try {
+    const existing = sessionStorage.getItem('table-canvas:tab-id')
+    if (existing) return existing
+  } catch {
+    // A generated in-memory ID is sufficient when storage is restricted.
+  }
   const id = typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  sessionStorage.setItem('table-canvas:tab-id', id)
+  try {
+    sessionStorage.setItem('table-canvas:tab-id', id)
+  } catch {
+    // Continue with the in-memory ID.
+  }
   return id
 }
 
@@ -34,8 +42,12 @@ export function ExclusiveTabGate({ children }: { children: ReactNode }) {
     }
     const onStorage = (event: StorageEvent) => {
       if (event.key !== TAKEOVER_KEY || !event.newValue) return
-      const requestingTab = JSON.parse(event.newValue) as { tabId?: string }
-      if (requestingTab.tabId !== idRef.current) release()
+      try {
+        const requestingTab = JSON.parse(event.newValue) as { tabId?: string }
+        if (requestingTab.tabId !== idRef.current) release()
+      } catch {
+        // Ignore malformed coordination messages.
+      }
     }
 
     if ('BroadcastChannel' in window) {
@@ -84,7 +96,11 @@ export function ExclusiveTabGate({ children }: { children: ReactNode }) {
   const takeOver = useCallback(() => {
     setStatus('checking')
     const message = { type: 'takeover', tabId: idRef.current, at: Date.now() }
-    localStorage.setItem(TAKEOVER_KEY, JSON.stringify(message))
+    try {
+      localStorage.setItem(TAKEOVER_KEY, JSON.stringify(message))
+    } catch {
+      // BroadcastChannel remains the primary takeover signal.
+    }
     if ('BroadcastChannel' in window) {
       const channel = new BroadcastChannel(CHANNEL_NAME)
       channel.postMessage(message)

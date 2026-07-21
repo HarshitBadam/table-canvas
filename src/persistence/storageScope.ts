@@ -18,6 +18,10 @@ export function setStorageScope(scope: string): void {
   activeStorageScope = scope
 }
 
+export function isCloudStorageScope(): boolean {
+  return activeStorageScope !== GUEST_SCOPE
+}
+
 const KEY_SEPARATOR = '\u001f'
 
 export function scopedStorageKey(scope: string, entityId: string): string {

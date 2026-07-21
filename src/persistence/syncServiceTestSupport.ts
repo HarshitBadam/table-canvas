@@ -5,6 +5,7 @@ export function createMockProject(id: string, name: string) {
     nodes: {},
     edges: {},
     patches: {},
+    revision: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
   }
