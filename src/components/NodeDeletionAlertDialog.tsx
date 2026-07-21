@@ -61,6 +61,9 @@ export function NodeDeletionProvider({ children }: { children: ReactNode }) {
           <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/50" />
           <Dialog.Content
             role="alertdialog"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') event.stopPropagation()
+            }}
             className="fixed left-1/2 top-1/2 z-modal w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border-elevation bg-surface p-5 shadow-xl focus:outline-none"
           >
             <Dialog.Title className="text-base font-semibold text-text-primary">
