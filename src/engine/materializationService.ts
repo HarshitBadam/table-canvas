@@ -376,4 +376,3 @@ async function materializeTableInternal(
   }
 }
 
-export { getTableData } from './tableDataService'

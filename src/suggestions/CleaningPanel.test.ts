@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getTableData = vi.hoisted(() => vi.fn())
 
-vi.mock('@/engine/materializationService', () => ({ getTableData }))
+vi.mock('@/engine/tableDataService', () => ({ getTableData }))
 
 import { loadCleaningRows } from './cleaningRows'
 

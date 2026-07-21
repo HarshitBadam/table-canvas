@@ -15,16 +15,15 @@ vi.mock('./db', () => ({
   loadReportsForProject: vi.fn(),
   loadFile: vi.fn(),
 }))
-vi.mock('@/engine/materializationService', () => ({
+vi.mock('@/engine/tableDataService', () => ({
   getTableData: vi.fn(),
-  ensureTableMaterialized: vi.fn(),
 }))
 vi.mock('@/state/dataStore', () => ({
   useDataStore: { getState: vi.fn(() => ({ tableData: {} })) },
 }))
 
 import * as db from './db'
-import * as materializationService from '@/engine/materializationService'
+import * as materializationService from '@/engine/tableDataService'
 import { useDataStore } from '@/state/dataStore'
 import {
   downloadBlob,

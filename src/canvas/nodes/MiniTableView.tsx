@@ -5,7 +5,7 @@ import { formatNumber } from '@/lib/utils'
 import { MINI_ROW_HEIGHT as CELL_HEIGHT, MINI_HEADER_HEIGHT as HEADER_HEIGHT, MINI_BUFFER_ROWS as BUFFER_ROWS, MINI_FOOTER_HEIGHT as FOOTER_HEIGHT } from '@/grid/constants'
 import { computeDisplayValue } from '@/grid/displayUtils'
 import { applyFilters, hasActiveFilters } from '@/grid/filterUtils'
-import { getTableData } from '@/engine/materializationService'
+import { getTableData } from '@/engine/tableDataService'
 import { useProjectStore } from '@/state/projectStore'
 
 interface MiniTableViewProps {

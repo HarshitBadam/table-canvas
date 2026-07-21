@@ -17,13 +17,12 @@ vi.mock('./db', () => ({
   loadReportsForProject: vi.fn(),
   loadFile: vi.fn(),
 }))
-vi.mock('@/engine/materializationService', () => ({
+vi.mock('@/engine/tableDataService', () => ({
   getTableData: vi.fn(),
-  ensureTableMaterialized: vi.fn(),
 }))
 
 import * as db from './db'
-import * as materializationService from '@/engine/materializationService'
+import * as materializationService from '@/engine/tableDataService'
 import { exportProjectAsZip } from './exportService'
 
 beforeEach(() => {

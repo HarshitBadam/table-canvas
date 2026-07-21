@@ -1,4 +1,4 @@
-import { getTableData } from '@/engine/materializationService'
+import { getTableData } from '@/engine/tableDataService'
 import type { TableRow } from '@/state/dataStore'
 
 const MAX_IN_MEMORY_CLEANING_ROWS = 100_000
