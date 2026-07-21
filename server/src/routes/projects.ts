@@ -7,6 +7,7 @@ import {
   asyncHandler,
   ValidationError,
   NotFoundError,
+  ConflictError,
 } from '../middleware/errorHandler.js';
 import { User } from '../models/User.js';
 import type { Tier } from '../config/limits.js';
@@ -14,8 +15,90 @@ import {
   createProjectWithinCapacity,
   restoreProjectWithinCapacity,
 } from '../services/projectCapacity.js';
+import { deleteFile } from '../services/file.service.js';
+import { releaseStorage } from '../services/storageQuota.service.js';
 
 const router = Router();
+
+function expectedRevision(value: unknown): number {
+  if (!Number.isInteger(value) || (value as number) < 0) {
+    throw new ValidationError(['expectedRevision must be a non-negative integer']);
+  }
+  return value as number;
+}
+
+async function updateOwnedProject(
+  projectId: string,
+  userId: string,
+  body: Record<string, unknown>,
+) {
+  const revision = expectedRevision(body.expectedRevision);
+  const allowedFields = ['name', 'nodes', 'edges', 'patches'] as const;
+  const updates: Record<string, unknown> = {};
+  for (const field of allowedFields) {
+    if (body[field] !== undefined) updates[field] = body[field];
+  }
+
+  const project = await Project.findOneAndUpdate(
+    {
+      _id: new Types.ObjectId(projectId),
+      userId: new Types.ObjectId(userId),
+      deletedAt: null,
+      revision,
+    },
+    {
+      $set: updates,
+      $inc: { revision: 1 },
+    },
+    { new: true, runValidators: true },
+  );
+  if (project) return project;
+
+  const exists = await Project.exists({
+    _id: new Types.ObjectId(projectId),
+    userId: new Types.ObjectId(userId),
+    deletedAt: null,
+  });
+  if (!exists) throw new NotFoundError('Project');
+  throw new ConflictError(
+    'Project changed in another session. Reload before saving to avoid overwriting newer work.',
+  );
+}
+
+function projectFileReferences(nodes: Record<string, unknown>): Set<string> {
+  const references = new Set<string>();
+  for (const value of Object.values(nodes)) {
+    const node = value as { kind?: string; plan?: { fileRef?: unknown } };
+    if (
+      node.kind === 'source_table'
+      && typeof node.plan?.fileRef === 'string'
+    ) {
+      references.add(node.plan.fileRef);
+    }
+  }
+  return references;
+}
+
+async function cleanUnreferencedFiles(
+  userId: string,
+  deletedNodes: Record<string, unknown>,
+): Promise<void> {
+  const candidates = projectFileReferences(deletedNodes);
+  if (candidates.size === 0) return;
+  const retainedProjects = await Project.find({
+    userId: new Types.ObjectId(userId),
+    deletedAt: null,
+  }).select('nodes');
+  const retained = new Set<string>();
+  for (const project of retainedProjects) {
+    for (const fileId of projectFileReferences(project.nodes)) retained.add(fileId);
+  }
+  for (const fileId of candidates) {
+    if (retained.has(fileId) || !Types.ObjectId.isValid(fileId)) continue;
+    const deletedBytes = await deleteFile(fileId, userId);
+    if (deletedBytes != null) await releaseStorage(userId, deletedBytes);
+  }
+}
 
 // All project routes require authentication
 router.use(requireAuth);
@@ -125,35 +208,12 @@ router.put(
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const projectId = req.params.id;
-    const { name, nodes, edges, patches } = req.body;
-
     // Validate ObjectId format
     if (!Types.ObjectId.isValid(projectId)) {
       throw new ValidationError(['Invalid project ID format']);
     }
 
-    // Find project and verify ownership
-    const project = await Project.findByIdAndUser(projectId, userId);
-
-    if (!project) {
-      throw new NotFoundError('Project');
-    }
-
-    // Update fields
-    if (name !== undefined) {
-      project.name = name;
-    }
-    if (nodes !== undefined) {
-      project.nodes = nodes;
-    }
-    if (edges !== undefined) {
-      project.edges = edges;
-    }
-    if (patches !== undefined) {
-      project.patches = patches;
-    }
-
-    await project.save();
+    const project = await updateOwnedProject(projectId, userId, req.body);
 
     const response: ApiResponse<{ project: IProjectPublic }> = {
       success: true,
@@ -181,22 +241,7 @@ router.patch(
       throw new ValidationError(['Invalid project ID format']);
     }
 
-    // Find project and verify ownership
-    const project = await Project.findByIdAndUser(projectId, userId);
-
-    if (!project) {
-      throw new NotFoundError('Project');
-    }
-
-    // Apply partial updates
-    const allowedFields = ['name', 'nodes', 'edges', 'patches'];
-    for (const field of allowedFields) {
-      if (req.body[field] !== undefined) {
-        (project as unknown as Record<string, unknown>)[field] = req.body[field];
-      }
-    }
-
-    await project.save();
+    const project = await updateOwnedProject(projectId, userId, req.body);
 
     const response: ApiResponse<{ project: IProjectPublic }> = {
       success: true,
@@ -235,6 +280,10 @@ router.delete(
     }
 
     if (!project.isDeleted()) await project.softDelete();
+    await cleanUnreferencedFiles(
+      userId,
+      project.nodes as unknown as Record<string, unknown>,
+    );
 
     const response: ApiResponse = {
       success: true,
