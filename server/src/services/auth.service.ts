@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { Response } from 'express';
 import { config } from '../config/env.js';
 import { JwtPayload } from '../types/index.js';
+import { createHash, randomUUID } from 'crypto';
 
 const SALT_ROUNDS = 12;
 
@@ -97,7 +98,12 @@ export function generateRefreshToken(userId: string, email: string): string {
 
   return jwt.sign(payload, config.jwtRefreshSecret, {
     expiresIn: expiresInSeconds,
+    jwtid: randomUUID(),
   });
+}
+
+export function hashRefreshToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
 }
 
 export function verifyAccessToken(token: string): JwtPayload | null {

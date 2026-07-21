@@ -26,6 +26,10 @@ export const config = {
   cookieSecure: process.env.NODE_ENV === 'production',
   cookieSameSite: (process.env.NODE_ENV === 'production' ? 'strict' : 'lax') as 'strict' | 'lax' | 'none',
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+  registrationEnabled:
+    process.env.ENABLE_REGISTRATION === 'true'
+    || (process.env.ENABLE_REGISTRATION !== 'false'
+      && process.env.NODE_ENV !== 'production'),
 } as const;
 
 export function validateConfig(): void {
