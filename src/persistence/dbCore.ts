@@ -5,7 +5,7 @@ import type { SerializedPatches } from './patchSerialization'
 
 export type { SerializedPatches } from './patchSerialization'
 
-export interface ScopedRecord {
+interface ScopedRecord {
   /** IndexedDB key. Never expose this value outside the persistence layer. */
   id: string
   /** Missing only on records written by the legacy, unscoped schema. */
