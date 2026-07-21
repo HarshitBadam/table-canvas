@@ -181,6 +181,9 @@ describe('importProjectWithSync', () => {
     ))
     mocks.updateProject.mockRejectedValueOnce(new TypeError('Upload failed'))
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mocks.loadReportsForProject.mockResolvedValue({
+      report: { id: 'report', name: 'Report' },
+    })
     mocks.loadProjectLocal.mockImplementation((id: string) => Promise.resolve({
       id,
       name: importedProject.name,
