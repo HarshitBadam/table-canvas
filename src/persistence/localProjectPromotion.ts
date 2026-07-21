@@ -23,58 +23,84 @@ import {
 } from './storageScope'
 import { reportProjectSyncError } from './projectSaveSync'
 
-export async function syncLocalProjectsToBackend(): Promise<void> {
-  if (!isNetworkOnline()) return
+export interface ProjectPromotion {
+  sourceProjectId: string
+  destinationProjectId: string
+  sourceScope: string
+}
+
+export async function promoteLocalProject(
+  projectId: string,
+  sourceScope: string,
+  destinationScope = getStorageScope(),
+): Promise<ProjectPromotion | null> {
+  const project = await loadProjectLocal(projectId, sourceScope)
+  if (!project) return null
+  const reports = await loadReportsForProject(projectId, sourceScope)
+  const created = await createProject(
+    { name: project.name },
+    `promote:${sourceScope}:${projectId}`,
+  )
+  const nodes = await promoteLocalFileRefs(
+    created.id,
+    project.nodes,
+    sourceScope,
+  )
+  const payload: ProjectPayload = {
+    name: project.name,
+    nodes,
+    edges: project.edges,
+    patches: project.patches,
+    reports: Object.fromEntries(
+      Object.entries(reports).map(([id, report]) => [
+        id,
+        { ...report, projectId: created.id },
+      ]),
+    ),
+    expectedRevision: created.revision ?? 0,
+  }
+  const updated = await updateProject(created.id, payload)
+  await saveProjectLocal(
+    created.id,
+    project.name,
+    nodes,
+    project.edges,
+    deserializePatches(project.patches),
+    { revision: updated.revision, updatedAt: updated.updatedAt },
+    destinationScope,
+  )
+  await copyReportsToProject(
+    projectId,
+    created.id,
+    sourceScope,
+    destinationScope,
+  )
+  await deleteProjectLocal(projectId, sourceScope)
+  await deleteReportsForProject(projectId, sourceScope)
+  return {
+    sourceProjectId: projectId,
+    destinationProjectId: created.id,
+    sourceScope,
+  }
+}
+
+export async function syncLocalProjectsToBackend(): Promise<ProjectPromotion[]> {
+  const promoted: ProjectPromotion[] = []
+  if (!isNetworkOnline()) return promoted
   const destinationScope = getStorageScope()
-  if (destinationScope === GUEST_STORAGE_SCOPE) return
+  if (destinationScope === GUEST_STORAGE_SCOPE) return promoted
 
   const sourceScopes = [GUEST_STORAGE_SCOPE, destinationScope]
   for (const sourceScope of sourceScopes) {
     for (const summary of await listProjectsLocal(sourceScope)) {
       if (!summary.id.startsWith('local_')) continue
-      const project = await loadProjectLocal(summary.id, sourceScope)
-      if (!project) continue
       try {
-        const reports = await loadReportsForProject(summary.id, sourceScope)
-        const created = await createProject(
-          { name: project.name },
-          `promote:${sourceScope}:${summary.id}`,
-        )
-        const nodes = await promoteLocalFileRefs(
-          created.id,
-          project.nodes,
-          sourceScope,
-        )
-        const payload: ProjectPayload = {
-          name: project.name,
-          nodes,
-          edges: project.edges,
-          patches: project.patches,
-          reports: Object.fromEntries(
-            Object.entries(reports).map(([id, report]) => [
-              id,
-              { ...report, projectId: created.id },
-            ]),
-          ),
-          expectedRevision: created.revision ?? 0,
-        }
-        const updated = await updateProject(created.id, payload)
-        await saveProjectLocal(
-          created.id,
-          project.name,
-          nodes,
-          project.edges,
-          deserializePatches(project.patches),
-          { revision: updated.revision, updatedAt: updated.updatedAt },
-        )
-        await copyReportsToProject(
+        const result = await promoteLocalProject(
           summary.id,
-          created.id,
           sourceScope,
           destinationScope,
         )
-        await deleteProjectLocal(summary.id, sourceScope)
-        await deleteReportsForProject(summary.id, sourceScope)
+        if (result) promoted.push(result)
       } catch (error) {
         console.error('[syncService] Failed to sync local project to backend:', error)
         reportProjectSyncError(
@@ -85,4 +111,5 @@ export async function syncLocalProjectsToBackend(): Promise<void> {
       }
     }
   }
+  return promoted
 }

@@ -9,6 +9,12 @@ const mocks = vi.hoisted(() => ({
   deleteProjectLocal: vi.fn(), updateProjectRevision: vi.fn(),
   copyReportsToProject: vi.fn(), deleteReportsForProject: vi.fn(),
   loadReportsForProject: vi.fn(),
+  operations: new Map<string, Record<string, unknown>>(),
+  saveProjectAndEnqueue: vi.fn(),
+  enqueueProjectSave: vi.fn(), enqueueProjectDelete: vi.fn(),
+  getProjectSyncOperation: vi.fn(), listProjectSyncOperations: vi.fn(),
+  acknowledgeProjectSave: vi.fn(), finalizeProjectDelete: vi.fn(),
+  clearProjectSyncOperation: vi.fn(),
 }))
 
 vi.mock('@/api/projects.api', () => ({
@@ -16,7 +22,17 @@ vi.mock('@/api/projects.api', () => ({
   getProject: (id: string) => mocks.getProject(id),
   createProject: (data: unknown, operationId?: string) => mocks.createProject(data, operationId),
   updateProject: (id: string, data: unknown) => mocks.updateProject(id, data),
-  deleteProject: (id: string) => mocks.deleteProject(id),
+  deleteProject: (id: string, revision: number) => mocks.deleteProject(id, revision),
+}))
+vi.mock('./projectSyncQueue', () => ({
+  saveProjectAndEnqueue: (...args: unknown[]) => mocks.saveProjectAndEnqueue(...args),
+  enqueueProjectSave: (...args: unknown[]) => mocks.enqueueProjectSave(...args),
+  enqueueProjectDelete: (...args: unknown[]) => mocks.enqueueProjectDelete(...args),
+  getProjectSyncOperation: (...args: unknown[]) => mocks.getProjectSyncOperation(...args),
+  listProjectSyncOperations: (...args: unknown[]) => mocks.listProjectSyncOperations(...args),
+  acknowledgeProjectSave: (...args: unknown[]) => mocks.acknowledgeProjectSave(...args),
+  finalizeProjectDelete: (...args: unknown[]) => mocks.finalizeProjectDelete(...args),
+  clearProjectSyncOperation: (...args: unknown[]) => mocks.clearProjectSyncOperation(...args),
 }))
 
 vi.mock('./db', () => ({
@@ -46,6 +62,63 @@ beforeEach(() => {
   mocks.listProjectsLocal.mockResolvedValue([])
   mocks.loadProjectLocal.mockResolvedValue(null)
   mocks.loadReportsForProject.mockResolvedValue({})
+  mocks.operations.clear()
+  mocks.enqueueProjectSave.mockImplementation((
+    id: string,
+    payload: Record<string, unknown>,
+    expectedRevision: number,
+  ) => {
+    const previous = mocks.operations.get(id)
+    const operation = {
+      projectId: id,
+      generation: Number(previous?.generation ?? 0) + 1,
+      expectedRevision,
+      operation: 'save',
+      payload,
+    }
+    mocks.operations.set(id, operation)
+    return operation
+  })
+  mocks.saveProjectAndEnqueue.mockImplementation((
+    id: string,
+    name: string,
+    nodes: Record<string, unknown>,
+    edges: Record<string, unknown>,
+    patches: Record<string, unknown>,
+    reports: Record<string, unknown>,
+  ) => mocks.enqueueProjectSave(id, {
+    name,
+    nodes,
+    edges,
+    patches,
+    reports,
+  }, 0))
+  mocks.enqueueProjectDelete.mockImplementation((id: string, expectedRevision: number) => {
+    const operation = {
+      projectId: id,
+      generation: 1,
+      expectedRevision,
+      operation: 'delete',
+    }
+    mocks.operations.set(id, operation)
+    return operation
+  })
+  mocks.getProjectSyncOperation.mockImplementation((id: string) => (
+    mocks.operations.get(id) ?? null
+  ))
+  mocks.listProjectSyncOperations.mockImplementation(() => (
+    [...mocks.operations.values()]
+  ))
+  mocks.acknowledgeProjectSave.mockImplementation((id: string) => {
+    mocks.operations.delete(id)
+  })
+  mocks.finalizeProjectDelete.mockImplementation((id: string) => {
+    mocks.operations.delete(id)
+    return {}
+  })
+  mocks.clearProjectSyncOperation.mockImplementation((id: string) => {
+    mocks.operations.delete(id)
+  })
   mocks.updateProject.mockImplementation((id: string, data: { expectedRevision?: number }) => ({
     ...createMockProject(id, 'Updated'),
     revision: (data.expectedRevision ?? 0) + 1,
@@ -55,6 +128,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  window.dispatchEvent(new Event('online'))
 })
 
 const {
@@ -91,7 +165,7 @@ describe('fetchProjects', () => {
     mockListProjects.mockRejectedValue(new ApiError('Sign in required', 401))
     await expect(fetchProjects()).rejects.toMatchObject({ statusCode: 401 })
   })
-  it('keeps newer cached metadata and includes unsynced local projects', async () => {
+  it('keeps queued cached metadata and includes unsynced local projects', async () => {
     const remote = createMockProject('proj_1', 'Remote name')
     remote.updatedAt = new Date('2026-01-01T00:00:00.000Z')
     mockListProjects.mockResolvedValue([remote])
@@ -107,6 +181,12 @@ describe('fetchProjects', () => {
         updatedAt: '2026-01-03T00:00:00.000Z',
       },
     ])
+    mocks.operations.set('proj_1', {
+      projectId: 'proj_1',
+      generation: 1,
+      expectedRevision: 0,
+      operation: 'save',
+    })
 
     const result = await fetchProjects()
 
@@ -148,7 +228,7 @@ describe('loadProjectWithSync', () => {
     expect(await loadProjectWithSync('nonexistent')).toBeNull()
   })
 
-  it('preserves and uploads a newer local project instead of overwriting it', async () => {
+  it('uploads an explicitly queued local project instead of overwriting it', async () => {
     const remote = createMockProject('proj_123', 'Stale remote project')
     remote.updatedAt = new Date('2026-01-01T00:00:00.000Z')
     mockGetProject.mockResolvedValue(remote)
@@ -160,6 +240,19 @@ describe('loadProjectWithSync', () => {
       patches: {},
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-02T00:00:00.000Z',
+    })
+    mocks.operations.set('proj_123', {
+      projectId: 'proj_123',
+      generation: 1,
+      expectedRevision: 0,
+      operation: 'save',
+      payload: {
+        name: 'Newer local project',
+        nodes: {},
+        edges: {},
+        patches: {},
+        reports: {},
+      },
     })
 
     const result = await loadProjectWithSync('proj_123')
@@ -192,9 +285,17 @@ describe('loadProjectWithSync', () => {
   })
 })
 describe('saveProjectWithSync', () => {
-  it('saves locally immediately and debounces backend save', async () => {
+  it('durably queues the local snapshot and debounces backend save', async () => {
     await saveProjectWithSync('proj_1', 'Test', {}, {}, {})
-    expect(mockSaveProjectLocal).toHaveBeenCalledWith('proj_1', 'Test', {}, {}, {})
+    expect(mocks.saveProjectAndEnqueue).toHaveBeenCalledWith(
+      'proj_1',
+      'Test',
+      {},
+      {},
+      {},
+      {},
+      accountStorageScope('test-user'),
+    )
     expect(mockUpdateProject).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(2000)
     expect(mockUpdateProject).toHaveBeenCalledWith(
@@ -240,6 +341,23 @@ describe('saveProjectWithSync', () => {
       expect.objectContaining({ name: 'Important edit' }),
     )
   })
+
+  it('keeps a durable save queued while offline and flushes it on reconnect', async () => {
+    await saveProjectWithSync('proj_1', 'Offline edit', {}, {}, {})
+    window.dispatchEvent(new Event('offline'))
+
+    await flushProjectSaveWithSync('proj_1')
+
+    expect(mockUpdateProject).not.toHaveBeenCalled()
+    expect(mocks.operations.get('proj_1')).toMatchObject({
+      payload: { name: 'Offline edit' },
+    })
+
+    window.dispatchEvent(new Event('online'))
+    await flushProjectSaveWithSync('proj_1')
+    expect(mockUpdateProject).toHaveBeenCalledTimes(1)
+    expect(mocks.operations.has('proj_1')).toBe(false)
+  })
 })
 describe('importProjectWithSync', () => {
   const importedProject = {
@@ -254,6 +372,16 @@ describe('importProjectWithSync', () => {
       'remote-import',
       importedProject.name,
     ))
+    mockLoadProjectLocal.mockImplementation((id: string) => Promise.resolve({
+      id,
+      name: importedProject.name,
+      nodes: {},
+      edges: {},
+      patches: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: id === 'remote-import' ? 1 : 0,
+    }))
 
     const result = await importProjectWithSync(importedProject)
 
@@ -276,21 +404,32 @@ describe('importProjectWithSync', () => {
     })
   })
 
-  it('cleans up a partial remote project without claiming local success', async () => {
+  it('keeps a local retryable import when remote promotion fails', async () => {
     mockCreateProject.mockResolvedValue(createMockProject(
       'partial-import',
       importedProject.name,
     ))
     mockUpdateProject.mockRejectedValueOnce(new TypeError('Upload failed'))
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockLoadProjectLocal.mockImplementation((id: string) => Promise.resolve({
+      id,
+      name: importedProject.name,
+      nodes: {},
+      edges: {},
+      patches: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: 0,
+    }))
 
-    await expect(importProjectWithSync({
+    const result = await importProjectWithSync({
       ...importedProject,
       reports: [{ id: 'report', name: 'Report' }],
-    } as typeof importedProject)).rejects.toThrow('Upload failed')
+    } as typeof importedProject)
 
-    expect(mockDeleteProject).toHaveBeenCalledWith('partial-import')
-    expect(mockSaveProjectLocal).not.toHaveBeenCalled()
+    expect(result).toMatchObject({ isLocalOnly: true, needsSync: true })
+    expect(mockDeleteProject).not.toHaveBeenCalled()
+    expect(mockSaveProjectLocal).toHaveBeenCalled()
     expect(mockUpdateProject).toHaveBeenCalledWith('partial-import', {
       name: importedProject.name,
       nodes: {},
@@ -359,15 +498,25 @@ describe('syncLocalProjectsToBackend', () => {
 })
 
 describe('deleteProjectWithSync', () => {
-  it('deletes locally and from backend', async () => {
+  it('queues a revisioned delete and finalizes it after backend success', async () => {
     await deleteProjectWithSync('proj_123')
-    expect(mockDeleteProjectLocal).toHaveBeenCalledWith('proj_123')
-    expect(mockDeleteProject).toHaveBeenCalledWith('proj_123')
+    expect(mocks.enqueueProjectDelete).toHaveBeenCalledWith(
+      'proj_123',
+      0,
+      accountStorageScope('test-user'),
+    )
+    expect(mockDeleteProject).toHaveBeenCalledWith('proj_123', 0)
+    expect(mocks.finalizeProjectDelete).toHaveBeenCalled()
   })
 
   it('does not call backend for local-only projects', async () => {
     await deleteProjectWithSync('local_123')
-    expect(mockDeleteProjectLocal).toHaveBeenCalledWith('local_123')
+    expect(mocks.enqueueProjectDelete).toHaveBeenCalledWith(
+      'local_123',
+      0,
+      accountStorageScope('test-user'),
+    )
+    expect(mocks.finalizeProjectDelete).toHaveBeenCalled()
     expect(mockDeleteProject).not.toHaveBeenCalled()
   })
 
@@ -380,20 +529,14 @@ describe('deleteProjectWithSync', () => {
       patches: {},
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-02T00:00:00.000Z',
+      revision: 3,
     })
     mockDeleteProject.mockRejectedValue(new Error('Server error'))
     await expect(deleteProjectWithSync('proj_123')).rejects.toThrow('Server error')
-    expect(mockDeleteProjectLocal).toHaveBeenCalledWith('proj_123')
-    expect(mockSaveProjectLocal).toHaveBeenCalledWith(
+    expect(mockDeleteProjectLocal).not.toHaveBeenCalled()
+    expect(mocks.clearProjectSyncOperation).toHaveBeenCalledWith(
       'proj_123',
-      'Project',
-      {},
-      {},
-      {},
-      {
-        createdAt: '2026-01-01T00:00:00.000Z',
-        updatedAt: '2026-01-02T00:00:00.000Z',
-      },
+      accountStorageScope('test-user'),
     )
   })
 })

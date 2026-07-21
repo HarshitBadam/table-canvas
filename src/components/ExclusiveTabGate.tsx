@@ -5,47 +5,43 @@ const LOCK_NAME = 'table-canvas:active-workspace'
 const CHANNEL_NAME = 'table-canvas:tab-coordination'
 const TAKEOVER_KEY = 'table-canvas:tab-takeover'
 
-type GateStatus = 'checking' | 'active' | 'blocked'
+type GateStatus = 'checking' | 'active' | 'blocked' | 'release-error'
 
 function tabId(): string {
-  try {
-    const existing = sessionStorage.getItem('table-canvas:tab-id')
-    if (existing) return existing
-  } catch {
-    // A generated in-memory ID is sufficient when storage is restricted.
-  }
-  const id = typeof crypto.randomUUID === 'function'
+  return typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  try {
-    sessionStorage.setItem('table-canvas:tab-id', id)
-  } catch {
-    // Continue with the in-memory ID.
-  }
-  return id
 }
 
 export function ExclusiveTabGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<GateStatus>('checking')
   const [attempt, setAttempt] = useState(0)
   const releaseRef = useRef<(() => void) | null>(null)
+  const retryReleaseRef = useRef<(() => void) | null>(null)
   const idRef = useRef<string>('')
 
   useEffect(() => {
     idRef.current = tabId()
     let cancelled = false
+    let releaseInFlight = false
     let channel: BroadcastChannel | null = null
 
     const release = async () => {
+      if (releaseInFlight) return
+      releaseInFlight = true
       try {
         await prepareForTabRelease()
       } catch (error) {
         console.error('[TabOwnership] Could not flush before takeover:', error)
+        releaseInFlight = false
+        if (!cancelled) setStatus('release-error')
+        return
       }
       releaseRef.current?.()
       releaseRef.current = null
       if (!cancelled) setStatus('blocked')
     }
+    retryReleaseRef.current = () => void release()
     const onStorage = (event: StorageEvent) => {
       if (event.key !== TAKEOVER_KEY || !event.newValue) return
       try {
@@ -92,6 +88,7 @@ export function ExclusiveTabGate({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true
+      retryReleaseRef.current = null
       releaseRef.current?.()
       releaseRef.current = null
       channel?.close()
@@ -136,6 +133,32 @@ export function ExclusiveTabGate({ children }: { children: ReactNode }) {
           </button>
         </section>
       </main>
+    )
+  }
+
+  if (status === 'release-error') {
+    return (
+      <>
+        {children}
+        <main className="fixed inset-0 z-modal flex items-center justify-center bg-black/50 p-6">
+          <section className="w-full max-w-md rounded-xl border border-border bg-surface p-6 text-center shadow-lg">
+            <h1 className="text-lg font-semibold text-text-primary">
+              Could not safely transfer this workspace
+            </h1>
+            <p className="mt-2 text-sm text-text-secondary">
+              Your latest changes could not be saved locally. This tab remains active to
+              prevent data loss.
+            </p>
+            <button
+              type="button"
+              onClick={() => retryReleaseRef.current?.()}
+              className="btn btn-primary mt-5"
+            >
+              Retry save and transfer
+            </button>
+          </section>
+        </main>
+      </>
     )
   }
 

@@ -5,6 +5,7 @@ import { useProjectStore } from './projectStore'
 
 const saveProjectWithSync = vi.hoisted(() => vi.fn())
 const flushProjectSaveWithSync = vi.hoisted(() => vi.fn())
+const flushAllProjectSavesWithSync = vi.hoisted(() => vi.fn())
 const deleteProjectWithSync = vi.hoisted(() => vi.fn())
 const loadProjectWithSync = vi.hoisted(() => vi.fn())
 const loadOrCreateProject = vi.hoisted(() => vi.fn())
@@ -55,11 +56,12 @@ vi.mock('@/persistence/syncService', () => ({
   createProjectWithSync: vi.fn(),
   deleteProjectWithSync,
   fetchProjects: vi.fn().mockResolvedValue([]),
+  flushAllProjectSavesWithSync,
   flushProjectSaveWithSync,
   loadProjectWithSync,
   saveProjectWithSync,
   setProjectSyncErrorHandler: vi.fn(),
-  syncLocalProjectsToBackend: vi.fn().mockResolvedValue(undefined),
+  syncLocalProjectsToBackend: vi.fn().mockResolvedValue([]),
 }))
 vi.mock('./projectLifecycle', () => ({
   clearProjectRuntime,
@@ -142,6 +144,7 @@ beforeEach(() => {
   flushReportSaves.mockResolvedValue(undefined)
   saveProjectWithSync.mockResolvedValue(undefined)
   flushProjectSaveWithSync.mockResolvedValue(undefined)
+  flushAllProjectSavesWithSync.mockResolvedValue(undefined)
   deleteProjectWithSync.mockResolvedValue(undefined)
   deleteReportsForProject.mockResolvedValue(undefined)
   saveAllReports.mockResolvedValue(undefined)
