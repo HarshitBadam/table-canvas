@@ -14,7 +14,8 @@ test('report text and linked tables survive reload and project export', async ({
   await page.getByRole('button', { name: /Blank report/ }).click()
 
   await page.getByRole('button', { name: 'Insert', exact: true }).click()
-  await page.getByRole('menuitem', { name: /Linked table/ }).click()
+  await expect(page.getByRole('menuitem', { name: /Linked table/ })).toBeFocused()
+  await page.keyboard.press('Enter')
   await page.getByRole('button', { name: /Embed Table/ }).click()
   const tablePicker = page.getByRole('dialog', { name: 'Select a table to embed' })
   await tablePicker.getByRole('button', { name: /Report Evidence/ }).click()
