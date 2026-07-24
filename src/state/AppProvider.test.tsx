@@ -58,6 +58,7 @@ vi.mock('@/persistence/syncService', () => ({
   flushProjectSaveWithSync,
   loadProjectWithSync,
   saveProjectWithSync,
+  setProjectSyncErrorHandler: vi.fn(),
   syncLocalProjectsToBackend: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('./projectLifecycle', () => ({
@@ -168,6 +169,7 @@ describe('AppProvider project lifecycle', () => {
         {},
         {},
         {},
+        {},
       )
     })
   })
@@ -189,6 +191,7 @@ describe('AppProvider project lifecycle', () => {
       expect(saveProjectWithSync).toHaveBeenCalledWith(
         'current-project',
         'Immediately durable',
+        {},
         {},
         {},
         {},
@@ -215,6 +218,7 @@ describe('AppProvider project lifecycle', () => {
     expect(saveProjectWithSync).toHaveBeenCalledWith(
       'current-project',
       'Unsaved current name',
+      {},
       {},
       {},
       {},

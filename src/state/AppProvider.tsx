@@ -28,6 +28,7 @@ import {
 } from './appContextValue'
 import { useProjectActions } from './useProjectActions'
 import { prepareProjectState } from './projectPreparation'
+import { setBeforeTabRelease } from './tabOwnership'
 const PHASE_MESSAGES: Record<AppPhase, string> = {
   idle: 'Starting...',
   initializing_engine: 'Starting data engine...',
@@ -70,7 +71,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const edges = useProjectStore(store => store.edges)
   const patches = useProjectStore(store => store.patches)
   const projectName = useProjectStore(store => store.projectName)
-  const reports = useReportStore(store => store.reports)
 
   const saveLatestProject = useCallback(async () => {
     if (saveInFlight.current) {
@@ -153,6 +153,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    setBeforeTabRelease(async () => {
+      await flushProjectSave()
+      await useReportStore.getState().flushSaves()
+    })
+    return () => setBeforeTabRelease(null)
+  }, [flushProjectSave])
+
+  useEffect(() => {
     setState(previous => ({ ...previous, user, isAuthenticated }))
     if (!isAuthenticated && useProjectStore.getState().projectId) {
       void resetWorkspace()
@@ -160,10 +168,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user, isAuthenticated, resetWorkspace])
 
   useEffect(() => {
-    setProjectSyncErrorHandler(message => {
+    setProjectSyncErrorHandler?.(message => {
       setState(previous => ({ ...previous, syncError: message }))
     })
-    return () => setProjectSyncErrorHandler(null)
+    return () => setProjectSyncErrorHandler?.(null)
   }, [])
 
   useEffect(() => {
@@ -220,12 +228,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     nodes,
     patches,
     projectName,
-    reports,
     state.isAuthenticated,
     state.phase,
     state.projectId,
     saveLatestProject,
   ])
+
+  useEffect(() => {
+    const store = useReportStore as typeof useReportStore & {
+      subscribe?: (listener: (state: ReturnType<typeof useReportStore.getState>) => void) => () => void
+    }
+    if (typeof store.subscribe !== 'function') return
+    let previousReports = store.getState().reports
+    return store.subscribe(reportState => {
+      if (reportState.reports === previousReports) return
+      previousReports = reportState.reports
+      void saveLatestProject().catch(error => {
+        console.error('[AppContext] Report sync failed:', error)
+      })
+    })
+  }, [saveLatestProject])
 
   useEffect(() => {
     if (!user || user.tier === 'guest') return

@@ -187,7 +187,7 @@ export interface ParsedImportData {
   reports: Report[]
 }
 
-export class ImportFileRollbackError extends Error {
+class ImportFileRollbackError extends Error {
   constructor(
     message: string,
     public readonly failures: unknown[],

@@ -1,7 +1,7 @@
 import { createProject } from '@/api/projects.api'
 import { ApiError } from '@/api/client'
 
-export class AmbiguousProjectCreateError extends Error {
+class AmbiguousProjectCreateError extends Error {
   constructor(
     message: string,
     public readonly operationId: string,
