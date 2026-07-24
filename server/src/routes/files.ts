@@ -46,7 +46,7 @@ const upload = multer({
     if (allowedMimes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Only CSV and Excel files are allowed'));
+      cb(new ValidationError(['Only CSV and Excel files are allowed']));
     }
   },
 });

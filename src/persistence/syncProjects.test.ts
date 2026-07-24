@@ -191,6 +191,7 @@ describe('fetchProjects', () => {
     expect(result[1].name).toBe('Newer local name')
   })
 })
+
 describe('loadProjectWithSync', () => {
   it('loads from API and caches locally when online', async () => {
     mockGetProject.mockResolvedValue(createMockProject('proj_123', 'Test Project'))

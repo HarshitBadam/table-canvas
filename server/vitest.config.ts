@@ -17,6 +17,12 @@ export default defineConfig({
         'dist/',
         'src/test/',
       ],
+      thresholds: {
+        lines: 70,
+        statements: 68,
+        functions: 80,
+        branches: 50,
+      },
     },
     testTimeout: 30000,
     hookTimeout: 30000,

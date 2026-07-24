@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { Page, Route } from '@playwright/test'
 
-export interface MockProject {
+interface MockProject {
   id: string
   name: string
   nodes: Record<string, unknown>
@@ -14,9 +14,27 @@ export interface MockProject {
   updatedAt: string
 }
 
+export interface MockBackendState {
+  projects: Map<string, MockProject>
+  projectNumber: number
+  fileNumber: number
+  pendingProjectUpdates: number
+}
+
 interface MockBackendOptions {
   projectId?: string
   projectName?: string
+  state?: MockBackendState
+  projectUpdateDelayMs?: number
+}
+
+export function createMockBackendState(): MockBackendState {
+  return {
+    projects: new Map<string, MockProject>(),
+    projectNumber: 0,
+    fileNumber: 0,
+    pendingProjectUpdates: 0,
+  }
 }
 
 async function fulfillJson(route: Route, data: unknown, status = 200) {
@@ -34,9 +52,8 @@ export async function installMockBackend(
   const projectId = options.projectId ?? 'sample-project'
   const projectName = options.projectName ?? 'Sample Workbook Project'
   const workbookPath = resolve(process.cwd(), 'data/sample_workbook.xlsx')
-  const projects = new Map<string, MockProject>()
-  let projectNumber = 0
-  let fileNumber = 0
+  const state = options.state ?? createMockBackendState()
+  const projects = state.projects
   const user = {
     id: 'sample-user',
     email: 'sample@example.com',
@@ -66,13 +83,15 @@ export async function installMockBackend(
       return
     }
     if (path === '/api/projects' && request.method() === 'POST') {
-      projectNumber += 1
+      state.projectNumber += 1
       const now = new Date().toISOString()
       const requested = request.postDataJSON() as { name?: string } | null
-      const id = projectNumber === 1 ? projectId : `${projectId}-${projectNumber}`
+      const id = state.projectNumber === 1 ? projectId : `${projectId}-${state.projectNumber}`
       const project: MockProject = {
         id,
-        name: projectNumber === 1 ? projectName : (requested?.name || `Project ${projectNumber}`),
+        name: state.projectNumber === 1
+          ? projectName
+          : (requested?.name || `Project ${state.projectNumber}`),
         nodes: {},
         edges: {},
         patches: {},
@@ -113,6 +132,14 @@ export async function installMockBackend(
         updatedAt: new Date().toISOString(),
       }
       projects.set(requestedProjectId, project)
+      if (options.projectUpdateDelayMs) {
+        state.pendingProjectUpdates += 1
+        try {
+          await new Promise(resolve => setTimeout(resolve, options.projectUpdateDelayMs))
+        } finally {
+          state.pendingProjectUpdates -= 1
+        }
+      }
       await fulfillJson(route, { project })
       return
     }
@@ -132,10 +159,10 @@ export async function installMockBackend(
       return
     }
     if (path === '/api/files/upload' && request.method() === 'POST') {
-      fileNumber += 1
+      state.fileNumber += 1
       await fulfillJson(route, {
         file: {
-          id: `sample-file-${fileNumber}`,
+          id: `sample-file-${state.fileNumber}`,
           filename: 'sample_workbook.xlsx',
           contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           size: readFileSync(workbookPath).byteLength,

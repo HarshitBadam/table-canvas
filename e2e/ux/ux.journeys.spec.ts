@@ -1,40 +1,14 @@
 import AxeBuilder from '@axe-core/playwright'
-import type { Page } from '@playwright/test'
 import { expect, test } from '../e2e.fixture'
-import { bootApp, createManualTable } from '../app.support'
+import {
+  bootApp,
+  connectTables,
+  createManualTable,
+  importCsv,
+} from '../app.support'
 
-async function importCsv(page: Page, name: string, rows: string[]) {
-  await page.locator('aside input[type="file"][accept*=".csv"]').setInputFiles({
-    name: `${name}.csv`,
-    mimeType: 'text/csv',
-    buffer: Buffer.from(rows.join('\n')),
-  })
-  await expect(page.locator('aside').getByRole('button', {
-    name: new RegExp(`^${name} ${rows.length - 1} rows`),
-  })).toBeVisible({ timeout: 30_000 })
-}
-
-async function connectTables(
-  page: Page,
-  sourceName: string,
-  targetName: string,
-  targetHandle = '.table-handle-left',
-) {
-  const nodes = page.locator('.react-flow__node')
-  const source = nodes.filter({
-    has: page.getByRole('heading', { name: sourceName, exact: true }),
-  })
-  const target = nodes.filter({
-    has: page.getByRole('heading', { name: targetName, exact: true }),
-  })
-  await source.locator('.table-handle-right').first().dragTo(
-    target.locator(targetHandle).first(),
-    { force: true },
-  )
-}
-
-test.describe('@ux critical journey contract', () => {
-  test('canvas join creates, persists, and reopens a correct derived result', async ({ page }) => {
+test.describe('Core workflows', () => {
+  test('a joined table contains the expected rows after reload', async ({ page }) => {
     test.setTimeout(90_000)
     await bootApp(page)
     await importCsv(page, 'Customers', [
@@ -86,15 +60,21 @@ test.describe('@ux critical journey contract', () => {
     await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
     await expect(page.locator('.react-flow__node')).toHaveCount(3)
     await expect(page.locator('.react-flow__edge')).toHaveCount(2)
+    await page.locator('aside').getByRole('button', {
+      name: /^Customer Orders 3 rows/,
+    }).click()
+    await expect(page.getByText('3 rows × 3 columns')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('gridcell').filter({ hasText: 'Ada' })).toHaveCount(1)
+    await expect(page.getByRole('gridcell').filter({ hasText: '240' })).toHaveCount(1)
   })
 
-  test('project switching saves each workspace and restores its exact state', async ({ page }) => {
+  test('switching projects restores only the selected workspace', async ({ page }) => {
     test.setTimeout(90_000)
     await bootApp(page)
     await createManualTable(page, 'First Workspace Table')
 
     await page.getByRole('button', { name: 'Current project' }).click()
-    await page.getByRole('button', { name: 'New project' }).click()
+    await page.getByRole('menuitem', { name: 'New project' }).click()
     const createDialog = page.getByRole('dialog', { name: 'Create project' })
     await createDialog.getByLabel('Project name').fill('Second Workspace')
     await createDialog.getByRole('button', { name: 'Create project' }).click()
@@ -119,7 +99,8 @@ test.describe('@ux critical journey contract', () => {
     await expect(page.locator('aside').getByText('First Workspace Table')).toHaveCount(0)
 
     await projectSwitcher.click()
-    await page.getByRole('button', { name: 'Rename', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'More project actions' }).click()
+    await page.getByRole('menuitem', { name: 'Rename current project' }).click()
     const renameInput = page.getByLabel('Rename project')
     await renameInput.fill('Operations Workspace')
     await page.getByRole('button', { name: 'Save', exact: true }).click()
@@ -128,10 +109,10 @@ test.describe('@ux critical journey contract', () => {
   })
 })
 
-test.describe('@ux narrow viewport contract', () => {
+test.describe('Core workflows at 320px', () => {
   test.use({ viewport: { width: 320, height: 700 } })
 
-  test('join dialog stays inside a narrow viewport', async ({ page }) => {
+  test('the join dialog remains within the viewport', async ({ page }) => {
     await bootApp(page)
     await page.getByRole('button', { name: 'Open navigation' }).click()
     await importCsv(page, 'Narrow Customers', [

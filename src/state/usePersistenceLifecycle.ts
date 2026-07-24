@@ -63,7 +63,7 @@ export function usePersistenceLifecycle({
   }, [prepareProject, saveLatestProject, setState, user])
 }
 
-async function synchronizeAfterReconnect({
+export async function synchronizeAfterReconnect({
   saveLatestProject,
   prepareProject,
   setState,
@@ -73,7 +73,7 @@ async function synchronizeAfterReconnect({
     await useReportStore.getState().flushSaves()
     const activeId = useProjectStore.getState().projectId
     const promotions = await syncLocalProjectsToBackend()
-    await flushAllProjectSavesWithSync()
+    const conflicts = await flushAllProjectSavesWithSync()
     const activePromotion = promotions.find(
       promotion => promotion.sourceProjectId === activeId,
     )
@@ -85,6 +85,15 @@ async function synchronizeAfterReconnect({
       if (promoted) {
         await prepareProject(promoted)
         activeProjectName = promoted.name
+      }
+    } else if (
+      activeId
+      && conflicts.some(conflict => conflict.projectId === activeId)
+    ) {
+      const recovered = await loadProjectWithSync(activeId)
+      if (recovered) {
+        await prepareProject(recovered)
+        activeProjectName = recovered.name
       }
     }
     const projects = await fetchProjects()

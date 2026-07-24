@@ -9,9 +9,42 @@ export async function bootApp(page: Page) {
   await expect(page.locator('aside')).toBeAttached()
 }
 
+export async function importCsv(
+  page: Page,
+  name: string,
+  lines: string[],
+) {
+  await page.locator('aside input[type="file"][accept*=".csv"]').setInputFiles({
+    name: `${name}.csv`,
+    mimeType: 'text/csv',
+    buffer: Buffer.from(lines.join('\n')),
+  })
+  await expect(page.locator('aside').getByRole('button', {
+    name: new RegExp(`^${name} ${lines.length - 1} rows`),
+  })).toBeVisible({ timeout: 30_000 })
+}
+
+export async function connectTables(
+  page: Page,
+  sourceName: string,
+  targetName: string,
+  targetHandle = '.table-handle-left',
+) {
+  const nodes = page.locator('.react-flow__node')
+  const source = nodes.filter({
+    has: page.getByRole('heading', { name: sourceName, exact: true }),
+  })
+  const target = nodes.filter({
+    has: page.getByRole('heading', { name: targetName, exact: true }),
+  })
+  await source.locator('.table-handle-right').first().dragTo(
+    target.locator(targetHandle).first(),
+  )
+}
+
 export async function createManualTable(
   page: Page,
-  name = 'UX Contract Table',
+  name = 'Test Table',
   rowCount = 5,
 ) {
   const trigger = page.locator('aside').getByRole('button', { name: 'New Table' })
@@ -30,7 +63,7 @@ export async function createManualTable(
   })).toBeAttached()
 }
 
-export async function openManualTable(page: Page, name = 'UX Contract Table', rowCount = 5) {
+export async function openManualTable(page: Page, name = 'Test Table', rowCount = 5) {
   await page.locator('aside').getByRole('button', {
     name: new RegExp(`^${name} .*${rowCount} rows`),
   }).click()

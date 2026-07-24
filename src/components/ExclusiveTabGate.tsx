@@ -4,6 +4,7 @@ import { prepareForTabRelease } from '@/state/tabOwnership'
 const LOCK_NAME = 'table-canvas:active-workspace'
 const CHANNEL_NAME = 'table-canvas:tab-coordination'
 const TAKEOVER_KEY = 'table-canvas:tab-takeover'
+const TAKEOVER_TIMEOUT_MS = 15_000
 
 type GateStatus = 'checking' | 'active' | 'blocked' | 'release-error'
 
@@ -16,15 +17,18 @@ function tabId(): string {
 export function ExclusiveTabGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<GateStatus>('checking')
   const [attempt, setAttempt] = useState(0)
+  const [waitForOwnership, setWaitForOwnership] = useState(false)
   const releaseRef = useRef<(() => void) | null>(null)
   const retryReleaseRef = useRef<(() => void) | null>(null)
   const idRef = useRef<string>('')
 
   useEffect(() => {
-    idRef.current = tabId()
+    if (!idRef.current) idRef.current = tabId()
     let cancelled = false
     let releaseInFlight = false
     let channel: BroadcastChannel | null = null
+    let ownershipAbort: AbortController | null = null
+    let ownershipTimeout: ReturnType<typeof setTimeout> | null = null
 
     const release = async () => {
       if (releaseInFlight) return
@@ -74,27 +78,55 @@ export function ExclusiveTabGate({ children }: { children: ReactNode }) {
       }
     }
 
-    void locks.request(LOCK_NAME, { mode: 'exclusive', ifAvailable: true }, async lock => {
+    const holdLock = async (lock: Lock | null) => {
       if (cancelled) return
       if (!lock) {
         setStatus('blocked')
         return
       }
+      if (ownershipTimeout) clearTimeout(ownershipTimeout)
+      ownershipTimeout = null
+      ownershipAbort = null
       setStatus('active')
       await new Promise<void>(resolve => {
         releaseRef.current = resolve
       })
-    })
+    }
+
+    if (waitForOwnership) {
+      ownershipAbort = new AbortController()
+      ownershipTimeout = setTimeout(() => {
+        ownershipAbort?.abort()
+        if (!cancelled) setStatus('blocked')
+      }, TAKEOVER_TIMEOUT_MS)
+      void locks.request(
+        LOCK_NAME,
+        { mode: 'exclusive', signal: ownershipAbort.signal },
+        holdLock,
+      ).catch((error: unknown) => {
+        if (
+          !cancelled
+          && (error as { name?: string })?.name !== 'AbortError'
+        ) {
+          console.error('[TabOwnership] Could not acquire workspace lock:', error)
+          setStatus('blocked')
+        }
+      })
+    } else {
+      void locks.request(LOCK_NAME, { mode: 'exclusive', ifAvailable: true }, holdLock)
+    }
 
     return () => {
       cancelled = true
       retryReleaseRef.current = null
+      if (ownershipTimeout) clearTimeout(ownershipTimeout)
+      ownershipAbort?.abort()
       releaseRef.current?.()
       releaseRef.current = null
       channel?.close()
       window.removeEventListener('storage', onStorage)
     }
-  }, [attempt])
+  }, [attempt, waitForOwnership])
 
   const takeOver = useCallback(() => {
     setStatus('checking')
@@ -109,7 +141,8 @@ export function ExclusiveTabGate({ children }: { children: ReactNode }) {
       channel.postMessage(message)
       channel.close()
     }
-    window.setTimeout(() => setAttempt(value => value + 1), 150)
+    setWaitForOwnership(true)
+    setAttempt(value => value + 1)
   }, [])
 
   if (status === 'checking') {

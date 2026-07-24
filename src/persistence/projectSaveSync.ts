@@ -134,11 +134,26 @@ export async function saveProjectWithSync(
   saveTimeouts.set(key, timeout)
 }
 
-export async function flushAllProjectSavesWithSync(
+export interface ProjectSyncConflict {
+  projectId: string
+  operation: 'save' | 'delete'
+}
+
+export async function flushAllQueuedProjectSavesWithSync(
   scope = getStorageScope(),
-): Promise<void> {
+): Promise<ProjectSyncConflict[]> {
   const operations = await listProjectSyncOperations(scope)
+  const conflicts: ProjectSyncConflict[] = []
   for (const operation of operations) {
-    await flushProjectSaveWithSync(operation.projectId, scope)
+    try {
+      await flushProjectSaveWithSync(operation.projectId, scope)
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.statusCode !== 409) throw error
+      conflicts.push({
+        projectId: operation.projectId,
+        operation: operation.operation,
+      })
+    }
   }
+  return conflicts
 }

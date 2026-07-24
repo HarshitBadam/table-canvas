@@ -11,23 +11,23 @@ test.describe('Canvas and table behavior', () => {
     await page.locator('.react-flow').getByRole('button', { name: 'New Table' }).click()
 
     const dialog = page.getByRole('dialog', { name: 'Create New Table' })
-    await dialog.getByLabel('Table Name').fill('Canvas Contract')
+    await dialog.getByLabel('Table Name').fill('Canvas Table')
     await dialog.getByLabel('Rows').fill('7')
     await dialog.getByRole('button', { name: 'Create Table' }).click()
 
-    const node = page.locator('.react-flow__node').filter({ hasText: 'Canvas Contract' })
+    const node = page.locator('.react-flow__node').filter({ hasText: 'Canvas Table' })
     await expect(node).toHaveCount(1)
     await expect(node).toContainText('7 rows · 2 columns')
     await expect(node).toContainText('Name')
     await expect(node).toContainText('Value')
     await expect(page.locator('aside').getByRole('button', {
-      name: /^Canvas Contract 7 rows/,
+      name: /^Canvas Table 7 rows/,
     })).toBeVisible()
   })
 
   test('a created source opens an editable grid and returns to the same canvas node', async ({ page }) => {
-    await createManualTable(page, 'Navigation Contract')
-    await openManualTable(page, 'Navigation Contract')
+    await createManualTable(page, 'Navigation Table')
+    await openManualTable(page, 'Navigation Table')
 
     await expect(page.getByText('Source - Editable')).toBeVisible()
     await expect(page.getByRole('grid', { name: 'Table data' })).toBeVisible()
@@ -35,7 +35,7 @@ test.describe('Canvas and table behavior', () => {
     await page.getByRole('button', { name: 'Back to Canvas' }).click()
 
     await expect(page.locator('.react-flow__node').filter({
-      hasText: 'Navigation Contract',
+      hasText: 'Navigation Table',
     })).toHaveCount(1)
   })
 
@@ -46,7 +46,7 @@ test.describe('Canvas and table behavior', () => {
 
     await dialog.getByLabel('Table Name').fill(' ')
     await expect(create).toBeDisabled()
-    await dialog.getByLabel('Table Name').fill('Validation Contract')
+    await dialog.getByLabel('Table Name').fill('Validation Table')
     await dialog.getByLabel('Column 2 name').fill('Name')
     await expect(dialog.getByRole('alert')).toHaveText('Give each column a different name.')
     await expect(create).toBeDisabled()
@@ -57,13 +57,13 @@ test.describe('Canvas and table behavior', () => {
 
   test('CSV import materializes exact rows and schema instead of only exposing a file input', async ({ page }) => {
     await page.locator('aside input[type="file"][accept*=".csv"]').setInputFiles({
-      name: 'import-contract.csv',
+      name: 'imported-data.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from('ID,Name\n1,Ada\n2,Grace\n3,Linus'),
     })
 
     const table = page.locator('aside').getByRole('button', {
-      name: /^import-contract 3 rows/,
+      name: /^imported-data 3 rows/,
     })
     await expect(table).toBeVisible({ timeout: 20_000 })
     await table.click()

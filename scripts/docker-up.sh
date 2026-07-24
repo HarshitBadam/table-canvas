@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo ""
-echo "⏳ Starting Table Canvas..."
+echo "Starting Table Canvas..."
 echo ""
 
 docker compose up -d --build > /dev/null 2>&1
@@ -45,12 +45,12 @@ done
 
 if [ "$SEED_SUCCESS" = true ]; then
     echo ""
-    echo "✅ Ready!"
+    echo "Ready."
     echo ""
-    echo "   🌐 Open http://localhost:5173"
+    echo "   Open http://localhost:5173"
     echo ""
-    echo "   👤 Email: demo@tablecanvas.app"
-    echo "   🔑 Password: 1234"
+    echo "   Email: demo@tablecanvas.app"
+    echo "   Password: 1234"
     echo ""
     echo "   Commands:"
     echo "   npm run docker:logs  - View logs"
@@ -58,13 +58,13 @@ if [ "$SEED_SUCCESS" = true ]; then
     echo ""
 else
     echo ""
-    echo "⚠️  Started but seeding failed."
+    echo "Started, but seeding failed."
     echo ""
     echo "   Error details:"
     echo "$SEED_OUTPUT" | head -20
     echo ""
     echo "   Try manually: docker compose exec backend npm run seed"
     echo ""
-    echo "   🌐 Open http://localhost:5173"
+    echo "   Open http://localhost:5173"
     echo ""
 fi

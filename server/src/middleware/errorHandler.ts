@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { MulterError } from 'multer';
 import { config } from '../config/env.js';
 
 
@@ -57,6 +58,8 @@ export function errorHandler(
     } else {
       console.error('[Error]', err);
     }
+  } else if (!(err instanceof AppError)) {
+    console.error('[Error] Unhandled request failure', err);
   }
 
   if (err instanceof AppError) {
@@ -72,6 +75,15 @@ export function errorHandler(
     res.status(err.statusCode).json({
       success: false,
       error: err.message,
+    });
+    return;
+  }
+
+  if (err instanceof MulterError) {
+    const fileTooLarge = err.code === 'LIMIT_FILE_SIZE';
+    res.status(fileTooLarge ? 413 : 400).json({
+      success: false,
+      error: fileTooLarge ? 'Uploaded file is too large' : 'Invalid file upload',
     });
     return;
   }
