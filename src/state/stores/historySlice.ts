@@ -6,15 +6,26 @@ import { invalidateMaterializations } from '@/engine/materializationCoordinator'
 import { withoutTransientComputeState } from '@/state/transientProjectState'
 const MAX_UNDO_HISTORY = 50
 
-function invalidateAllTableCaches(nodes: Record<string, ProjectNode>) {
+function invalidateAllTableCaches(
+  nodes: Record<string, ProjectNode>,
+  replacedNodes: Record<string, ProjectNode> = {},
+) {
   Object.values(nodes).forEach((node) => {
     if (node.kind === 'source_table' || node.kind === 'derived_table') {
       node.cacheInfo ??= {}
+      const replacedNode = replacedNodes[node.id]
+      const replacedRevision = replacedNode?.kind === 'source_table'
+        || replacedNode?.kind === 'derived_table'
+        ? replacedNode.cacheInfo?.dataRevision ?? 0
+        : 0
       node.cacheInfo.isDirty = true
       node.cacheInfo.isComputing = false
       node.cacheInfo.error = undefined
       node.cacheInfo.currentVersionHash = undefined
-      node.cacheInfo.dataRevision = (node.cacheInfo.dataRevision ?? 0) + 1
+      node.cacheInfo.dataRevision = Math.max(
+        node.cacheInfo.dataRevision ?? 0,
+        replacedRevision,
+      ) + 1
     }
   })
 }
@@ -80,7 +91,7 @@ export const createHistorySlice: StateCreator<
           highlightedCells: new Set((patches as unknown as { highlightedCells: string[] }).highlightedCells || []),
         }
       })
-      invalidateAllTableCaches(state.nodes)
+      invalidateAllTableCaches(state.nodes, current.nodes)
     })
     useDataStore.setState({ tableData: {} })
   },
@@ -115,7 +126,7 @@ export const createHistorySlice: StateCreator<
           highlightedCells: new Set((patches as unknown as { highlightedCells: string[] }).highlightedCells || []),
         }
       })
-      invalidateAllTableCaches(state.nodes)
+      invalidateAllTableCaches(state.nodes, current.nodes)
     })
     useDataStore.setState({ tableData: {} })
   },
