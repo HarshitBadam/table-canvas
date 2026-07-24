@@ -72,7 +72,7 @@ export default function App() {
 }
 
 function MainApp() {
-  const { projectLimitViolation, setProjectLimitViolation } = useApp()
+  const { projectLimitViolation, setProjectLimitViolation, syncError } = useApp()
   const [viewMode, setViewMode] = useState<ViewMode>('canvas')
   const [navigationOpen, setNavigationOpen] = useState(false)
 
@@ -148,6 +148,21 @@ function MainApp() {
     <NavigationProvider value={navigationValue}>
       <NodeDeletionProvider>
         <StorageWarningBanner />
+        {syncError && (
+          <div
+            className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900"
+            role="alert"
+          >
+            {syncError}{' '}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="font-semibold underline"
+            >
+              Reload safely
+            </button>
+          </div>
+        )}
         <div className="relative flex h-full min-h-0 bg-canvas">
           <Sidebar isOpen={navigationOpen} onClose={() => setNavigationOpen(false)} />
 
