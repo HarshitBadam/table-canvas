@@ -1,5 +1,6 @@
 import { useMemo, useCallback, useRef, useState } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { SelectField } from '@/components/SelectField'
 import { useProjectStore } from '@/state/projectStore'
 import { ChartRenderer } from './ChartRenderer'
 import { ChartTypeIcon } from './ChartTypeIcon'
@@ -136,7 +137,7 @@ export function ChartView({ chartId }: ChartViewProps) {
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-5xl space-y-4 p-3 sm:p-6">
         <div className="rounded-lg border border-border bg-surface shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-3 py-4 dark:border-gray-700 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-3 py-4 sm:px-5">
             <div className="flex min-w-0 items-center gap-3">
               <div className="w-10 h-10 bg-accent-green rounded-lg flex items-center justify-center">
                 <ChartTypeIcon type={chartType} className="w-5 h-5 text-white" />
@@ -181,16 +182,13 @@ export function ChartView({ chartId }: ChartViewProps) {
               </div>
             </div>
             <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:gap-3">
-              <select
+              <SelectField
                 value={sourceTableId}
-                onChange={(event) => handleSourceChange(event.target.value)}
-                aria-label="Chart source table"
-                className="min-w-0 max-w-40 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-800 sm:max-w-56"
-              >
-                {tables.map((table) => (
-                  <option key={table.id} value={table.id}>{table.name}</option>
-                ))}
-              </select>
+                onValueChange={handleSourceChange}
+                ariaLabel="Chart source table"
+                className="h-9 min-w-36 max-w-40 sm:max-w-56"
+                options={tables.map(table => ({ value: table.id, label: table.name }))}
+              />
               <button
                 onClick={() => openTable(sourceTableId)}
                 className="max-w-40 truncate rounded-md bg-accent-green/10 px-3 py-1.5 text-sm font-medium text-accent-green transition-colors hover:bg-accent-green/20 sm:max-w-56"
@@ -260,48 +258,53 @@ export function ChartView({ chartId }: ChartViewProps) {
           </div>
         </div>
         
-        <div className="rounded-lg border border-border bg-surface p-3 shadow-sm sm:p-5">
-          <div className="mb-4 flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-gray-700 sm:flex-row sm:items-center sm:gap-8">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider sm:w-14">Type</span>
-            <div className="flex flex-wrap gap-2">
+        <section className="overflow-hidden rounded-lg border border-border bg-surface shadow-sm" aria-labelledby="chart-setup-heading">
+          <div className="flex flex-col gap-3 border-b border-border-subtle bg-surface-secondary/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div>
+              <h2 id="chart-setup-heading" className="text-sm font-semibold text-text-primary">Chart setup</h2>
+              <p className="text-xs text-text-tertiary">Changes update the chart immediately</p>
+            </div>
+            <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-surface p-1">
               {(['bar', 'line', 'pie', 'scatter'] as ChartType[]).map((type) => (
                 <button
                   key={type}
                   onClick={() => handleChartTypeChange(type)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  aria-pressed={chartType === type}
+                  className={`flex min-h-8 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
                     chartType === type
-                      ? 'bg-accent-green text-white'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      ? 'bg-accent-green text-white shadow-sm'
+                      : 'text-text-secondary hover:bg-surface-tertiary hover:text-text-primary'
                   }`}
                 >
-                  <ChartTypeIcon type={type} className="w-4 h-4" />
+                  <ChartTypeIcon type={type} className="h-3.5 w-3.5" />
                   {type.charAt(0).toUpperCase() + type.slice(1)}
                 </button>
               ))}
             </div>
           </div>
           
-          <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  {chartType === 'pie' ? 'Category' : 'X-Axis'}
-                </span>
-                <span className="px-2.5 py-1 text-xs font-medium text-accent-green bg-accent-green/10 rounded-md">
-                  {xAxisName}
-                </span>
+          <div className={`grid gap-0 divide-y divide-border-subtle lg:divide-x lg:divide-y-0 ${
+            chartType === 'scatter' ? 'lg:grid-cols-2' : 'lg:grid-cols-3'
+          }`}>
+            <div className="min-w-0 p-4 sm:p-5">
+              <div className="mb-3">
+                <h3 className="text-xs font-semibold text-text-primary">
+                  {chartType === 'pie' ? 'Category column' : 'X axis column'}
+                </h3>
+                <p className="mt-0.5 truncate text-xs text-accent-text">{xAxisName}</p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {(chartType === 'scatter' ? numericColumns : categoricalColumns.length > 0 ? categoricalColumns : columns)
                   .slice(0, 6)
                   .map((col) => (
                     <button
                       key={col.id}
                       onClick={() => handleConfigChange({ xAxis: col.id })}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      aria-pressed={config.xAxis === col.id}
+                      className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                         config.xAxis === col.id
-                          ? 'bg-accent-green text-white'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
+                          ? 'border-accent-green bg-accent-green/10 text-accent-text'
+                          : 'border-transparent bg-surface-secondary text-text-secondary hover:border-border hover:bg-surface-tertiary'
                       }`}
                     >
                       {col.name}
@@ -310,26 +313,23 @@ export function ChartView({ chartId }: ChartViewProps) {
               </div>
             </div>
             
-            <div className="hidden w-px bg-gray-200 dark:bg-gray-700 lg:block" />
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  {chartType === 'pie' ? 'Value' : 'Y-Axis'}
-                </span>
-                <span className="px-2.5 py-1 text-xs font-medium text-accent-green bg-accent-green/10 rounded-md">
-                  {yAxisName}
-                </span>
+            <div className="min-w-0 p-4 sm:p-5">
+              <div className="mb-3">
+                <h3 className="text-xs font-semibold text-text-primary">
+                  {chartType === 'pie' ? 'Value column' : 'Y axis column'}
+                </h3>
+                <p className="mt-0.5 truncate text-xs text-accent-text">{yAxisName}</p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {numericColumns.slice(0, 6).map((col) => (
                   <button
                     key={col.id}
                     onClick={() => handleConfigChange({ yAxis: col.id })}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                    aria-pressed={config.yAxis === col.id}
+                    className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                       config.yAxis === col.id
-                        ? 'bg-accent-green text-white'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
+                        ? 'border-accent-green bg-accent-green/10 text-accent-text'
+                        : 'border-transparent bg-surface-secondary text-text-secondary hover:border-border hover:bg-surface-tertiary'
                     }`}
                   >
                     {col.name}
@@ -338,28 +338,27 @@ export function ChartView({ chartId }: ChartViewProps) {
               </div>
             </div>
             
-            {chartType !== 'scatter' && <div className="hidden w-px bg-gray-200 dark:bg-gray-700 lg:block" />}
-            
             {chartType !== 'scatter' && (
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Aggregation</span>
-                  <span className="px-2.5 py-1 text-xs font-medium text-accent-green bg-accent-green/10 rounded-md">
+              <div className="min-w-0 p-4 sm:p-5">
+                <div className="mb-3">
+                  <h3 className="text-xs font-semibold text-text-primary">Summarize values</h3>
+                  <p className="mt-0.5 text-xs text-accent-text">
                     {config.aggregation === 'count_distinct'
                       ? 'Distinct'
                       : (config.aggregation || 'sum').charAt(0).toUpperCase()
                         + (config.aggregation || 'sum').slice(1)}
-                  </span>
+                  </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {['sum', 'avg', 'count', 'count_distinct', 'min', 'max'].map((agg) => (
                     <button
                       key={agg}
                       onClick={() => handleConfigChange({ aggregation: agg as AggregationType })}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      aria-pressed={config.aggregation === agg}
+                      className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                         config.aggregation === agg
-                          ? 'bg-accent-green text-white'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
+                          ? 'border-accent-green bg-accent-green/10 text-accent-text'
+                          : 'border-transparent bg-surface-secondary text-text-secondary hover:border-border hover:bg-surface-tertiary'
                       }`}
                     >
                       {agg === 'count_distinct'
@@ -371,7 +370,7 @@ export function ChartView({ chartId }: ChartViewProps) {
               </div>
             )}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   )
