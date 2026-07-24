@@ -42,7 +42,7 @@ let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
 let onAuthError: (() => void) | null = null;
 
-export function setAuthErrorHandler(handler: () => void): void {
+export function setAuthErrorHandler(handler: (() => void) | null): void {
   onAuthError = handler;
 }
 
@@ -53,10 +53,12 @@ async function refreshToken(): Promise<boolean> {
       credentials: 'include',
     });
 
-    return response.ok;
+    if (response.ok) return true;
+    if (response.status === 401 || response.status === 403) return false;
+    throw new ApiError('Unable to refresh session', response.status);
   } catch (error) {
     console.error('[client] Failed to refresh token:', error);
-    return false;
+    throw error;
   }
 }
 
@@ -169,13 +171,22 @@ export const api = {
       body: body ? JSON.stringify(body) : undefined,
     }),
 
-  delete: <T>(endpoint: string, options?: RequestOptions): Promise<T> =>
-    request<T>(endpoint, { ...options, method: 'DELETE' }),
+  delete: <T>(
+    endpoint: string,
+    body?: unknown,
+    options?: RequestOptions
+  ): Promise<T> =>
+    request<T>(endpoint, {
+      ...options,
+      method: 'DELETE',
+      body: body ? JSON.stringify(body) : undefined,
+    }),
 
   upload: async <T>(
     endpoint: string,
     file: File,
-    additionalData?: Record<string, string>
+    additionalData?: Record<string, string>,
+    operationId?: string
   ): Promise<T> => {
     const formData = new FormData();
     formData.append('file', file);
@@ -191,6 +202,7 @@ export const api = {
       method: 'POST',
       body: formData,
       credentials: 'include',
+      headers: operationId ? { 'Idempotency-Key': operationId } : undefined,
     };
     let response = await fetch(url, config);
     if (response.status === 401 && await refreshSession()) {

@@ -17,6 +17,7 @@ import {
   deleteReport as deleteReportDB,
   loadAllReports,
 } from '@/persistence/db';
+import { getStorageScope, scopedStorageKey } from '@/persistence/storageScope';
 import type {
   Report,
   ReportStoreState,
@@ -32,38 +33,45 @@ import type {
 // never drop a pending save for another.
 interface PendingSave {
   report: Report;
+  scope: string;
   timeout: ReturnType<typeof setTimeout>;
 }
 
 const pendingSaves = new Map<string, PendingSave>();
 let initializationSequence = 0;
 
-async function persistReport(report: Report): Promise<void> {
-  useReportStore.setState({ persistenceStatus: 'saving', persistenceError: null });
+async function persistReport(report: Report, scope: string): Promise<void> {
+  if (scope === getStorageScope()) {
+    useReportStore.setState({ persistenceStatus: 'saving', persistenceError: null });
+  }
   try {
-    await saveReportDB(report);
-    if (pendingSaves.size === 0) {
+    await saveReportDB(report, scope);
+    if (pendingSaves.size === 0 && scope === getStorageScope()) {
       useReportStore.setState({ persistenceStatus: 'saved', persistenceError: null });
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to save report';
-    useReportStore.setState({ persistenceStatus: 'error', persistenceError: message });
+    if (scope === getStorageScope()) {
+      useReportStore.setState({ persistenceStatus: 'error', persistenceError: message });
+    }
     throw error;
   }
 }
 
 function debouncedSave(report: Report) {
-  const existing = pendingSaves.get(report.id);
+  const scope = getStorageScope();
+  const key = scopedStorageKey(scope, report.id);
+  const existing = pendingSaves.get(key);
   if (existing) {
     clearTimeout(existing.timeout);
   }
   const timeout = setTimeout(() => {
-    pendingSaves.delete(report.id);
-    void persistReport(report).catch((error) => {
+    pendingSaves.delete(key);
+    void persistReport(report, scope).catch((error) => {
       console.error('[ReportStore] Failed to save report:', error);
     });
-  }, 500);
-  pendingSaves.set(report.id, { report, timeout });
+  }, 100);
+  pendingSaves.set(key, { report, scope, timeout });
   useReportStore.setState({ persistenceStatus: 'saving', persistenceError: null });
 }
 
@@ -72,7 +80,7 @@ async function flushPendingSaves(): Promise<void> {
   pendingSaves.clear();
   for (const save of saves) clearTimeout(save.timeout);
   if (saves.length === 0) return;
-  await Promise.all(saves.map(({ report }) => persistReport(report)));
+  await Promise.all(saves.map(({ report, scope }) => persistReport(report, scope)));
 }
 
 function reportDocument(name: string, template: ReportTemplateId): TipTapContent {
@@ -183,8 +191,6 @@ export const useReportStore = create<ReportStoreState>()(
 
     reset: () => {
       initializationSequence += 1;
-      for (const pending of pendingSaves.values()) clearTimeout(pending.timeout);
-      pendingSaves.clear();
       set((state) => {
         state.reports = {};
         state.selectedReportId = null;
@@ -265,10 +271,11 @@ export const useReportStore = create<ReportStoreState>()(
     },
 
     deleteReport: (id) => {
-      const pending = pendingSaves.get(id);
+      const key = scopedStorageKey(getStorageScope(), id);
+      const pending = pendingSaves.get(key);
       if (pending) {
         clearTimeout(pending.timeout);
-        pendingSaves.delete(id);
+        pendingSaves.delete(key);
       }
       set((state) => {
         delete state.reports[id];

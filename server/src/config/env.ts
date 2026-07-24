@@ -23,6 +23,10 @@ export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  trustProxy: process.env.TRUST_PROXY
+    || (process.env.NODE_ENV === 'production'
+      ? 'loopback, linklocal, uniquelocal'
+      : false),
   cookieSecure: process.env.NODE_ENV === 'production',
   cookieSameSite: (process.env.NODE_ENV === 'production' ? 'strict' : 'lax') as 'strict' | 'lax' | 'none',
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',

@@ -51,14 +51,23 @@ export async function reconcileStorageUsage(): Promise<void> {
     { $group: { _id: '$metadata.userId', bytes: { $sum: '$length' } } },
   ]).toArray();
 
-  await User.updateMany({}, { $set: { storageUsedBytes: 0 } });
+  await User.updateMany(
+    { storageUsedBytes: { $exists: false } },
+    { $set: { storageUsedBytes: 0 } },
+  );
   if (usage.length === 0) return;
   await User.bulkWrite(usage
     .filter(item => Types.ObjectId.isValid(item._id))
     .map(item => ({
       updateOne: {
         filter: { _id: new Types.ObjectId(item._id) },
-        update: { $set: { storageUsedBytes: item.bytes } },
+        update: [{
+          $set: {
+            storageUsedBytes: {
+              $max: [{ $ifNull: ['$storageUsedBytes', 0] }, item.bytes],
+            },
+          },
+        }],
       },
     })));
 }

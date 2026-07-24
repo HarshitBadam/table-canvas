@@ -13,6 +13,7 @@ import {
   getRefreshTokenFromCookie,
   getRefreshTokenExpiryDate,
   hashRefreshToken,
+  persistRefreshSession,
 } from '../services/auth.service.js';
 import { verifyGoogleToken } from '../services/google.service.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -25,6 +26,7 @@ import {
 } from '../middleware/errorHandler.js';
 import { rateLimit } from 'express-rate-limit';
 import { config } from '../config/env.js';
+import { MongoRateLimitStore } from '../services/rateLimitStore.js';
 
 const router = Router();
 const signInLimiter = rateLimit({
@@ -32,6 +34,7 @@ const signInLimiter = rateLimit({
   limit: 20,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
+  store: new MongoRateLimitStore('auth-sign-in'),
   message: { success: false, error: 'Too many authentication attempts' },
 });
 const refreshLimiter = rateLimit({
@@ -39,6 +42,7 @@ const refreshLimiter = rateLimit({
   limit: 120,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
+  store: new MongoRateLimitStore('auth-refresh'),
   message: { success: false, error: 'Too many refresh attempts' },
 });
 
@@ -82,18 +86,14 @@ router.post(
     const accessToken = generateAccessToken(user._id.toString(), user.email);
     const refreshToken = generateRefreshToken(user._id.toString(), user.email);
 
-    user.refreshTokens.push({
-      tokenHash: hashRefreshToken(refreshToken),
-      expiresAt: getRefreshTokenExpiryDate(),
-    });
-    await user.save();
+    const sessionUser = await persistRefreshSession(user._id.toString(), refreshToken);
 
     setAuthCookies(res, accessToken, refreshToken);
 
     const response: ApiResponse<RegisterResponse> = {
       success: true,
       data: {
-        user: user.toPublic(),
+        user: sessionUser.toPublic(),
         message: 'Registration successful',
       },
     };
@@ -125,18 +125,14 @@ router.post(
     const accessToken = generateAccessToken(user._id.toString(), user.email);
     const refreshToken = generateRefreshToken(user._id.toString(), user.email);
 
-    user.refreshTokens.push({
-      tokenHash: hashRefreshToken(refreshToken),
-      expiresAt: getRefreshTokenExpiryDate(),
-    });
-    await user.save();
+    const sessionUser = await persistRefreshSession(user._id.toString(), refreshToken);
 
     setAuthCookies(res, accessToken, refreshToken);
 
     const response: ApiResponse<LoginResponse> = {
       success: true,
       data: {
-        user: user.toPublic(),
+        user: sessionUser.toPublic(),
         message: 'Login successful',
       },
     };
@@ -228,6 +224,7 @@ router.post(
       { new: true },
     );
     if (!user) {
+      clearAuthCookies(res);
       throw new AuthenticationError('Refresh token not found or expired');
     }
 
@@ -263,51 +260,46 @@ router.post(
       throw new AuthenticationError(message);
     }
 
-    // 1. Try to find by googleId
+    // Google identities are only linked at account creation. Existing password
+    // accounts require a future explicit, authenticated account-linking flow.
     let user: IUserDocument | null = await User.findOne({ googleId: googleInfo.googleId });
 
     if (!user) {
-      // 2. Try to find by email and link the Google account
-      user = await User.findByEmail(googleInfo.email);
-      if (user) {
-        user.googleId = googleInfo.googleId;
-        if (!user.avatarUrl && googleInfo.avatarUrl) {
-          user.avatarUrl = googleInfo.avatarUrl;
-        }
-        if (!user.tier) {
-          user.tier = 'google';
-        }
-      } else {
-        // 3. Create a brand-new Google user
-        user = new User({
-          email: googleInfo.email.toLowerCase().trim(),
-          name: googleInfo.name,
-          googleId: googleInfo.googleId,
-          avatarUrl: googleInfo.avatarUrl,
-          tier: 'google',
-        });
+      const passwordAccount = await User.findByEmail(googleInfo.email);
+      if (passwordAccount) {
+        throw new ConflictError(
+          'An account already uses this email. Sign in with its password before linking Google.',
+        );
       }
+      user = await User.create({
+        email: googleInfo.email.toLowerCase().trim(),
+        name: googleInfo.name,
+        googleId: googleInfo.googleId,
+        avatarUrl: googleInfo.avatarUrl,
+        tier: 'google',
+      });
     } else {
       if (googleInfo.avatarUrl) {
-        user.avatarUrl = googleInfo.avatarUrl;
+        user = await User.findByIdAndUpdate(
+          user._id,
+          { $set: { avatarUrl: googleInfo.avatarUrl } },
+          { new: true },
+        );
+        if (!user) throw new AuthenticationError('Google account no longer exists');
       }
     }
 
     const accessToken = generateAccessToken(user._id.toString(), user.email);
     const refreshToken = generateRefreshToken(user._id.toString(), user.email);
 
-    user.refreshTokens.push({
-      tokenHash: hashRefreshToken(refreshToken),
-      expiresAt: getRefreshTokenExpiryDate(),
-    });
-    await user.save();
+    const sessionUser = await persistRefreshSession(user._id.toString(), refreshToken);
 
     setAuthCookies(res, accessToken, refreshToken);
 
     const response: ApiResponse<LoginResponse> = {
       success: true,
       data: {
-        user: user.toPublic(),
+        user: sessionUser.toPublic(),
         message: 'Google login successful',
       },
     };
