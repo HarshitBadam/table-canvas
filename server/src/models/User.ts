@@ -3,7 +3,7 @@ import { IUser, IRefreshToken } from '../types/index.js';
 
 const RefreshTokenSchema = new Schema<IRefreshToken>(
   {
-    token: {
+    tokenHash: {
       type: String,
       required: true,
     },
@@ -78,6 +78,11 @@ const UserSchema = new Schema<IUserDocument, IUserModel>(
       type: [RefreshTokenSchema],
       default: [],
     },
+    storageUsedBytes: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
   },
   {
     timestamps: true,
@@ -87,7 +92,7 @@ const UserSchema = new Schema<IUserDocument, IUserModel>(
 
 // Note: email index is already created by `unique: true` in schema definition
 // googleId index is created by `unique: true` + `sparse: true` in schema definition
-UserSchema.index({ 'refreshTokens.token': 1 });
+UserSchema.index({ 'refreshTokens.tokenHash': 1 });
 
 UserSchema.methods.toPublic = function () {
   const pub: ReturnType<IUserDocument['toPublic']> = {
