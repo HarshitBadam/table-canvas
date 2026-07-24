@@ -54,12 +54,13 @@ vi.mock('@/persistence/syncService', () => ({
   createProjectWithSync: vi.fn(),
   deleteProjectWithSync: vi.fn(),
   fetchProjects: vi.fn(),
+  flushAllProjectSavesWithSync: vi.fn().mockResolvedValue(undefined),
   flushProjectSaveWithSync: mocks.flushProjectSave,
   importProjectWithSync: vi.fn(),
   loadProjectWithSync: mocks.loadProject,
   saveProjectWithSync: mocks.saveProject,
   setProjectSyncErrorHandler: vi.fn(),
-  syncLocalProjectsToBackend: vi.fn().mockResolvedValue(undefined),
+  syncLocalProjectsToBackend: vi.fn().mockResolvedValue([]),
 }))
 vi.mock('./projectLifecycle', () => ({
   clearProjectRuntime: mocks.clearRuntime,

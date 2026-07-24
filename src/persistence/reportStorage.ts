@@ -2,7 +2,6 @@ import type { Report } from '@/report/types'
 import { getDB } from './dbCore'
 import {
   getStorageScope,
-  isLegacyRecord,
   scopedStorageKey,
 } from './storageScope'
 
@@ -17,9 +16,6 @@ export async function saveReport(
     entityId: report.id,
     ownerId: scope,
   })
-  if (scope === 'guest') {
-    await db.delete('reports', report.id)
-  }
 }
 
 export async function loadReport(
@@ -27,10 +23,7 @@ export async function loadReport(
   scope = getStorageScope(),
 ): Promise<Report | null> {
   const db = await getDB()
-  let report = await db.get('reports', scopedStorageKey(scope, id))
-  if (!report && scope === 'guest') {
-    report = await db.get('reports', id)
-  }
+  const report = await db.get('reports', scopedStorageKey(scope, id))
   return report ? fromStoredReport(report) : null
 }
 
@@ -38,13 +31,9 @@ export async function loadAllReports(
   scope = getStorageScope(),
 ): Promise<Record<string, Report>> {
   const db = await getDB()
-  const reports = await db.getAll('reports')
+  const reports = await db.getAllFromIndex('reports', 'by-owner', scope)
   const result: Record<string, Report> = {}
   for (const stored of reports) {
-    if (
-      stored.ownerId !== scope
-      && !(scope === 'guest' && isLegacyRecord(stored.ownerId))
-    ) continue
     const report = fromStoredReport(stored)
     result[report.id] = report
   }
@@ -55,10 +44,16 @@ export async function loadReportsForProject(
   projectId: string,
   scope = getStorageScope(),
 ): Promise<Record<string, Report>> {
-  const reports = await loadAllReports(scope)
-  return Object.fromEntries(
-    Object.entries(reports).filter(([, report]) => report.projectId === projectId),
+  const db = await getDB()
+  const reports = await db.getAllFromIndex(
+    'reports',
+    'by-owner-project',
+    [scope, projectId],
   )
+  return Object.fromEntries(reports.map((stored) => {
+    const report = fromStoredReport(stored)
+    return [report.id, report]
+  }))
 }
 
 export async function listReports(
@@ -66,21 +61,20 @@ export async function listReports(
   scope = getStorageScope(),
 ): Promise<Array<{ id: string; name: string; updatedAt: string }>> {
   const db = await getDB()
-  const reports = await db.getAllFromIndex('reports', 'by-updated')
+  const reports = projectId
+    ? await db.getAllFromIndex('reports', 'by-owner-project', [scope, projectId])
+    : await db.getAllFromIndex('reports', 'by-owner', scope)
 
   return reports
-    .filter(report => (
-      (report.ownerId === scope || (scope === 'guest' && isLegacyRecord(report.ownerId)))
-      && (!projectId || report.projectId === projectId)
-    ))
     .map(stored => {
       const report = fromStoredReport(stored)
       return {
-    id: report.id,
-    name: report.name,
-    updatedAt: report.updatedAt,
+        id: report.id,
+        name: report.name,
+        updatedAt: report.updatedAt,
       }
-    }).reverse()
+    })
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
 export async function deleteReport(
@@ -89,9 +83,6 @@ export async function deleteReport(
 ): Promise<void> {
   const db = await getDB()
   await db.delete('reports', scopedStorageKey(scope, id))
-  if (scope === 'guest') {
-    await db.delete('reports', id)
-  }
 }
 
 export async function saveAllReports(
@@ -108,17 +99,15 @@ export async function deleteReportsForProject(
   scope = getStorageScope(),
 ): Promise<void> {
   const db = await getDB()
-  const reports = await db.getAll('reports')
+  const reports = await db.getAllFromIndex(
+    'reports',
+    'by-owner-project',
+    [scope, projectId],
+  )
   const tx = db.transaction('reports', 'readwrite')
 
   for (const report of reports) {
-    const belongsToScope = (
-      report.ownerId === scope
-      || (scope === 'guest' && isLegacyRecord(report.ownerId))
-    )
-    if (belongsToScope && report.projectId === projectId) {
-      await tx.store.delete(report.id)
-    }
+    await tx.store.delete(report.id)
   }
 
   await tx.done
@@ -129,13 +118,18 @@ export async function copyReportsToProject(
   destinationProjectId: string,
   sourceScope = getStorageScope(),
   destinationScope = getStorageScope(),
+  regenerateIds = false,
 ): Promise<void> {
   const reports = await loadReportsForProject(sourceProjectId, sourceScope)
-  await Promise.all(Object.values(reports).map(report => saveReport({
-    ...report,
-    projectId: destinationProjectId,
-    updatedAt: new Date().toISOString(),
-  }, destinationScope)))
+  await Promise.all(Object.values(reports).map((report) => {
+    const id = regenerateIds ? createEntityId() : report.id
+    return saveReport({
+      ...report,
+      id,
+      projectId: destinationProjectId,
+      updatedAt: new Date().toISOString(),
+    }, destinationScope)
+  }))
 }
 
 export async function replaceReportsForProject(
@@ -171,4 +165,10 @@ function fromStoredReport(
     ...report,
     id: stored.entityId ?? stored.id,
   }
+}
+
+function createEntityId(): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `report_${Date.now()}_${Math.random().toString(36).slice(2)}`
 }

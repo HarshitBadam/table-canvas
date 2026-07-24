@@ -43,7 +43,7 @@ describe('storage ownership scopes', () => {
     expect((await db.loadReport('same-report'))?.name).toBe('Report A')
   })
 
-  it('exposes legacy unscoped records only to the guest workspace', async () => {
+  it('quarantines legacy unscoped records from every workspace', async () => {
     const db = await getDB()
     const raw = await db.getDB()
     await raw.put('projects', {
@@ -60,7 +60,7 @@ describe('storage ownership scopes', () => {
     expect(await db.loadProject('legacy-project')).toBeNull()
 
     db.setStorageScope(db.GUEST_STORAGE_SCOPE)
-    expect((await db.loadProject('legacy-project'))?.name).toBe('Legacy guest work')
+    expect(await db.loadProject('legacy-project')).toBeNull()
   })
 
   it('re-keys reports when a guest project is promoted', async () => {

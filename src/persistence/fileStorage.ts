@@ -19,9 +19,6 @@ export async function saveFile(
     data,
     createdAt: new Date().toISOString(),
   })
-  if (scope === 'guest') {
-    await db.delete('files', id)
-  }
 }
 
 export async function loadFile(
@@ -55,9 +52,6 @@ export async function deleteFile(
 ): Promise<void> {
   const db = await getDB()
   await db.delete('files', scopedStorageKey(scope, id))
-  if (scope === 'guest') {
-    await db.delete('files', id)
-  }
 }
 
 async function getFileRecord(
@@ -65,7 +59,5 @@ async function getFileRecord(
   id: string,
   scope: string,
 ) {
-  const scoped = await db.get('files', scopedStorageKey(scope, id))
-  if (scoped || scope !== 'guest') return scoped
-  return db.get('files', id)
+  return db.get('files', scopedStorageKey(scope, id))
 }

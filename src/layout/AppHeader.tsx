@@ -310,7 +310,9 @@ export function AppHeader({
         <button
           type="button"
           onClick={() => {
-            void leaveGuest().then(() => window.location.assign('/login'))
+            void leaveGuest()
+              .then(() => window.location.assign('/login'))
+              .catch(() => undefined)
           }}
           className="btn btn-secondary ml-2"
         >

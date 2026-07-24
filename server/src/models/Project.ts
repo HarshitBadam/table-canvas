@@ -4,6 +4,7 @@ import { IProject, ProjectNode, Edge, SerializedPatches } from '../types/index.j
 export interface IProjectDocument extends Omit<IProject, '_id'>, Document {
   deletedAt: Date | null;
   clientOperationId?: string;
+  clientOperationHash?: string;
   quotaSlot?: number;
   
   toPublic(): {
@@ -99,6 +100,11 @@ const ProjectSchema = new Schema<IProjectDocument, IProjectModel>(
       type: String,
       maxlength: 200,
     },
+    clientOperationHash: {
+      type: String,
+      minlength: 64,
+      maxlength: 64,
+    },
     quotaSlot: {
       type: Number,
       min: 0,
@@ -155,11 +161,13 @@ ProjectSchema.methods.toPublic = function () {
 
 ProjectSchema.methods.softDelete = async function (): Promise<IProjectDocument> {
   this.deletedAt = new Date();
+  this.revision = (this.revision ?? 0) + 1;
   return this.save();
 };
 
 ProjectSchema.methods.restore = async function (): Promise<IProjectDocument> {
   this.deletedAt = null;
+  this.revision = (this.revision ?? 0) + 1;
   return this.save();
 };
 

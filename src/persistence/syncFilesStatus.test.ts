@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   saveFileLocal: vi.fn(),
   loadFileLocal: vi.fn(),
   deleteFileLocal: vi.fn(),
+  saveProjectAndEnqueue: vi.fn(),
 }))
 
 vi.mock('@/api/projects.api', () => ({
@@ -19,9 +20,20 @@ vi.mock('@/api/projects.api', () => ({
 }))
 
 vi.mock('@/api/files.api', () => ({
-  uploadFile: (file: File, projectId?: string) => mocks.uploadFile(file, projectId),
+  uploadFile: (file: File, projectId?: string, operationId?: string) => (
+    mocks.uploadFile(file, projectId, operationId)
+  ),
   getFileAsArrayBuffer: (id: string) => mocks.getFileAsArrayBuffer(id),
   deleteFile: (id: string) => mocks.deleteFile(id),
+}))
+vi.mock('./projectSyncQueue', () => ({
+  acknowledgeProjectSave: vi.fn(),
+  clearProjectSyncOperation: vi.fn(),
+  enqueueProjectDelete: vi.fn(),
+  finalizeProjectDelete: vi.fn(),
+  getProjectSyncOperation: vi.fn().mockResolvedValue(null),
+  listProjectSyncOperations: vi.fn().mockResolvedValue([]),
+  saveProjectAndEnqueue: (...args: unknown[]) => mocks.saveProjectAndEnqueue(...args),
 }))
 
 vi.mock('./db', () => ({
@@ -67,7 +79,6 @@ const {
   getFileAsArrayBuffer: mockGetFileAsArrayBuffer,
   loadFileLocal: mockLoadFileLocal,
   saveFileLocal: mockSaveFileLocal,
-  saveProjectLocal: mockSaveProjectLocal,
   uploadFile: mockUploadFile,
 } = mocks
 
@@ -92,8 +103,12 @@ describe('uploadFileWithSync', () => {
       filename: 'test.csv',
       contentType: 'text/csv',
     })
-    const result = await uploadFileWithSync(file, 'proj_1')
-    expect(mockUploadFile).toHaveBeenCalledWith(file, 'proj_1')
+    const result = await uploadFileWithSync(file, 'proj_1', 'upload-operation')
+    expect(mockUploadFile).toHaveBeenCalledWith(
+      file,
+      'proj_1',
+      'upload-operation',
+    )
     expect(mockSaveFileLocal).toHaveBeenCalled()
     expect(result.id).toBe('server_file_123')
   })
@@ -106,6 +121,23 @@ describe('uploadFileWithSync', () => {
     expect(mockSaveFileLocal).toHaveBeenCalled()
     expect(result.id).toMatch(/^local_file_/)
     expect(result.name).toBe('test.csv')
+  })
+
+  it('keeps a successful remote upload when local caching fails', async () => {
+    const file = createMockFile('test content', 'test.csv', 'text/csv')
+    mockUploadFile.mockResolvedValue({
+      id: 'server_file_123',
+      filename: file.name,
+      contentType: file.type,
+    })
+    mockSaveFileLocal.mockRejectedValueOnce(new Error('IndexedDB unavailable'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await uploadFileWithSync(file, 'proj_1', 'cache-failure')
+
+    expect(result.id).toBe('server_file_123')
+    expect(result.id).not.toMatch(/^local_file_/)
+    errorSpy.mockRestore()
   })
 })
 
@@ -164,7 +196,7 @@ describe('sync edge cases', () => {
       saveProjectWithSync('proj_1', 'B', {}, {}, {}),
       saveProjectWithSync('proj_1', 'C', {}, {}, {}),
     ])
-    expect(mockSaveProjectLocal).toHaveBeenCalledTimes(3)
+    expect(mocks.saveProjectAndEnqueue).toHaveBeenCalledTimes(3)
   })
 
   it('handles special characters in project names', async () => {
@@ -176,6 +208,14 @@ describe('sync edge cases', () => {
 
   it('handles empty project state', async () => {
     await saveProjectWithSync('proj_empty', 'Empty', {}, {}, {})
-    expect(mockSaveProjectLocal).toHaveBeenCalledWith('proj_empty', 'Empty', {}, {}, {})
+    expect(mocks.saveProjectAndEnqueue).toHaveBeenCalledWith(
+      'proj_empty',
+      'Empty',
+      {},
+      {},
+      {},
+      {},
+      accountStorageScope('test-user'),
+    )
   })
 })

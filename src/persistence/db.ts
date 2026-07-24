@@ -1,5 +1,6 @@
 export { getDB } from './dbCore'
 export type { TableCanvasDB } from './dbCore'
+export type { ProjectSyncOperation } from './dbCore'
 export type { SerializedPatches } from './patchSerialization'
 export {
   accountStorageScope,
@@ -13,7 +14,6 @@ export {
   loadProject,
   listProjects,
   deleteProject,
-  updateProjectRevision,
 } from './projectStorage'
 export type { StoredProject } from './projectStorage'
 
@@ -31,6 +31,17 @@ export {
   replaceReportsForProject,
   saveAllReports,
 } from './reportStorage'
+
+export {
+  acknowledgeProjectSave,
+  clearProjectSyncOperation,
+  enqueueProjectDelete,
+  enqueueProjectSave,
+  finalizeProjectDelete,
+  getProjectSyncOperation,
+  listProjectSyncOperations,
+  saveProjectAndEnqueue,
+} from './projectSyncQueue'
 
 export {
   exportProjectFile,

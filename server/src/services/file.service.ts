@@ -48,6 +48,55 @@ export async function uploadFile(
   });
 }
 
+export async function findFileByOperationId(
+  userId: string,
+  operationId: string,
+  expected: {
+    filename: string
+    size: number
+    projectId?: string
+  },
+): Promise<{ file: UploadedFile; matches: boolean } | null> {
+  const db = mongoose.connection.db;
+  if (!db) throw new Error('Database connection not established');
+  const file = await db.collection('files.files').findOne({
+    'metadata.userId': userId,
+    'metadata.clientOperationId': operationId,
+  });
+  if (!file) return null;
+  return {
+    file: {
+      id: file._id.toString(),
+      filename: file.filename,
+      contentType: file.contentType || 'application/octet-stream',
+      size: file.length,
+      uploadDate: file.uploadDate,
+    },
+    matches: (
+      file.filename === expected.filename
+      && file.length === expected.size
+      && (file.metadata?.projectId ?? undefined) === expected.projectId
+    ),
+  };
+}
+
+export async function initializeFileIndexes(): Promise<void> {
+  const db = mongoose.connection.db;
+  if (!db) throw new Error('Database connection not established');
+  await db.collection('files.files').createIndex(
+    {
+      'metadata.userId': 1,
+      'metadata.clientOperationId': 1,
+    },
+    {
+      unique: true,
+      partialFilterExpression: {
+        'metadata.clientOperationId': { $type: 'string' },
+      },
+    },
+  );
+}
+
 export interface FileDownload {
   stream: NodeJS.ReadableStream;
   filename: string;
@@ -163,5 +212,26 @@ export async function getFileMetadata(
     contentType: fileDoc.contentType || 'application/octet-stream',
     size: fileDoc.length,
     uploadDate: fileDoc.uploadDate,
+  };
+}
+
+export async function getFileLifecycleMetadata(
+  fileId: string,
+  userId: string,
+): Promise<{ projectId?: string } | null> {
+  const db = mongoose.connection.db;
+  if (!db) throw new Error('Database connection not established');
+  const file = await db.collection('files.files').findOne(
+    {
+      _id: new mongo.ObjectId(fileId),
+      'metadata.userId': userId,
+    },
+    { projection: { metadata: 1 } },
+  );
+  if (!file) return null;
+  return {
+    projectId: typeof file.metadata?.projectId === 'string'
+      ? file.metadata.projectId
+      : undefined,
   };
 }
