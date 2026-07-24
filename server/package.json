@@ -16,7 +16,7 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -36,13 +36,13 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^20.10.5",
     "@types/supertest": "^6.0.2",
-    "@vitest/coverage-v8": "^2.1.0",
-    "@vitest/ui": "^2.1.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/ui": "^4.1.10",
     "eslint": "^9.39.4",
     "mongodb-memory-server": "^10.1.2",
     "supertest": "^7.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
-    "vitest": "^2.1.0"
+    "vitest": "^4.1.10"
   }
 }
