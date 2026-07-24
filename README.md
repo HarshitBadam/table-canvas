@@ -19,8 +19,9 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. With no backend running, the app drops into **local mode**:
-you're signed in automatically as "Local User" and everything is stored in IndexedDB.
+Open `http://localhost:5173` and choose **Continue as guest** for a browser-local
+workspace. Set `VITE_AUTO_GUEST=true` only when automatic guest startup is useful
+during development.
 
 For the full stack (auth + sync) with Docker:
 
@@ -102,6 +103,7 @@ npm run test           # Unit tests (watch)
 npm run test:run       # Unit tests once
 npm run test:coverage  # Coverage report
 npm run test:e2e       # Playwright E2E
+npm run test:production # isolated production Docker smoke test (requires Docker)
 
 npm run docker:up      # Full stack (Docker)
 npm run docker:down    # Stop the stack
@@ -115,6 +117,7 @@ npm run docker:seed    # Seed sample data
 | [Setup](docs/setup.md) | Run modes, environment variables, troubleshooting |
 | [Architecture](docs/architecture.md) | DAG, engine, state, materialization, persistence |
 | [Session and data reliability](docs/reliability.md) | Guest/account isolation, promotion, concurrency, quotas, operations |
+| [Production deployment](docs/production.md) | Vercel, backend, backups, monitoring, release and rollback |
 | [Features](docs/features.md) | Canvas, grid, formulas, transforms, charts, dashboard, reports |
 | [API](docs/api.md) | REST endpoints for the optional backend |
 | [Testing](docs/testing.md) | How to run tests, where they live, CI |

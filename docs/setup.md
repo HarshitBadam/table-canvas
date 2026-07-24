@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 18+ and npm 9+
+- Node.js 24+ and npm
 - Docker + Docker Compose (only for the full stack)
 
 ## Run modes
@@ -16,9 +16,9 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. With no backend reachable, the app enters **local mode**: you're
-signed in automatically as "Local User" and everything persists in IndexedDB. Data only lives in
-that one browser with no cross-device sync.
+Open `http://localhost:5173` and choose **Continue as guest**. Everything persists in
+IndexedDB and remains in that browser with no cross-device sync. Development can set
+`VITE_AUTO_GUEST=true` to skip the explicit choice.
 
 ### 2. Full stack (Docker)
 
@@ -59,6 +59,7 @@ Only needed when running the backend. In local mode you can skip all of this.
 
 ```env
 VITE_API_URL=http://localhost:3001/api
+VITE_AUTO_GUEST=false
 ```
 
 **Backend**: `server/.env`:
@@ -74,6 +75,7 @@ JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
 FRONTEND_URL=http://localhost:5173   # must match the frontend origin for CORS
+COOKIE_SAME_SITE=lax
 
 # Optional — enables Google Sign-In (get from Google Cloud Console → Credentials)
 GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
@@ -88,9 +90,8 @@ VITE_GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
 
 Generate secrets with `openssl rand -base64 32`.
 
-Google Sign-In is optional. If `GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` are absent, the
-server boots normally (Google login attempts return a clear error) and the client hides the
-Google button.
+Google Sign-In is optional in every environment. The client hides the Google button
+when its client ID is absent.
 
 ## Build
 
@@ -101,10 +102,13 @@ npm run build   # tsc + vite, output in dist/
 `dist/` can be served by any static file server. Configure it to fall back to `index.html` for
 client-side routing.
 
+For the hosted Vercel frontend and production backend checklist, see
+[Production deployment](production.md).
+
 ## Gotchas
 
-- **Backend reachability** is checked with a 3s timeout on startup. If the backend is slow to
-  come up, the frontend may fall back to local mode. Reload once it's ready.
+- **Backend reachability** is checked during authentication. When it is unavailable,
+  users can explicitly continue with a guest workspace.
 - **CORS errors** usually mean `FRONTEND_URL` doesn't match the actual frontend origin (including port).
 - **Reset local data**: `indexedDB.deleteDatabase('table-canvas-v2')` in the browser console, or
   clear site data.

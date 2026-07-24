@@ -6,7 +6,7 @@ import {
   openManualTable,
 } from '../app.support'
 
-test.describe('@ux visual regression contract', () => {
+test.describe('Visual regression', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
   test('empty canvas is visually stable in light and dark themes', async ({ page }) => {
@@ -33,8 +33,8 @@ test.describe('@ux visual regression contract', () => {
   test('editable grid and suggestions panel are visually stable', async ({ page }) => {
     await bootApp(page)
     await freezeVisualMotion(page)
-    await createManualTable(page, 'Visual Contract')
-    await openManualTable(page, 'Visual Contract')
+    await createManualTable(page, 'Visual Table')
+    await openManualTable(page, 'Visual Table')
 
     await expect(page).toHaveScreenshot('editable-grid.png')
 
@@ -60,7 +60,6 @@ test.describe('@ux visual regression contract', () => {
     await leftNode.locator('.table-handle-right').first()
       .dragTo(
         rightNode.locator('.table-handle-left').first(),
-        { force: true },
       )
     await expect(page.getByRole('dialog', { name: 'Combine Tables' })).toBeVisible()
 

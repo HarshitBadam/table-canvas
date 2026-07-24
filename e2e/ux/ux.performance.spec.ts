@@ -2,28 +2,28 @@ import type { Page } from '@playwright/test'
 import { expect, test } from '../e2e.fixture'
 import { bootApp } from '../app.support'
 
-type LongTaskWindow = Window & { __uxLongTasks: number[] }
+type LongTaskWindow = Window & { __longTasks: number[] }
 
 async function installLongTaskRecorder(page: Page) {
   await page.addInitScript(() => {
     const target = window as LongTaskWindow
-    target.__uxLongTasks = []
+    target.__longTasks = []
     new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) target.__uxLongTasks.push(entry.duration)
+      for (const entry of list.getEntries()) target.__longTasks.push(entry.duration)
     }).observe({ type: 'longtask', buffered: true })
   })
 }
 
 async function resetLongTasks(page: Page) {
   await page.evaluate(() => {
-    (window as LongTaskWindow).__uxLongTasks = []
+    (window as LongTaskWindow).__longTasks = []
   })
 }
 
 async function expectLongTasksWithinBudget(page: Page) {
   await page.waitForTimeout(250)
   const durations = await page.evaluate(
-    () => (window as LongTaskWindow).__uxLongTasks ?? [],
+    () => (window as LongTaskWindow).__longTasks ?? [],
   )
   const maxDuration = durations.length > 0 ? Math.max(...durations) : 0
   expect(maxDuration, `Longest main-thread task was ${maxDuration.toFixed(1)}ms`).toBeLessThan(250)
@@ -33,7 +33,7 @@ async function expectLongTasksWithinBudget(page: Page) {
   ).toHaveLength(durations.some(duration => duration >= 100) ? 1 : 0)
 }
 
-test.describe('@ux deterministic performance contract', () => {
+test.describe('Performance budgets', () => {
   test('production build records Core Web Vitals in the telemetry buffer', async ({ page }) => {
     await bootApp(page)
 
@@ -55,14 +55,14 @@ test.describe('@ux deterministic performance contract', () => {
       ...Array.from({ length: 2_000 }, (_, index) => `Item ${index + 1},${index + 1}`),
     ].join('\n')
     await page.locator('aside input[type="file"][accept*=".csv"]').setInputFiles({
-      name: 'performance-contract.csv',
+      name: 'large-table.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from(csv),
     })
     await expect(page.locator('aside').getByRole('button', { name: 'Import Data' }))
       .toBeEnabled({ timeout: 30_000 })
     await page.locator('aside').getByRole('button', {
-      name: /^performance-contract\b/,
+      name: /^large-table\b/,
     }).click()
     await expect(page.getByText('2,000 rows × 2 columns')).toBeVisible({ timeout: 20_000 })
     await expect(page.locator('.cursor-cell').first()).toBeVisible()
@@ -95,8 +95,8 @@ test.describe('@ux deterministic performance contract', () => {
     const editor = page.locator('.tiptap-editor-content')
     await expect(editor).toBeVisible()
     await editor.click()
-    await page.keyboard.type('Responsive editing remains smooth under the UX contract.')
-    await expect(editor).toContainText('Responsive editing remains smooth')
+    await page.keyboard.type('Report editing remains responsive.')
+    await expect(editor).toContainText('Report editing remains responsive.')
 
     await expectLongTasksWithinBudget(page)
   })

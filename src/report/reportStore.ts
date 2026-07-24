@@ -34,10 +34,12 @@ import type {
 interface PendingSave {
   report: Report;
   scope: string;
-  timeout: ReturnType<typeof setTimeout>;
+  timeout: ReturnType<typeof setTimeout> | null;
 }
 
 const pendingSaves = new Map<string, PendingSave>();
+const inFlightWrites = new Map<string, Promise<void>>();
+const saveVersions = new Map<string, number>();
 let initializationSequence = 0;
 
 async function persistReport(report: Report, scope: string): Promise<void> {
@@ -46,9 +48,6 @@ async function persistReport(report: Report, scope: string): Promise<void> {
   }
   try {
     await saveReportDB(report, scope);
-    if (pendingSaves.size === 0 && scope === getStorageScope()) {
-      useReportStore.setState({ persistenceStatus: 'saved', persistenceError: null });
-    }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to save report';
     if (scope === getStorageScope()) {
@@ -58,16 +57,60 @@ async function persistReport(report: Report, scope: string): Promise<void> {
   }
 }
 
+function queueWrite(
+  key: string,
+  scope: string,
+  write: () => Promise<void>,
+): Promise<void> {
+  const previous = inFlightWrites.get(key);
+  const queued = (previous ? previous.catch(() => undefined) : Promise.resolve())
+    .then(write);
+  inFlightWrites.set(key, queued);
+  const settle = () => {
+    if (inFlightWrites.get(key) === queued) inFlightWrites.delete(key);
+    if (
+      pendingSaves.size === 0
+      && inFlightWrites.size === 0
+      && scope === getStorageScope()
+    ) {
+      useReportStore.setState({ persistenceStatus: 'saved', persistenceError: null });
+    }
+  };
+  void queued.then(settle, settle);
+  return queued;
+}
+
+function queueReportSave(report: Report, scope: string): Promise<void> {
+  const key = scopedStorageKey(scope, report.id);
+  const version = (saveVersions.get(key) ?? 0) + 1;
+  saveVersions.set(key, version);
+  return queueWrite(
+    key,
+    scope,
+    () => persistReport(report, scope),
+  ).catch((error) => {
+    const latest = useReportStore.getState().reports[report.id];
+    if (
+      saveVersions.get(key) === version
+      && !pendingSaves.has(key)
+      && latest
+    ) {
+      pendingSaves.set(key, { report: latest, scope, timeout: null });
+    }
+    throw error;
+  });
+}
+
 function debouncedSave(report: Report) {
   const scope = getStorageScope();
   const key = scopedStorageKey(scope, report.id);
   const existing = pendingSaves.get(key);
-  if (existing) {
+  if (existing?.timeout) {
     clearTimeout(existing.timeout);
   }
   const timeout = setTimeout(() => {
     pendingSaves.delete(key);
-    void persistReport(report, scope).catch((error) => {
+    void queueReportSave(report, scope).catch((error) => {
       console.error('[ReportStore] Failed to save report:', error);
     });
   }, 100);
@@ -76,11 +119,15 @@ function debouncedSave(report: Report) {
 }
 
 async function flushPendingSaves(): Promise<void> {
-  const saves = [...pendingSaves.values()];
-  pendingSaves.clear();
-  for (const save of saves) clearTimeout(save.timeout);
-  if (saves.length === 0) return;
-  await Promise.all(saves.map(({ report, scope }) => persistReport(report, scope)));
+  while (pendingSaves.size > 0 || inFlightWrites.size > 0) {
+    const saves = [...pendingSaves.values()];
+    pendingSaves.clear();
+    for (const save of saves) {
+      if (save.timeout) clearTimeout(save.timeout);
+    }
+    const queued = saves.map(({ report, scope }) => queueReportSave(report, scope));
+    await Promise.all([...inFlightWrites.values(), ...queued]);
+  }
 }
 
 function reportDocument(name: string, template: ReportTemplateId): TipTapContent {
@@ -271,10 +318,14 @@ export const useReportStore = create<ReportStoreState>()(
     },
 
     deleteReport: (id) => {
-      const key = scopedStorageKey(getStorageScope(), id);
+      const scope = getStorageScope();
+      const key = scopedStorageKey(scope, id);
+      const deletedReport = get().reports[id];
       const pending = pendingSaves.get(key);
-      if (pending) {
+      if (pending?.timeout) {
         clearTimeout(pending.timeout);
+      }
+      if (pending) {
         pendingSaves.delete(key);
       }
       set((state) => {
@@ -284,8 +335,18 @@ export const useReportStore = create<ReportStoreState>()(
           state.selectedReportId = remainingIds.length > 0 ? remainingIds[0] : null;
         }
       });
-      deleteReportDB(id).catch((error) => {
+      void queueWrite(key, scope, () => deleteReportDB(id, scope)).catch((error) => {
         console.error('[ReportStore] Failed to delete report:', error);
+        if (
+          deletedReport
+          && scope === getStorageScope()
+          && get().activeProjectId === deletedReport.projectId
+        ) {
+          set((state) => {
+            state.reports[id] = deletedReport;
+            state.selectedReportId ??= id;
+          });
+        }
         useReportStore.setState({
           persistenceStatus: 'error',
           persistenceError: error instanceof Error ? error.message : 'Unable to delete report',

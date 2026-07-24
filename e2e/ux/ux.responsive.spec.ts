@@ -23,7 +23,7 @@ for (const viewport of [
   { width: 1024, height: 768, label: 'minimum desktop' },
   { width: 1440, height: 900, label: 'standard desktop' },
 ]) {
-  test.describe(`@ux responsive contract: ${viewport.label}`, () => {
+  test.describe(`Responsive layout: ${viewport.label}`, () => {
     test.use({ viewport: { width: viewport.width, height: viewport.height } })
 
     test('canvas shell has no clipping or page-level overflow', async ({ page }) => {
@@ -42,8 +42,8 @@ for (const viewport of [
       await expectInsideViewport(page, dialog)
       await page.keyboard.press('Escape')
 
-      await createManualTable(page, 'Responsive Contract')
-      await openManualTable(page, 'Responsive Contract')
+      await createManualTable(page, 'Responsive Table')
+      await openManualTable(page, 'Responsive Table')
       await expectNoViewportOverflow(page)
       await expectInsideViewport(page, page.getByRole('button', {
         name: 'Suggestions',
@@ -63,7 +63,7 @@ for (const viewport of [
   { width: 667, height: 375, label: 'phone landscape' },
   { width: 768, height: 1024, label: 'tablet portrait' },
 ]) {
-  test.describe(`@ux adaptive contract: ${viewport.label}`, () => {
+  test.describe(`Adaptive layout: ${viewport.label}`, () => {
     test.use({ viewport: { width: viewport.width, height: viewport.height } })
 
     test('navigation, dialogs, grid, and reports reflow inside the viewport', async ({ page }) => {

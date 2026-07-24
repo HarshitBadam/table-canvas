@@ -7,7 +7,7 @@ test.describe('Canvas interaction behavior', () => {
   })
 
   test('zoom controls change the viewport transform', async ({ page }) => {
-    await createManualTable(page, 'Zoom Contract')
+    await createManualTable(page, 'Zoom Table')
     const viewport = page.locator('.react-flow__viewport')
     const before = await viewport.getAttribute('style')
 
@@ -17,8 +17,8 @@ test.describe('Canvas interaction behavior', () => {
   })
 
   test('dragging a node changes its position and keeps it interactive', async ({ page }) => {
-    await createManualTable(page, 'Drag Contract')
-    const node = page.locator('.react-flow__node').filter({ hasText: 'Drag Contract' })
+    await createManualTable(page, 'Drag Table')
+    const node = page.locator('.react-flow__node').filter({ hasText: 'Drag Table' })
     const before = await node.boundingBox()
     expect(before).not.toBeNull()
 
@@ -40,8 +40,8 @@ test.describe('Canvas interaction behavior', () => {
   })
 
   test('selection and export menu expose explicit state and actions', async ({ page }) => {
-    await createManualTable(page, 'Selection Contract')
-    const node = page.locator('.react-flow__node').filter({ hasText: 'Selection Contract' })
+    await createManualTable(page, 'Selection Table')
+    const node = page.locator('.react-flow__node').filter({ hasText: 'Selection Table' })
     await node.click()
     await expect(node).toHaveClass(/selected/)
 

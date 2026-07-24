@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -22,19 +25,20 @@
     "test:suggestions": "vitest run src/suggestions --reporter=verbose",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:ux": "playwright test --grep @ux --workers=1",
-    "test:ux:update": "playwright test --grep @ux --workers=1 --update-snapshots",
+    "test:ux": "playwright test e2e/ux --workers=1",
+    "test:ux:update": "playwright test e2e/ux --workers=1 --update-snapshots",
     "test:all": "npm run test:unit && npm run test:e2e",
-    "test:release": "npm run lint && npm run test:coverage && npm run test:e2e",
+    "test:release": "npm run lint && npm run check:dead-code && npm run test:coverage && npm --prefix server run lint && npm --prefix server run test:coverage && npm run test:e2e && npm run build && npm --prefix server run build && npm audit --omit=dev --audit-level=moderate && npm --prefix server audit --omit=dev --audit-level=moderate",
     "test:ci": "vitest run --reporter=junit --outputFile=./test-results/junit.xml",
     "seed": "npm run seed --prefix server",
     "docker:up": "./scripts/docker-up.sh",
     "docker:up:attached": "docker compose up --build",
     "docker:down": "./scripts/docker-down.sh",
-    "docker:down:volumes": "echo '' && echo '⏳ Stopping and removing data...' && docker compose down -v > /dev/null 2>&1 && echo '✅ Stopped and removed database!' && echo ''",
+    "docker:down:volumes": "echo '' && echo 'Stopping and removing data...' && docker compose down -v > /dev/null 2>&1 && echo 'Stopped and removed database.' && echo ''",
     "docker:logs": "docker compose logs -f frontend backend",
     "docker:restart": "docker compose down && docker compose up --build",
-    "docker:seed": "docker compose exec backend npm run seed"
+    "docker:seed": "docker compose exec backend npm run seed",
+    "test:production": "./scripts/test-production-compose.sh"
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "^1.33.1-dev16.0",
@@ -61,7 +65,7 @@
     "papaparse": "^5.4.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.21.1",
+    "react-router-dom": "^7.18.1",
     "reactflow": "^11.11.4",
     "recharts": "^2.15.0",
     "tippy.js": "^6.3.7",
@@ -75,7 +79,7 @@
     "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
-    "@types/node": "^22.10.5",
+    "@types/node": "^24.13.3",
     "@types/papaparse": "^5.3.15",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

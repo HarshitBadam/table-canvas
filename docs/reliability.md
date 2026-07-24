@@ -54,6 +54,11 @@ revision. Offline saves and deletions survive reload and replay on reconnect.
 Timestamps are presentation metadata and are never used to infer whether data is
 dirty.
 
+Startup and reconnect replay reconcile HTTP 409 responses before initialization
+continues. Stale saves become conflict copies; stale deletes are cancelled and the
+newer cloud project is restored. Report writes are serialized per report, and flush
+boundaries wait for both debounced and already-running IndexedDB writes.
+
 If the cloud revision advances beyond a queued operation's base, Table Canvas loads
 the cloud version and preserves the queued project and reports under new ids as a
 conflict copy. The UI keeps sync errors visible and offers a safe reload. This is
@@ -70,6 +75,8 @@ optimistic concurrency, not real-time collaborative editing.
   during startup migration.
 - Login, registration, Google sign-in, and refresh endpoints are rate limited with
   a shared MongoDB store across backend instances.
+- The rate-limit key has a unique MongoDB index, so concurrent first requests cannot
+  create separate counters. Startup consolidates records created by older versions.
 - Google sign-in never auto-links an existing password account. Linking requires a
   future explicit authenticated flow.
 - Public email registration is disabled by default in production. Set
@@ -91,10 +98,11 @@ garbage collection removes only files no remaining local project references.
 
 ## Operations
 
-- Serve `/api` through the frontend origin so cookie behavior does not depend on
-  cross-origin browser policy.
-- Keep the backend port private. `TRUST_PROXY` must contain only the reverse
-  proxy's private ranges; never configure Express to trust every client.
+- Prefer a same-origin API proxy or same-site frontend/API subdomains. Unrelated
+  domains require `COOKIE_SAME_SITE=none` and remain subject to browser
+  third-party-cookie restrictions.
+- Set `TRUST_PROXY` to the actual proxy hop count or private ranges; never configure
+  Express to trust every client.
 - Back up MongoDB, including `files.files` and `files.chunks`, as one consistency
   unit.
 - Alert on HTTP 409, 413, 429, and 5xx rates. A rise in 409s usually indicates an
@@ -103,3 +111,5 @@ garbage collection removes only files no remaining local project references.
   already-issued access tokens expire according to `JWT_ACCESS_EXPIRES_IN`.
 - Do not enable multiple active browser tabs unless the product first adopts an
   operation log or another merge-capable collaboration model.
+- Follow [Production deployment](production.md) for Vercel, backend readiness,
+  backups, monitoring, release gates, and rollback.

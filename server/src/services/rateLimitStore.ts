@@ -6,9 +6,73 @@ import type {
 } from 'express-rate-limit';
 
 interface RateLimitDocument {
+  _id?: mongoose.Types.ObjectId
   key: string
   totalHits: number
   resetTime: Date
+}
+
+interface DuplicateRateLimitKey {
+  _id: string
+  keepId: mongoose.Types.ObjectId
+  duplicateIds: mongoose.Types.ObjectId[]
+  totalHits: number
+  resetTime: Date
+}
+
+function rateLimitCollection() {
+  const db = mongoose.connection.db;
+  if (!db) throw new Error('Database connection not established');
+  return db.collection<RateLimitDocument>('rate_limits');
+}
+
+async function ensureRateLimitIndexes(): Promise<string[]> {
+  return rateLimitCollection().createIndexes([
+    {
+      key: { key: 1 },
+      name: 'rate_limit_key_unique',
+      unique: true,
+    },
+    {
+      key: { resetTime: 1 },
+      expireAfterSeconds: 0,
+    },
+  ]);
+}
+
+export async function initializeRateLimitIndexes(): Promise<void> {
+  const collection = rateLimitCollection();
+  await collection.deleteMany({ resetTime: { $lte: new Date() } });
+  const duplicates = await collection.aggregate<DuplicateRateLimitKey>([
+    { $sort: { _id: 1 } },
+    {
+      $group: {
+        _id: '$key',
+        keepId: { $first: '$_id' },
+        duplicateIds: { $push: '$_id' },
+        totalHits: { $sum: '$totalHits' },
+        resetTime: { $max: '$resetTime' },
+      },
+    },
+    { $match: { 'duplicateIds.1': { $exists: true } } },
+  ]).toArray();
+
+  for (const duplicate of duplicates) {
+    await collection.updateOne(
+      { _id: duplicate.keepId },
+      {
+        $set: {
+          totalHits: duplicate.totalHits,
+          resetTime: duplicate.resetTime,
+        },
+      },
+    );
+    await collection.deleteMany({
+      _id: { $in: duplicate.duplicateIds.slice(1) },
+    });
+  }
+
+  await ensureRateLimitIndexes();
 }
 
 export class MongoRateLimitStore implements Store {
@@ -18,7 +82,7 @@ export class MongoRateLimitStore implements Store {
 
   private windowMs = 60_000;
 
-  private indexPromise: Promise<string> | null = null;
+  private indexPromise: Promise<string[]> | null = null;
 
   constructor(prefix: string) {
     this.prefix = prefix;
@@ -30,10 +94,7 @@ export class MongoRateLimitStore implements Store {
 
   async increment(key: string): Promise<ClientRateLimitInfo> {
     const collection = this.collection();
-    this.indexPromise ??= collection.createIndex(
-      { resetTime: 1 },
-      { expireAfterSeconds: 0 },
-    );
+    this.indexPromise ??= ensureRateLimitIndexes();
     await this.indexPromise;
     const now = new Date();
     const resetTime = new Date(now.getTime() + this.windowMs);
@@ -88,8 +149,6 @@ export class MongoRateLimitStore implements Store {
   }
 
   private collection() {
-    const db = mongoose.connection.db;
-    if (!db) throw new Error('Database connection not established');
-    return db.collection<RateLimitDocument>('rate_limits');
+    return rateLimitCollection();
   }
 }

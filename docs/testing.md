@@ -101,11 +101,12 @@ the store.
 GitHub Actions workflows live in `.github/workflows/`:
 
 - **`ci.yml`**: runs on push/PR to `main` and `develop`. Jobs: lint, typecheck (`tsc --noEmit`),
-  unit tests (with coverage), E2E, build, backend checks, and dead-code analysis. A final gate
-  job fails if any of them fail.
+  dependency audit, unit tests (with coverage), E2E, build, backend checks, dead-code analysis,
+  and the production Compose smoke test. A final gate job fails if any of them fail.
 - **`test-suites.yml`**: manual (`workflow_dispatch`); run a single suite (engine, formula,
   persistence, suggestions, or e2e) on demand.
-- **`release.yml`**: runs on `v*` tags to validate and build a release.
+- **`release.yml`**: runs on `v*` tags and repeats the full frontend/backend release checks and
+  production Compose smoke test before building a release.
 
 CI artifacts: coverage report and Playwright report are uploaded on every run. Playwright
 screenshots are uploaded only on failure. Traces are retained on failure; view one locally

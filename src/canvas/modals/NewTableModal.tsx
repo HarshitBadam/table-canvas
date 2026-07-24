@@ -170,6 +170,10 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
       <Dialog.Portal>
         <Dialog.Overlay className="join-overlay z-50" />
         <Dialog.Content
+          onEscapeKeyDown={(event) => {
+            event.preventDefault()
+            handleClose()
+          }}
           onCloseAutoFocus={(event) => {
             const returnFocusElement = returnFocusRef.current && isVisibleElement(returnFocusRef.current)
               ? returnFocusRef.current

@@ -105,6 +105,7 @@ export function LoginPage() {
     g.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: handleGoogleCredential,
+      use_fedcm_for_button: true,
     });
     // Clear any previously rendered button first; otherwise effect re-runs (StrictMode
     // double-invoke, or a changed callback identity) stack duplicate Google buttons.

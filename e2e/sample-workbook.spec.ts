@@ -23,7 +23,7 @@ async function downloadWorkbook(page: Page): Promise<XLSX.WorkBook> {
   return XLSX.read(workbookBytes, { type: 'buffer' })
 }
 
-test('@ux imports, reloads, and exports every sample workbook sheet with data', async ({ page }) => {
+test('every sample workbook sheet retains its rows through reload and export', async ({ page }) => {
   test.setTimeout(120_000)
   const backend = await installMockBackend(page)
   await page.goto('/')
@@ -50,8 +50,10 @@ test('@ux imports, reloads, and exports every sample workbook sheet with data', 
 
   await page.reload()
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
-  for (const sheetName of Object.keys(expectedRows)) {
-    await expect(page.locator('aside').getByText(sheetName, { exact: true })).toBeVisible()
+  for (const [sheetName, rowCount] of Object.entries(expectedRows)) {
+    await expect(page.locator('aside').getByRole('button', {
+      name: new RegExp(`^${sheetName} ${rowCount} rows`),
+    })).toBeVisible()
   }
 
   const exported = await downloadWorkbook(page)
@@ -65,7 +67,7 @@ test('@ux imports, reloads, and exports every sample workbook sheet with data', 
   }
 })
 
-test('@ux exports an immediate edit to a newly created manual table', async ({ page }) => {
+test('an edit made immediately before export is included in the workbook', async ({ page }) => {
   test.setTimeout(60_000)
   const backend = await installMockBackend(page)
   await page.goto('/')
@@ -73,12 +75,12 @@ test('@ux exports an immediate edit to a newly created manual table', async ({ p
 
   await page.locator('aside').getByRole('button', { name: 'New Table' }).click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByPlaceholder('Enter table name').fill('Manual Reliability')
+  await dialog.getByPlaceholder('Enter table name').fill('Immediate Export')
   await dialog.getByRole('button', { name: 'Create Table' }).click()
   await expect(dialog).toBeHidden()
 
   await page.locator('aside').getByRole('button', {
-    name: /^Manual Reliability 5 rows/,
+    name: /^Immediate Export 5 rows/,
   }).click()
   const firstCell = page.locator('.cursor-cell').first()
   await expect(firstCell).toBeVisible({ timeout: 10_000 })
@@ -101,14 +103,14 @@ test('@ux exports an immediate edit to a newly created manual table', async ({ p
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
   const exported = await downloadWorkbook(page)
   const rows = XLSX.utils.sheet_to_json<unknown[]>(
-    exported.Sheets['Manual Reliability'],
+    exported.Sheets['Immediate Export'],
     { header: 1 },
   )
 
   expect(rows[1][0]).toBe('Exported immediately')
 })
 
-test('@ux applies a cleaning suggestion and preserves it across reload', async ({ page }) => {
+test('an applied cleaning suggestion survives undo, redo, reload, and export', async ({ page }) => {
   test.setTimeout(90_000)
   const backend = await installMockBackend(page)
   await page.goto('/')

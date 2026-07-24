@@ -21,7 +21,7 @@ async function expectAccessible(page: Page, context?: string, include?: string) 
   expect(violations, `${context ?? 'Page'} must have no WCAG A/AA violations`).toEqual([])
 }
 
-test.describe('@ux accessibility contract', () => {
+test.describe('Accessibility', () => {
   test('app shell and empty canvas have no automated WCAG violations', async ({ page }) => {
     await bootApp(page)
     await expectAccessible(page, 'Empty canvas')
@@ -39,7 +39,7 @@ test.describe('@ux accessibility contract', () => {
     await page.keyboard.press('Escape')
 
     await page.getByRole('button', { name: 'Current project' }).click()
-    await page.getByRole('button', { name: 'New project' }).click()
+    await page.getByRole('menuitem', { name: 'New project' }).click()
     const projectDialog = page.getByRole('dialog', { name: 'Create project' })
     await expect(projectDialog.getByLabel('Project name')).toBeFocused()
     await expectAccessible(page, 'New project dialog')
@@ -90,7 +90,7 @@ test.describe('@ux accessibility contract', () => {
     await expect(firstCell).toBeFocused()
 
     await page.locator('aside').getByRole('button', {
-      name: 'Actions for UX Contract Table',
+      name: 'Actions for Test Table',
     }).click()
     await page.getByRole('menuitem', { name: 'Delete' }).click()
     const deleteDialog = page.getByRole('alertdialog', { name: 'Delete Node' })
@@ -116,7 +116,7 @@ test.describe('@ux accessibility contract', () => {
   })
 })
 
-test.describe('@ux keyboard contract', () => {
+test.describe('Keyboard interaction', () => {
   test('dialog opens and closes from the keyboard and restores focus', async ({ page }) => {
     await bootApp(page)
     const trigger = page.locator('aside').getByRole('button', { name: 'New Table' })
@@ -253,7 +253,6 @@ test.describe('@ux keyboard contract', () => {
     })
     await source.locator('.table-handle-right').first().dragTo(
       target.locator('.table-handle-left').first(),
-      { force: true },
     )
 
     const dialog = page.getByRole('dialog', { name: 'Combine Tables' })
@@ -278,7 +277,7 @@ test.describe('@ux keyboard contract', () => {
   })
 })
 
-test.describe('@ux mobile nested dialog contract', () => {
+test.describe('Mobile dialog interaction', () => {
   test.use({ viewport: { width: 320, height: 700 } })
 
   test('new table close restores focus to a visible control', async ({ page }) => {

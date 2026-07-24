@@ -2,7 +2,7 @@ import { expect, test } from './e2e.fixture'
 import { installMockBackend } from './derived-tables.support'
 import { createManualTable, downloadProjectZip } from './app.support'
 
-test('@ux persists report edits across reload and includes them in project export', async ({ page }) => {
+test('report text and linked tables survive reload and project export', async ({ page }) => {
   test.setTimeout(90_000)
   await installMockBackend(page)
   await page.goto('/')
@@ -24,15 +24,15 @@ test('@ux persists report edits across reload and includes them in project expor
   await expect(editor).toBeVisible()
   await editor.click()
   await page.keyboard.press('End')
-  await page.keyboard.type('Persisted reliability note')
-  await expect(editor).toContainText('Persisted reliability note')
+  await page.keyboard.type('Quarterly review note')
+  await expect(editor).toContainText('Quarterly review note')
   await expect(page.getByText('Saved', { exact: true })).toBeVisible({ timeout: 10_000 })
 
   await page.reload()
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
   await page.locator('aside').getByRole('button', { name: 'Report', exact: true }).click()
   await expect(page.locator('.tiptap-editor-content')).toContainText(
-    'Persisted reliability note',
+    'Quarterly review note',
   )
 
   await page.locator('aside').getByRole('button', { name: 'Canvas', exact: true }).click()
@@ -42,5 +42,5 @@ test('@ux persists report edits across reload and includes them in project expor
   )
   expect(reportPath).toBeTruthy()
   const reportHtml = await zip.file(reportPath!)!.async('text')
-  expect(reportHtml).toContain('Persisted reliability note')
+  expect(reportHtml).toContain('Quarterly review note')
 })
