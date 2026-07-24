@@ -19,7 +19,7 @@ interface Timestamped {
 
 
 export interface IRefreshToken {
-  token: string;
+  tokenHash: string;
   expiresAt: Date;
 }
 
@@ -32,6 +32,7 @@ export interface IUser {
   avatarUrl?: string;
   tier: 'guest' | 'google';
   refreshTokens: IRefreshToken[];
+  storageUsedBytes: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -90,6 +91,7 @@ export interface IProject extends SoftDeletable, Timestamped {
   nodes: Record<string, ProjectNode>;
   edges: Record<string, Edge>;
   patches: Record<string, SerializedPatches>;
+  revision: number;
 }
 
 export interface IProjectPublic {
@@ -98,6 +100,7 @@ export interface IProjectPublic {
   nodes: Record<string, ProjectNode>;
   edges: Record<string, Edge>;
   patches: Record<string, SerializedPatches>;
+  revision: number;
   createdAt: Date;
   updatedAt: Date;
 }

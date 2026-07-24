@@ -12,6 +12,7 @@ import {
   clearAuthCookies,
   getRefreshTokenFromCookie,
   getRefreshTokenExpiryDate,
+  hashRefreshToken,
 } from '../services/auth.service.js';
 import { verifyGoogleToken } from '../services/google.service.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -20,13 +21,34 @@ import {
   ValidationError,
   AuthenticationError,
   ConflictError,
+  AppError,
 } from '../middleware/errorHandler.js';
+import { rateLimit } from 'express-rate-limit';
+import { config } from '../config/env.js';
 
 const router = Router();
+const signInLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many authentication attempts' },
+});
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 120,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many refresh attempts' },
+});
 
 router.post(
   '/register',
+  signInLimiter,
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    if (!config.registrationEnabled) {
+      throw new AppError('Public registration is disabled', 403);
+    }
     const { email, password, name } = req.body;
 
     if (!email || !password || !name) {
@@ -61,7 +83,7 @@ router.post(
     const refreshToken = generateRefreshToken(user._id.toString(), user.email);
 
     user.refreshTokens.push({
-      token: refreshToken,
+      tokenHash: hashRefreshToken(refreshToken),
       expiresAt: getRefreshTokenExpiryDate(),
     });
     await user.save();
@@ -82,6 +104,7 @@ router.post(
 
 router.post(
   '/login',
+  signInLimiter,
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { email, password } = req.body;
 
@@ -103,7 +126,7 @@ router.post(
     const refreshToken = generateRefreshToken(user._id.toString(), user.email);
 
     user.refreshTokens.push({
-      token: refreshToken,
+      tokenHash: hashRefreshToken(refreshToken),
       expiresAt: getRefreshTokenExpiryDate(),
     });
     await user.save();
@@ -129,8 +152,8 @@ router.post(
 
     if (refreshToken) {
       await User.updateOne(
-        { 'refreshTokens.token': refreshToken },
-        { $pull: { refreshTokens: { token: refreshToken } } }
+        { 'refreshTokens.tokenHash': hashRefreshToken(refreshToken) },
+        { $pull: { refreshTokens: { tokenHash: hashRefreshToken(refreshToken) } } }
       );
     }
 
@@ -168,6 +191,7 @@ router.get(
 
 router.post(
   '/refresh',
+  refreshLimiter,
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const refreshToken = getRefreshTokenFromCookie(req.cookies || {});
 
@@ -181,33 +205,31 @@ router.post(
       throw new AuthenticationError('Invalid or expired refresh token');
     }
 
-    const user = await User.findById(payload.userId);
-    if (!user) {
-      clearAuthCookies(res);
-      throw new AuthenticationError('User not found');
-    }
-
-    const tokenExists = user.refreshTokens.some(
-      (t) => t.token === refreshToken && t.expiresAt > new Date()
+    const newAccessToken = generateAccessToken(payload.userId, payload.email);
+    const newRefreshToken = generateRefreshToken(payload.userId, payload.email);
+    const user = await User.findOneAndUpdate(
+      {
+        _id: payload.userId,
+        refreshTokens: {
+          $elemMatch: {
+            tokenHash: hashRefreshToken(refreshToken),
+            expiresAt: { $gt: new Date() },
+          },
+        },
+      },
+      {
+        $set: {
+          'refreshTokens.$': {
+            tokenHash: hashRefreshToken(newRefreshToken),
+            expiresAt: getRefreshTokenExpiryDate(),
+          },
+        },
+      },
+      { new: true },
     );
-
-    if (!tokenExists) {
-      clearAuthCookies(res);
+    if (!user) {
       throw new AuthenticationError('Refresh token not found or expired');
     }
-
-    user.refreshTokens = user.refreshTokens.filter(
-      (t) => t.token !== refreshToken
-    );
-
-    const newAccessToken = generateAccessToken(user._id.toString(), user.email);
-    const newRefreshToken = generateRefreshToken(user._id.toString(), user.email);
-
-    user.refreshTokens.push({
-      token: newRefreshToken,
-      expiresAt: getRefreshTokenExpiryDate(),
-    });
-    await user.save();
 
     setAuthCookies(res, newAccessToken, newRefreshToken);
 
@@ -225,6 +247,7 @@ router.post(
 
 router.post(
   '/google',
+  signInLimiter,
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { credential } = req.body;
 
@@ -274,7 +297,7 @@ router.post(
     const refreshToken = generateRefreshToken(user._id.toString(), user.email);
 
     user.refreshTokens.push({
-      token: refreshToken,
+      tokenHash: hashRefreshToken(refreshToken),
       expiresAt: getRefreshTokenExpiryDate(),
     });
     await user.save();
