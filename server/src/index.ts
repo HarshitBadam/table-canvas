@@ -11,13 +11,16 @@ import fileRoutes from './routes/files.js';
 validateConfig();
 
 const app = express();
+if (config.nodeEnv === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // CORS configuration for cookie-based auth
 app.use(cors({
   origin: config.frontendUrl,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
 }));
 
 app.use(express.json({ limit: '50mb' }));
