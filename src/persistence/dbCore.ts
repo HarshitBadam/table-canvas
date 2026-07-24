@@ -5,24 +5,32 @@ import type { SerializedPatches } from './patchSerialization'
 
 export type { SerializedPatches } from './patchSerialization'
 
+interface ScopedRecord {
+  /** IndexedDB key. Never expose this value outside the persistence layer. */
+  id: string
+  /** Missing only on records written by the legacy, unscoped schema. */
+  entityId?: string
+  /** Missing records belong to the guest workspace and are migrated lazily. */
+  ownerId?: string
+}
+
 export interface TableCanvasDB extends DBSchema {
   projects: {
     key: string
-    value: {
-      id: string
+    value: ScopedRecord & {
       name: string
       nodes: Record<string, ProjectNode>
       edges: Record<string, Edge>
       patches: Record<string, SerializedPatches>
       createdAt: string
       updatedAt: string
+      revision?: number
     }
     indexes: { 'by-updated': string }
   }
   files: {
     key: string
-    value: {
-      id: string
+    value: ScopedRecord & {
       name: string
       type: string
       data: ArrayBuffer
@@ -31,7 +39,7 @@ export interface TableCanvasDB extends DBSchema {
   }
   reports: {
     key: string
-    value: Report
+    value: ScopedRecord & Omit<Report, 'id'>
     indexes: { 'by-updated': string }
   }
 }
