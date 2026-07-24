@@ -91,7 +91,7 @@ export async function downloadFile(
 export async function deleteFile(
   fileId: string,
   userId: string
-): Promise<boolean> {
+): Promise<number | null> {
   const gridFS = getGridFSBucket();
   const db = mongoose.connection.db;
   
@@ -104,15 +104,15 @@ export async function deleteFile(
   });
 
   if (!fileDoc) {
-    return false;
+    return null;
   }
 
   if (fileDoc.metadata?.userId !== userId) {
-    return false;
+    return null;
   }
 
   await gridFS.delete(new mongo.ObjectId(fileId));
-  return true;
+  return fileDoc.length;
 }
 
 
