@@ -62,7 +62,7 @@ test.describe('@ux deterministic performance contract', () => {
     await expect(page.locator('aside').getByRole('button', { name: 'Import Data' }))
       .toBeEnabled({ timeout: 30_000 })
     await page.locator('aside').getByRole('button', {
-      name: /^performance-contract 2000 rows/,
+      name: /^performance-contract\b/,
     }).click()
     await expect(page.getByText('2,000 rows × 2 columns')).toBeVisible({ timeout: 20_000 })
     await expect(page.locator('.cursor-cell').first()).toBeVisible()

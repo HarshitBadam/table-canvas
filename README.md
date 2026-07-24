@@ -114,6 +114,7 @@ npm run docker:seed    # Seed sample data
 |----------|--------------|
 | [Setup](docs/setup.md) | Run modes, environment variables, troubleshooting |
 | [Architecture](docs/architecture.md) | DAG, engine, state, materialization, persistence |
+| [Session and data reliability](docs/reliability.md) | Guest/account isolation, promotion, concurrency, quotas, operations |
 | [Features](docs/features.md) | Canvas, grid, formulas, transforms, charts, dashboard, reports |
 | [API](docs/api.md) | REST endpoints for the optional backend |
 | [Testing](docs/testing.md) | How to run tests, where they live, CI |

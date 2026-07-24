@@ -17,13 +17,12 @@ vi.mock('./db', () => ({
   loadReportsForProject: vi.fn(),
   loadFile: vi.fn(),
 }))
-vi.mock('@/engine/materializationService', () => ({
+vi.mock('@/engine/tableDataService', () => ({
   getTableData: vi.fn(),
-  ensureTableMaterialized: vi.fn(),
 }))
 
 import * as db from './db'
-import * as materializationService from '@/engine/materializationService'
+import * as materializationService from '@/engine/tableDataService'
 import { exportProjectAsZip } from './exportService'
 
 beforeEach(() => {
@@ -183,10 +182,6 @@ describe('exportProjectAsZip happy paths', () => {
       { ID: '2', Value: 200 },
     ]))
     vi.mocked(db.loadReportsForProject).mockResolvedValue({})
-    vi.mocked(materializationService.ensureTableMaterialized).mockResolvedValue({
-      status: 'computed',
-      tableId: 'table_2',
-    })
     vi.mocked(materializationService.getTableData).mockResolvedValue({
       rows: [{ __rowId: 'r1', ID: '1', Value: 100 }],
       totalRows: 1,

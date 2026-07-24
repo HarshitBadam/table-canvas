@@ -183,6 +183,8 @@ Create a new project.
       "nodes": {},
       "edges": {},
       "patches": {},
+      "reports": {},
+      "revision": 0,
       "updatedAt": "...",
       "createdAt": "..."
     }
@@ -204,7 +206,9 @@ Get project by ID.
       "name": "My Project",
       "nodes": { ... },
       "edges": { ... },
-      "patches": { ... }
+      "patches": { ... },
+      "reports": { ... },
+      "revision": 0
     }
   }
 }
@@ -224,7 +228,9 @@ Update project. Only provided fields are updated; omitted fields retain their cu
   "name": "Updated Name",
   "nodes": { ... },
   "edges": { ... },
-  "patches": { ... }
+  "patches": { ... },
+  "reports": { ... },
+  "expectedRevision": 0
 }
 ```
 
@@ -240,6 +246,7 @@ Update project. Only provided fields are updated; omitted fields retain their cu
 
 **Errors:**
 - `400` - Invalid project ID format
+- `409` - `expectedRevision` is stale; reload before retrying
 - `404` - Project not found
 
 ### PATCH /projects/:id
@@ -249,11 +256,13 @@ Partial update of project. Only provided fields are updated.
 **Request:**
 ```json
 {
-  "name": "New Name"
+  "name": "New Name",
+  "expectedRevision": 1
 }
 ```
 
-**Allowed fields:** `name`, `nodes`, `edges`, `patches`
+**Allowed fields:** `name`, `nodes`, `edges`, `patches`, `reports`.
+`expectedRevision` is required for both PUT and PATCH.
 
 **Response (200):**
 ```json
@@ -267,6 +276,7 @@ Partial update of project. Only provided fields are updated.
 
 **Errors:**
 - `400` - Invalid project ID format
+- `409` - `expectedRevision` is stale; reload before retrying
 - `404` - Project not found
 
 ### DELETE /projects/:id

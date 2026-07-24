@@ -15,7 +15,9 @@ test('formula columns can be created, edited, deleted, and reloaded', async ({ p
     buffer: Buffer.from(csv),
   })
 
-  const table = page.locator('aside').getByRole('button', { name: /^Formula Regression 3 columns 2 rows/ })
+  const table = page.locator('aside').getByRole('button', {
+    name: /^Formula Regression\b/,
+  })
   await expect(table).toBeVisible({ timeout: 30_000 })
   await table.click()
   await expect(page.getByRole('gridcell').first()).toBeVisible({ timeout: 20_000 })
@@ -51,7 +53,9 @@ test('formula columns can be created, edited, deleted, and reloaded', async ({ p
 
   await page.reload()
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
-  await page.locator('aside').getByRole('button', { name: /^Formula Regression 3 columns 2 rows/ }).click()
+  await page.locator('aside').getByRole('button', {
+    name: /^Formula Regression\b/,
+  }).click()
   await expect(page.getByRole('gridcell').first()).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('columnheader', { name: /total/ })).toHaveCount(0)
 })

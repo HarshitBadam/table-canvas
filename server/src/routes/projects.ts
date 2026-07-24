@@ -39,12 +39,15 @@ async function updateOwnedProject(
     if (body[field] !== undefined) updates[field] = body[field];
   }
 
+  const revisionFilter = revision === 0
+    ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] }
+    : { revision };
   const project = await Project.findOneAndUpdate(
     {
       _id: new Types.ObjectId(projectId),
       userId: new Types.ObjectId(userId),
       deletedAt: null,
-      revision,
+      ...revisionFilter,
     },
     {
       $set: updates,

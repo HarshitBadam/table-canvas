@@ -34,7 +34,8 @@ test.describe('@ux accessibility contract', () => {
     await expectAccessible(page, 'New table dialog')
     await page.keyboard.press('Escape')
 
-    await page.locator('aside').getByRole('button', { name: 'New project' }).click()
+    await page.getByRole('button', { name: 'Current project' }).click()
+    await page.getByRole('button', { name: 'New project' }).click()
     const projectDialog = page.getByRole('dialog', { name: 'Create project' })
     await expect(projectDialog.getByLabel('Project name')).toBeFocused()
     await expectAccessible(page, 'New project dialog')
@@ -67,7 +68,11 @@ test.describe('@ux accessibility contract', () => {
     await page.getByRole('button', { name: 'Add Column at end' }).click()
     const columnDialog = page.getByRole('dialog', { name: 'New Column' })
     await expect(columnDialog.getByLabel('Column Name')).toBeFocused()
-    await expectAccessible(page, 'Formula column dialog', '[aria-labelledby="new-column-title"]')
+    await expectAccessible(
+      page,
+      'Formula column dialog',
+      '[aria-labelledby="formula-column-title"]',
+    )
     await page.keyboard.press('Escape')
 
     const firstCell = page.getByRole('gridcell').first()
@@ -292,8 +297,11 @@ test.describe('@ux mobile nested dialog contract', () => {
     await page.getByRole('button', { name: 'Open navigation' }).click()
 
     const sidebar = page.locator('aside')
-    const trigger = sidebar.getByRole('button', { name: 'Delete Nested Dialog Table' })
+    const trigger = sidebar.getByRole('button', {
+      name: 'Actions for Nested Dialog Table',
+    })
     await trigger.click()
+    await page.getByRole('menuitem', { name: 'Delete' }).click()
     const dialog = page.getByRole('alertdialog', { name: 'Delete Node' })
     await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused()
     await page.keyboard.press('Escape')
