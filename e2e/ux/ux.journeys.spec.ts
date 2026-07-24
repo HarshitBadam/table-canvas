@@ -93,12 +93,13 @@ test.describe('@ux critical journey contract', () => {
     await bootApp(page)
     await createManualTable(page, 'First Workspace Table')
 
-    await page.locator('aside').getByRole('button', { name: 'New project' }).click()
+    await page.getByRole('button', { name: 'Current project' }).click()
+    await page.getByRole('button', { name: 'New project' }).click()
     const createDialog = page.getByRole('dialog', { name: 'Create project' })
     await createDialog.getByLabel('Project name').fill('Second Workspace')
     await createDialog.getByRole('button', { name: 'Create project' }).click()
     await expect(createDialog).toBeHidden({ timeout: 20_000 })
-    const projectSwitcher = page.locator('aside').getByRole('button', { name: 'Current project' })
+    const projectSwitcher = page.getByRole('button', { name: 'Current project' })
     await expect(projectSwitcher).toContainText('Second Workspace')
     await expect(page.locator('aside').getByText('No tables yet')).toBeVisible()
 

@@ -3,7 +3,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 
 const getTableData = vi.hoisted(() => vi.fn());
 
-vi.mock('@/engine/materializationService', () => ({ getTableData }));
+vi.mock('@/engine/tableDataService', () => ({ getTableData }));
 
 import {
   selectRows,
