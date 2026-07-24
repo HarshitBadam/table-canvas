@@ -33,6 +33,7 @@ export function useAuthState() {
 
   useEffect(() => {
     setAuthErrorHandler(handleAuthError)
+    return () => setAuthErrorHandler(null)
   }, [handleAuthError])
 
   const performLogin = useCallback(async (credentials: LoginCredentials) => {
@@ -52,10 +53,9 @@ export function useAuthState() {
   }, [])
 
   const performLogout = useCallback(async () => {
-    try { await apiLogout() } catch (error) { console.error('[useAuthState] Logout request failed:', error); } finally {
-      setUser(null)
-      setIsAuthenticated(false)
-    }
+    await apiLogout()
+    setUser(null)
+    setIsAuthenticated(false)
   }, [])
 
   /**

@@ -8,12 +8,15 @@ import {
   deleteFile,
   listUserFiles,
   getFileMetadata,
+  findFileByOperationId,
+  getFileLifecycleMetadata,
 } from '../services/file.service.js';
 import {
   asyncHandler,
   ValidationError,
   NotFoundError,
   AppError,
+  ConflictError,
 } from '../middleware/errorHandler.js';
 import { User } from '../models/User.js';
 import { Project } from '../models/Project.js';
@@ -96,6 +99,30 @@ router.post(
       if (!project) throw new NotFoundError('Project');
     }
 
+    const operationId = req.get('Idempotency-Key')?.trim();
+    if (operationId && operationId.length > 200) {
+      throw new ValidationError(['Idempotency key cannot exceed 200 characters']);
+    }
+    if (operationId) {
+      const existing = await findFileByOperationId(userId, operationId, {
+        filename: file.originalname,
+        size: file.size,
+        projectId,
+      });
+      if (existing) {
+        if (!existing.matches) {
+          throw new ConflictError(
+            'Idempotency key was already used with different file data',
+          );
+        }
+        res.json({
+          success: true,
+          data: { file: existing.file },
+        } satisfies ApiResponse<{ file: UploadedFile }>);
+        return;
+      }
+    }
+
     const reserved = await reserveStorage(
       userId,
       file.size,
@@ -126,10 +153,31 @@ router.post(
           originalName: file.originalname,
           userId,
           projectId,
+          clientOperationId: operationId,
         },
       );
     } catch (error) {
       await releaseStorage(userId, file.size);
+      if (
+        operationId
+        && error
+        && typeof error === 'object'
+        && 'code' in error
+        && error.code === 11000
+      ) {
+        const existing = await findFileByOperationId(userId, operationId, {
+          filename: file.originalname,
+          size: file.size,
+          projectId,
+        });
+        if (existing?.matches) {
+          res.json({
+            success: true,
+            data: { file: existing.file },
+          } satisfies ApiResponse<{ file: UploadedFile }>);
+          return;
+        }
+      }
       throw error;
     }
 
@@ -203,6 +251,31 @@ router.delete(
     const fileId = req.params.id;
     if (!Types.ObjectId.isValid(fileId)) {
       throw new ValidationError(['Invalid file ID format']);
+    }
+
+    const metadata = await getFileLifecycleMetadata(fileId, userId);
+    if (!metadata) throw new NotFoundError('File');
+    if (metadata.projectId && Types.ObjectId.isValid(metadata.projectId)) {
+      const owningProject = await Project.exists({
+        _id: new Types.ObjectId(metadata.projectId),
+        userId: new Types.ObjectId(userId),
+        deletedAt: null,
+      });
+      if (owningProject) {
+        throw new ConflictError(
+          'Files belonging to an active project cannot be deleted directly',
+        );
+      }
+    }
+    const retainedProjects = await Project.find({
+      userId: new Types.ObjectId(userId),
+      deletedAt: null,
+    }).select('nodes');
+    const referenced = retainedProjects.some(project => (
+      JSON.stringify(project.nodes).includes(fileId)
+    ));
+    if (referenced) {
+      throw new ConflictError('File is still referenced by an active project');
     }
 
     const deletedBytes = await deleteFile(fileId, userId);

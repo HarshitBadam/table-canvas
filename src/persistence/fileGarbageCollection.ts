@@ -4,6 +4,7 @@ import {
   listProjects,
   loadProject,
 } from './db'
+import { getStorageScope } from './storageScope'
 
 function fileReferences(nodes: Record<string, ProjectNode>): Set<string> {
   const references = new Set<string>()
@@ -17,13 +18,14 @@ function fileReferences(nodes: Record<string, ProjectNode>): Set<string> {
 
 export async function deleteUnreferencedLocalFiles(
   deletedNodes: Record<string, ProjectNode>,
+  scope = getStorageScope(),
 ): Promise<void> {
   const candidates = fileReferences(deletedNodes)
   if (candidates.size === 0) return
 
   const retained = new Set<string>()
-  for (const summary of await listProjects()) {
-    const project = await loadProject(summary.id)
+  for (const summary of await listProjects(scope)) {
+    const project = await loadProject(summary.id, scope)
     if (!project) continue
     for (const reference of fileReferences(project.nodes)) retained.add(reference)
   }
@@ -31,6 +33,6 @@ export async function deleteUnreferencedLocalFiles(
   await Promise.all(
     [...candidates]
       .filter(reference => !retained.has(reference))
-      .map(reference => deleteFile(reference)),
+             .map(reference => deleteFile(reference, scope)),
   )
 }

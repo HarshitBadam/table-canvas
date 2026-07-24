@@ -281,7 +281,15 @@ Partial update of project. Only provided fields are updated.
 
 ### DELETE /projects/:id
 
-Soft delete a project.
+Soft delete a project. The revision is advanced atomically. Restorable files remain
+stored and count toward quota.
+
+**Request:**
+```json
+{
+  "expectedRevision": 3
+}
+```
 
 **Response (200):**
 ```json
@@ -293,11 +301,19 @@ Soft delete a project.
 
 **Errors:**
 - `400` - Invalid project ID format
+- `409` - `expectedRevision` is stale; reload before retrying
 - `404` - Project not found
 
 ### POST /projects/:id/restore
 
 Restore a soft-deleted project.
+
+**Request:**
+```json
+{
+  "expectedRevision": 4
+}
+```
 
 **Response (200):**
 ```json
@@ -312,4 +328,5 @@ Restore a soft-deleted project.
 
 **Errors:**
 - `400` - Invalid project ID format
+- `409` - `expectedRevision` is stale; reload before retrying
 - `404` - Deleted project not found

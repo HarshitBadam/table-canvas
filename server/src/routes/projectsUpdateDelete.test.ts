@@ -144,6 +144,7 @@ describe('Projects API update and delete', () => {
       })
       const response = await request(app)
         .delete(`/api/projects/${project._id}`)
+        .send({ expectedRevision: project.revision })
         .expect(200)
       expect(response.body.success).toBe(true)
       expect(response.body.message).toContain('deleted')
@@ -156,6 +157,7 @@ describe('Projects API update and delete', () => {
       const { app } = getProjectRoutesTestContext()
       const response = await request(app)
         .delete(`/api/projects/${new Types.ObjectId()}`)
+        .send({ expectedRevision: 0 })
         .expect(404)
       expect(response.body.success).toBe(false)
     })
@@ -165,6 +167,7 @@ describe('Projects API update and delete', () => {
       const project = await createTestProject({ userId: new Types.ObjectId() })
       const response = await request(app)
         .delete(`/api/projects/${project._id}`)
+        .send({ expectedRevision: project.revision })
         .expect(404)
       expect(response.body.success).toBe(false)
       expect(await Project.findById(project._id)).not.toBeNull()
@@ -179,8 +182,28 @@ describe('Projects API update and delete', () => {
       })
       const response = await request(app)
         .delete(`/api/projects/${project._id}`)
+        .send({ expectedRevision: project.revision })
         .expect(200)
       expect(response.body.success).toBe(true)
+    })
+
+    it('rejects a stale delete after another writer updates the project', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+        name: 'Concurrent project',
+      })
+      await request(app)
+        .put(`/api/projects/${project._id}`)
+        .send({ name: 'Newer version', expectedRevision: project.revision })
+        .expect(200)
+
+      await request(app)
+        .delete(`/api/projects/${project._id}`)
+        .send({ expectedRevision: project.revision })
+        .expect(409)
+
+      expect((await Project.findById(project._id))?.deletedAt).toBeNull()
     })
   })
 })

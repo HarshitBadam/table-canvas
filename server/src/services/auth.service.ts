@@ -4,6 +4,7 @@ import { Response } from 'express';
 import { config } from '../config/env.js';
 import { JwtPayload } from '../types/index.js';
 import { createHash, randomUUID } from 'crypto';
+import { User, type IUserDocument } from '../models/User.js';
 
 const SALT_ROUNDS = 12;
 
@@ -185,4 +186,63 @@ export function getRefreshTokenFromCookie(cookies: Record<string, string>): stri
 export function getRefreshTokenExpiryDate(): Date {
   const expiresIn = parseDuration(config.jwtRefreshExpiresIn);
   return new Date(Date.now() + expiresIn);
+}
+
+export async function persistRefreshSession(
+  userId: string,
+  refreshToken: string,
+): Promise<IUserDocument> {
+  const now = new Date();
+  const token = {
+    tokenHash: hashRefreshToken(refreshToken),
+    expiresAt: getRefreshTokenExpiryDate(),
+  };
+  const user = await User.findByIdAndUpdate(
+    userId,
+    [{
+      $set: {
+        refreshTokens: {
+          $slice: [
+            {
+              $concatArrays: [
+                {
+                  $filter: {
+                    input: { $ifNull: ['$refreshTokens', []] },
+                    as: 'token',
+                    cond: {
+                      $and: [
+                        { $eq: [{ $type: '$$token.tokenHash' }, 'string'] },
+                        { $gt: ['$$token.expiresAt', now] },
+                      ],
+                    },
+                  },
+                },
+                [token],
+              ],
+            },
+            -5,
+          ],
+        },
+      },
+    }],
+    { new: true },
+  );
+  if (!user) throw new Error('User disappeared while creating a session');
+  return user;
+}
+
+export async function revokeLegacyRefreshSessions(): Promise<void> {
+  await User.updateMany(
+    {
+      refreshTokens: {
+        $elemMatch: {
+          $or: [
+            { tokenHash: { $exists: false } },
+            { token: { $exists: true } },
+          ],
+        },
+      },
+    },
+    { $set: { refreshTokens: [] } },
+  );
 }
