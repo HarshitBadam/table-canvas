@@ -173,7 +173,6 @@
   align-items: center;
   justify-content: center;
   z-index: 100;
-  animation: fadeIn 150ms ease;
 }
 
 [data-theme="dark"] .dimension-modal-overlay {
@@ -381,7 +380,7 @@
   font-size: 14px;
   font-weight: 500;
   color: #fff;
-  background: var(--color-accent-green);
+  background: var(--color-accent-hover);
   border: none;
   border-radius: 8px;
   cursor: pointer;

@@ -242,7 +242,7 @@ export function FormulaColumnModal({
                       }`}>
                         {type.label}
                       </div>
-                      <div className="text-xs text-gray-500">{type.desc}</div>
+                      <div className="text-xs text-text-secondary">{type.desc}</div>
                     </div>
                     {staticType === type.value && (
                       <svg className="w-5 h-5 text-accent-green" fill="currentColor" viewBox="0 0 20 20">
