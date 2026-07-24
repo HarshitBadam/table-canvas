@@ -1,7 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog'
 import { useState } from 'react'
 import type { LimitExceeded } from '@/shared/enforce'
-import { useNavigate } from 'react-router-dom'
 import { useApp } from '@/state/AppContext'
 
 interface UpgradePromptProps {
@@ -12,7 +11,6 @@ interface UpgradePromptProps {
 
 export function UpgradePrompt({ open, onOpenChange, violation }: UpgradePromptProps) {
   const [signInError, setSignInError] = useState<string | null>(null)
-  const navigate = useNavigate()
   const { leaveGuest } = useApp()
   if (!violation) return null
 
@@ -23,7 +21,7 @@ export function UpgradePrompt({ open, onOpenChange, violation }: UpgradePromptPr
     try {
       await leaveGuest()
       onOpenChange(false)
-      navigate('/login')
+      window.location.assign('/login')
     } catch (error) {
       setSignInError(error instanceof Error ? error.message : 'Could not prepare sign-in')
     }

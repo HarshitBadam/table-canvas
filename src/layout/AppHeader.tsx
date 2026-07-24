@@ -10,7 +10,6 @@ import { ProjectSwitcher } from './ProjectSwitcher'
 import type { ChartNode, ProjectNode } from '@/types'
 import type { ViewMode } from './App'
 import type { ProjectExportState } from './useProjectExport'
-import { useNavigate } from 'react-router-dom'
 
 interface AppHeaderProps {
   viewMode: ViewMode
@@ -28,7 +27,6 @@ export function AppHeader({
   onOpenNavigation,
 }: AppHeaderProps) {
   const { user, logout, leaveGuest } = useAppAuth()
-  const navigate = useNavigate()
   const { isSaving } = useApp()
   const canUndo = useProjectStore(state => state.history.past.length > 0)
   const canRedo = useProjectStore(state => state.history.future.length > 0)
@@ -312,7 +310,7 @@ export function AppHeader({
         <button
           type="button"
           onClick={() => {
-            void leaveGuest().then(() => navigate('/login'))
+            void leaveGuest().then(() => window.location.assign('/login'))
           }}
           className="btn btn-secondary ml-2"
         >

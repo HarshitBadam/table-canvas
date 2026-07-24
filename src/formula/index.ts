@@ -1,10 +1,6 @@
-export type {
-  FormulaValue,
-  FormulaSuggestion,
-} from './types'
+export type { FormulaSuggestion } from './types'
 
 export {
-  evaluateFormula,
   inferFormulaType,
   validateFormulaWithColumns,
 } from './evaluator'
@@ -19,11 +15,6 @@ export {
 
 export {
   canonicalizeFormulaReferences,
-} from './canonicalize'
-
-export type {
-  CanonicalizeFormulaResult,
-  FormulaColumnReference,
 } from './canonicalize'
 
 export {

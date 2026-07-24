@@ -58,6 +58,7 @@ vi.mock('@/persistence/syncService', () => ({
   importProjectWithSync: vi.fn(),
   loadProjectWithSync: mocks.loadProject,
   saveProjectWithSync: mocks.saveProject,
+  setProjectSyncErrorHandler: vi.fn(),
   syncLocalProjectsToBackend: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('./projectLifecycle', () => ({

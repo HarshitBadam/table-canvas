@@ -2,7 +2,7 @@ import type { CellValue, ColumnSchema } from '@/types'
 import type { GridRow } from './types'
 import { validateCellInput } from './cellValueValidation'
 
-export interface GridPasteChange {
+interface GridPasteChange {
   rowId: string
   columnId: string
   value: CellValue

@@ -4,7 +4,6 @@ import type { ProjectSummary } from '@/api/projects.api'
 import type { LimitExceeded } from '@/shared/enforce'
 import type { Report } from '@/report/types'
 import type { Edge, Patches, ProjectNode } from '@/types'
-export { ProjectActionError } from './projectOperations'
 
 export interface ProjectImportData {
   name: string
