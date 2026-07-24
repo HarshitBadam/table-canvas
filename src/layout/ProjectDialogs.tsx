@@ -73,7 +73,7 @@ export function CreateProjectDialog({
                 )}
                 {showCapacityFeedback && tier === 'guest' && (
                   <button type="button" onClick={onSignIn} className="btn btn-secondary mt-3">
-                    Sign in with Google
+                    Sign in
                   </button>
                 )}
               </div>

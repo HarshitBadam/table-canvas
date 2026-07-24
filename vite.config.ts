@@ -50,6 +50,14 @@ function duckdbLocalBundlePlugin(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), duckdbLocalBundlePlugin()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

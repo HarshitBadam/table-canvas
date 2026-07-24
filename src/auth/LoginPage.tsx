@@ -19,7 +19,7 @@ export function LoginPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [gisReady, setGisReady] = useState(false);
 
-  const { login, googleLogin } = useApp();
+  const { login, googleLogin, continueAsGuest } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const googleBtnRef = useRef<HTMLDivElement>(null);
@@ -247,6 +247,38 @@ export function LoginPage() {
               )}
             </button>
           </form>
+
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-surface px-2 text-text-tertiary">or</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={async () => {
+              clearFormError();
+              setIsSubmitting(true);
+              try {
+                await continueAsGuest();
+                navigate(from, { replace: true });
+              } catch (err) {
+                handleError(err);
+              } finally {
+                setIsSubmitting(false);
+              }
+            }}
+            className="btn btn-secondary w-full"
+          >
+            Continue without an account
+          </button>
+          <p className="mt-2 text-center text-xs text-text-tertiary">
+            Work stays in this browser. Sign in later to sync it.
+          </p>
 
           <div className="mt-6 pt-6 border-t border-border text-center">
             <p className="text-sm text-text-secondary">
