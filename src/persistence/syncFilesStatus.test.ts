@@ -37,10 +37,15 @@ vi.mock('./projectSyncQueue', () => ({
 }))
 
 vi.mock('./db', () => ({
+  clearProjectDeletion: vi.fn(),
   deleteProject: vi.fn(),
+  isProjectDeletionPending: vi.fn().mockResolvedValue(false),
+  listProjectDeletions: vi.fn().mockResolvedValue([]),
   listProjects: vi.fn().mockResolvedValue([]),
   loadProject: vi.fn(),
+  restoreStagedProject: vi.fn(),
   saveProject: (...args: unknown[]) => mocks.saveProjectLocal(...args),
+  stageProjectDeletion: vi.fn(),
 }))
 
 vi.mock('./fileStorage', () => ({

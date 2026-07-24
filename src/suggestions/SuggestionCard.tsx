@@ -131,7 +131,7 @@ export function SuggestionCard({
         aria-label={`${suggestion.title}: ${isExpanded ? 'Collapse' : 'Expand'} details`}
         aria-expanded={isExpanded}
         aria-controls={detailsId}
-        className="flex w-full items-start gap-3 px-3 py-3 text-left transition-colors"
+        className="flex w-full items-start gap-3 px-4 py-4 text-left transition-colors"
       >
         <div className={`mt-0.5 shrink-0 rounded-md p-1.5 ${categoryColors[suggestion.category]}`}>
           {categoryIcons[suggestion.category]}
@@ -172,7 +172,7 @@ export function SuggestionCard({
           id={detailsId}
           role="region"
           aria-labelledby={summaryId}
-          className="mx-3 border-t border-border-subtle pb-3 pl-9 pt-3"
+          className="mx-4 border-t border-border-subtle pb-4 pl-9 pt-3"
         >
           {suggestion.why && suggestion.why.length > 0 && (
             <div className="mb-3">

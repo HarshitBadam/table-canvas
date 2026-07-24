@@ -12,11 +12,11 @@ describe('ChartBuilder', () => {
     tableId = addSource('Sales')
   })
 
-  it('uses keyboard-focusable native radio groups and linear field mapping', () => {
+  it('uses keyboard-focusable controls and linear field mapping', () => {
     render(<ChartBuilder isOpen sourceTableId={tableId} onClose={vi.fn()} />)
 
     expect(screen.getByRole('group', { name: 'Chart type' })).toBeVisible()
-    expect(screen.getByRole('group', { name: 'Aggregation' })).toBeVisible()
+    expect(screen.getByRole('group', { name: 'Summarize values' })).toBeVisible()
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
     const bar = screen.getByRole('radio', { name: 'Bar' })
     const line = screen.getByRole('radio', { name: 'Line' })
@@ -28,8 +28,8 @@ describe('ChartBuilder', () => {
     fireEvent.click(line)
     expect(line).toBeChecked()
 
-    expect(screen.getByLabelText(/Category · text or date/i)).toBeInstanceOf(HTMLSelectElement)
-    expect(screen.getByLabelText(/Y axis · numeric/i)).toBeInstanceOf(HTMLSelectElement)
+    expect(screen.getByRole('combobox', { name: 'Category column' })).toBeVisible()
+    expect(screen.getByRole('combobox', { name: 'Y axis column' })).toBeVisible()
 
     const average = screen.getByRole('radio', { name: 'Average' })
     fireEvent.click(average)
@@ -56,7 +56,7 @@ describe('ChartBuilder', () => {
     render(<ChartBuilder isOpen sourceTableId={tableId} onClose={vi.fn()} />)
 
     expect(screen.getByText(/No numeric columns are available/i)).toBeVisible()
-    expect(screen.getByLabelText(/Y axis · numeric/i)).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Create Chart' })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Y axis column' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Create chart' })).toBeDisabled()
   })
 })

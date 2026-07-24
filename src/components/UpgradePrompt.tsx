@@ -30,50 +30,75 @@ export function UpgradePrompt({ open, onOpenChange, violation }: UpgradePromptPr
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-xl shadow-2xl w-full max-w-sm z-50 overflow-hidden border border-border-elevation focus:outline-none">
-          <div className="px-5 pt-5 pb-3">
+        <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/40 motion-safe:animate-fade-in" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-modal w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl focus:outline-none motion-safe:animate-scale-in">
+          <div className="px-5 pb-4 pt-5">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                isGuest ? 'bg-accent-green/10 text-accent-text' : 'bg-warning/10 text-warning-text'
+              }`}>
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {isGuest ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 7V5.5A2.5 2.5 0 0110.5 3h3A2.5 2.5 0 0116 5.5V7m-8 0h8m-8 0a2 2 0 00-2 2v9h12V9a2 2 0 00-2-2m-4 4v4m-2-2h4" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8v4m0 4h.01M10.3 3.8 2.7 17a2 2 0 001.7 3h15.2a2 2 0 001.7-3L13.7 3.8a2 2 0 00-3.4 0z" />
+                  )}
                 </svg>
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <Dialog.Title className="text-base font-semibold text-text-primary">
-                  {isGuest ? 'Upgrade to continue' : 'Limit reached'}
+                  {isGuest ? 'Sign in to continue' : 'Free plan limit reached'}
                 </Dialog.Title>
                 <Dialog.Description className="text-sm text-text-secondary mt-1">
                   {violation.reason}
                 </Dialog.Description>
               </div>
+              <Dialog.Close
+                className="-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-text-primary"
+                aria-label="Close"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
+                  <path d="m6 6 8 8m0-8-8 8" strokeLinecap="round" strokeWidth={1.75} />
+                </svg>
+              </Dialog.Close>
             </div>
           </div>
 
-          <div className="px-5 pb-4">
+          <div className="px-5 pb-5">
             {isGuest ? (
-              <div className="bg-surface-secondary rounded-lg p-3 text-sm text-text-secondary">
-                Sign in with Google to unlock higher limits, cloud sync, and more storage.
-              </div>
+              <ul className="space-y-2 text-sm text-text-secondary" aria-label="Sign in benefits">
+                {['Create more tables and projects', 'Sync your work across devices', 'Keep working without starting over'].map(benefit => (
+                  <li key={benefit} className="flex items-center gap-2">
+                    <svg className="h-4 w-4 shrink-0 text-accent-green" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
+                      <path d="m5 10 3 3 7-7" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} />
+                    </svg>
+                    {benefit}
+                  </li>
+                ))}
+              </ul>
             ) : (
-              <div className="bg-surface-secondary rounded-lg p-3 text-sm text-text-secondary">
-                You've reached the free plan limit. We're working on expanded plans — stay tuned!
-              </div>
+              <p className="text-sm leading-6 text-text-secondary">
+                You can continue by removing work you no longer need. Expanded plans are not available yet.
+              </p>
             )}
-            {signInError && <p className="mt-3 text-sm text-red-700" role="alert">{signInError}</p>}
+            {signInError && (
+              <p className="mt-4 rounded-lg border border-error/20 bg-error/5 p-3 text-sm text-error-text" role="alert">
+                {signInError}
+              </p>
+            )}
           </div>
 
-          <div className="px-5 py-3 border-t border-border-subtle flex items-center justify-end gap-2 bg-surface-secondary/50">
+          <div className="flex items-center justify-end gap-2 border-t border-border-subtle bg-surface-secondary/40 px-5 py-3">
             <Dialog.Close asChild>
-              <button className="px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-tertiary rounded-lg transition-colors">
-                {isGuest ? 'Maybe later' : 'OK'}
+              <button className="btn btn-ghost">
+                {isGuest ? 'Not now' : 'Close'}
               </button>
             </Dialog.Close>
 
             {isGuest && (
               <button
                 onClick={() => void handleSignIn()}
-                className="px-4 py-2 text-sm font-medium text-white bg-accent-green hover:bg-accent-green/90 rounded-lg transition-colors flex items-center gap-2"
+                className="btn btn-primary gap-2 px-4"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />

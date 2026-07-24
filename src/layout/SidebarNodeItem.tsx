@@ -106,7 +106,7 @@ export function SidebarNodeItem({
   return (
     <li
       className={`group flex min-h-14 items-center rounded-lg transition-colors ${
-        selected ? 'bg-accent-green/10' : 'hover:bg-surface-secondary'
+        selected ? 'bg-accent-green/10 hover:bg-accent-green/15' : 'hover:bg-surface-secondary'
       }`}
     >
       {renaming ? (
@@ -161,7 +161,11 @@ export function SidebarNodeItem({
             aria-label={`Actions for ${node.name}`}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            className={`sidebar-node-action mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-[opacity,color,background-color] hover:bg-surface-tertiary hover:text-text-primary focus:opacity-100 focus-visible:ring-2 focus-visible:ring-accent-green group-hover:opacity-100 group-focus-within:opacity-100 ${
+            className={`sidebar-node-action mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-[opacity,color,background-color] focus:opacity-100 focus-visible:ring-2 focus-visible:ring-accent-green group-hover:opacity-100 group-focus-within:opacity-100 ${
+              selected
+                ? 'hover:bg-accent-green/15 hover:text-accent-text'
+                : 'hover:bg-surface-tertiary hover:text-text-primary'
+            } ${
               selected || menuOpen ? 'opacity-100' : 'opacity-0'
             }`}
           >
@@ -185,7 +189,6 @@ export function SidebarNodeItem({
         >
           <MenuItem icon={<RenameIcon />} label="Rename" onClick={startRename} />
           <MenuItem icon={<DuplicateIcon />} label="Duplicate" onClick={duplicate} />
-          <div className="my-1 border-t border-border-subtle" />
           <MenuItem
             icon={<DeleteIcon />}
             label="Delete"
