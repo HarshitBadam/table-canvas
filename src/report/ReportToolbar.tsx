@@ -311,7 +311,7 @@ export function ReportToolbar({
             ref={insertRef}
             onBlur={(event) => {
               const nextTarget = event.relatedTarget
-              if (!nextTarget || !event.currentTarget.contains(nextTarget as Node)) {
+              if (nextTarget && !event.currentTarget.contains(nextTarget as Node)) {
                 setShowInsertMenu(false)
               }
             }}
