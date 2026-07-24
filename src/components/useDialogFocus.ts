@@ -16,6 +16,7 @@ const INITIAL_FOCUS_SELECTORS = [
   FOCUSABLE_SELECTOR,
 ]
 const MODAL_SELECTOR = '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]'
+const DIALOG_SELECTOR = '[role="dialog"], [role="alertdialog"]'
 
 interface DialogEntry {
   dialog: HTMLElement
@@ -124,7 +125,14 @@ export function useDialogFocus<T extends HTMLElement>(
     const initialFocusFrame = window.requestAnimationFrame(focusInitialControl)
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (getTopmostDialog() !== entry || hasVisibleModalOutside(dialog)) return
+      const eventDialog = event.target instanceof Element
+        ? event.target.closest(DIALOG_SELECTOR)
+        : null
+      if (
+        getTopmostDialog() !== entry
+        || hasVisibleModalOutside(dialog)
+        || (eventDialog && eventDialog !== dialog)
+      ) return
 
       if (event.key === 'Escape') {
         event.preventDefault()
