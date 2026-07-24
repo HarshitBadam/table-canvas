@@ -12,6 +12,7 @@ import {
   listProjects as listProjectsLocal,
   loadProject as loadProjectLocal,
   saveProject as saveProjectLocal,
+  updateProjectRevision,
 } from './db'
 import { deserializePatches, serializePatches } from './patchSerialization'
 import { isNetworkOnline } from './syncState'
@@ -22,6 +23,7 @@ import {
   isRetryableRemoteDeferral,
 } from './projectCreateReconciliation'
 import { promoteLocalFileRefs } from './projectFilePromotion'
+import { deleteUnreferencedLocalFiles } from './fileGarbageCollection'
 export {
   AmbiguousProjectCreateError,
   ProjectCleanupError,
@@ -37,9 +39,21 @@ export interface ProjectWithSync {
   patches: Record<string, Patches>
   isLocalOnly?: boolean
   needsSync?: boolean
+  revision: number
+}
+
+const projectRevisions = new Map<string, number>()
+let projectSyncErrorHandler: ((message: string | null) => void) | null = null
+
+export function setProjectSyncErrorHandler(
+  handler: ((message: string | null) => void) | null,
+): void {
+  projectSyncErrorHandler = handler
 }
 
 function fromRemote(project: Awaited<ReturnType<typeof getProject>>): ProjectWithSync {
+  const revision = project.revision ?? 0
+  projectRevisions.set(project.id, revision)
   return {
     id: project.id,
     name: project.name,
@@ -48,6 +62,7 @@ function fromRemote(project: Awaited<ReturnType<typeof getProject>>): ProjectWit
     patches: deserializePatches(project.patches),
     isLocalOnly: false,
     needsSync: false,
+    revision,
   }
 }
 
@@ -105,12 +120,15 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
   const localProject = await loadProjectLocal(projectId)
   if (projectId.startsWith('local_')) {
     if (!localProject) return null
-    return {
+    const localOnly = {
       ...localProject,
       patches: deserializePatches(localProject.patches),
       isLocalOnly: true,
       needsSync: true,
+      revision: localProject.revision ?? 0,
     }
+    projectRevisions.set(projectId, localOnly.revision)
+    return localOnly
   }
 
   if (isNetworkOnline()) {
@@ -121,27 +139,52 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
         && toTimestamp(localProject.updatedAt) > toTimestamp(remoteProject.updatedAt)
       ) {
         const patches = deserializePatches(localProject.patches)
-        try {
-          await updateProject(projectId, {
-            name: localProject.name,
-            nodes: localProject.nodes,
-            edges: localProject.edges,
-            patches: localProject.patches,
-          })
-          return {
-            ...localProject,
+        const localRevision = localProject.revision ?? 0
+        if (localRevision < (remoteProject.revision ?? 0)) {
+          const recoveryId = createLocalId('local')
+          await saveProjectLocal(
+            recoveryId,
+            `${localProject.name} (conflict copy)`,
+            localProject.nodes,
+            localProject.edges,
             patches,
-            isLocalOnly: false,
-            needsSync: false,
-          }
-        } catch (error) {
-          console.error('[syncService] Failed to upload newer local project:', error)
-          if (!isRetryableRemoteDeferral(error)) throw error
-          return {
-            ...localProject,
-            patches,
-            isLocalOnly: false,
-            needsSync: true,
+            { revision: 0 },
+          )
+          projectSyncErrorHandler?.(
+            'A newer cloud version was found. Your unsynced work was preserved as a conflict copy.',
+          )
+        } else {
+          try {
+            const updated = await updateProject(projectId, {
+              name: localProject.name,
+              nodes: localProject.nodes,
+              edges: localProject.edges,
+              patches: localProject.patches,
+              expectedRevision: remoteProject.revision ?? 0,
+            })
+            projectRevisions.set(projectId, updated.revision)
+            await updateProjectRevision(projectId, updated.revision, updated.updatedAt)
+            return {
+              ...localProject,
+              patches,
+              isLocalOnly: false,
+              needsSync: false,
+              revision: updated.revision,
+            }
+          } catch (error) {
+            console.error('[syncService] Failed to upload newer local project:', error)
+            if (!isRetryableRemoteDeferral(error)) throw error
+            projectRevisions.set(
+              projectId,
+              localRevision,
+            )
+            return {
+              ...localProject,
+              patches,
+              isLocalOnly: false,
+              needsSync: true,
+              revision: localRevision,
+            }
           }
         }
       }
@@ -156,6 +199,7 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
         {
           createdAt: remoteProject.createdAt,
           updatedAt: remoteProject.updatedAt,
+          revision: remoteProject.revision,
         },
       )
       return loaded
@@ -165,12 +209,15 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
     }
   }
   if (!localProject) return null
-  return {
+  const fallback = {
     ...localProject,
     patches: deserializePatches(localProject.patches),
     isLocalOnly: !isNetworkOnline(),
     needsSync: true,
+    revision: localProject.revision ?? 0,
   }
+  projectRevisions.set(projectId, fallback.revision)
+  return fallback
 }
 
 export async function createProjectWithSync(name = 'Untitled Project'): Promise<ProjectWithSync> {
@@ -186,6 +233,7 @@ export async function createProjectWithSync(name = 'Untitled Project'): Promise<
       {
         createdAt: remoteProject.createdAt,
         updatedAt: remoteProject.updatedAt,
+        revision: remoteProject.revision,
       },
     )
     return project
@@ -198,6 +246,7 @@ export async function createProjectWithSync(name = 'Untitled Project'): Promise<
     patches: {},
     isLocalOnly: true,
     needsSync: true,
+    revision: 0,
   }
   await saveProjectLocal(project.id, project.name, project.nodes, project.edges, project.patches)
   return project
@@ -219,12 +268,20 @@ async function saveToBackend(
   patches: Record<string, Patches>,
 ): Promise<void> {
   if (!isNetworkOnline() || projectId.startsWith('local_')) return
-  await updateProject(projectId, {
+  const expectedRevision = projectRevisions.get(projectId)
+  if (expectedRevision == null) {
+    throw new Error(`Missing revision for project ${projectId}`)
+  }
+  const updated = await updateProject(projectId, {
     name,
     nodes: withoutTransientComputeState(nodes),
     edges,
     patches: serializePatches(patches),
+    expectedRevision,
   })
+  projectRevisions.set(projectId, updated.revision)
+  await updateProjectRevision(projectId, updated.revision, updated.updatedAt)
+  projectSyncErrorHandler?.(null)
 }
 
 export async function flushProjectSaveWithSync(projectId: string): Promise<void> {
@@ -266,6 +323,9 @@ export async function saveProjectWithSync(
   const timeout = setTimeout(() => {
     void flushProjectSaveWithSync(projectId).catch((error) => {
       console.error('[Sync] Failed to save to backend:', error)
+      projectSyncErrorHandler?.(
+        error instanceof Error ? error.message : 'Project sync failed',
+      )
     })
   }, 2000)
   saveTimeouts.set(projectId, timeout)
@@ -290,6 +350,7 @@ export async function deleteProjectWithSync(projectId: string): Promise<void> {
             {
               createdAt: localProject.createdAt,
               updatedAt: localProject.updatedAt,
+              revision: localProject.revision,
             },
           )
         } catch (restoreError) {
@@ -306,9 +367,15 @@ export async function deleteProjectWithSync(projectId: string): Promise<void> {
   if (timeout) clearTimeout(timeout)
   saveTimeouts.delete(projectId)
   pendingBackendSaves.delete(projectId)
+  projectRevisions.delete(projectId)
+  if (localProject) {
+    await deleteUnreferencedLocalFiles(localProject.nodes)
+  }
 }
 
-export async function importProjectWithSync(project: Omit<ProjectWithSync, 'id' | 'isLocalOnly' | 'needsSync'>): Promise<ProjectWithSync> {
+export async function importProjectWithSync(
+  project: Omit<ProjectWithSync, 'id' | 'isLocalOnly' | 'needsSync' | 'revision'>,
+): Promise<ProjectWithSync> {
   let createdProjectId: string | undefined
   if (isNetworkOnline()) {
     try {
@@ -321,16 +388,26 @@ export async function importProjectWithSync(project: Omit<ProjectWithSync, 'id' 
         nodes,
         edges: project.edges,
         patches: serializePatches(project.patches),
+        expectedRevision: created.revision,
       }
-      await updateProject(created.id, payload)
+      const updated = await updateProject(created.id, payload)
       const result = {
         ...project,
         nodes,
         id: created.id,
         isLocalOnly: false,
         needsSync: false,
+        revision: updated.revision,
       }
-      await saveProjectLocal(result.id, result.name, result.nodes, result.edges, result.patches)
+      projectRevisions.set(result.id, updated.revision)
+      await saveProjectLocal(
+        result.id,
+        result.name,
+        result.nodes,
+        result.edges,
+        result.patches,
+        { revision: updated.revision, updatedAt: updated.updatedAt },
+      )
       return result
     } catch (error) {
       console.error('[Sync] Failed to import project to server:', error)
@@ -347,7 +424,13 @@ export async function importProjectWithSync(project: Omit<ProjectWithSync, 'id' 
       throw error
     }
   }
-  const result = { ...project, id: createLocalId('local'), isLocalOnly: true, needsSync: true }
+  const result = {
+    ...project,
+    id: createLocalId('local'),
+    isLocalOnly: true,
+    needsSync: true,
+    revision: 0,
+  }
   await saveProjectLocal(result.id, result.name, result.nodes, result.edges, result.patches)
   return result
 }
