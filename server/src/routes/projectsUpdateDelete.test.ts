@@ -24,7 +24,7 @@ describe('Projects API update and delete', () => {
       const edges = { newEdge: createSampleEdge('newEdge', 'a', 'b') }
       const response = await request(app)
         .put(`/api/projects/${project._id}`)
-        .send({ name: 'Updated Name', nodes, edges })
+        .send({ name: 'Updated Name', nodes, edges, expectedRevision: project.revision })
         .expect(200)
       expect(response.body.success).toBe(true)
       expect(response.body.data.project.name).toBe('Updated Name')
@@ -41,7 +41,7 @@ describe('Projects API update and delete', () => {
       })
       const response = await request(app)
         .put(`/api/projects/${project._id}`)
-        .send({ name: 'New Name' })
+        .send({ name: 'New Name', expectedRevision: project.revision })
         .expect(200)
       expect(response.body.data.project.name).toBe('New Name')
       const node = response.body.data.project.nodes.node1
@@ -58,7 +58,7 @@ describe('Projects API update and delete', () => {
       await new Promise(resolve => setTimeout(resolve, 10))
       const response = await request(app)
         .put(`/api/projects/${project._id}`)
-        .send({ name: 'Updated' })
+        .send({ name: 'Updated', expectedRevision: project.revision })
         .expect(200)
       expect(new Date(response.body.data.project.updatedAt).getTime())
         .toBeGreaterThan(originalUpdatedAt.getTime())
@@ -68,7 +68,7 @@ describe('Projects API update and delete', () => {
       const { app } = getProjectRoutesTestContext()
       const response = await request(app)
         .put(`/api/projects/${new Types.ObjectId()}`)
-        .send({ name: 'Updated' })
+        .send({ name: 'Updated', expectedRevision: 0 })
         .expect(404)
       expect(response.body.success).toBe(false)
     })
@@ -78,9 +78,27 @@ describe('Projects API update and delete', () => {
       const project = await createTestProject({ userId: new Types.ObjectId() })
       const response = await request(app)
         .put(`/api/projects/${project._id}`)
-        .send({ name: 'Hijacked' })
+        .send({ name: 'Hijacked', expectedRevision: 0 })
         .expect(404)
       expect(response.body.success).toBe(false)
+    })
+
+    it('rejects stale revisions instead of overwriting newer work', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+        name: 'Original',
+      })
+      await request(app)
+        .put(`/api/projects/${project._id}`)
+        .send({ name: 'First writer', expectedRevision: project.revision })
+        .expect(200)
+      const response = await request(app)
+        .put(`/api/projects/${project._id}`)
+        .send({ name: 'Stale writer', expectedRevision: project.revision })
+        .expect(409)
+      expect(response.body.error).toContain('another session')
+      expect((await Project.findById(project._id))?.name).toBe('First writer')
     })
   })
 
@@ -94,7 +112,7 @@ describe('Projects API update and delete', () => {
       })
       const response = await request(app)
         .patch(`/api/projects/${project._id}`)
-        .send({ name: 'Patched Name' })
+        .send({ name: 'Patched Name', expectedRevision: project.revision })
         .expect(200)
       expect(response.body.data.project.name).toBe('Patched Name')
       expect(response.body.data.project.nodes.node1).toBeDefined()
@@ -109,6 +127,7 @@ describe('Projects API update and delete', () => {
         .patch(`/api/projects/${project._id}`)
         .send({
           name: 'Valid Update',
+          expectedRevision: project.revision,
           userId: new Types.ObjectId().toString(),
         })
         .expect(200)

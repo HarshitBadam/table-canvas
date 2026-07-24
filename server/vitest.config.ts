@@ -8,9 +8,6 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
-      // Exclude auth-related tests per project constraints
-      '**/auth*.test.ts',
-      '**/auth*.spec.ts',
     ],
     coverage: {
       provider: 'v8',
@@ -19,12 +16,6 @@ export default defineConfig({
         'node_modules/',
         'dist/',
         'src/test/',
-        // Exclude auth-related code from coverage per constraints
-        '**/auth*',
-        '**/User*',
-        'src/middleware/auth.ts',
-        'src/routes/auth.ts',
-        'src/services/auth.service.ts',
       ],
     },
     testTimeout: 30000,

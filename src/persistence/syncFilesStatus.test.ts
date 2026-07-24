@@ -45,10 +45,16 @@ import {
   saveProjectWithSync,
   uploadFileWithSync,
 } from './syncService'
+import {
+  accountStorageScope,
+  GUEST_STORAGE_SCOPE,
+  setStorageScope,
+} from './storageScope'
 
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
+  setStorageScope(accountStorageScope('test-user'))
 })
 
 afterEach(() => {
@@ -66,6 +72,19 @@ const {
 } = mocks
 
 describe('uploadFileWithSync', () => {
+  it('keeps explicit guest work local even when the backend is reachable', async () => {
+    setStorageScope(GUEST_STORAGE_SCOPE)
+    const file = createMockFile('a,b\n1,2', 'guest.csv', 'text/csv')
+
+    const uploaded = await uploadFileWithSync(file)
+    const project = await createProjectWithSync('Guest project')
+
+    expect(mockUploadFile).not.toHaveBeenCalled()
+    expect(mocks.createProject).not.toHaveBeenCalled()
+    expect(uploaded.id).toMatch(/^local_file_/)
+    expect(project.id).toMatch(/^local_/)
+  })
+
   it('uploads to server and caches locally when online', async () => {
     const file = createMockFile('test content', 'test.csv', 'text/csv')
     mockUploadFile.mockResolvedValue({
