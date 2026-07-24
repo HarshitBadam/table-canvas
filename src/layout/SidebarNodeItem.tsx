@@ -207,11 +207,10 @@ function TableDimensions({ node, selected }: { node: TableNode; selected: boolea
   const columns = node.schema.columns.length
   const rows = node.cacheInfo?.lastRowCount ?? node.schema.rowCount ?? 0
   return (
-    <span className={`mt-0.5 flex gap-3 text-xs tabular-nums ${
+    <span className={`mt-0.5 text-xs tabular-nums ${
       selected ? 'text-accent-text' : 'text-text-tertiary'
     }`}>
-      <span>{columns.toLocaleString()} columns</span>
-      <span>{rows.toLocaleString()} rows</span>
+      {rows.toLocaleString()} rows · {columns.toLocaleString()} columns
     </span>
   )
 }

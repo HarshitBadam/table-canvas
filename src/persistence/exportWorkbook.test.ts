@@ -5,11 +5,11 @@ import * as XLSX from 'xlsx'
 import type { ProjectNode, SourceTableNode } from '@/types'
 import { parseWorkbookSheet, readWorkbook } from '@/engine/fileParsers'
 
-vi.mock('@/engine/materializationService', () => ({
+vi.mock('@/engine/tableDataService', () => ({
   getTableData: vi.fn(),
 }))
 
-import { getTableData } from '@/engine/materializationService'
+import { getTableData } from '@/engine/tableDataService'
 import { createWorkbook } from './exportWorkbook'
 
 const sampleWorkbookPath = resolve(process.cwd(), 'data/sample_workbook.xlsx')

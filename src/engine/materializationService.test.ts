@@ -41,12 +41,11 @@ vi.mock('papaparse', () => ({
   },
 }))
 vi.mock('xlsx', () => ({ read: vi.fn(), utils: { sheet_to_json: vi.fn() } }))
-import { ensureTableMaterialized, getTableData } from './materializationService'
+import { ensureTableMaterialized } from './materializationService'
+import { getTableData } from './tableDataService'
 import { computeDerivedTable } from './derivedTableComputation'
 import {
-  computeDerivedVersionHash,
-  computeSchemaFingerprint,
-  computeSourceVersionHash,
+  computeDerivedVersionHash, computeSchemaFingerprint, computeSourceVersionHash,
 } from './cacheUtils'
 const schema: TableSchema = {
   columns: [

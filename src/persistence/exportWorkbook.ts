@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import { getTableData } from '@/engine/materializationService'
+import { getTableData } from '@/engine/tableDataService'
 import type { ProjectNode, TableNode } from '@/types'
 import { getTableNodes } from '@/lib/utils'
 import { computeDisplayValue } from '@/grid/displayUtils'
