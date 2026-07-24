@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LoginCredentials } from '@/api/auth.api'
 import {
   fetchProjects,
+  flushAllProjectSavesWithSync,
   flushProjectSaveWithSync,
   saveProjectWithSync,
   setProjectSyncErrorHandler,
@@ -28,7 +29,8 @@ import {
 } from './appContextValue'
 import { useProjectActions } from './useProjectActions'
 import { prepareProjectState } from './projectPreparation'
-import { setBeforeTabRelease } from './tabOwnership'
+import { usePersistenceLifecycle } from './usePersistenceLifecycle'
+
 const PHASE_MESSAGES: Record<AppPhase, string> = {
   idle: 'Starting...',
   initializing_engine: 'Starting data engine...',
@@ -71,7 +73,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const edges = useProjectStore(store => store.edges)
   const patches = useProjectStore(store => store.patches)
   const projectName = useProjectStore(store => store.projectName)
-
   const saveLatestProject = useCallback(async () => {
     if (saveInFlight.current) {
       savePending.current = true
@@ -131,7 +132,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const prepareProject = useCallback(prepareProjectState, [])
-
   const resetWorkspace = useCallback(async () => {
     await clearProjectRuntime(useProjectStore.getState().nodes)
     setState(previous => ({
@@ -151,15 +151,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     useDataStore.setState({ tableData: {} })
     useReportStore.getState().reset()
   }, [])
-
-  useEffect(() => {
-    setBeforeTabRelease(async () => {
-      await flushProjectSave()
-      await useReportStore.getState().flushSaves()
-    })
-    return () => setBeforeTabRelease(null)
-  }, [flushProjectSave])
-
+  usePersistenceLifecycle({
+    user,
+    flushProjectSave,
+    saveLatestProject,
+    prepareProject,
+    setState,
+  })
   useEffect(() => {
     setState(previous => ({ ...previous, user, isAuthenticated }))
     if (!isAuthenticated && useProjectStore.getState().projectId) {
@@ -173,7 +171,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
     return () => setProjectSyncErrorHandler?.(null)
   }, [])
-
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
@@ -191,6 +188,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         if (authResult.user.tier !== 'guest') {
           await syncLocalProjectsToBackend()
+          await flushAllProjectSavesWithSync()
         }
 
         setPhase('loading_project')
@@ -249,25 +247,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }, [saveLatestProject])
 
-  useEffect(() => {
-    if (!user || user.tier === 'guest') return
-    const handleOnline = () => {
-      void syncLocalProjectsToBackend()
-      const projectId = useProjectStore.getState().projectId
-      if (projectId) {
-        void flushProjectSaveWithSync(projectId).catch(error => {
-          console.error('[AppContext] Reconnect sync failed:', error)
-        })
-      }
-    }
-    window.addEventListener('online', handleOnline)
-    return () => window.removeEventListener('online', handleOnline)
-  }, [user])
-
   const postLoginSetup = useCallback(async (tier: Tier) => {
     setPhase('loading_project')
     if (tier !== 'guest') {
       await syncLocalProjectsToBackend()
+      await flushAllProjectSavesWithSync()
     }
     const { project, projectList } = await loadOrCreateProject()
     await prepareProject(project)
@@ -304,17 +288,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const leaveGuest = useCallback(async () => {
     if (user?.tier !== 'guest') return
-    await flushProjectSave()
-    await useReportStore.getState().flushSaves()
-    await resetWorkspace()
-    clearGuestAuth()
+    try {
+      await flushProjectSave()
+      await useReportStore.getState().flushSaves()
+      await resetWorkspace()
+      clearGuestAuth()
+    } catch (error) {
+      setState(previous => ({
+        ...previous,
+        syncError: error instanceof Error
+          ? `Could not safely close the guest workspace: ${error.message}`
+          : 'Could not safely close the guest workspace.',
+      }))
+      throw error
+    }
   }, [clearGuestAuth, flushProjectSave, resetWorkspace, user?.tier])
 
   const logout = useCallback(async () => {
-    await flushProjectSave()
-    await useReportStore.getState().flushSaves()
-    await performLogout()
-    await resetWorkspace()
+    try {
+      await flushProjectSave()
+      await useReportStore.getState().flushSaves()
+      await performLogout()
+      await resetWorkspace()
+    } catch (error) {
+      setState(previous => ({
+        ...previous,
+        syncError: error instanceof Error
+          ? `Sign out failed: ${error.message}`
+          : 'Sign out failed. Try again while connected.',
+      }))
+    }
   }, [flushProjectSave, performLogout, resetWorkspace])
 
   const {

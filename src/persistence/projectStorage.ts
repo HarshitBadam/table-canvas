@@ -4,7 +4,6 @@ import { serializePatches, type SerializedPatches } from './patchSerialization'
 import { withoutTransientComputeState } from '@/state/transientProjectState'
 import {
   getStorageScope,
-  isLegacyRecord,
   scopedStorageKey,
 } from './storageScope'
 
@@ -59,9 +58,6 @@ export async function saveProject(
   }
 
   await db.put('projects', project)
-  if (scope === 'guest') {
-    await db.delete('projects', id)
-  }
 }
 
 export async function loadProject(
@@ -69,16 +65,13 @@ export async function loadProject(
   scope = getStorageScope(),
 ): Promise<StoredProject | null> {
   const db = await getDB()
-  let project = await db.get('projects', scopedStorageKey(scope, id))
-  if (!project && scope === 'guest') {
-    project = await db.get('projects', id)
-  }
+  const project = await db.get('projects', scopedStorageKey(scope, id))
   if (!project) return null
   const stored = project as unknown as StoredProject & {
     entityId?: string
     ownerId?: string
   }
-  if (!isLegacyRecord(stored.ownerId) && stored.ownerId !== scope) return null
+  if (stored.ownerId !== scope) return null
   return {
     ...stored,
     id: stored.entityId ?? stored.id,
@@ -90,19 +83,15 @@ export async function listProjects(
   scope = getStorageScope(),
 ): Promise<Array<{ id: string; name: string; updatedAt: string }>> {
   const db = await getDB()
-  const projects = await db.getAllFromIndex('projects', 'by-updated')
+  const projects = await db.getAllFromIndex('projects', 'by-owner', scope)
 
   return projects
-    .filter(project => (
-      project.ownerId === scope
-      || (scope === 'guest' && isLegacyRecord(project.ownerId))
-    ))
     .map(project => ({
       id: project.entityId ?? project.id,
       name: project.name,
       updatedAt: project.updatedAt,
     }))
-    .reverse()
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
 export async function deleteProject(
@@ -111,22 +100,4 @@ export async function deleteProject(
 ): Promise<void> {
   const db = await getDB()
   await db.delete('projects', scopedStorageKey(scope, id))
-  if (scope === 'guest') {
-    await db.delete('projects', id)
-  }
-}
-
-export async function updateProjectRevision(
-  id: string,
-  revision: number,
-  updatedAt: Date | string,
-  scope = getStorageScope(),
-): Promise<void> {
-  const db = await getDB()
-  const key = scopedStorageKey(scope, id)
-  const project = await db.get('projects', key)
-  if (!project) return
-  project.revision = revision
-  project.updatedAt = new Date(updatedAt).toISOString()
-  await db.put('projects', project)
 }

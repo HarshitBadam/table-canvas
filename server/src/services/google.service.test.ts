@@ -88,7 +88,7 @@ describe('POST /api/auth/google', () => {
     expect(res2.body.data.user.id).toBe(userId1);
   });
 
-  it('links Google to an existing email/password user', async () => {
+  it('refuses to auto-link Google to an existing password user', async () => {
     const pw = await hashPassword('Str0ngPass!');
     const existing = await User.create({
       email: 'linked@example.com',
@@ -108,21 +108,19 @@ describe('POST /api/auth/google', () => {
       .post('/api/auth/google')
       .send({ credential: 'tok' });
 
-    expect(res.status).toBe(200);
-    expect(res.body.data.user.id).toBe(existing._id.toString());
+    expect(res.status).toBe(409);
 
     const updated = await User.findById(existing._id);
-    expect(updated!.googleId).toBe('g-link');
+    expect(updated!.googleId).toBeUndefined();
     expect(updated!.passwordHash).toBe(pw);
-    expect(updated!.avatarUrl).toBe('https://example.com/linked.jpg');
+    expect(updated!.avatarUrl).toBeUndefined();
   });
 
-  it('does not overwrite existing avatarUrl when linking', async () => {
-    const pw = await hashPassword('Str0ngPass!');
+  it('refreshes the avatar for an existing Google identity', async () => {
     await User.create({
       email: 'hasavatar@example.com',
       name: 'Has Avatar',
-      passwordHash: pw,
+      googleId: 'g-avatar',
       avatarUrl: 'https://example.com/original.jpg',
     });
 
@@ -139,7 +137,7 @@ describe('POST /api/auth/google', () => {
 
     expect(res.status).toBe(200);
     const updated = await User.findOne({ googleId: 'g-avatar' });
-    expect(updated!.avatarUrl).toBe('https://example.com/original.jpg');
+    expect(updated!.avatarUrl).toBe('https://example.com/new.jpg');
   });
 
   it('sets cookies on successful Google login', async () => {

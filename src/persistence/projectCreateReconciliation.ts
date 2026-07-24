@@ -12,13 +12,6 @@ class AmbiguousProjectCreateError extends Error {
   }
 }
 
-export class ProjectCleanupError extends Error {
-  constructor(message: string, public readonly cause: unknown) {
-    super(message)
-    this.name = 'ProjectCleanupError'
-  }
-}
-
 export function isRetryableRemoteDeferral(error: unknown): boolean {
   if (error instanceof ApiError) return error.statusCode >= 500
   return error instanceof TypeError

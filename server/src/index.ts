@@ -8,13 +8,13 @@ import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
 import fileRoutes from './routes/files.js';
 import { reconcileStorageUsage } from './services/storageQuota.service.js';
+import { revokeLegacyRefreshSessions } from './services/auth.service.js';
+import { initializeFileIndexes } from './services/file.service.js';
 
 validateConfig();
 
 const app = express();
-if (config.nodeEnv === 'production') {
-  app.set('trust proxy', 1);
-}
+if (config.trustProxy) app.set('trust proxy', config.trustProxy);
 
 // CORS configuration for cookie-based auth
 app.use(cors({
@@ -24,8 +24,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
 }));
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '12mb' }));
+app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 app.use(cookieParser());
 
 app.get('/api/health', (_req, res) => {
@@ -48,6 +48,8 @@ app.use(errorHandler);
 async function startServer(): Promise<void> {
   try {
     await connectDatabase();
+    await revokeLegacyRefreshSessions();
+    await initializeFileIndexes();
     await reconcileStorageUsage();
 
     app.listen(config.port, () => {

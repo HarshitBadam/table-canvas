@@ -190,11 +190,8 @@ export function useProjectActions({
       edges: structuredClone(current.edges),
       patches: structuredClone(current.patches),
     }
-    let deletedReports: Awaited<ReturnType<typeof loadReportsForProject>> = {}
     let replacementPrepared = false
-    let reportsDeleted = false
     try {
-      deletedReports = await loadReportsForProject(projectId)
       let replacement: ProjectWithSync | null = null
       if (replacementSummary) {
         await flushProjectSave()
@@ -206,8 +203,6 @@ export function useProjectActions({
         await prepareProject(replacement)
         replacementPrepared = true
       }
-      await deleteReportsForProject(projectId)
-      reportsDeleted = true
       await deleteProjectWithSync(projectId)
       setState(previous => ({
         ...previous,
@@ -217,11 +212,6 @@ export function useProjectActions({
       }))
     } catch (error) {
       const restorationFailures: unknown[] = []
-      if (reportsDeleted) {
-        await saveAllReports(deletedReports).catch(restoreError => {
-          restorationFailures.push(restoreError)
-        })
-      }
       if (replacementPrepared) {
         await prepareProject(original).catch(restoreError => {
           restorationFailures.push(restoreError)

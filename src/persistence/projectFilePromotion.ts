@@ -18,6 +18,7 @@ export async function promoteLocalFileRefs(
     const uploaded = await uploadFileWithSync(
       new File([file.data], file.name, { type: file.type }),
       projectId,
+      `promote:${sourceScope}:${projectId}:${node.plan.fileRef}`,
     )
     if (uploaded.id.startsWith('local_file_')) {
       throw new Error(`Could not upload data file for "${node.name}"`)

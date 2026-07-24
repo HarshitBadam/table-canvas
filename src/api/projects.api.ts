@@ -79,7 +79,10 @@ export async function updateProject(
   return project;
 }
 
-export async function deleteProject(projectId: string): Promise<void> {
-  await api.delete(`/projects/${projectId}`);
+export async function deleteProject(
+  projectId: string,
+  expectedRevision: number
+): Promise<void> {
+  await api.delete(`/projects/${projectId}`, { expectedRevision });
 }
 

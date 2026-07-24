@@ -12,7 +12,8 @@ export interface UploadedFile {
 
 export async function uploadFile(
   file: File,
-  projectId?: string
+  projectId?: string,
+  operationId?: string
 ): Promise<UploadedFile> {
   const additionalData: Record<string, string> = {};
   if (projectId) {
@@ -22,7 +23,8 @@ export async function uploadFile(
   const { file: uploadedFile } = await api.upload<{ file: UploadedFile }>(
     '/files/upload',
     file,
-    additionalData
+    additionalData,
+    operationId
   );
 
   return uploadedFile;

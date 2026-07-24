@@ -27,7 +27,3 @@ const KEY_SEPARATOR = '\u001f'
 export function scopedStorageKey(scope: string, entityId: string): string {
   return `${scope}${KEY_SEPARATOR}${entityId}`
 }
-
-export function isLegacyRecord(ownerId: string | undefined): boolean {
-  return ownerId == null
-}

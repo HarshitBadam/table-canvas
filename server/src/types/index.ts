@@ -111,6 +111,7 @@ export interface FileMetadata {
   originalName: string;
   projectId?: string;
   userId: string;
+  clientOperationId?: string;
 }
 
 export interface UploadedFile {

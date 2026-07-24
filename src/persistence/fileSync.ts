@@ -10,6 +10,7 @@ import {
 } from './fileStorage'
 import { isNetworkOnline } from './syncState'
 import { isCloudStorageScope } from './storageScope'
+import { isRetryableRemoteDeferral } from './projectCreateReconciliation'
 
 export interface FileWithSync {
   id: string
@@ -45,20 +46,46 @@ export async function loadFileWithSync(fileId: string): Promise<ArrayBuffer | nu
   }
 }
 
-export async function uploadFileWithSync(file: File, projectId?: string): Promise<FileWithSync> {
+export async function uploadFileWithSync(
+  file: File,
+  projectId?: string,
+  operationId = createUploadOperationId(),
+): Promise<FileWithSync> {
   const buffer = await readFileBuffer(file)
   if (isNetworkOnline() && isCloudStorageScope()) {
+    let uploaded: Awaited<ReturnType<typeof uploadFile>> | null = null
     try {
-      const uploaded = await uploadFile(file, projectId)
-      await saveFileLocal(uploaded.id, uploaded.filename, uploaded.contentType, buffer)
+      uploaded = await uploadFile(file, projectId, operationId)
+    } catch (firstError) {
+      if (isRetryableRemoteDeferral(firstError)) {
+        try {
+          uploaded = await uploadFile(file, projectId, operationId)
+        } catch (retryError) {
+          console.error('[syncService] Failed to upload file to backend:', retryError)
+        }
+      } else {
+        console.error('[syncService] Failed to upload file to backend:', firstError)
+      }
+    }
+    if (uploaded) {
+      try {
+        await saveFileLocal(uploaded.id, uploaded.filename, uploaded.contentType, buffer)
+      } catch (error) {
+        console.error('[syncService] Uploaded file but could not cache it locally:', error)
+      }
       return { id: uploaded.id, name: uploaded.filename, contentType: uploaded.contentType }
-    } catch (error) {
-      console.error('[syncService] Failed to upload file to backend:', error)
     }
   }
   const id = `local_file_${Date.now()}_${Math.random().toString(36).slice(2)}`
   await saveFileLocal(id, file.name, file.type, buffer)
   return { id, name: file.name, contentType: file.type }
+}
+
+function createUploadOperationId(): string {
+  const suffix = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}_${Math.random().toString(36).slice(2)}`
+  return `file_${suffix}`
 }
 
 export async function deleteFileWithSync(

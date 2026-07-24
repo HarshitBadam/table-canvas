@@ -15,8 +15,6 @@ import {
   createProjectWithinCapacity,
   restoreProjectWithinCapacity,
 } from '../services/projectCapacity.js';
-import { deleteFile } from '../services/file.service.js';
-import { releaseStorage } from '../services/storageQuota.service.js';
 
 const router = Router();
 
@@ -27,11 +25,40 @@ function expectedRevision(value: unknown): number {
   return value as number;
 }
 
+function validateProjectPayload(body: Record<string, unknown>): void {
+  const objectFields = ['nodes', 'edges', 'patches', 'reports'] as const;
+  for (const field of objectFields) {
+    const value = body[field];
+    if (
+      value !== undefined
+      && (
+        value === null
+        || typeof value !== 'object'
+        || Array.isArray(value)
+      )
+    ) {
+      throw new ValidationError([`${field} must be an object`]);
+    }
+  }
+  const nodes = body.nodes as Record<string, unknown> | undefined;
+  const edges = body.edges as Record<string, unknown> | undefined;
+  if (nodes && Object.keys(nodes).length > 5_000) {
+    throw new ValidationError(['A project cannot exceed 5,000 nodes']);
+  }
+  if (edges && Object.keys(edges).length > 20_000) {
+    throw new ValidationError(['A project cannot exceed 20,000 edges']);
+  }
+  if (Buffer.byteLength(JSON.stringify(body), 'utf8') > 10 * 1024 * 1024) {
+    throw new ValidationError(['Project data cannot exceed 10 MB']);
+  }
+}
+
 async function updateOwnedProject(
   projectId: string,
   userId: string,
   body: Record<string, unknown>,
 ) {
+  validateProjectPayload(body);
   const revision = expectedRevision(body.expectedRevision);
   const allowedFields = ['name', 'nodes', 'edges', 'patches', 'reports'] as const;
   const updates: Record<string, unknown> = {};
@@ -66,41 +93,6 @@ async function updateOwnedProject(
   throw new ConflictError(
     'Project changed in another session. Reload before saving to avoid overwriting newer work.',
   );
-}
-
-function projectFileReferences(nodes: Record<string, unknown>): Set<string> {
-  const references = new Set<string>();
-  for (const value of Object.values(nodes)) {
-    const node = value as { kind?: string; plan?: { fileRef?: unknown } };
-    if (
-      node.kind === 'source_table'
-      && typeof node.plan?.fileRef === 'string'
-    ) {
-      references.add(node.plan.fileRef);
-    }
-  }
-  return references;
-}
-
-async function cleanUnreferencedFiles(
-  userId: string,
-  deletedNodes: Record<string, unknown>,
-): Promise<void> {
-  const candidates = projectFileReferences(deletedNodes);
-  if (candidates.size === 0) return;
-  const retainedProjects = await Project.find({
-    userId: new Types.ObjectId(userId),
-    deletedAt: null,
-  }).select('nodes');
-  const retained = new Set<string>();
-  for (const project of retainedProjects) {
-    for (const fileId of projectFileReferences(project.nodes)) retained.add(fileId);
-  }
-  for (const fileId of candidates) {
-    if (retained.has(fileId) || !Types.ObjectId.isValid(fileId)) continue;
-    const deletedBytes = await deleteFile(fileId, userId);
-    if (deletedBytes != null) await releaseStorage(userId, deletedBytes);
-  }
 }
 
 // All project routes require authentication
@@ -141,6 +133,7 @@ router.post(
   '/',
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
+    validateProjectPayload(req.body);
     const { name, nodes, edges, patches, reports } = req.body;
     const operationId = req.get('Idempotency-Key')?.trim();
     if (operationId && operationId.length > 200) {
@@ -273,21 +266,36 @@ router.delete(
       throw new ValidationError(['Invalid project ID format']);
     }
 
-    // Include already-deleted projects so retries are idempotent.
-    const project = await Project.findOne({
-      _id: new Types.ObjectId(projectId),
-      userId: new Types.ObjectId(userId),
-    });
+    const revision = expectedRevision(req.body.expectedRevision);
+    const revisionFilter = revision === 0
+      ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] }
+      : { revision };
+    const project = await Project.findOneAndUpdate(
+      {
+        _id: new Types.ObjectId(projectId),
+        userId: new Types.ObjectId(userId),
+        deletedAt: null,
+        ...revisionFilter,
+      },
+      {
+        $set: { deletedAt: new Date(), quotaSlot: null },
+        $inc: { revision: 1 },
+      },
+      { new: true },
+    );
 
     if (!project) {
-      throw new NotFoundError('Project');
+      const existing = await Project.findOne({
+        _id: new Types.ObjectId(projectId),
+        userId: new Types.ObjectId(userId),
+      });
+      if (!existing) throw new NotFoundError('Project');
+      if (!existing.isDeleted()) {
+        throw new ConflictError(
+          'Project changed in another session. Reload before deleting it.',
+        );
+      }
     }
-
-    if (!project.isDeleted()) await project.softDelete();
-    await cleanUnreferencedFiles(
-      userId,
-      project.nodes as unknown as Record<string, unknown>,
-    );
 
     const response: ApiResponse = {
       success: true,
@@ -326,7 +334,13 @@ router.post(
 
     const userDoc = await User.findById(userId);
     const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
-    const restored = await restoreProjectWithinCapacity(project, userId, tier);
+    const revision = expectedRevision(req.body.expectedRevision);
+    const restored = await restoreProjectWithinCapacity(
+      project,
+      userId,
+      tier,
+      revision,
+    );
 
     const response: ApiResponse<{ project: IProjectPublic }> = {
       success: true,
