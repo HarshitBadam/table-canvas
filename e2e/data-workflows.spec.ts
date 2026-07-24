@@ -39,6 +39,7 @@ test.describe('Data import and export integrity', () => {
     await page.locator('aside').getByRole('button', { name: /^Edge Values 3 rows/ }).click()
     await expect(page.getByRole('gridcell', { name: 'Contact, row 1: Ada, Lovelace' })).toBeVisible()
     await expect(page.getByRole('gridcell', { name: 'Note, row 3: empty' })).toBeVisible()
+    await page.getByRole('button', { name: 'Back to Canvas' }).click()
     const { zip, workbook } = await readExportedWorkbook(page)
 
     expect(Object.keys(zip.files).sort()).toEqual([
