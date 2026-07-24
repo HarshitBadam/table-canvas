@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useApp } from '@/state/AppContext'
 import { CreateProjectDialog, DeleteProjectDialog } from './ProjectDialogs'
 import { ProjectSwitcherActions } from './ProjectSwitcherActions'
+import { useNavigate } from 'react-router-dom'
 
 interface MenuPosition {
   left: number
@@ -24,7 +25,9 @@ export function ProjectSwitcher() {
     loadProject,
     renameProject,
     setProjectLimitViolation,
+    leaveGuest,
   } = useApp()
+  const navigate = useNavigate()
   const switcherRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -159,15 +162,15 @@ export function ProjectSwitcher() {
     }
   }
 
-  const handleSignIn = () => {
-    const google = (window as unknown as {
-      google?: { accounts?: { id?: { prompt: () => void } } }
-    }).google
-    if (!google?.accounts?.id) {
-      setError('Google sign-in is unavailable. Try again after the page finishes loading.')
-      return
+  const handleSignIn = async () => {
+    setError(null)
+    try {
+      await leaveGuest()
+      setCreateOpen(false)
+      navigate('/login')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not prepare sign-in')
     }
-    google.accounts.id.prompt()
   }
 
   const handleRename = () => {
@@ -358,7 +361,7 @@ export function ProjectSwitcher() {
         tier={user?.tier ?? 'guest'}
         onNameChange={setName}
         onSubmit={() => void handleCreate()}
-        onSignIn={handleSignIn}
+        onSignIn={() => void handleSignIn()}
         onOpenChange={(open) => {
           if (isCreating) return
           setCreateOpen(open)
