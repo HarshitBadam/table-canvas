@@ -30,7 +30,6 @@ import {
 import { useProjectActions } from './useProjectActions'
 import { prepareProjectState } from './projectPreparation'
 import { usePersistenceLifecycle } from './usePersistenceLifecycle'
-
 const PHASE_MESSAGES: Record<AppPhase, string> = {
   idle: 'Starting...',
   initializing_engine: 'Starting data engine...',
@@ -100,7 +99,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setState(previous => ({ ...previous, isSaving: false }))
       }
     }
-
     const inFlight = save()
     saveInFlight.current = inFlight
     try {
@@ -109,7 +107,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (saveInFlight.current === inFlight) saveInFlight.current = null
     }
   }, [])
-
   const flushProjectSave = useCallback(async () => {
     await saveLatestProject()
     const projectId = useProjectStore.getState().projectId
@@ -121,7 +118,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.warn('[AppContext] Retryable remote save deferred:', error)
     }
   }, [saveLatestProject])
-
   const setPhase = useCallback((phase: AppPhase, error?: string) => {
     setState(previous => ({
       ...previous,
@@ -130,7 +126,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       error: phase === 'error' ? error || 'Unknown error' : null,
     }))
   }, [])
-
   const prepareProject = useCallback(prepareProjectState, [])
   const resetWorkspace = useCallback(async () => {
     await clearProjectRuntime(useProjectStore.getState().nodes)

@@ -3,13 +3,12 @@ import { createPortal } from 'react-dom'
 import { useApp } from '@/state/AppContext'
 import { CreateProjectDialog, DeleteProjectDialog } from './ProjectDialogs'
 import { ProjectSwitcherActions } from './ProjectSwitcherActions'
-
 interface MenuPosition {
   left: number
   top: number
   width: number
+  maxHeight: number
 }
-
 export function ProjectSwitcher() {
   const {
     projectId,
@@ -53,10 +52,17 @@ export function ProjectSwitcher() {
     const rect = trigger.getBoundingClientRect()
     const gutter = 12
     const width = Math.min(288, window.innerWidth - gutter * 2)
+    const availableBelow = window.innerHeight - rect.bottom - gutter
+    const availableAbove = rect.top - gutter
+    const openAbove = availableBelow < 280 && availableAbove > availableBelow
+    const maxHeight = Math.max(220, Math.min(420, openAbove ? availableAbove : availableBelow))
     setMenuPosition({
       left: Math.min(Math.max(rect.left, gutter), window.innerWidth - width - gutter),
-      top: rect.bottom + 6,
+      top: openAbove
+        ? Math.max(gutter, rect.top - maxHeight - 6)
+        : rect.bottom + 6,
       width,
+      maxHeight,
     })
   }, [])
 
@@ -199,8 +205,11 @@ export function ProjectSwitcher() {
   }
 
   const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.target instanceof HTMLInputElement) return
     const options = Array.from(
-      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+      event.currentTarget.querySelectorAll<HTMLButtonElement>(
+        '[role="option"], [role="menuitem"]',
+      ),
     )
     const currentIndex = options.indexOf(document.activeElement as HTMLButtonElement)
     if (event.key === 'ArrowDown') {
@@ -263,7 +272,8 @@ export function ProjectSwitcher() {
           <div
             ref={menuRef}
             style={menuPosition}
-            className="fixed z-popover overflow-hidden rounded-lg border border-border bg-surface shadow-lg motion-safe:animate-scale-in"
+            onKeyDown={handleMenuKeyDown}
+            className="fixed z-popover overflow-y-auto rounded-lg border border-border bg-surface shadow-lg motion-safe:animate-scale-in"
           >
             <div className="px-3 pb-1.5 pt-3">
               <span className="text-xs font-semibold text-text-secondary">Projects</span>
@@ -272,7 +282,6 @@ export function ProjectSwitcher() {
               role="listbox"
               aria-label="Projects"
               className="max-h-56 overflow-y-auto px-1.5 pb-1.5"
-              onKeyDown={handleMenuKeyDown}
             >
               {projects.map(project => {
                 const active = project.id === projectId
@@ -314,7 +323,6 @@ export function ProjectSwitcher() {
                 )
               })}
             </div>
-
             {menuActionError && (
               <p className="border-t border-border-subtle px-3 py-2 text-xs text-red-700" role="alert">
                 {menuActionError}

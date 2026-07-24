@@ -58,22 +58,32 @@ export function CreateProjectDialog({
             {error && (
               <div
                 id="create-project-error"
-                className="mt-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3"
+                className={`mt-3 rounded-lg border p-3 ${
+                  showCapacityFeedback && tier === 'guest'
+                    ? 'border-accent-green/20 bg-accent-green/5'
+                    : 'border-error/20 bg-error/5'
+                }`}
                 role="alert"
               >
-                <p className="text-sm font-medium text-red-700">
+                <p className={`text-sm font-medium ${
+                  showCapacityFeedback && tier === 'guest' ? 'text-accent-text' : 'text-error-text'
+                }`}>
                   {showCapacityFeedback
                     ? tier === 'guest'
-                      ? 'Sign in to create more projects.'
-                      : 'Project limit reached.'
+                      ? 'Sign in to create more projects'
+                      : 'Project limit reached'
                     : error}
                 </p>
                 {showCapacityFeedback && (
-                  <p className="mt-1 text-xs text-text-secondary">{error}</p>
+                  <p className="mt-1 text-xs leading-5 text-text-secondary">
+                    {tier === 'guest'
+                      ? 'Your current project stays on this device. Signing in also enables cloud sync.'
+                      : error}
+                  </p>
                 )}
                 {showCapacityFeedback && tier === 'guest' && (
-                  <button type="button" onClick={onSignIn} className="btn btn-secondary mt-3">
-                    Sign in
+                  <button type="button" onClick={onSignIn} className="btn btn-primary mt-3">
+                    Sign in with Google
                   </button>
                 )}
               </div>
@@ -127,7 +137,12 @@ export function DeleteProjectDialog({
           <Dialog.Description className="mt-2 text-sm text-text-secondary">
             This permanently removes the project and its reports from this device and your synced account. Shared source files are kept for other projects.
           </Dialog.Description>
-          {error && <p className="mt-3 text-sm text-red-700" role="alert">{error}</p>}
+          {error && (
+            <div className="mt-3 rounded-lg border border-error/20 bg-error/5 p-3" role="alert">
+              <p className="text-sm font-medium text-error-text">Project wasn’t deleted</p>
+              <p className="mt-1 text-xs text-text-secondary">{error}</p>
+            </div>
+          )}
           <div className="mt-5 flex justify-end gap-2">
             <Dialog.Close asChild>
               <button type="button" disabled={isDeleting} className="btn btn-ghost">
@@ -138,9 +153,10 @@ export function DeleteProjectDialog({
               type="button"
               disabled={isDeleting}
               onClick={onDelete}
+              aria-busy={isDeleting}
               className="btn bg-red-600 text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isDeleting ? 'Deleting…' : 'Delete project'}
+              {isDeleting ? 'Deleting…' : error ? 'Try again' : 'Delete project'}
             </button>
           </div>
         </Dialog.Content>

@@ -88,7 +88,8 @@ describe('SuggestionsPanel list and navigation', () => {
     const list = screen.getByRole('list', { name: 'Suggestions' })
     const items = within(list).getAllByRole('listitem')
     expect(items).toHaveLength(2)
-    expect(list).toHaveClass('border-y', 'divide-y')
+    expect(list).toHaveClass('divide-y')
+    expect(list).not.toHaveClass('border-y')
     expect(items[0]).not.toHaveClass('rounded-lg')
     expect(items[1]).not.toHaveClass('rounded-lg')
 

@@ -36,8 +36,13 @@ function renderSwitcher(overrides: Partial<AppContextValue> = {}) {
 
 function openCreateDialog() {
   fireEvent.click(screen.getByRole('button', { name: 'Current project' }))
-  fireEvent.click(screen.getByRole('button', { name: 'New project' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'New project' }))
   return screen.getByRole('textbox', { name: 'Project name' })
+}
+
+function openProjectActions() {
+  fireEvent.click(screen.getByRole('button', { name: 'Current project' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'More project actions' }))
 }
 
 beforeEach(() => {
@@ -97,26 +102,26 @@ describe('ProjectSwitcher project actions', () => {
   it('duplicates once and surfaces a retryable failure', async () => {
     actions.duplicateActiveProject.mockRejectedValueOnce(new Error('Sync unavailable'))
     renderSwitcher()
-    fireEvent.click(screen.getByRole('button', { name: 'Current project' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Duplicate' }))
+    openProjectActions()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate current project' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Sync unavailable')
-    fireEvent.click(screen.getByRole('button', { name: 'Duplicate' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate current project' }))
     await waitFor(() => expect(actions.duplicateActiveProject).toHaveBeenCalledTimes(2))
   })
 
   it('names deletion consequences and keeps confirmation open on failure', async () => {
     actions.deleteProject.mockRejectedValueOnce(new Error('Delete failed'))
     renderSwitcher()
-    fireEvent.click(screen.getByRole('button', { name: 'Current project' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    openProjectActions()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete current project' }))
 
     expect(screen.getByRole('heading', { name: 'Delete “Quarterly plan”?' })).toBeVisible()
     expect(screen.getByText(/permanently removes the project and its reports/i)).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Delete project' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Delete failed')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete project' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() => expect(actions.deleteProject).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
@@ -127,7 +132,7 @@ describe('ProjectSwitcher project actions', () => {
         { id: 'project-1', name: 'Quarterly plan', createdAt: new Date(), updatedAt: new Date() },
       ],
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Current project' }))
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled()
+    openProjectActions()
+    expect(screen.getByRole('menuitem', { name: 'Delete current project' })).toBeDisabled()
   })
 })

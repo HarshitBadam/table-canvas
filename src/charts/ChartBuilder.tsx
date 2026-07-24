@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import type { AggregationType, ChartType, TableNode, ProjectNode } from '@/types'
+import { SelectField } from '@/components/SelectField'
 import { isLikelyIdColumn, computeChartPosition, buildChartNodeSpec } from './chartBuilderUtils'
 import { ChartTypeIcon } from './ChartTypeIcon'
 
@@ -95,25 +96,33 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
+        <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/40 motion-safe:animate-fade-in" />
         <Dialog.Content 
-          className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-1rem)] w-[520px] max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-lg"
+          className="fixed left-1/2 top-1/2 z-modal flex max-h-[calc(100dvh-1rem)] w-[600px] max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl motion-safe:animate-scale-in"
         >
-          <div className="border-b border-border-subtle px-5 py-4">
+          <div className="border-b border-border-subtle bg-accent-green/5 px-5 py-4">
             <div className="flex items-center justify-between">
-              <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-green text-white">
+                  <ChartTypeIcon type={chartType} className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
                   <Dialog.Title className="text-base font-semibold text-text-primary">
-                    Create Chart
+                    Create chart
                   </Dialog.Title>
-                  <Dialog.Description className="mt-0.5 truncate text-xs text-text-secondary">
+                  <Dialog.Description className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-text-secondary">
                     {selectedTable ? (
                       <>
-                        {selectedTable.name} - {(selectedTable.cacheInfo?.lastRowCount
-                        ?? selectedTable.schema?.rowCount
-                        ?? 0).toLocaleString()} rows
+                        <span className="truncate font-medium text-text-primary">{selectedTable.name}</span>
+                        <span className="rounded bg-surface px-1.5 py-0.5 text-text-secondary shadow-sm">
+                          {(selectedTable.cacheInfo?.lastRowCount
+                            ?? selectedTable.schema?.rowCount
+                            ?? 0).toLocaleString()} rows
+                        </span>
                       </>
                     ) : 'Choose a source and map its fields'}
                   </Dialog.Description>
+                </div>
               </div>
               <Dialog.Close 
                 className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-text-primary sm:min-h-0 sm:min-w-0 sm:p-1.5"
@@ -128,8 +137,8 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
           
           <div className="flex min-h-0 flex-1 flex-col">
           <div className="overflow-y-auto px-4 sm:px-5">
-            <fieldset className="py-4">
-              <legend className="mb-2 text-xs font-semibold text-text-primary">Chart type</legend>
+            <fieldset className="py-5">
+              <legend className="mb-3 text-sm font-semibold text-text-primary">Chart type</legend>
               <div className="flex flex-wrap gap-1.5">
                 {[
                   { type: 'bar' as ChartType, label: 'Bar' },
@@ -139,10 +148,10 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                 ].map((ct) => (
                   <label
                     key={ct.type}
-                    className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors focus-within:ring-2 focus-within:ring-accent-green focus-within:ring-offset-2 ${
+                    className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3.5 py-2 text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-accent-green focus-within:ring-offset-2 ${
                       chartType === ct.type
-                        ? 'border-accent-green bg-accent-green/10 text-accent-text'
-                        : 'border-border text-text-secondary hover:bg-surface-secondary'
+                        ? 'border-accent-green bg-accent-green text-white shadow-sm'
+                        : 'border-border bg-surface text-text-secondary hover:border-text-tertiary hover:bg-surface-secondary'
                     }`}
                   >
                     <input
@@ -162,33 +171,39 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
 
             {selectedTable && (
               <>
-                <fieldset className="border-t border-border-subtle py-4">
-                  <legend className="mb-3 text-xs font-semibold text-text-primary">Field mapping</legend>
+                <fieldset className="border-t border-border-subtle py-5">
+                  <legend className="mb-4 text-sm font-semibold text-text-primary">Field mapping</legend>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="text-xs font-medium text-text-secondary">
-                      {chartType === 'scatter' ? 'X axis · numeric' : 'Category · text or date'}
-                      <select
+                    <div>
+                      <label className="text-xs font-medium text-text-primary">
+                        {chartType === 'scatter' ? 'X axis column' : 'Category column'}
+                      </label>
+                      <p className="mb-1.5 mt-0.5 text-xs text-text-tertiary">
+                        {chartType === 'scatter' ? 'Numeric values' : 'Text or date values'}
+                      </p>
+                      <SelectField
                         value={xAxis}
-                        onChange={(event) => setXAxis(event.target.value)}
-                        className="input mt-1.5 w-full"
-                      >
-                        <option value="">Choose a column</option>
-                        {(chartType === 'scatter' ? numericColumns : categoricalColumns.length > 0 ? categoricalColumns : columns)
-                          .map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
-                      </select>
-                    </label>
-                    <label className="text-xs font-medium text-text-secondary">
-                      {chartType === 'pie' ? 'Value · numeric' : 'Y axis · numeric'}
-                      <select
+                        onValueChange={setXAxis}
+                        ariaLabel={chartType === 'scatter' ? 'X axis column' : 'Category column'}
+                        placeholder="Choose a column"
+                        options={(chartType === 'scatter' ? numericColumns : categoricalColumns.length > 0 ? categoricalColumns : columns)
+                          .map(column => ({ value: column.id, label: column.name }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-text-primary">
+                        {chartType === 'pie' ? 'Value column' : 'Y axis column'}
+                      </label>
+                      <p className="mb-1.5 mt-0.5 text-xs text-text-tertiary">Numeric values</p>
+                      <SelectField
                         value={yAxis}
-                        onChange={(event) => setYAxis(event.target.value)}
+                        onValueChange={setYAxis}
+                        ariaLabel={chartType === 'pie' ? 'Value column' : 'Y axis column'}
+                        placeholder="Choose a column"
                         disabled={numericColumns.length === 0}
-                        className="input mt-1.5 w-full"
-                      >
-                        <option value="">Choose a column</option>
-                        {numericColumns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
-                      </select>
-                    </label>
+                        options={numericColumns.map(column => ({ value: column.id, label: column.name }))}
+                      />
+                    </div>
                   </div>
                   {numericColumns.length === 0 && (
                     <p className="mt-3 text-xs leading-5 text-warning-text" role="status">
@@ -203,8 +218,8 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                 </fieldset>
 
                 {chartType !== 'scatter' && (
-                  <fieldset className="border-t border-border-subtle py-4">
-                    <legend className="mb-2 text-xs font-semibold text-text-primary">Aggregation</legend>
+                  <fieldset className="border-t border-border-subtle py-5">
+                    <legend className="mb-3 text-sm font-semibold text-text-primary">Summarize values</legend>
                     <div className="flex flex-wrap gap-1.5">
                       {[
                         { value: 'sum', label: 'Sum' },
@@ -216,10 +231,10 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                       ].map((agg) => (
                         <label
                           key={agg.value}
-                          className={`cursor-pointer rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors focus-within:ring-2 focus-within:ring-accent-green focus-within:ring-offset-2 ${
+                          className={`min-h-9 cursor-pointer rounded-md border px-3 py-2 text-xs font-medium transition-colors focus-within:ring-2 focus-within:ring-accent-green focus-within:ring-offset-2 ${
                             aggregation === agg.value
                               ? 'border-accent-green bg-accent-green/10 text-accent-text'
-                              : 'border-border text-text-secondary hover:bg-surface-secondary'
+                              : 'border-border bg-surface text-text-secondary hover:border-text-tertiary hover:bg-surface-secondary'
                           }`}
                         >
                           <input
@@ -241,7 +256,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
           </div>
 
           <div 
-            className="shrink-0 border-t border-border-subtle bg-surface px-4 py-3 sm:px-5"
+            className="shrink-0 border-t border-border-subtle bg-accent-green/5 px-4 py-3 sm:px-5"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -259,7 +274,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                   disabled={!isValid}
                   className="btn btn-primary px-5"
                 >
-                  Create Chart
+                  Create chart
                 </button>
               </div>
             </div>
