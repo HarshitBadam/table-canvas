@@ -20,6 +20,7 @@ interface CreateProjectInput {
   nodes?: Record<string, ProjectNode>;
   edges?: Record<string, Edge>;
   patches?: Record<string, SerializedPatches>;
+  reports?: Record<string, unknown>;
 }
 
 function isDuplicateKey(error: unknown): boolean {
@@ -79,6 +80,7 @@ export async function createProjectWithinCapacity({
   nodes,
   edges,
   patches,
+  reports,
 }: CreateProjectInput): Promise<IProjectDocument> {
   const objectUserId = new Types.ObjectId(userId);
   if (operationId) {
@@ -102,6 +104,7 @@ export async function createProjectWithinCapacity({
         nodes: nodes || {},
         edges: edges || {},
         patches: patches || {},
+        reports: reports || {},
       }).save();
     } catch (error) {
       if (!isDuplicateKey(error)) throw error;

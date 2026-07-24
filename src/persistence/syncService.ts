@@ -1,5 +1,3 @@
-import { syncLocalProjectsToBackend } from './projectSync'
-
 export {
   createProjectWithSync,
   deleteProjectWithSync,

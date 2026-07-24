@@ -24,12 +24,31 @@ import {
 } from './projectCreateReconciliation'
 import { promoteLocalFileRefs } from './projectFilePromotion'
 import { deleteUnreferencedLocalFiles } from './fileGarbageCollection'
+import {
+  clearPendingProjectSave,
+  clearProjectRevision,
+  flushProjectSaveWithSync,
+  reportProjectSyncError,
+  setProjectRevision,
+} from './projectSaveSync'
+import { isCloudStorageScope } from './storageScope'
+import type { Report } from '@/report/types'
+import {
+  copyReportsToProject,
+  loadReportsForProject,
+  replaceReportsForProject,
+} from './reportStorage'
 export {
   AmbiguousProjectCreateError,
   ProjectCleanupError,
   isRetryableRemoteDeferral,
 } from './projectCreateReconciliation'
 export { syncLocalProjectsToBackend } from './localProjectPromotion'
+export {
+  flushProjectSaveWithSync,
+  saveProjectWithSync,
+  setProjectSyncErrorHandler,
+} from './projectSaveSync'
 
 export interface ProjectWithSync {
   id: string
@@ -39,21 +58,13 @@ export interface ProjectWithSync {
   patches: Record<string, Patches>
   isLocalOnly?: boolean
   needsSync?: boolean
-  revision: number
-}
-
-const projectRevisions = new Map<string, number>()
-let projectSyncErrorHandler: ((message: string | null) => void) | null = null
-
-export function setProjectSyncErrorHandler(
-  handler: ((message: string | null) => void) | null,
-): void {
-  projectSyncErrorHandler = handler
+  revision?: number
+  reports?: Record<string, Report>
 }
 
 function fromRemote(project: Awaited<ReturnType<typeof getProject>>): ProjectWithSync {
   const revision = project.revision ?? 0
-  projectRevisions.set(project.id, revision)
+  setProjectRevision(project.id, revision)
   return {
     id: project.id,
     name: project.name,
@@ -63,6 +74,7 @@ function fromRemote(project: Awaited<ReturnType<typeof getProject>>): ProjectWit
     isLocalOnly: false,
     needsSync: false,
     revision,
+    reports: project.reports ?? {},
   }
 }
 
@@ -73,7 +85,7 @@ function toTimestamp(value: Date | string | undefined): number {
 }
 
 export async function fetchProjects(): Promise<ProjectSummary[]> {
-  if (isNetworkOnline()) {
+  if (isNetworkOnline() && isCloudStorageScope()) {
     try {
       const [remoteProjects, localProjects] = await Promise.all([
         listProjects(),
@@ -118,6 +130,7 @@ export async function fetchProjects(): Promise<ProjectSummary[]> {
 
 export async function loadProjectWithSync(projectId: string): Promise<ProjectWithSync | null> {
   const localProject = await loadProjectLocal(projectId)
+  const localReports = await loadReportsForProject(projectId)
   if (projectId.startsWith('local_')) {
     if (!localProject) return null
     const localOnly = {
@@ -127,11 +140,11 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
       needsSync: true,
       revision: localProject.revision ?? 0,
     }
-    projectRevisions.set(projectId, localOnly.revision)
+    setProjectRevision(projectId, localOnly.revision)
     return localOnly
   }
 
-  if (isNetworkOnline()) {
+  if (isNetworkOnline() && isCloudStorageScope()) {
     try {
       const remoteProject = await getProject(projectId)
       if (
@@ -150,7 +163,11 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
             patches,
             { revision: 0 },
           )
-          projectSyncErrorHandler?.(
+          await copyReportsToProject(
+            projectId,
+            recoveryId,
+          )
+          reportProjectSyncError(
             'A newer cloud version was found. Your unsynced work was preserved as a conflict copy.',
           )
         } else {
@@ -160,9 +177,10 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
               nodes: localProject.nodes,
               edges: localProject.edges,
               patches: localProject.patches,
+              reports: localReports,
               expectedRevision: remoteProject.revision ?? 0,
             })
-            projectRevisions.set(projectId, updated.revision)
+            setProjectRevision(projectId, updated.revision)
             await updateProjectRevision(projectId, updated.revision, updated.updatedAt)
             return {
               ...localProject,
@@ -174,7 +192,7 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
           } catch (error) {
             console.error('[syncService] Failed to upload newer local project:', error)
             if (!isRetryableRemoteDeferral(error)) throw error
-            projectRevisions.set(
+            setProjectRevision(
               projectId,
               localRevision,
             )
@@ -202,6 +220,10 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
           revision: remoteProject.revision,
         },
       )
+      await replaceReportsForProject(
+        loaded.id,
+        remoteProject.reports ?? {},
+      )
       return loaded
     } catch (error) {
       console.error('[syncService] Failed to load project from backend:', error)
@@ -212,16 +234,16 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
   const fallback = {
     ...localProject,
     patches: deserializePatches(localProject.patches),
-    isLocalOnly: !isNetworkOnline(),
+    isLocalOnly: !isNetworkOnline() || !isCloudStorageScope(),
     needsSync: true,
     revision: localProject.revision ?? 0,
   }
-  projectRevisions.set(projectId, fallback.revision)
+  setProjectRevision(projectId, fallback.revision)
   return fallback
 }
 
 export async function createProjectWithSync(name = 'Untitled Project'): Promise<ProjectWithSync> {
-  if (isNetworkOnline()) {
+  if (isNetworkOnline() && isCloudStorageScope()) {
     const remoteProject = await createRemoteProject({ name }, `create:${name}`)
     const project = fromRemote(remoteProject)
     await saveProjectLocal(
@@ -244,6 +266,7 @@ export async function createProjectWithSync(name = 'Untitled Project'): Promise<
     nodes: {},
     edges: {},
     patches: {},
+    reports: {},
     isLocalOnly: true,
     needsSync: true,
     revision: 0,
@@ -252,89 +275,14 @@ export async function createProjectWithSync(name = 'Untitled Project'): Promise<
   return project
 }
 
-const saveTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
-const pendingBackendSaves = new Map<string, {
-  name: string
-  nodes: Record<string, ProjectNode>
-  edges: Record<string, Edge>
-  patches: Record<string, Patches>
-}>()
-
-async function saveToBackend(
-  projectId: string,
-  name: string,
-  nodes: Record<string, ProjectNode>,
-  edges: Record<string, Edge>,
-  patches: Record<string, Patches>,
-): Promise<void> {
-  if (!isNetworkOnline() || projectId.startsWith('local_')) return
-  const expectedRevision = projectRevisions.get(projectId)
-  if (expectedRevision == null) {
-    throw new Error(`Missing revision for project ${projectId}`)
-  }
-  const updated = await updateProject(projectId, {
-    name,
-    nodes: withoutTransientComputeState(nodes),
-    edges,
-    patches: serializePatches(patches),
-    expectedRevision,
-  })
-  projectRevisions.set(projectId, updated.revision)
-  await updateProjectRevision(projectId, updated.revision, updated.updatedAt)
-  projectSyncErrorHandler?.(null)
-}
-
-export async function flushProjectSaveWithSync(projectId: string): Promise<void> {
-  const timeout = saveTimeouts.get(projectId)
-  if (timeout) clearTimeout(timeout)
-  saveTimeouts.delete(projectId)
-
-  const pending = pendingBackendSaves.get(projectId)
-  if (!pending) return
-  try {
-    await saveToBackend(
-      projectId,
-      pending.name,
-      pending.nodes,
-      pending.edges,
-      pending.patches,
-    )
-    if (pendingBackendSaves.get(projectId) === pending) {
-      pendingBackendSaves.delete(projectId)
-    }
-  } catch (error) {
-    pendingBackendSaves.set(projectId, pending)
-    throw error
-  }
-}
-
-export async function saveProjectWithSync(
-  projectId: string,
-  name: string,
-  nodes: Record<string, ProjectNode>,
-  edges: Record<string, Edge>,
-  patches: Record<string, Patches>,
-): Promise<void> {
-  const persistedNodes = withoutTransientComputeState(nodes)
-  await saveProjectLocal(projectId, name, persistedNodes, edges, patches)
-  pendingBackendSaves.set(projectId, { name, nodes: persistedNodes, edges, patches })
-  const existingTimeout = saveTimeouts.get(projectId)
-  if (existingTimeout) clearTimeout(existingTimeout)
-  const timeout = setTimeout(() => {
-    void flushProjectSaveWithSync(projectId).catch((error) => {
-      console.error('[Sync] Failed to save to backend:', error)
-      projectSyncErrorHandler?.(
-        error instanceof Error ? error.message : 'Project sync failed',
-      )
-    })
-  }, 2000)
-  saveTimeouts.set(projectId, timeout)
-}
-
 export async function deleteProjectWithSync(projectId: string): Promise<void> {
   const localProject = await loadProjectLocal(projectId)
   await deleteProjectLocal(projectId)
-  if (isNetworkOnline() && !projectId.startsWith('local_')) {
+  if (
+    isNetworkOnline()
+    && isCloudStorageScope()
+    && !projectId.startsWith('local_')
+  ) {
     try {
       await flushProjectSaveWithSync(projectId)
       await deleteProjectRemote(projectId)
@@ -363,43 +311,54 @@ export async function deleteProjectWithSync(projectId: string): Promise<void> {
       throw error
     }
   }
-  const timeout = saveTimeouts.get(projectId)
-  if (timeout) clearTimeout(timeout)
-  saveTimeouts.delete(projectId)
-  pendingBackendSaves.delete(projectId)
-  projectRevisions.delete(projectId)
+  clearPendingProjectSave(projectId)
+  clearProjectRevision(projectId)
   if (localProject) {
     await deleteUnreferencedLocalFiles(localProject.nodes)
   }
 }
 
 export async function importProjectWithSync(
-  project: Omit<ProjectWithSync, 'id' | 'isLocalOnly' | 'needsSync' | 'revision'>,
+  project: Omit<
+    ProjectWithSync,
+    'id' | 'isLocalOnly' | 'needsSync' | 'revision' | 'reports'
+  > & { reports?: Record<string, Report> | Report[] },
 ): Promise<ProjectWithSync> {
   let createdProjectId: string | undefined
-  if (isNetworkOnline()) {
+  if (isNetworkOnline() && isCloudStorageScope()) {
     try {
       const recoveryKey = `import:${project.name}:${Object.keys(project.nodes).sort().join(',')}`
       const created = await createRemoteProject({ name: project.name }, recoveryKey)
       createdProjectId = created.id
       const nodes = await promoteLocalFileRefs(created.id, project.nodes)
+      const reportEntries = Array.isArray(project.reports)
+        ? project.reports.map(report => [report.id, report] as const)
+        : Object.entries(project.reports ?? {})
+      const reports = Object.fromEntries(
+        reportEntries.map(([id, report]) => [
+          id,
+          { ...report, projectId: created.id },
+        ]),
+      )
       const payload: ProjectPayload = {
         name: project.name,
         nodes,
         edges: project.edges,
         patches: serializePatches(project.patches),
         expectedRevision: created.revision,
+        reports,
       }
       const updated = await updateProject(created.id, payload)
       const result = {
         ...project,
+        reports,
         nodes,
         id: created.id,
         isLocalOnly: false,
         needsSync: false,
         revision: updated.revision,
       }
-      projectRevisions.set(result.id, updated.revision)
+      setProjectRevision(result.id, updated.revision)
       await saveProjectLocal(
         result.id,
         result.name,
@@ -407,6 +366,10 @@ export async function importProjectWithSync(
         result.edges,
         result.patches,
         { revision: updated.revision, updatedAt: updated.updatedAt },
+      )
+      await replaceReportsForProject(
+        result.id,
+        payload.reports,
       )
       return result
     } catch (error) {
@@ -424,8 +387,14 @@ export async function importProjectWithSync(
       throw error
     }
   }
+  const reports = Object.fromEntries(
+    (Array.isArray(project.reports)
+      ? project.reports.map(report => [report.id, report] as const)
+      : Object.entries(project.reports ?? {})),
+  )
   const result = {
     ...project,
+    reports,
     id: createLocalId('local'),
     isLocalOnly: true,
     needsSync: true,

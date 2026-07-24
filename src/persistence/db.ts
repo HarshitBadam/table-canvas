@@ -28,6 +28,7 @@ export {
   deleteReport,
   deleteReportsForProject,
   copyReportsToProject,
+  replaceReportsForProject,
   saveAllReports,
 } from './reportStorage'
 

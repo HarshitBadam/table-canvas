@@ -127,7 +127,7 @@ export async function deleteReportsForProject(
 export async function copyReportsToProject(
   sourceProjectId: string,
   destinationProjectId: string,
-  sourceScope: string,
+  sourceScope = getStorageScope(),
   destinationScope = getStorageScope(),
 ): Promise<void> {
   const reports = await loadReportsForProject(sourceProjectId, sourceScope)
@@ -138,12 +138,37 @@ export async function copyReportsToProject(
   }, destinationScope)))
 }
 
+export async function replaceReportsForProject(
+  projectId: string,
+  reports: Record<string, Report>,
+  scope = getStorageScope(),
+): Promise<void> {
+  const existing = await loadReportsForProject(projectId, scope)
+  const normalized = Object.fromEntries(
+    Object.entries(reports).map(([id, report]) => [
+      id,
+      { ...report, id, projectId },
+    ]),
+  )
+  await saveAllReports(normalized, scope)
+  await Promise.all(
+    Object.keys(existing)
+      .filter(id => !normalized[id])
+      .map(id => deleteReport(id, scope)),
+  )
+}
+
 function fromStoredReport(
   stored: import('./dbCore').TableCanvasDB['reports']['value'],
 ): Report {
-  const { entityId, ownerId: _ownerId, ...report } = stored
+  const report = { ...stored } as typeof stored & {
+    entityId?: string
+    ownerId?: string
+  }
+  delete report.entityId
+  delete report.ownerId
   return {
     ...report,
-    id: entityId ?? stored.id,
+    id: stored.entityId ?? stored.id,
   }
 }

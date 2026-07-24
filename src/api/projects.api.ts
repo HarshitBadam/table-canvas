@@ -1,6 +1,7 @@
 import { api } from './client';
 import type { ProjectNode, Edge } from '@/types';
 import type { SerializedPatches } from '@/persistence/patchSerialization';
+import type { Report } from '@/report/types';
 
 export interface ProjectSummary {
   id: string;
@@ -15,6 +16,7 @@ export interface Project {
   nodes: Record<string, ProjectNode>;
   edges: Record<string, Edge>;
   patches: Record<string, SerializedPatches>;
+  reports: Record<string, Report>;
   revision: number;
   createdAt: Date;
   updatedAt: Date;
@@ -25,6 +27,7 @@ interface CreateProjectData {
   nodes?: Record<string, ProjectNode>;
   edges?: Record<string, Edge>;
   patches?: Record<string, SerializedPatches>;
+  reports?: Record<string, Report>;
 }
 
 interface UpdateProjectData {
@@ -32,6 +35,7 @@ interface UpdateProjectData {
   nodes?: Record<string, ProjectNode>;
   edges?: Record<string, Edge>;
   patches?: Record<string, SerializedPatches>;
+  reports?: Record<string, Report>;
   expectedRevision: number;
 }
 
@@ -40,6 +44,7 @@ export type ProjectPayload = {
   nodes: Record<string, ProjectNode>;
   edges: Record<string, Edge>;
   patches: Record<string, SerializedPatches>;
+  reports: Record<string, Report>;
   expectedRevision: number;
 }
 

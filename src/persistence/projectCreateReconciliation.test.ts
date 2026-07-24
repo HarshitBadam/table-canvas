@@ -23,9 +23,11 @@ vi.mock('./db', () => ({
 }))
 
 import { createProjectWithSync } from './projectSync'
+import { accountStorageScope, setStorageScope } from './storageScope'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  setStorageScope(accountStorageScope('test-user'))
   window.dispatchEvent(new Event('online'))
 })
 
