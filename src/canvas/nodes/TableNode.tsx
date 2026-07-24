@@ -58,7 +58,7 @@ function ViewModeControl({
           className={`rounded-full px-2 py-1 text-xs font-medium outline-none transition-[color,background-color,box-shadow] focus-visible:ring-2 focus-visible:ring-accent-green ${
             currentMode === mode
               ? `bg-surface shadow-sm ${isSource ? 'text-accent-text' : 'text-node-derived-text'}`
-              : 'text-text-tertiary hover:text-text-primary'
+              : 'text-text-secondary hover:text-text-primary'
           }`}
         >
           {VIEW_MODE_LABELS[mode]}
@@ -113,9 +113,8 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             <h3 className="truncate text-sm font-semibold tracking-tight text-text-primary">
               {data.name}
             </h3>
-            <div className="mt-0.5 flex items-center gap-3 text-xs text-text-secondary">
-              <span>{formatNumber(colCount)} columns</span>
-              <span>{formatNumber(rowCount)} rows</span>
+            <div className="mt-0.5 text-xs text-text-secondary">
+              <span>{formatNumber(rowCount)} rows · {formatNumber(colCount)} columns</span>
             </div>
           </div>
           

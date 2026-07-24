@@ -1,6 +1,6 @@
 import type JSZipInstance from 'jszip'
 import { exportProjectFile, loadReportsForProject, loadProject } from './db'
-import { getTableData } from '@/engine/materializationService'
+import { getTableData } from '@/engine/tableDataService'
 import type { ProjectNode } from '@/types'
 import type { Report } from '@/report/types'
 import {

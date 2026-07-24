@@ -8,6 +8,8 @@ export interface MockProject {
   nodes: Record<string, unknown>
   edges: Record<string, unknown>
   patches: Record<string, unknown>
+  reports: Record<string, unknown>
+  revision: number
   createdAt: string
   updatedAt: string
 }
@@ -43,7 +45,7 @@ export async function installMockBackend(
     createdAt: new Date().toISOString(),
   }
 
-  await page.route('http://localhost:3001/api/**', async (route) => {
+  await page.route('**/api/**', async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
 
@@ -74,6 +76,8 @@ export async function installMockBackend(
         nodes: {},
         edges: {},
         patches: {},
+        reports: {},
+        revision: 0,
         createdAt: now,
         updatedAt: now,
       }
@@ -94,10 +98,18 @@ export async function installMockBackend(
         await fulfillJson(route, null, 404)
         return
       }
-      const update = request.postDataJSON() as Partial<MockProject>
+      const {
+        expectedRevision,
+        ...update
+      } = request.postDataJSON() as Partial<MockProject> & { expectedRevision?: number }
+      if (expectedRevision !== existing.revision) {
+        await fulfillJson(route, null, 409)
+        return
+      }
       const project: MockProject = {
         ...existing,
         ...update,
+        revision: existing.revision + 1,
         updatedAt: new Date().toISOString(),
       }
       projects.set(requestedProjectId, project)
@@ -105,6 +117,16 @@ export async function installMockBackend(
       return
     }
     if (requestedProjectId && request.method() === 'DELETE') {
+      const existing = projects.get(requestedProjectId)
+      const requested = request.postDataJSON() as { expectedRevision?: number } | null
+      if (!existing) {
+        await fulfillJson(route, null, 404)
+        return
+      }
+      if (requested?.expectedRevision !== existing.revision) {
+        await fulfillJson(route, null, 409)
+        return
+      }
       projects.delete(requestedProjectId)
       await fulfillJson(route, {})
       return

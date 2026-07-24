@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   updateCacheInfo: vi.fn(),
 }))
 
-vi.mock('@/engine/materializationService', () => ({
+vi.mock('@/engine/tableDataService', () => ({
   getTableData: mocks.getTableData,
 }))
 
