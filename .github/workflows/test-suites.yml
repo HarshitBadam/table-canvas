@@ -17,11 +17,11 @@ on:
           - e2e
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
 
 jobs:
   engine-tests:
-    name: ⚙️ Engine Tests
+    name: Engine tests
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.suite == 'all' || github.event.inputs.suite == 'engine' }}
     steps:
@@ -41,7 +41,7 @@ jobs:
         run: npm run test:engine
 
   formula-tests:
-    name: 📐 Formula Tests
+    name: Formula tests
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.suite == 'all' || github.event.inputs.suite == 'formula' }}
     steps:
@@ -61,7 +61,7 @@ jobs:
         run: npm run test:formula
 
   persistence-tests:
-    name: 💾 Persistence Tests
+    name: Persistence tests
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.suite == 'all' || github.event.inputs.suite == 'persistence' }}
     steps:
@@ -81,7 +81,7 @@ jobs:
         run: npm run test:persistence
 
   suggestions-tests:
-    name: 💡 Suggestions Tests
+    name: Suggestions tests
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.suite == 'all' || github.event.inputs.suite == 'suggestions' }}
     steps:
@@ -101,7 +101,7 @@ jobs:
         run: npm run test:suggestions
 
   e2e-tests:
-    name: 🎭 E2E Tests
+    name: End-to-end tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     if: ${{ github.event.inputs.suite == 'all' || github.event.inputs.suite == 'e2e' }}

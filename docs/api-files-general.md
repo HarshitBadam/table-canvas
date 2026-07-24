@@ -155,7 +155,9 @@ All errors follow this format:
 
 ## Rate Limiting
 
-Currently no rate limiting is implemented. For production, configure at the reverse proxy level (nginx, Cloudflare, etc.).
+Authentication endpoints use a shared MongoDB-backed rate limiter, including a
+unique key index for concurrent backend instances. A reverse proxy or hosting
+provider may add broader edge limits for the remaining API surface.
 
 ## CORS
 

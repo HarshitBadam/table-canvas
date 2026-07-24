@@ -40,21 +40,21 @@ const seedUsers = [
 ];
 
 async function seed() {
-  console.log('🌱 Starting database seed...\n');
+  console.log('Starting database seed...\n');
 
   try {
     // Connect to MongoDB
-    console.log(`📡 Connecting to MongoDB: ${MONGODB_URI}`);
+    console.log(`Connecting to MongoDB: ${MONGODB_URI}`);
     await mongoose.connect(MONGODB_URI);
-    console.log('✅ Connected to MongoDB\n');
+    console.log('Connected to MongoDB\n');
 
     // Clear existing users
-    console.log('🗑️  Clearing existing users...');
+    console.log('Clearing existing users...');
     await User.deleteMany({});
-    console.log('   ✅ Cleared all existing users\n');
+    console.log('Cleared all existing users\n');
 
     // Seed users
-    console.log('👤 Seeding users...');
+    console.log('Seeding users...');
     for (const userData of seedUsers) {
       const passwordHash = await bcrypt.hash(userData.password, SALT_ROUNDS);
       
@@ -66,20 +66,20 @@ async function seed() {
       });
 
       await user.save();
-      console.log(`   ✅ Created user: ${userData.email}`);
+      console.log(`Created user: ${userData.email}`);
     }
 
-    console.log('\n🎉 Seed completed successfully!');
-    console.log('\n📋 Test Credentials:');
-    console.log('   Email: demo@tablecanvas.app');
-    console.log('   Password: 1234');
+    console.log('\nSeed completed successfully.');
+    console.log('\nTest credentials:');
+    console.log('Email: demo@tablecanvas.app');
+    console.log('Password: 1234');
 
   } catch (error) {
-    console.error('\n❌ Seed failed:', error);
+    console.error('\nSeed failed:', error);
     process.exit(1);
   } finally {
     await mongoose.disconnect();
-    console.log('\n📡 Disconnected from MongoDB');
+    console.log('\nDisconnected from MongoDB');
   }
 }
 

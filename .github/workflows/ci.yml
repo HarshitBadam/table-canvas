@@ -11,11 +11,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
 
 jobs:
   lint:
-    name: 🔍 Lint
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -34,7 +34,7 @@ jobs:
         run: npm run lint
 
   typecheck:
-    name: 📘 TypeScript
+    name: TypeScript
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -52,8 +52,34 @@ jobs:
       - name: Run TypeScript compiler
         run: npx tsc --noEmit
 
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix server ci
+
+      - name: Audit production dependencies
+        run: |
+          npm audit --omit=dev --audit-level=moderate
+          npm --prefix server audit --omit=dev --audit-level=moderate
+
   unit-tests:
-    name: 🧪 Unit Tests
+    name: Unit tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -91,7 +117,7 @@ jobs:
           retention-days: 7
 
   e2e-tests:
-    name: 🎭 E2E Tests
+    name: End-to-end tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -132,7 +158,7 @@ jobs:
           retention-days: 7
 
   build:
-    name: 🏗️ Build
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -158,7 +184,7 @@ jobs:
           retention-days: 7
 
   backend:
-    name: ⚙️ Backend
+    name: Backend
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -185,14 +211,25 @@ jobs:
         run: npm --prefix server run build
 
       - name: Test backend
-        run: npm --prefix server run test
+        run: npm --prefix server run test:coverage
 
       - name: Check for dead code
         run: npm run check:dead-code
 
+  production-smoke:
+    name: Production smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and test production containers
+        run: ./scripts/test-production-compose.sh
+
   ci-success:
-    name: ✅ CI Success
-    needs: [lint, typecheck, unit-tests, e2e-tests, build, backend]
+    name: Required checks
+    needs: [lint, typecheck, dependency-audit, unit-tests, e2e-tests, build, backend, production-smoke]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -200,11 +237,13 @@ jobs:
         run: |
           if [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.typecheck.result }}" != "success" ]] || \
+             [[ "${{ needs.dependency-audit.result }}" != "success" ]] || \
              [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
              [[ "${{ needs.e2e-tests.result }}" != "success" ]] || \
              [[ "${{ needs.build.result }}" != "success" ]] || \
-             [[ "${{ needs.backend.result }}" != "success" ]]; then
-            echo "❌ One or more CI jobs failed"
+             [[ "${{ needs.backend.result }}" != "success" ]] || \
+             [[ "${{ needs.production-smoke.result }}" != "success" ]]; then
+            echo "One or more required CI jobs failed."
             exit 1
           fi
-          echo "✅ All CI jobs passed successfully!"
+          echo "All required CI jobs passed."

@@ -15,7 +15,10 @@ import {
 } from './projectCreateReconciliation'
 import { deleteUnreferencedLocalFiles } from './fileGarbageCollection'
 import {
-  flushProjectSaveWithSync, reportProjectSyncError,
+  flushAllQueuedProjectSavesWithSync,
+  flushProjectSaveWithSync,
+  reportProjectSyncError,
+  type ProjectSyncConflict,
 } from './projectSaveSync'
 import {
   getStorageScope,
@@ -38,7 +41,7 @@ export {
 export { syncLocalProjectsToBackend } from './localProjectPromotion'
 export { importProjectWithSync } from './projectImportSync'
 export {
-  flushAllProjectSavesWithSync, flushProjectSaveWithSync, saveProjectWithSync,
+  flushProjectSaveWithSync, saveProjectWithSync,
   setProjectSyncErrorHandler,
 } from './projectSaveSync'
 
@@ -130,6 +133,21 @@ export async function fetchProjects(): Promise<ProjectSummary[]> {
   }))
 }
 
+export async function flushAllProjectSavesWithSync(): Promise<ProjectSyncConflict[]> {
+  const scope = getStorageScope()
+  const conflicts = await flushAllQueuedProjectSavesWithSync(scope)
+  for (const conflict of conflicts) {
+    if (conflict.operation === 'delete') {
+      await clearProjectSyncOperation(conflict.projectId, scope)
+      reportProjectSyncError(
+        'A project changed in the cloud and was not deleted. The newer version was restored.',
+      )
+    }
+    await loadProjectWithSync(conflict.projectId)
+  }
+  return conflicts
+}
+
 export async function loadProjectWithSync(projectId: string): Promise<ProjectWithSync | null> {
   const scope = getStorageScope()
   const localProject = await loadProjectLocal(projectId)
@@ -138,11 +156,22 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
     if (isNetworkOnline() && isCloudStorageScope()) {
       try {
         await flushProjectSaveWithSync(projectId, scope)
+        return null
       } catch (error) {
-        if (!isRetryableRemoteDeferral(error)) throw error
+        if (error instanceof ApiError && error.statusCode === 409) {
+          await clearProjectSyncOperation(projectId, scope)
+          reportProjectSyncError(
+            'This project changed in the cloud and was not deleted. The newer version was restored.',
+          )
+        } else if (isRetryableRemoteDeferral(error)) {
+          return null
+        } else {
+          throw error
+        }
       }
+    } else {
+      return null
     }
-    return null
   }
   if (projectId.startsWith('local_')) {
     if (!localProject) return null

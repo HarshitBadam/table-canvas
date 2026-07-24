@@ -13,7 +13,8 @@ export async function connectDatabase(): Promise<void> {
     console.log('[DB] Connecting to MongoDB...');
     
     await mongoose.connect(config.mongodbUri, {
-      // Modern mongoose doesn't need most options, they're defaults now
+      connectTimeoutMS: 10_000,
+      serverSelectionTimeoutMS: 10_000,
     });
 
     isConnected = true;
