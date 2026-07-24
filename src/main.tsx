@@ -8,6 +8,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ThemeProvider } from './components/ThemeProvider'
 import { AppProvider } from './state/AppContext'
 import { initializeFrontendTelemetry } from './observability/frontendTelemetry'
+import { ExclusiveTabGate } from './components/ExclusiveTabGate'
 
 enableMapSet()
 initializeFrontendTelemetry()
@@ -16,11 +17,13 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
-        <AppProvider>
-          <ThemeProvider>
-            <App />
-          </ThemeProvider>
-        </AppProvider>
+        <ExclusiveTabGate>
+          <AppProvider>
+            <ThemeProvider>
+              <App />
+            </ThemeProvider>
+          </AppProvider>
+        </ExclusiveTabGate>
       </BrowserRouter>
     </ErrorBoundary>
   </StrictMode>,

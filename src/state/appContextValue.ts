@@ -34,8 +34,11 @@ export interface AppContextValue {
   isSaving: boolean
   isProjectOperationPending: boolean
   error: string | null
+  syncError: string | null
   login: (credentials: LoginCredentials) => Promise<void>
   googleLogin: (credential: string) => Promise<void>
+  continueAsGuest: () => Promise<void>
+  leaveGuest: () => Promise<void>
   logout: () => Promise<void>
   createNewProject: (name?: string) => Promise<void>
   duplicateActiveProject: () => Promise<void>
@@ -64,6 +67,7 @@ export type AppProviderState = Pick<
   | 'isSaving'
   | 'isProjectOperationPending'
   | 'error'
+  | 'syncError'
 >
 
 export const AppContext = createContext<AppContextValue | null>(null)
@@ -75,6 +79,22 @@ export function useApp(): AppContextValue {
 }
 
 export function useAppAuth() {
-  const { user, isAuthenticated, login, googleLogin, logout } = useApp()
-  return { user, isAuthenticated, login, googleLogin, logout }
+  const {
+    user,
+    isAuthenticated,
+    login,
+    googleLogin,
+    continueAsGuest,
+    leaveGuest,
+    logout,
+  } = useApp()
+  return {
+    user,
+    isAuthenticated,
+    login,
+    googleLogin,
+    continueAsGuest,
+    leaveGuest,
+    logout,
+  }
 }

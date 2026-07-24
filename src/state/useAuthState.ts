@@ -8,6 +8,19 @@ import {
   User,
 } from '@/api/auth.api'
 import { setAuthErrorHandler, API_BASE_URL } from '@/api/client'
+import {
+  accountStorageScope,
+  GUEST_STORAGE_SCOPE,
+  setStorageScope,
+} from '@/persistence/storageScope'
+
+const LOCAL_USER: User = {
+  id: 'local-user',
+  email: 'local@tablecanvas.app',
+  name: 'Local User',
+  tier: 'guest',
+  createdAt: new Date(0),
+}
 
 export function useAuthState() {
   const [user, setUser] = useState<User | null>(null)
@@ -24,6 +37,7 @@ export function useAuthState() {
 
   const performLogin = useCallback(async (credentials: LoginCredentials) => {
     const { user } = await apiLogin(credentials)
+    setStorageScope(accountStorageScope(user.id))
     setUser(user)
     setIsAuthenticated(true)
     return user
@@ -31,6 +45,7 @@ export function useAuthState() {
 
   const performGoogleLogin = useCallback(async (credential: string) => {
     const { user } = await apiLoginWithGoogle(credential)
+    setStorageScope(accountStorageScope(user.id))
     setUser(user)
     setIsAuthenticated(true)
     return user
@@ -79,13 +94,14 @@ export function useAuthState() {
       }
 
       if (!backendReachable) {
-        authedUser = {
-          id: 'local-user',
-          email: 'local@tablecanvas.app',
-          name: 'Local User',
-          tier: 'guest',
-          createdAt: new Date(),
+        const allowAutomaticLocalMode = import.meta.env.DEV
+          || import.meta.env.VITE_AUTO_GUEST === 'true'
+        if (!allowAutomaticLocalMode) {
+          setUser(null)
+          setIsAuthenticated(false)
+          return { user: null, shouldContinue: false }
         }
+        authedUser = LOCAL_USER
       } else {
         setUser(null)
         setIsAuthenticated(false)
@@ -93,9 +109,26 @@ export function useAuthState() {
       }
     }
 
+    setStorageScope(
+      authedUser.tier === 'guest'
+        ? GUEST_STORAGE_SCOPE
+        : accountStorageScope(authedUser.id),
+    )
     setUser(authedUser)
     setIsAuthenticated(true)
     return { user: authedUser, shouldContinue: true }
+  }, [])
+
+  const continueAsGuest = useCallback((): User => {
+    setStorageScope(GUEST_STORAGE_SCOPE)
+    setUser(LOCAL_USER)
+    setIsAuthenticated(true)
+    return LOCAL_USER
+  }, [])
+
+  const leaveGuest = useCallback(() => {
+    setUser(null)
+    setIsAuthenticated(false)
   }, [])
 
   return {
@@ -107,5 +140,7 @@ export function useAuthState() {
     performGoogleLogin,
     performLogout,
     performCheckAuth,
+    continueAsGuest,
+    leaveGuest,
   }
 }

@@ -4,6 +4,7 @@ import {
   fetchProjects,
   flushProjectSaveWithSync,
   saveProjectWithSync,
+  setProjectSyncErrorHandler,
   syncLocalProjectsToBackend,
 } from '@/persistence/syncService'
 import {
@@ -48,6 +49,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     performLogin,
     performGoogleLogin,
     performLogout,
+    continueAsGuest: setGuestAuth,
+    leaveGuest: clearGuestAuth,
   } = useAuthState()
   const [projectLimitViolation, setProjectLimitViolation] =
     useState<LimitExceeded | null>(null)
@@ -63,6 +66,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isSaving: false,
     isProjectOperationPending: false,
     error: null,
+    syncError: null,
   })
   const initialized = useRef(false)
   const saveInFlight = useRef<Promise<void> | null>(null)
@@ -201,9 +205,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const resetWorkspace = useCallback(async () => {
+    await clearProjectRuntime(useProjectStore.getState().nodes)
+    setState(previous => ({
+      ...previous,
+      projectId: null,
+      projectName: 'Untitled Project',
+      projects: [],
+    }))
+    useProjectStore.setState({
+      projectId: '',
+      projectName: 'Untitled Project',
+      nodes: {},
+      edges: {},
+      patches: {},
+      selectedNodeId: null,
+    })
+    useDataStore.setState({ tableData: {} })
+    useReportStore.getState().reset()
+  }, [])
+
   useEffect(() => {
     setState(previous => ({ ...previous, user, isAuthenticated }))
-  }, [user, isAuthenticated])
+    if (!isAuthenticated && useProjectStore.getState().projectId) {
+      void resetWorkspace()
+    }
+  }, [user, isAuthenticated, resetWorkspace])
+
+  useEffect(() => {
+    setProjectSyncErrorHandler(message => {
+      setState(previous => ({ ...previous, syncError: message }))
+    })
+    return () => setProjectSyncErrorHandler(null)
+  }, [])
 
   useEffect(() => {
     if (initialized.current) return
@@ -265,6 +299,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveLatestProject,
   ])
 
+  useEffect(() => {
+    if (!user || user.tier === 'guest') return
+    const handleOnline = () => {
+      void syncLocalProjectsToBackend()
+      const projectId = useProjectStore.getState().projectId
+      if (projectId) {
+        void flushProjectSaveWithSync(projectId).catch(error => {
+          console.error('[AppContext] Reconnect sync failed:', error)
+        })
+      }
+    }
+    window.addEventListener('online', handleOnline)
+    return () => window.removeEventListener('online', handleOnline)
+  }, [user])
+
   const postLoginSetup = useCallback(async (tier: Tier) => {
     setPhase('loading_project')
     if (tier !== 'guest') {
@@ -298,28 +347,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await postLoginSetup(loggedInUser.tier)
   }, [performGoogleLogin, postLoginSetup])
 
+  const continueAsGuest = useCallback(async () => {
+    const guest = setGuestAuth()
+    await postLoginSetup(guest.tier)
+  }, [postLoginSetup, setGuestAuth])
+
+  const leaveGuest = useCallback(async () => {
+    if (user?.tier !== 'guest') return
+    await flushProjectSave()
+    await useReportStore.getState().flushSaves()
+    await resetWorkspace()
+    clearGuestAuth()
+  }, [clearGuestAuth, flushProjectSave, resetWorkspace, user?.tier])
+
   const logout = useCallback(async () => {
     await flushProjectSave()
     await useReportStore.getState().flushSaves()
-    await clearProjectRuntime(useProjectStore.getState().nodes)
     await performLogout()
-    setState(previous => ({
-      ...previous,
-      projectId: null,
-      projectName: 'Untitled Project',
-      projects: [],
-    }))
-    useProjectStore.setState({
-      projectId: '',
-      projectName: 'Untitled Project',
-      nodes: {},
-      edges: {},
-      patches: {},
-      selectedNodeId: null,
-    })
-    useDataStore.setState({ tableData: {} })
-    useReportStore.getState().reset()
-  }, [flushProjectSave, performLogout])
+    await resetWorkspace()
+  }, [flushProjectSave, performLogout, resetWorkspace])
 
   const {
     createNewProject,
@@ -382,6 +428,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isLoading: state.phase !== 'ready' && state.phase !== 'error',
     login,
     googleLogin,
+    continueAsGuest,
+    leaveGuest,
     logout,
     createNewProject,
     duplicateActiveProject,
