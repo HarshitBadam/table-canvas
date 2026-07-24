@@ -7,6 +7,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
 import fileRoutes from './routes/files.js';
+import { reconcileStorageUsage } from './services/storageQuota.service.js';
 
 validateConfig();
 
@@ -47,6 +48,7 @@ app.use(errorHandler);
 async function startServer(): Promise<void> {
   try {
     await connectDatabase();
+    await reconcileStorageUsage();
 
     app.listen(config.port, () => {
       console.log(`[Server] Running on port ${config.port}`);

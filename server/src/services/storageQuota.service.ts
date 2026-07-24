@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { User } from '../models/User.js';
 
 export async function reserveStorage(
@@ -38,4 +38,27 @@ export async function releaseStorage(userId: string, bytes: number): Promise<voi
       },
     ],
   );
+}
+
+export async function reconcileStorageUsage(): Promise<void> {
+  const db = mongoose.connection.db;
+  if (!db) throw new Error('Database connection not established');
+  const usage = await db.collection('files.files').aggregate<{
+    _id: string
+    bytes: number
+  }>([
+    { $match: { 'metadata.userId': { $type: 'string' } } },
+    { $group: { _id: '$metadata.userId', bytes: { $sum: '$length' } } },
+  ]).toArray();
+
+  await User.updateMany({}, { $set: { storageUsedBytes: 0 } });
+  if (usage.length === 0) return;
+  await User.bulkWrite(usage
+    .filter(item => Types.ObjectId.isValid(item._id))
+    .map(item => ({
+      updateOne: {
+        filter: { _id: new Types.ObjectId(item._id) },
+        update: { $set: { storageUsedBytes: item.bytes } },
+      },
+    })));
 }

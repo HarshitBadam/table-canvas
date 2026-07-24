@@ -15,11 +15,13 @@ import { isNetworkOnline } from './syncState'
 import {
   copyReportsToProject,
   deleteReportsForProject,
+  loadReportsForProject,
 } from './reportStorage'
 import {
   getStorageScope,
   GUEST_STORAGE_SCOPE,
 } from './storageScope'
+import { reportProjectSyncError } from './projectSaveSync'
 
 export async function syncLocalProjectsToBackend(): Promise<void> {
   if (!isNetworkOnline()) return
@@ -33,6 +35,7 @@ export async function syncLocalProjectsToBackend(): Promise<void> {
       const project = await loadProjectLocal(summary.id, sourceScope)
       if (!project) continue
       try {
+        const reports = await loadReportsForProject(summary.id, sourceScope)
         const created = await createProject(
           { name: project.name },
           `promote:${sourceScope}:${summary.id}`,
@@ -47,6 +50,12 @@ export async function syncLocalProjectsToBackend(): Promise<void> {
           nodes,
           edges: project.edges,
           patches: project.patches,
+          reports: Object.fromEntries(
+            Object.entries(reports).map(([id, report]) => [
+              id,
+              { ...report, projectId: created.id },
+            ]),
+          ),
           expectedRevision: created.revision ?? 0,
         }
         const updated = await updateProject(created.id, payload)
@@ -68,6 +77,11 @@ export async function syncLocalProjectsToBackend(): Promise<void> {
         await deleteReportsForProject(summary.id, sourceScope)
       } catch (error) {
         console.error('[syncService] Failed to sync local project to backend:', error)
+        reportProjectSyncError(
+          error instanceof Error
+            ? `Local project promotion failed: ${error.message}`
+            : 'Local project promotion failed',
+        )
       }
     }
   }
