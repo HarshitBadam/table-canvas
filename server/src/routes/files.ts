@@ -16,9 +16,11 @@ import {
   AppError,
 } from '../middleware/errorHandler.js';
 import { User } from '../models/User.js';
-import { File } from '../models/File.js';
-import { checkFileSize, checkStorageQuota } from '../config/enforce.js';
-import type { Tier } from '../config/limits.js';
+import { Project } from '../models/Project.js';
+import { checkFileSize } from '../config/enforce.js';
+import { getLimits, type Tier } from '../config/limits.js';
+import { reserveStorage, releaseStorage } from '../services/storageQuota.service.js';
+import { Types } from 'mongoose';
 
 const router = Router();
 
@@ -85,15 +87,22 @@ router.post(
       throw new AppError(sizeCheck.reason, 413);
     }
 
-    const userFiles = await File.find({
-      userId: userDoc!._id,
-      deletedAt: null,
-    }).select('size');
-    const currentUsedBytes = userFiles.reduce((sum, f) => sum + (f.size || 0), 0);
+    const projectId = req.body.projectId as string | undefined;
+    if (projectId) {
+      if (!Types.ObjectId.isValid(projectId)) {
+        throw new ValidationError(['Invalid project ID format']);
+      }
+      const project = await Project.findByIdAndUser(projectId, userId);
+      if (!project) throw new NotFoundError('Project');
+    }
 
-    const quotaCheck = checkStorageQuota(currentUsedBytes, file.size, tier);
-    if (!quotaCheck.ok) {
-      throw new AppError(quotaCheck.reason, 413);
+    const reserved = await reserveStorage(
+      userId,
+      file.size,
+      getLimits(tier).maxServerStorageBytes,
+    );
+    if (!reserved) {
+      throw new AppError('This upload would exceed your storage quota', 413);
     }
 
     let contentType = file.mimetype;
@@ -107,16 +116,22 @@ router.post(
       contentType = 'application/vnd.ms-excel';
     }
 
-    const uploadedFile = await uploadFile(
-      file.buffer,
-      file.originalname,
-      contentType,
-      {
-        originalName: file.originalname,
-        userId,
-        projectId: req.body.projectId,
-      }
-    );
+    let uploadedFile: UploadedFile;
+    try {
+      uploadedFile = await uploadFile(
+        file.buffer,
+        file.originalname,
+        contentType,
+        {
+          originalName: file.originalname,
+          userId,
+          projectId,
+        },
+      );
+    } catch (error) {
+      await releaseStorage(userId, file.size);
+      throw error;
+    }
 
     const response: ApiResponse<{ file: UploadedFile }> = {
       success: true,
@@ -134,6 +149,9 @@ router.get(
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const fileId = req.params.id;
+    if (!Types.ObjectId.isValid(fileId)) {
+      throw new ValidationError(['Invalid file ID format']);
+    }
 
     const fileDownload = await downloadFile(fileId, userId);
 
@@ -157,6 +175,9 @@ router.get(
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const fileId = req.params.id;
+    if (!Types.ObjectId.isValid(fileId)) {
+      throw new ValidationError(['Invalid file ID format']);
+    }
 
     const metadata = await getFileMetadata(fileId, userId);
 
@@ -180,12 +201,16 @@ router.delete(
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const fileId = req.params.id;
+    if (!Types.ObjectId.isValid(fileId)) {
+      throw new ValidationError(['Invalid file ID format']);
+    }
 
-    const deleted = await deleteFile(fileId, userId);
+    const deletedBytes = await deleteFile(fileId, userId);
 
-    if (!deleted) {
+    if (deletedBytes == null) {
       throw new NotFoundError('File');
     }
+    await releaseStorage(userId, deletedBytes);
 
     const response: ApiResponse = {
       success: true,

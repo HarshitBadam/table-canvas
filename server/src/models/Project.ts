@@ -12,6 +12,7 @@ export interface IProjectDocument extends Omit<IProject, '_id'>, Document {
     nodes: Record<string, ProjectNode>;
     edges: Record<string, Edge>;
     patches: Record<string, SerializedPatches>;
+    revision: number;
     createdAt: Date;
     updatedAt: Date;
   };
@@ -73,6 +74,12 @@ const ProjectSchema = new Schema<IProjectDocument, IProjectModel>(
         message: 'Patches must be an object',
       },
     },
+    revision: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
     deletedAt: {
       type: Date,
       default: null,
@@ -128,6 +135,7 @@ ProjectSchema.methods.toPublic = function () {
     nodes: this.nodes || {},
     edges: this.edges || {},
     patches: this.patches || {},
+    revision: this.revision ?? 0,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,
   };
