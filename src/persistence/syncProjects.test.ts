@@ -3,18 +3,11 @@ import { createMockProject } from './syncServiceTestSupport'
 import { ApiError } from '@/api/client'
 
 const mocks = vi.hoisted(() => ({
-  listProjects: vi.fn(),
-  getProject: vi.fn(),
-  createProject: vi.fn(),
-  updateProject: vi.fn(),
-  deleteProject: vi.fn(),
-  saveProjectLocal: vi.fn(),
-  loadProjectLocal: vi.fn(),
-  listProjectsLocal: vi.fn(),
-  deleteProjectLocal: vi.fn(),
-  updateProjectRevision: vi.fn(),
-  copyReportsToProject: vi.fn(),
-  deleteReportsForProject: vi.fn(),
+  listProjects: vi.fn(), getProject: vi.fn(), createProject: vi.fn(),
+  updateProject: vi.fn(), deleteProject: vi.fn(), saveProjectLocal: vi.fn(),
+  loadProjectLocal: vi.fn(), listProjectsLocal: vi.fn(),
+  deleteProjectLocal: vi.fn(), updateProjectRevision: vi.fn(),
+  copyReportsToProject: vi.fn(), deleteReportsForProject: vi.fn(),
   loadReportsForProject: vi.fn(),
 }))
 
@@ -41,12 +34,8 @@ vi.mock('./reportStorage', () => ({
 }))
 
 import {
-  deleteProjectWithSync,
-  fetchProjects,
-  flushProjectSaveWithSync,
-  importProjectWithSync,
-  loadProjectWithSync,
-  saveProjectWithSync,
+  deleteProjectWithSync, fetchProjects, flushProjectSaveWithSync,
+  importProjectWithSync, loadProjectWithSync, saveProjectWithSync,
   syncLocalProjectsToBackend,
 } from './syncService'
 import { accountStorageScope, setStorageScope } from './storageScope'
@@ -69,14 +58,10 @@ afterEach(() => {
 })
 
 const {
-  createProject: mockCreateProject,
-  deleteProject: mockDeleteProject,
-  deleteProjectLocal: mockDeleteProjectLocal,
-  getProject: mockGetProject,
-  listProjects: mockListProjects,
-  listProjectsLocal: mockListProjectsLocal,
-  loadProjectLocal: mockLoadProjectLocal,
-  saveProjectLocal: mockSaveProjectLocal,
+  createProject: mockCreateProject, deleteProject: mockDeleteProject,
+  deleteProjectLocal: mockDeleteProjectLocal, getProject: mockGetProject,
+  listProjects: mockListProjects, listProjectsLocal: mockListProjectsLocal,
+  loadProjectLocal: mockLoadProjectLocal, saveProjectLocal: mockSaveProjectLocal,
   updateProject: mockUpdateProject,
 } = mocks
 
@@ -129,7 +114,6 @@ describe('fetchProjects', () => {
     expect(result[1].name).toBe('Newer local name')
   })
 })
-
 describe('loadProjectWithSync', () => {
   it('loads from API and caches locally when online', async () => {
     mockGetProject.mockResolvedValue(createMockProject('proj_123', 'Test Project'))
@@ -207,7 +191,6 @@ describe('loadProjectWithSync', () => {
     expect(result?.needsSync).toBe(true)
   })
 })
-
 describe('saveProjectWithSync', () => {
   it('saves locally immediately and debounces backend save', async () => {
     await saveProjectWithSync('proj_1', 'Test', {}, {}, {})
@@ -258,7 +241,6 @@ describe('saveProjectWithSync', () => {
     )
   })
 })
-
 describe('importProjectWithSync', () => {
   const importedProject = {
     name: 'Imported project',

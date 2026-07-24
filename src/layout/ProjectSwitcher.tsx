@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { useApp } from '@/state/AppContext'
 import { CreateProjectDialog, DeleteProjectDialog } from './ProjectDialogs'
 import { ProjectSwitcherActions } from './ProjectSwitcherActions'
-import { useNavigate } from 'react-router-dom'
 
 interface MenuPosition {
   left: number
@@ -27,7 +26,6 @@ export function ProjectSwitcher() {
     setProjectLimitViolation,
     leaveGuest,
   } = useApp()
-  const navigate = useNavigate()
   const switcherRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -167,7 +165,7 @@ export function ProjectSwitcher() {
     try {
       await leaveGuest()
       setCreateOpen(false)
-      navigate('/login')
+      window.location.assign('/login')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not prepare sign-in')
     }
