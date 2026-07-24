@@ -84,7 +84,7 @@ export function NodeDeletionProvider({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={() => void confirmDeletion()}
                 disabled={isDeleting}
-                className="btn bg-error text-white hover:bg-error/90 disabled:opacity-50"
+                className="btn btn-danger"
               >
                 {isDeleting ? 'Deleting…' : 'Delete'}
               </button>
