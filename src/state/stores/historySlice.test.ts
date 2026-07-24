@@ -17,6 +17,8 @@ describe('history slice', () => {
     useProjectStore.getState().saveSnapshot('Before edit')
     useProjectStore.getState().setCellValue(tableId, 'row-1', 'col1', 'edited')
     useDataStore.getState().setTableData(tableId, [{ __rowId: 'row-1', col1: 'edited' }])
+    const editedRevision = useProjectStore.getState()
+      .getTableNode(tableId)?.cacheInfo?.dataRevision ?? 0
 
     useProjectStore.getState().undo()
 
@@ -25,6 +27,9 @@ describe('history slice', () => {
       isDirty: true,
       isComputing: false,
     })
+    const undoRevision = useProjectStore.getState()
+      .getTableNode(tableId)?.cacheInfo?.dataRevision ?? 0
+    expect(undoRevision).toBeGreaterThan(editedRevision)
     expect(useProjectStore.getState().getTableNode(derivedId)?.cacheInfo?.isDirty).toBe(true)
     expect(useDataStore.getState().tableData).toEqual({})
     expect(useProjectStore.getState().canRedo()).toBe(true)
@@ -33,6 +38,9 @@ describe('history slice', () => {
 
     expect(useProjectStore.getState().patches[tableId].cellPatches.col1['row-1']).toBe('edited')
     expect(useProjectStore.getState().getTableNode(tableId)?.cacheInfo?.isDirty).toBe(true)
+    expect(
+      useProjectStore.getState().getTableNode(tableId)?.cacheInfo?.dataRevision ?? 0,
+    ).toBeGreaterThan(undoRevision)
     expect(useDataStore.getState().tableData).toEqual({})
   })
 
