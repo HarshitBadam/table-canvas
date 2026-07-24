@@ -8,6 +8,7 @@ export {
   importProjectWithSync,
   loadProjectWithSync,
   saveProjectWithSync,
+  setProjectSyncErrorHandler,
   syncLocalProjectsToBackend,
 } from './projectSync'
 export {
@@ -17,9 +18,3 @@ export {
 } from './fileSync'
 
 export { isNetworkOnline } from './syncState'
-
-if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => {
-    void syncLocalProjectsToBackend()
-  })
-}
