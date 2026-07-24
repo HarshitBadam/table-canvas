@@ -29,7 +29,7 @@ const CREATE_OPERATIONS_KEY = 'tablecanvas:unresolved-project-creates'
 
 function readPersistedOperations(): Record<string, string> {
   try {
-    const value = sessionStorage.getItem(CREATE_OPERATIONS_KEY)
+    const value = localStorage.getItem(CREATE_OPERATIONS_KEY)
     return value ? JSON.parse(value) as Record<string, string> : {}
   } catch {
     return {}
@@ -38,7 +38,7 @@ function readPersistedOperations(): Record<string, string> {
 
 function persistOperations(): void {
   try {
-    sessionStorage.setItem(
+    localStorage.setItem(
       CREATE_OPERATIONS_KEY,
       JSON.stringify({
         ...readPersistedOperations(),
@@ -66,7 +66,7 @@ function resolveOperation(recoveryKey: string): void {
   delete persisted[recoveryKey]
   for (const [key, value] of unresolvedCreateOperations) persisted[key] = value
   try {
-    sessionStorage.setItem(CREATE_OPERATIONS_KEY, JSON.stringify(persisted))
+    localStorage.setItem(CREATE_OPERATIONS_KEY, JSON.stringify(persisted))
   } catch {
     // The in-memory entry was still cleared.
   }

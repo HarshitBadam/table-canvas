@@ -15,6 +15,7 @@ export interface Project {
   nodes: Record<string, ProjectNode>;
   edges: Record<string, Edge>;
   patches: Record<string, SerializedPatches>;
+  revision: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,6 +32,7 @@ interface UpdateProjectData {
   nodes?: Record<string, ProjectNode>;
   edges?: Record<string, Edge>;
   patches?: Record<string, SerializedPatches>;
+  expectedRevision: number;
 }
 
 export type ProjectPayload = {
@@ -38,6 +40,7 @@ export type ProjectPayload = {
   nodes: Record<string, ProjectNode>;
   edges: Record<string, Edge>;
   patches: Record<string, SerializedPatches>;
+  expectedRevision: number;
 }
 
 export async function listProjects(): Promise<ProjectSummary[]> {
