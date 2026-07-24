@@ -81,6 +81,23 @@ describe('shared node deletion alert dialog', () => {
     expect(screen.queryByRole('alertdialog', { name: 'Delete node?' })).not.toBeInTheDocument()
   })
 
+  it('does not close an outer navigation dialog when Escape closes deletion', async () => {
+    const closeNavigation = vi.fn()
+    render(<Providers><Sidebar isOpen onClose={closeNavigation} /></Providers>)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Sales' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete node?' })
+    await waitFor(() => expect(within(dialog).getByRole('button', {
+      name: 'Cancel',
+    })).toHaveFocus())
+
+    fireEvent.keyDown(document.activeElement ?? dialog, { key: 'Escape' })
+
+    await waitFor(() => expect(dialog).not.toBeInTheDocument())
+    expect(closeNavigation).not.toHaveBeenCalled()
+  })
+
   it('preserves the dependent-node warning while explaining undo', async () => {
     const sourceId = useProjectStore.getState().selectedNodeId!
     addFilter(sourceId, 'Filtered Sales')
