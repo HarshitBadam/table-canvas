@@ -13,7 +13,7 @@ import { useTableRuntimeStore } from './tableRuntimeStore'
  * successful local save and followers apply. Applying only touches in-memory stores
  * plus per-tab runtime state, so an applied snapshot cannot bounce back as a save.
  */
-export interface DocumentSnapshotMessage {
+interface DocumentSnapshotMessage {
   tabId: string
   name: string
   nodes: Record<string, ProjectNode>
@@ -129,7 +129,7 @@ export function startDocumentMirror(key: string): () => void {
   }
 }
 
-export function stopDocumentMirror(): void {
+function stopDocumentMirror(): void {
   if (!session) return
   session.stopped = true
   session.channel?.close()

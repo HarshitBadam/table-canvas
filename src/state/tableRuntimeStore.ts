@@ -104,10 +104,6 @@ export function updateNodeCacheInfo(
   useTableRuntimeStore.getState().updateCacheInfo(nodeId, updates)
 }
 
-export function getMaterializedSchema(nodeId: string): TableSchema | undefined {
-  return useTableRuntimeStore.getState().schemas[nodeId]
-}
-
 /** The schema readers should trust: this tab's materialized copy, else the document. */
 export function effectiveTableSchema(
   node: TableNode | undefined,
