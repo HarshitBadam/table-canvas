@@ -3,6 +3,8 @@ import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { ProjectNode, TableNode } from '@/types'
 import { useProjectStore } from '@/state/projectStore'
+import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
+import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { focusMenuItem } from '@/lib/focusMenuItem'
 
 interface SidebarNodeItemProps {
@@ -25,6 +27,7 @@ export function SidebarNodeItem({
 }: SidebarNodeItemProps) {
   const updateNode = useProjectStore(state => state.updateNode)
   const duplicateNode = useProjectStore(state => state.duplicateNode)
+  const { canEdit } = useWorkspaceLease()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null)
@@ -187,12 +190,13 @@ export function SidebarNodeItem({
           onKeyDown={event => focusMenuItem(event, menuRef.current)}
           className="fixed z-popover overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-lg motion-safe:animate-scale-in"
         >
-          <MenuItem icon={<RenameIcon />} label="Rename" onClick={startRename} />
-          <MenuItem icon={<DuplicateIcon />} label="Duplicate" onClick={duplicate} />
+          <MenuItem icon={<RenameIcon />} label="Rename" onClick={startRename} disabled={!canEdit} />
+          <MenuItem icon={<DuplicateIcon />} label="Duplicate" onClick={duplicate} disabled={!canEdit} />
           <MenuItem
             icon={<DeleteIcon />}
             label="Delete"
             destructive
+            disabled={!canEdit}
             onClick={() => {
               setMenuPosition(null)
               onDelete(node.id, triggerRef.current)
@@ -206,9 +210,10 @@ export function SidebarNodeItem({
 }
 
 function TableDimensions({ node, selected }: { node: TableNode; selected: boolean }) {
+  const cacheInfo = useNodeCacheInfo(node.id)
   if (!node.schema) return null
   const columns = node.schema.columns.length
-  const rows = node.cacheInfo?.lastRowCount ?? node.schema.rowCount ?? 0
+  const rows = cacheInfo?.lastRowCount ?? node.schema.rowCount ?? 0
   return (
     <span className={`mt-0.5 text-xs tabular-nums ${
       selected ? 'text-accent-text' : 'text-text-tertiary'
@@ -246,11 +251,13 @@ function MenuItem({
   label,
   onClick,
   destructive = false,
+  disabled = false,
 }: {
   icon: ReactNode
   label: string
   onClick: () => void
   destructive?: boolean
+  disabled?: boolean
 }) {
   return (
     <button
@@ -258,7 +265,9 @@ function MenuItem({
       role="menuitem"
       tabIndex={-1}
       onClick={onClick}
-      className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset ${
+      disabled={disabled}
+      title={disabled ? EDITING_ELSEWHERE_TOOLTIP : undefined}
+      className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset disabled:opacity-40 disabled:hover:bg-transparent ${
         destructive
           ? 'text-error-text hover:bg-error/10 focus-visible:ring-error'
           : 'text-text-primary hover:bg-surface-secondary focus-visible:ring-accent-green'

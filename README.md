@@ -19,7 +19,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` and choose **Continue as guest** for a browser-local
+Open `http://localhost:3000` and choose **Continue as guest** for a browser-local
 workspace. Set `VITE_AUTO_GUEST=true` only when automatic guest startup is useful
 during development.
 

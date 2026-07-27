@@ -24,7 +24,7 @@ VITE_API_URL=https://api.example.com/api
 VITE_AUTO_GUEST=false
 # Optional:
 # VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
-# VITE_TELEMETRY_ENDPOINT=https://telemetry.example.com/events
+# VITE_SENTRY_DSN=<sentry-project-dsn>
 ```
 
 `vercel.json` supplies the SPA fallback, immutable asset caching, and baseline
@@ -48,6 +48,7 @@ COOKIE_SAME_SITE=strict
 ENABLE_REGISTRATION=false
 # Optional:
 # GOOGLE_CLIENT_ID=<same-google-oauth-client-id>
+# SENTRY_DSN=<sentry-project-dsn>
 ```
 
 `FRONTEND_URL` accepts a comma-separated allowlist when a second trusted origin is
@@ -93,6 +94,12 @@ Use the backend host and Atlas alerts for:
 - HTTP 429 authentication throttling;
 - MongoDB connection and storage pressure.
 
+Rate-based alerting stays with the host and Atlas, which already count responses.
+Sentry answers the separate question of *which* defect caused a 5xx. Set
+`SENTRY_DSN` on the backend and `VITE_SENTRY_DSN` on Vercel to enable it; both are
+optional and the application runs unchanged without them. See
+[Error monitoring](reliability.md#error-monitoring) for what is and is not sent.
+
 Do not log tokens, cookies, project payloads, or uploaded file contents.
 
 ## Release gate
@@ -129,7 +136,16 @@ frontend and API origins.
 
 ## Supported concurrency
 
-Multiple users and browsers can work concurrently. Project writes use optimistic
-revisions and preserve stale local work as a conflict copy. The same project is not
-a real-time collaborative document: simultaneous editors do not merge live changes.
-Within one browser profile, only one active tab may edit at a time.
+Multiple users, browsers, devices, and tabs can work concurrently. Project writes
+use optimistic revisions; a rejected write is merged on the client from the last
+acknowledged base, and only an unmergeable one preserves the local work as a
+conflict copy.
+
+Within one browser profile, tabs on different projects edit independently. Tabs on
+the same project elect one writer and mirror it live, and editing follows the tab
+the user is working in. Across devices, edits merge per entity when they land, with
+last-write-wins on client timestamps as the tiebreak.
+
+The same project is still not a real-time collaborative document: two people editing
+it at once will see each other's work only after a save round-trip, and colliding
+changes to the same field resolve to one of them.

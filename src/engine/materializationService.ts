@@ -12,6 +12,11 @@ import {
   simpleHash,
 } from './cacheUtils'
 import { computeDerivedTable } from './derivedTableComputation'
+import {
+  effectiveTableSchema,
+  getNodeCacheInfo,
+  updateNodeCacheInfo,
+} from '@/state/tableRuntimeStore'
 import { loadEngineTable } from './loadTableIntoEngine'
 import {
   captureMaterializationScope,
@@ -21,6 +26,7 @@ import {
 } from './materializationCoordinator'
 import type {
   SourceTableNode,
+  CacheInfo,
   CellValue,
   Patches,
   TableSchema,
@@ -44,6 +50,7 @@ const inProgressMaterializations = new Map<string, Promise<MaterializationResult
 interface SourceSnapshot {
   generation: string
   node: SourceTableNode
+  cacheInfo?: CacheInfo
   schema?: TableSchema
   patches?: Patches
   currentVersionHash: string
@@ -54,6 +61,7 @@ function captureSourceSnapshot(tableId: string): SourceSnapshot | undefined {
   const node = state.getTableNode(tableId)
   if (!node || node.kind !== 'source_table') return undefined
 
+  const cacheInfo = getNodeCacheInfo(tableId)
   const schema = copySchema(node.schema)
   const patches = copyPatches(state.patches[tableId])
   const patchVersion = computePatchesVersion(patches)
@@ -66,7 +74,7 @@ function captureSourceSnapshot(tableId: string): SourceSnapshot | undefined {
   )
   const generation = simpleHash(JSON.stringify({
     version: currentVersionHash,
-    revision: node.cacheInfo?.dataRevision ?? 0,
+    revision: cacheInfo?.dataRevision ?? 0,
     updatedAt: node.updatedAt,
     fileType: node.plan.fileType,
     sheetName: node.plan.sheetName ?? null,
@@ -82,8 +90,8 @@ function captureSourceSnapshot(tableId: string): SourceSnapshot | undefined {
         initialRows: node.plan.initialRows?.map((row) => ({ ...row })),
       },
       schema,
-      cacheInfo: node.cacheInfo ? { ...node.cacheInfo } : undefined,
     },
+    cacheInfo: cacheInfo ? { ...cacheInfo } : undefined,
     schema,
     patches,
     currentVersionHash,
@@ -113,7 +121,7 @@ function captureTableRequestGeneration(tableId: string): string | undefined {
     kind: node.kind,
     plan: node.plan,
     schema: computeSchemaFingerprint(node.schema),
-    revision: node.cacheInfo?.dataRevision ?? 0,
+    revision: getNodeCacheInfo(tableId)?.dataRevision ?? 0,
     updatedAt: node.updatedAt,
   }))
 }
@@ -130,30 +138,30 @@ async function loadSourceTable(
       error: 'Source table not found',
     }
   }
-  useProjectStore.getState().updateCacheInfo(tableId, { isComputing: true })
+  updateNodeCacheInfo(tableId, { isComputing: true })
   try {
     const engineRowCount = await getEngineTableRowCount(tableId)
     if (!sourceGenerationIsCurrent(tableId, snapshot.generation, scope)) {
       return staleMaterialization(tableId)
     }
     const existsInEngine = engineRowCount >= 0
-    const expectedRows = snapshot.node.cacheInfo?.lastRowCount
+    const expectedRows = snapshot.cacheInfo?.lastRowCount
     const engineHasExpectedData =
       expectedRows !== undefined && engineRowCount === expectedRows
     if (
       existsInEngine &&
       engineHasExpectedData &&
-      snapshot.node.cacheInfo?.currentVersionHash === snapshot.currentVersionHash &&
-      !snapshot.node.cacheInfo?.isDirty
+      snapshot.cacheInfo?.currentVersionHash === snapshot.currentVersionHash &&
+      !snapshot.cacheInfo?.isDirty
     ) {
-      useProjectStore.getState().updateCacheInfo(tableId, {
+      updateNodeCacheInfo(tableId, {
         isComputing: false,
         error: undefined,
       })
       return {
         status: 'cached',
         tableId,
-        rowCount: snapshot.node.cacheInfo?.lastRowCount ?? 0,
+        rowCount: snapshot.cacheInfo?.lastRowCount ?? 0,
         schema: snapshot.schema,
       }
     }
@@ -181,7 +189,7 @@ async function loadSourceTable(
         }))
         useDataStore.getState().setTableData(tableId, [])
       } else {
-        useProjectStore.getState().updateCacheInfo(tableId, {
+        updateNodeCacheInfo(tableId, {
           isDirty: true,
           isComputing: false,
           error: 'Data file not found. Please re-import the file.',
@@ -227,7 +235,7 @@ async function loadSourceTable(
     }
     const rowCount = loadedRowCount >= 0 ? loadedRowCount : rows.length
 
-    useProjectStore.getState().updateCacheInfo(tableId, {
+    updateNodeCacheInfo(tableId, {
       isDirty: false,
       isComputing: false,
       lastComputedAt: new Date().toISOString(),
@@ -248,7 +256,7 @@ async function loadSourceTable(
     const errorMessage = error instanceof Error ? error.message : String(error)
 
     if (sourceGenerationIsCurrent(tableId, snapshot.generation, scope)) {
-      useProjectStore.getState().updateCacheInfo(tableId, {
+      updateNodeCacheInfo(tableId, {
         isDirty: true,
         isComputing: false,
         error: errorMessage,
@@ -329,7 +337,7 @@ async function materializeTableInternal(
       if (result.status === 'error') {
         if (nodeToCompute !== tableId) {
           if (scopeIsCurrent(scope) && captureTableRequestGeneration(tableId) === requestGeneration) {
-            useProjectStore.getState().updateCacheInfo(tableId, {
+            updateNodeCacheInfo(tableId, {
               isDirty: true,
               isComputing: false,
               error: `Upstream table "${tableNode.name}" failed: ${result.error}`,
@@ -348,7 +356,7 @@ async function materializeTableInternal(
       if (result.status === 'error') {
         if (nodeToCompute !== tableId) {
           if (scopeIsCurrent(scope) && captureTableRequestGeneration(tableId) === requestGeneration) {
-            useProjectStore.getState().updateCacheInfo(tableId, {
+            updateNodeCacheInfo(tableId, {
               isDirty: true,
               isComputing: false,
               error: `Upstream table "${tableNode.name}" failed: ${result.error}`,
@@ -367,12 +375,13 @@ async function materializeTableInternal(
 
   if (!scopeIsCurrent(scope)) return staleMaterialization(tableId)
   const finalNode = useProjectStore.getState().getTableNode(tableId)
+  const finalCacheInfo = getNodeCacheInfo(tableId)
   return {
-    status: finalNode?.cacheInfo?.error ? 'error' : 'computed',
+    status: finalCacheInfo?.error ? 'error' : 'computed',
     tableId,
-    rowCount: finalNode?.cacheInfo?.lastRowCount,
-    schema: finalNode?.schema,
-    error: finalNode?.cacheInfo?.error,
+    rowCount: finalCacheInfo?.lastRowCount,
+    schema: effectiveTableSchema(finalNode),
+    error: finalCacheInfo?.error,
   }
 }
 

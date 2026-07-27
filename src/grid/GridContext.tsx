@@ -5,7 +5,10 @@ import { gridContext } from './gridContextStore'
 
 export interface GridContextValue {
   tableId: string
+  /** True when the table kind accepts edits at all. */
   isEditable: boolean
+  /** False when another tab holds editing; controls disable instead of disappearing. */
+  canEdit: boolean
 
   columns: ColumnSchema[]
   getDisplayValue: (rowId: string, columnId: string, baseValue: CellValue, row?: GridRow) => CellValue

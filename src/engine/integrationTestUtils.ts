@@ -1,5 +1,10 @@
 import { useProjectStore } from '@/state/projectStore'
-import type { DerivedTableNode, SourceTableNode, TableSchema } from '@/types'
+import {
+  getNodeCacheInfo,
+  updateNodeCacheInfo,
+  useTableRuntimeStore,
+} from '@/state/tableRuntimeStore'
+import type { CacheInfo, DerivedTableNode, SourceTableNode, TableSchema } from '@/types'
 
 const sampleSchema: TableSchema = {
   columns: [
@@ -10,6 +15,7 @@ const sampleSchema: TableSchema = {
 }
 
 export function resetStore(): void {
+  useTableRuntimeStore.getState().resetRuntime()
   useProjectStore.setState({
     projectId: 'test-project',
     projectName: 'Test Project',
@@ -55,8 +61,7 @@ export function addJoin(leftTableId: string, rightTableId: string, name: string)
 }
 
 export function clean(...tableIds: string[]): void {
-  const store = useProjectStore.getState()
-  for (const tableId of tableIds) store.updateCacheInfo(tableId, { isDirty: false })
+  for (const tableId of tableIds) updateNodeCacheInfo(tableId, { isDirty: false })
 }
 
 export function derived(tableId: string): DerivedTableNode {
@@ -65,4 +70,8 @@ export function derived(tableId: string): DerivedTableNode {
 
 export function source(tableId: string): SourceTableNode {
   return useProjectStore.getState().nodes[tableId] as SourceTableNode
+}
+
+export function cacheOf(tableId: string): CacheInfo | undefined {
+  return getNodeCacheInfo(tableId)
 }

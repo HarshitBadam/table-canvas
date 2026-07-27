@@ -1,6 +1,7 @@
 import type { ViewFilterConfig } from '@/types'
 import { hasActiveFilters, countActiveFilters } from './filterUtils'
 import { formatNumber } from '@/lib/utils'
+import { EDITING_ELSEWHERE_TOOLTIP } from '@/state/useWorkspaceLease'
 import { useGridContext } from './useGridContext'
 
 interface GridToolbarProps {
@@ -36,7 +37,7 @@ export function GridToolbar({
   onOpenChartBuilder,
   onClearHighlights,
 }: GridToolbarProps) {
-  const { filters: contextFilters, isEditable, highlightedCells, tableId, handleAddRow, handleToggleFilters } = useGridContext()
+  const { filters: contextFilters, isEditable, canEdit, highlightedCells, tableId, handleAddRow, handleToggleFilters } = useGridContext()
   const filters = contextFilters as ViewFilterConfig
   return (
     <div
@@ -72,8 +73,9 @@ export function GridToolbar({
           <div role="group" aria-label="Insert" className="flex items-center gap-2">
             <button 
               onClick={handleAddRow}
-              className="btn btn-primary min-h-11 gap-1.5 px-2.5 py-0 text-xs sm:min-h-0 sm:px-3 sm:py-1.5"
-              title={`Insert row ${rowInsertionDescription}`}
+              disabled={!canEdit}
+              className="btn btn-primary min-h-11 gap-1.5 px-2.5 py-0 text-xs disabled:opacity-40 sm:min-h-0 sm:px-3 sm:py-1.5"
+              title={canEdit ? `Insert row ${rowInsertionDescription}` : EDITING_ELSEWHERE_TOOLTIP}
               aria-label={`Add row ${rowInsertionDescription}`}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -83,8 +85,9 @@ export function GridToolbar({
             </button>
             <button 
               onClick={onAddColumn}
-              className="btn btn-secondary min-h-11 gap-1.5 px-2.5 py-0 text-xs sm:min-h-0 sm:px-3 sm:py-1.5"
-              title={`Insert column ${columnInsertionDescription}`}
+              disabled={!canEdit}
+              className="btn btn-secondary min-h-11 gap-1.5 px-2.5 py-0 text-xs disabled:opacity-40 sm:min-h-0 sm:px-3 sm:py-1.5"
+              title={canEdit ? `Insert column ${columnInsertionDescription}` : EDITING_ELSEWHERE_TOOLTIP}
               aria-label={`Add column ${columnInsertionDescription}`}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">

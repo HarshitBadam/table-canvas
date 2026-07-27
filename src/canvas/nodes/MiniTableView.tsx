@@ -6,7 +6,7 @@ import { MINI_ROW_HEIGHT as CELL_HEIGHT, MINI_HEADER_HEIGHT as HEADER_HEIGHT, MI
 import { computeDisplayValue } from '@/grid/displayUtils'
 import { applyFilters, hasActiveFilters } from '@/grid/filterUtils'
 import { getTableData } from '@/engine/tableDataService'
-import { useProjectStore } from '@/state/projectStore'
+import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 
 interface MiniTableViewProps {
   tableId: string
@@ -47,7 +47,7 @@ export const MiniTableView = memo(({
   const [isLoaded, setIsLoaded] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
-  const updateCacheInfo = useProjectStore((state) => state.updateCacheInfo)
+  const updateCacheInfo = useTableRuntimeStore((state) => state.updateCacheInfo)
   const schemaKey = useMemo(
     () => columns.map(column => `${column.id}:${column.name}:${column.type}`).join('|'),
     [columns],

@@ -23,16 +23,28 @@ type TelemetryEnvelope = FrontendTelemetryEvent & {
   sessionId: string
 }
 
+type ErrorSource = Extract<FrontendTelemetryEvent, { type: 'frontend-error' }>['source']
+
 declare global {
   interface Window {
     __tableCanvasTelemetry?: TelemetryEnvelope[]
   }
 }
 
-const endpoint = import.meta.env.VITE_TELEMETRY_ENDPOINT?.trim()
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN?.trim()
+const telemetryEnabled = import.meta.env.PROD
+  || import.meta.env.VITE_ENABLE_FRONTEND_TELEMETRY === 'true'
 const sessionId = crypto.randomUUID()
+const DEDUPE_WINDOW_MS = 5_000
 let initialized = false
 const recentErrors = new Map<string, number>()
+
+let captureException: typeof import('@sentry/browser').captureException | null = null
+// Errors can fire before the lazily loaded SDK chunk resolves, and the earliest
+// failures are usually the interesting ones. Hold a bounded backlog rather than
+// dropping them or letting a broken page grow the list without limit.
+const pendingCaptures: { error: Error; source: ErrorSource }[] = []
+const MAX_PENDING_CAPTURES = 20
 
 function publish(event: FrontendTelemetryEvent) {
   const envelope: TelemetryEnvelope = {
@@ -46,26 +58,39 @@ function publish(event: FrontendTelemetryEvent) {
   if (buffer.length > 100) buffer.shift()
   window.__tableCanvasTelemetry = buffer
   window.dispatchEvent(new CustomEvent('tablecanvas:telemetry', { detail: envelope }))
+}
 
-  if (!endpoint) return
-  const body = JSON.stringify(envelope)
-  if (navigator.sendBeacon?.(endpoint, new Blob([body], { type: 'application/json' }))) return
-  void fetch(endpoint, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body,
-    keepalive: true,
+function captureRemotely(error: Error, source: ErrorSource) {
+  if (!sentryDsn) return
+  if (!captureException) {
+    if (pendingCaptures.length < MAX_PENDING_CAPTURES) pendingCaptures.push({ error, source })
+    return
+  }
+  captureException(error, {
+    tags: { source },
+    extra: { route: window.location.pathname, sessionId },
   })
 }
 
-function reportError(
-  source: Extract<FrontendTelemetryEvent, { type: 'frontend-error' }>['source'],
-  cause: unknown,
-) {
+async function loadSentry(dsn: string) {
+  try {
+    const { startErrorReporting } = await import('./sentryClient')
+    captureException = startErrorReporting(dsn)
+    for (const { error, source } of pendingCaptures.splice(0)) captureRemotely(error, source)
+  } catch {
+    // An ad blocker or a failed chunk request must not take the app down with it.
+    pendingCaptures.length = 0
+  }
+}
+
+function reportError(source: ErrorSource, cause: unknown) {
   const error = cause instanceof Error ? cause : new Error(String(cause))
   const signature = `${source}:${error.message}`
   const now = Date.now()
-  if (now - (recentErrors.get(signature) ?? 0) < 5_000) return
+  if (now - (recentErrors.get(signature) ?? 0) < DEDUPE_WINDOW_MS) return
+  for (const [seen, at] of recentErrors) {
+    if (now - at >= DEDUPE_WINDOW_MS) recentErrors.delete(seen)
+  }
   recentErrors.set(signature, now)
   publish({
     type: 'frontend-error',
@@ -73,6 +98,7 @@ function reportError(
     message: error.message.slice(0, 1_000),
     stack: error.stack?.slice(0, 4_000),
   })
+  captureRemotely(error, source)
 }
 
 export function reportReactError(cause: unknown) {
@@ -80,9 +106,14 @@ export function reportReactError(cause: unknown) {
 }
 
 export function initializeFrontendTelemetry() {
-  if (initialized || !import.meta.env.PROD) return
+  if (initialized || !telemetryEnabled) return
   initialized = true
 
+  if (sentryDsn) void loadSentry(sentryDsn)
+
+  // Web vitals stay in the local buffer only. Their job is to enforce the
+  // performance budget asserted by the UX end-to-end suite, which needs no
+  // remote collector and no sampling quota.
   const reportMetric = (metric: Metric) => publish({
     type: 'web-vital',
     name: metric.name,

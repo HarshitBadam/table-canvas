@@ -3,6 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
 import { useAppAuth } from '@/state/AppContext'
+import { useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { generateId } from '@/lib/utils'
 import { ColumnType, ColumnSchema, TableSchema } from '@/types'
 import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
@@ -31,6 +32,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   const nodes = useProjectStore((state) => state.nodes)
   const setTableData = useDataStore((state) => state.setTableData)
   const { user } = useAppAuth()
+  const { canEdit } = useWorkspaceLease()
   
   const [tableName, setTableName] = useState('New Table')
   const [rowCount, setRowCount] = useState(5)
@@ -171,6 +173,11 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
         <Dialog.Overlay className="join-overlay z-50" />
         <Dialog.Content
           onEscapeKeyDown={(event) => {
+            event.preventDefault()
+            handleClose()
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape' || event.defaultPrevented) return
             event.preventDefault()
             handleClose()
           }}
@@ -340,7 +347,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
               <button
                 type="button"
                 onClick={() => void handleCreate()}
-                disabled={isCreating || !tableName.trim() || columns.length === 0 || Boolean(columnError)}
+                disabled={!canEdit || isCreating || !tableName.trim() || columns.length === 0 || Boolean(columnError)}
                 className="canvas-touch-target rounded-lg bg-accent-green px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-green/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {isCreating ? 'Creating…' : 'Create Table'}

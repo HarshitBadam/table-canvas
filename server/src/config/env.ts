@@ -15,7 +15,7 @@ const INSECURE_DEFAULTS = [
 ];
 
 const nodeEnv = process.env.NODE_ENV || 'development';
-const frontendOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+const frontendOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
@@ -36,7 +36,7 @@ export const config = {
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || 'default-refresh-secret-change-me',
   jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
-  port: parseInt(process.env.PORT || '3001', 10),
+  port: parseInt(process.env.PORT || '5173', 10),
   nodeEnv,
   frontendUrl: frontendOrigins[0],
   frontendOrigins,
@@ -44,6 +44,7 @@ export const config = {
   cookieSecure: nodeEnv === 'production',
   cookieSameSite,
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+  sentryDsn: process.env.SENTRY_DSN?.trim() || '',
   registrationEnabled:
     process.env.ENABLE_REGISTRATION === 'true'
     || (process.env.ENABLE_REGISTRATION !== 'false'

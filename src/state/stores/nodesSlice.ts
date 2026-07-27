@@ -9,6 +9,9 @@ import type {
 } from '@/types'
 import { generateId } from '@/lib/utils'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
+import { computeSchemaFingerprint } from '@/engine/cacheUtils'
+import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
+import { canWriteDocument } from '@/state/transientProjectState'
 import { createInitialPatches } from './patchesSlice'
 import { createColumnOps } from './nodesColumnOps'
 import { createChartOps } from './nodesChartOps'
@@ -55,6 +58,7 @@ export const createNodesSlice: StateCreator<
     state.saveSnapshot(`Delete node ${state.nodes[id]?.name || id}`)
     const nodeIds = new Set([id, ...getDependentNodeIds(state.nodes, state.edges, id)])
     invalidateMaterializations()
+    useTableRuntimeStore.getState().forgetNodes(nodeIds)
 
     set((state) => {
       for (const nodeId of nodeIds) {
@@ -122,7 +126,6 @@ export const createNodesSlice: StateCreator<
         fileType: 'csv',
         inferredSchemaVersion: 1,
       },
-      cacheInfo: {},
       createdAt: now,
       updatedAt: now,
     }
@@ -174,7 +177,6 @@ export const createNodesSlice: StateCreator<
         inferredSchemaVersion: 1,
         initialRows,
       },
-      cacheInfo: {},
       createdAt: now,
       updatedAt: now,
     }
@@ -218,11 +220,11 @@ export const createNodesSlice: StateCreator<
         transformDef,
         upstreamNodeIds,
       },
-      cacheInfo: { isDirty: true },
       createdAt: now,
       updatedAt: now,
     }
 
+    useTableRuntimeStore.getState().markNodesDirty([id])
     set((state) => {
       state.nodes[id] = newTable
 
@@ -254,10 +256,17 @@ export const createNodesSlice: StateCreator<
     get().markNodeAndDescendantsDirty(tableId)
   },
   setMaterializedTableSchema: (tableId, schema) => {
+    useTableRuntimeStore.getState().setMaterializedSchema(tableId, schema)
+    const node = get().getTableNode(tableId)
+    if (!node) return
+    const isUnchanged = computeSchemaFingerprint(node.schema)
+      === computeSchemaFingerprint(schema)
+    // Persisting an identical schema would dirty the document from a viewing tab.
+    if (isUnchanged || !canWriteDocument()) return
     set((state) => {
-      const node = state.nodes[tableId]
-      if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-        (node as TableNode).schema = schema
+      const target = state.nodes[tableId]
+      if (target && (target.kind === 'source_table' || target.kind === 'derived_table')) {
+        (target as TableNode).schema = schema
       }
     })
   },
@@ -309,65 +318,25 @@ export const createNodesSlice: StateCreator<
     })
   },
 
-  markNodeDirty: (nodeId) => {
-    set((state) => {
-      const node = state.nodes[nodeId]
-      if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-        const tableNode = node as TableNode
-        if (!tableNode.cacheInfo) {
-          tableNode.cacheInfo = {}
-        }
-        tableNode.cacheInfo.isDirty = true
-        tableNode.cacheInfo.error = undefined
-        tableNode.cacheInfo.dataRevision = (tableNode.cacheInfo.dataRevision ?? 0) + 1
-        tableNode.updatedAt = new Date().toISOString()
-      }
-    })
-  },
-
   markNodeAndDescendantsDirty: (nodeId) => {
     const state = get()
-    state.markNodeDirty(nodeId)
-    const descendants = getDependentNodeIds(state.nodes, state.edges, nodeId)
-    set((draft) => {
-      for (const descendantId of descendants) {
-        const node = draft.nodes[descendantId]
-        if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-          const tableNode = node as TableNode
-          if (!tableNode.cacheInfo) {
-            tableNode.cacheInfo = {}
-          }
-          tableNode.cacheInfo.isDirty = true
-          tableNode.cacheInfo.error = undefined
-          tableNode.cacheInfo.dataRevision = (tableNode.cacheInfo.dataRevision ?? 0) + 1
-          tableNode.updatedAt = new Date().toISOString()
-        }
-      }
-    })
+    const affected = [nodeId, ...getDependentNodeIds(state.nodes, state.edges, nodeId)]
+      .filter((id) => {
+        const node = state.nodes[id]
+        return node?.kind === 'source_table' || node?.kind === 'derived_table'
+      })
+    useTableRuntimeStore.getState().markNodesDirty(affected)
   },
 
-  updateCacheInfo: (nodeId, cacheInfoUpdates) => {
+  /**
+   * The only arbiter the cross-device three-way merge has for this node and its cell
+   * patches, so every real data edit has to call it. Positions and view modes
+   * deliberately do not: the merge resolves those subtrees without a timestamp.
+   */
+  touchNodeUpdatedAt: (nodeId) => {
     set((state) => {
       const node = state.nodes[nodeId]
-      if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-        const tableNode = node as TableNode
-        if (!tableNode.cacheInfo) {
-          tableNode.cacheInfo = {}
-        }
-        Object.assign(tableNode.cacheInfo, cacheInfoUpdates)
-      }
-    })
-  },
-
-  clearNodeError: (nodeId) => {
-    set((state) => {
-      const node = state.nodes[nodeId]
-      if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-        const tableNode = node as TableNode
-        if (tableNode.cacheInfo) {
-          tableNode.cacheInfo.error = undefined
-        }
-      }
+      if (node) node.updatedAt = new Date().toISOString()
     })
   },
   getNode: (id) => get().nodes[id],

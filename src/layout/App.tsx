@@ -16,6 +16,8 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { StorageWarningBanner } from '@/persistence/StorageWarningBanner'
+import { EditingElsewhereBanner } from '@/components/EditingElsewhereBanner'
+import { MergeNoticeBanner } from '@/components/MergeNoticeBanner'
 import { NodeDeletionProvider } from '@/components/NodeDeletionAlertDialog'
 
 const GridView = lazy(() => import('@/grid/GridView').then(m => ({ default: m.GridView })))
@@ -61,6 +63,10 @@ export default function App() {
         <Route
           path="/early-access"
           element={isAuthenticated ? <Navigate to="/" replace /> : <EarlyAccessPage />}
+        />
+        <Route
+          path="/p/:projectId/*"
+          element={isAuthenticated ? <MainApp /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/*"
@@ -148,6 +154,8 @@ function MainApp() {
     <NavigationProvider value={navigationValue}>
       <NodeDeletionProvider>
         <StorageWarningBanner />
+        <EditingElsewhereBanner />
+        <MergeNoticeBanner />
         {syncError && (
           <div
             className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900"

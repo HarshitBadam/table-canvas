@@ -12,8 +12,11 @@ class AmbiguousProjectCreateError extends Error {
   }
 }
 
+/** 429 defers rather than fails: the queued operation survives for the next attempt. */
 export function isRetryableRemoteDeferral(error: unknown): boolean {
-  if (error instanceof ApiError) return error.statusCode >= 500
+  if (error instanceof ApiError) {
+    return error.statusCode >= 500 || error.statusCode === 429
+  }
   return error instanceof TypeError
 }
 

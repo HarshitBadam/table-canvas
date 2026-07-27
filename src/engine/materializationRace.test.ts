@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SourceTableNode, TableSchema } from '@/types'
+import type { CacheInfo, SourceTableNode, TableSchema } from '@/types'
 
 const projectStore = {
   projectId: 'project_1',
@@ -7,7 +7,6 @@ const projectStore = {
   edges: {},
   patches: {} as Record<string, unknown>,
   getTableNode: vi.fn(),
-  updateCacheInfo: vi.fn(),
 }
 const dataStore = {
   tableData: {} as Record<string, { rows: unknown[] }>,
@@ -58,6 +57,7 @@ vi.mock('xlsx', () => ({
   utils: { sheet_to_json: vi.fn() },
 }))
 
+import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import { ensureTableMaterialized } from './materializationService'
 import { dropEngineTables } from './engineTableCleanup'
 import { invalidateMaterializations } from './materializationCoordinator'
@@ -75,7 +75,16 @@ const schema: TableSchema = {
 }
 const csv = () => new TextEncoder().encode('ID,Value\n1,100').buffer
 
-function sourceNode(cacheInfo: Partial<SourceTableNode['cacheInfo']>): SourceTableNode {
+function cacheOf(id: string): CacheInfo | undefined {
+  return useTableRuntimeStore.getState().cacheInfo[id]
+}
+
+function setCache(updates: Partial<CacheInfo>): void {
+  useTableRuntimeStore.getState().updateCacheInfo('table_1', updates)
+}
+
+function sourceNode(cacheInfo: Partial<CacheInfo>): SourceTableNode {
+  setCache({ isDirty: true, isComputing: false, ...cacheInfo })
   return {
     id: 'table_1',
     kind: 'source_table',
@@ -88,11 +97,6 @@ function sourceNode(cacheInfo: Partial<SourceTableNode['cacheInfo']>): SourceTab
       inferredSchemaVersion: 1,
     },
     schema,
-    cacheInfo: {
-      isDirty: true,
-      isComputing: false,
-      ...cacheInfo,
-    },
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   }
@@ -100,6 +104,7 @@ function sourceNode(cacheInfo: Partial<SourceTableNode['cacheInfo']>): SourceTab
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useTableRuntimeStore.getState().resetRuntime()
   projectStore.nodes = {}
   projectStore.projectId = 'project_1'
   projectStore.patches = {}
@@ -132,10 +137,8 @@ describe('generation-safe source materialization', () => {
     const result = await ensureTableMaterialized('table_1')
 
     expect(result.status).toBe('cached')
-    expect(projectStore.updateCacheInfo).toHaveBeenCalledWith('table_1', {
-      isComputing: false,
-      error: undefined,
-    })
+    expect(cacheOf('table_1')).toMatchObject({ isComputing: false })
+    expect(cacheOf('table_1')?.error).toBeUndefined()
   })
 
   it('restarts with fresh schema after a change during file loading', async () => {
@@ -162,7 +165,7 @@ describe('generation-safe source materialization', () => {
       }],
     }
     projectStore.nodes.table_1.schema = revisedSchema
-    projectStore.nodes.table_1.cacheInfo!.dataRevision = 2
+    setCache({ dataRevision: 2 })
     resolveFirstFile(csv())
 
     expect((await materialization).status).toBe('computed')
@@ -193,7 +196,7 @@ describe('generation-safe source materialization', () => {
       insertedRows: [],
       deletedRows: new Set<string>(),
     }
-    projectStore.nodes.table_1.cacheInfo!.dataRevision = 2
+    setCache({ dataRevision: 2 })
     const newerRequest = ensureTableMaterialized('table_1')
     resolveFirstWrite()
 
@@ -224,10 +227,7 @@ describe('generation-safe source materialization', () => {
 
     expect((await staleRequest).status).toBe('loading')
     expect(engine.loadTable).not.toHaveBeenCalled()
-    expect(projectStore.updateCacheInfo).not.toHaveBeenCalledWith(
-      'table_1',
-      expect.objectContaining({ isDirty: false }),
-    )
+    expect(cacheOf('table_1')?.isDirty).toBe(true)
   })
 
   it('skips a queued delete cleanup when undo restores the node', async () => {
@@ -244,10 +244,8 @@ describe('generation-safe source materialization', () => {
     invalidateMaterializations()
     delete projectStore.nodes.table_1
     const cleanup = dropEngineTables(['table_1'], { onlyIfDeleted: true })
-    projectStore.nodes.table_1 = {
-      ...deletedNode,
-      cacheInfo: { ...deletedNode.cacheInfo, isDirty: true, dataRevision: 2 },
-    }
+    projectStore.nodes.table_1 = { ...deletedNode }
+    setCache({ isDirty: true, dataRevision: 2 })
     resolveWrite()
 
     await Promise.all([materialization, cleanup])
@@ -267,10 +265,8 @@ describe('generation-safe source materialization', () => {
     const cleanup = dropEngineTables(['table_1'], { onlyIfDeleted: true })
     await vi.waitFor(() => expect(engine.dropTable).toHaveBeenCalledOnce())
 
-    projectStore.nodes.table_1 = {
-      ...deletedNode,
-      cacheInfo: { ...deletedNode.cacheInfo, isDirty: true, dataRevision: 2 },
-    }
+    projectStore.nodes.table_1 = { ...deletedNode }
+    setCache({ isDirty: true, dataRevision: 2 })
     resolveDrop()
     await cleanup
 

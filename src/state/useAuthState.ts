@@ -54,6 +54,7 @@ export function useAuthState() {
 
   const performLogout = useCallback(async () => {
     await apiLogout()
+    setStorageScope(GUEST_STORAGE_SCOPE)
     setUser(null)
     setIsAuthenticated(false)
   }, [])
@@ -127,6 +128,7 @@ export function useAuthState() {
   }, [])
 
   const leaveGuest = useCallback(() => {
+    setStorageScope(GUEST_STORAGE_SCOPE)
     setUser(null)
     setIsAuthenticated(false)
   }, [])

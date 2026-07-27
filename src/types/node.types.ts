@@ -25,6 +25,7 @@ interface BaseNode {
 }
 
 
+/** Per-tab materialization state, held in `tableRuntimeStore`, never persisted. */
 export interface CacheInfo {
   isDirty?: boolean
   lastComputedAt?: string
@@ -52,7 +53,6 @@ export interface SourceTableNode extends BaseNode {
   kind: 'source_table'
   schema?: TableSchema
   plan: SourceTablePlan
-  cacheInfo?: CacheInfo
   viewFilters?: ViewFilterConfig
 }
 
@@ -66,7 +66,6 @@ export interface DerivedTableNode extends BaseNode {
   kind: 'derived_table'
   schema?: TableSchema
   plan: DerivedTablePlan
-  cacheInfo?: CacheInfo
   viewFilters?: ViewFilterConfig
 }
 

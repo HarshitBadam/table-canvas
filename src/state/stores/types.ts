@@ -3,7 +3,6 @@ import type {
   Edge, 
   Position, 
   TableSchema,
-  CacheInfo,
   NodeViewMode,
   ViewFilterConfig,
   ChartConfig,
@@ -85,10 +84,8 @@ export interface NodesSliceState {
   updateChartName: (chartId: string, name: string) => void
   setTableFilters: (tableId: string, filters: ViewFilterConfig | null) => void
   getTableFilters: (tableId: string) => ViewFilterConfig | undefined
-  markNodeDirty: (nodeId: string) => void
   markNodeAndDescendantsDirty: (nodeId: string) => void
-  updateCacheInfo: (nodeId: string, cacheInfo: Partial<CacheInfo>) => void
-  clearNodeError: (nodeId: string) => void
+  touchNodeUpdatedAt: (nodeId: string) => void
   
   getNode: (id: string) => ProjectNode | undefined
   getTableNode: (id: string) => import('@/types').TableNode | undefined

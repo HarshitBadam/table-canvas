@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TableRow } from '@/state/dataStore';
 import { useProjectStore } from '@/state/projectStore';
+import { useNodeCacheInfo, useTableRuntimeStore } from '@/state/tableRuntimeStore';
 import { getTableData } from '@/engine/tableDataService';
 import type {
   AggregationType,
@@ -200,13 +201,16 @@ export function useTableSource(
   const tableNode = useProjectStore((state) =>
     sourceTableId ? (state.nodes[sourceTableId] as TableNodeType | undefined) : undefined
   );
-  const columns = tableNode?.schema?.columns ?? [];
-  const expectedRowCount = tableNode?.cacheInfo?.lastRowCount
+  const cacheInfo = useNodeCacheInfo(sourceTableId);
+  const materializedSchema = useTableRuntimeStore((state) =>
+    (sourceTableId ? state.schemas[sourceTableId] : undefined));
+  const columns = (materializedSchema ?? tableNode?.schema)?.columns ?? [];
+  const expectedRowCount = cacheInfo?.lastRowCount
     ?? tableNode?.schema?.rowCount
     ?? 0;
-  const cacheError = tableNode?.cacheInfo?.error;
-  const sourceVersionHash = tableNode?.cacheInfo?.currentVersionHash;
-  const dataRevision = tableNode?.cacheInfo?.dataRevision ?? 0;
+  const cacheError = cacheInfo?.error;
+  const sourceVersionHash = cacheInfo?.currentVersionHash;
+  const dataRevision = cacheInfo?.dataRevision ?? 0;
   const isTable = tableNode?.kind === 'source_table' || tableNode?.kind === 'derived_table';
   const safeMaxRows = Math.max(1, Math.min(Math.floor(maxRows) || MAX_EMBEDDED_TABLE_ROWS, MAX_REPORT_CHART_ROWS));
   const safeRowLimit = Math.max(

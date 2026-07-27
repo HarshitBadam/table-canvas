@@ -20,10 +20,6 @@ vi.mock('./projectStore', () => ({
     getState: () => projectState,
   },
 }))
-vi.mock('./tabOwnership', () => ({
-  setBeforeTabRelease: vi.fn(),
-}))
-
 import { synchronizeAfterReconnect } from './usePersistenceLifecycle'
 
 describe('reconnect persistence recovery', () => {

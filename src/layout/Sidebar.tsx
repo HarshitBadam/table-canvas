@@ -4,6 +4,7 @@ import { ImportButton } from '@/components/ImportButton'
 import { useNodeDeletion } from '@/components/nodeDeletionContext'
 import { NewTableModal } from '@/canvas/modals/NewTableModal'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { useNavigation } from './NavigationContext'
 import { WORKSPACE_NAV_ITEMS } from './viewNavigation'
 import type { ProjectNode, TableNode, ChartNode } from '@/types'
@@ -20,6 +21,7 @@ export function Sidebar({ isOpen = false, onClose = () => undefined }: SidebarPr
   const nodes = useProjectStore((state) => state.nodes)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
   const { requestNodeDeletion } = useNodeDeletion()
+  const { canEdit } = useWorkspaceLease()
   
   const [newTableModalOpen, setNewTableModalOpen] = useState(false)
 
@@ -96,6 +98,8 @@ export function Sidebar({ isOpen = false, onClose = () => undefined }: SidebarPr
           <button
             onClick={handleNewTable}
             type="button"
+            disabled={!canEdit}
+            title={canEdit ? undefined : EDITING_ELSEWHERE_TOOLTIP}
             className="btn btn-secondary w-full gap-2"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

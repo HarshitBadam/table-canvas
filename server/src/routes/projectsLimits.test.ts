@@ -150,6 +150,21 @@ describe('Projects API limits', () => {
   })
 })
 
+describe('Projects API request rate limiting', () => {
+  it('meters writes but leaves reads unmetered', async () => {
+    const { app } = getProjectRoutesTestContext()
+
+    const write = await request(app)
+      .post('/api/projects')
+      .send({ name: 'Metered' })
+      .expect(201)
+    const read = await request(app).get('/api/projects').expect(200)
+
+    expect(write.headers['ratelimit-policy']).toBeDefined()
+    expect(read.headers['ratelimit-policy']).toBeUndefined()
+  })
+})
+
 describe('Projects API edge cases', () => {
   it('should handle very long project names at limit', async () => {
     const { app } = getProjectRoutesTestContext()

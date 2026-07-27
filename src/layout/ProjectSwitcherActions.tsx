@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 
 interface Props {
   isRenaming: boolean
@@ -20,6 +21,10 @@ const actionClass = 'flex min-h-10 w-full items-center gap-2.5 rounded-md px-2.5
 
 export function ProjectSwitcherActions(props: Props) {
   const [actionsOpen, setActionsOpen] = useState(false)
+  // Creating and switching projects stays available: they target other documents, which is
+  // how a second tab gets its own editable workspace.
+  const { canEdit } = useWorkspaceLease()
+  const blocked = canEdit ? {} : { disabled: true, title: EDITING_ELSEWHERE_TOOLTIP }
 
   if (props.isRenaming) {
     return (
@@ -94,7 +99,7 @@ export function ProjectSwitcherActions(props: Props) {
       </div>
       {actionsOpen && (
         <div className="mt-1 border-t border-border-subtle pt-1">
-          <button type="button" role="menuitem" disabled={props.isPending} onClick={props.onRenameStart} className={actionClass}>
+          <button type="button" role="menuitem" disabled={props.isPending} onClick={props.onRenameStart} className={actionClass} {...blocked}>
             <svg className="h-4 w-4 text-text-tertiary" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12.5 4.5l3 3M4 16l.75-3 8.5-8.5a1.4 1.4 0 012 2L6.75 15 4 16z" />
             </svg>
@@ -106,6 +111,7 @@ export function ProjectSwitcherActions(props: Props) {
             disabled={props.isDuplicating || props.isPending}
             onClick={props.onDuplicate}
             className={actionClass}
+            {...blocked}
           >
             <svg className="h-4 w-4 text-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 8h11v11H8zM5 16H4V5h11v1" />
@@ -119,6 +125,7 @@ export function ProjectSwitcherActions(props: Props) {
             title={!props.canDelete ? 'The last project cannot be deleted' : undefined}
             onClick={props.onDelete}
             className={`${actionClass} text-error-text hover:bg-error/10 focus-visible:ring-error active:bg-error/15`}
+            {...blocked}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" />

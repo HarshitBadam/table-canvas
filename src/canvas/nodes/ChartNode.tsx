@@ -5,6 +5,7 @@ import { ChartNode as ChartNodeType, TableNode } from '@/types'
 import { MiniChart } from '@/charts/ChartRenderer'
 import { useChartData } from '@/charts/useChartData'
 import { useProjectStore } from '@/state/projectStore'
+import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
 
 export interface ChartNodeData extends ChartNodeType {
   selected: boolean
@@ -18,8 +19,9 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
   const sourceTable = useProjectStore((state) => 
     state.nodes[sourceTableId] as TableNode | undefined
   )
-  const sourceVersionHash = `${sourceTable?.cacheInfo?.currentVersionHash ?? ''}:${
-    sourceTable?.cacheInfo?.dataRevision ?? 0
+  const sourceCacheInfo = useNodeCacheInfo(sourceTableId)
+  const sourceVersionHash = `${sourceCacheInfo?.currentVersionHash ?? ''}:${
+    sourceCacheInfo?.dataRevision ?? 0
   }`
   
   const columnNames = useMemo(() => {

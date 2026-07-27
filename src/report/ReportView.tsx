@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useRef, useEffect, useMemo } from 'react';
+import { useWorkspaceLease } from '@/state/useWorkspaceLease';
 import { useReportStore } from './reportStore';
 import { TipTapEditor, type TipTapEditorHandle } from './editor/TipTapEditor';
 import { ReportToolbar } from './ReportToolbar';
@@ -41,6 +42,7 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
   const addReport = useReportStore((state) => state.addReport);
   const persistenceStatus = useReportStore((state) => state.persistenceStatus);
   const persistenceError = useReportStore((state) => state.persistenceError);
+  const { canEdit } = useWorkspaceLease();
   const editorRef = useRef<TipTapEditorHandle>(null);
 
   // Resolve the content to display: the report's TipTap document, or a fresh
@@ -121,6 +123,7 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
             onChange={handleContentChange}
             reportId={reportId}
             onOpenTable={onOpenTable}
+            editable={canEdit}
             placeholder="Type '/' for commands..."
           />
         </div>

@@ -1,14 +1,17 @@
 import { useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
+import { useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { useNodeDeletion } from '@/components/nodeDeletionContext'
 
 export function useCanvasKeyboard() {
   const undo = useProjectStore((state) => state.undo)
   const redo = useProjectStore((state) => state.redo)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
+  const { canEdit } = useWorkspaceLease()
   const { requestNodeDeletion, deletionPending } = useNodeDeletion()
 
   useEffect(() => {
+    if (!canEdit) return
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target instanceof HTMLElement ? e.target : null
       const isEditing = Boolean(
@@ -51,5 +54,5 @@ export function useCanvasKeyboard() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [deletionPending, redo, requestNodeDeletion, selectedNodeId, undo])
+  }, [canEdit, deletionPending, redo, requestNodeDeletion, selectedNodeId, undo])
 }

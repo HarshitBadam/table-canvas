@@ -3,14 +3,9 @@ import type { LoginCredentials } from '@/api/auth.api'
 import {
   fetchProjects,
   flushAllProjectSavesWithSync,
-  flushProjectSaveWithSync,
-  saveProjectWithSync,
   setProjectSyncErrorHandler,
   syncLocalProjectsToBackend,
 } from '@/persistence/syncService'
-import {
-  isRetryableRemoteDeferral,
-} from '@/persistence/projectSync'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
 import { dropEngineTables } from '@/engine/engineTableCleanup'
 import { useReportStore } from '@/report/reportStore'
@@ -30,6 +25,9 @@ import {
 import { useProjectActions } from './useProjectActions'
 import { prepareProjectState } from './projectPreparation'
 import { usePersistenceLifecycle } from './usePersistenceLifecycle'
+import { requestedDocumentProjectId, useDocumentSession } from './useDocumentSession'
+import { useDocumentCoordination } from './useDocumentCoordination'
+import { useProjectAutosave } from './useProjectAutosave'
 const PHASE_MESSAGES: Record<AppPhase, string> = {
   idle: 'Starting...',
   initializing_engine: 'Starting data engine...',
@@ -66,58 +64,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     syncError: null,
   })
   const initialized = useRef(false)
-  const saveInFlight = useRef<Promise<void> | null>(null)
-  const savePending = useRef(false)
-  const nodes = useProjectStore(store => store.nodes)
-  const edges = useProjectStore(store => store.edges)
-  const patches = useProjectStore(store => store.patches)
-  const projectName = useProjectStore(store => store.projectName)
-  const saveLatestProject = useCallback(async () => {
-    if (saveInFlight.current) {
-      savePending.current = true
-      await saveInFlight.current
-      return
-    }
-
-    const save = async () => {
-      setState(previous => ({ ...previous, isSaving: true }))
-      try {
-        do {
-          savePending.current = false
-          const project = useProjectStore.getState()
-          if (!project.projectId) break
-          await saveProjectWithSync(
-            project.projectId,
-            project.projectName,
-            project.nodes,
-            project.edges,
-            project.patches,
-            useReportStore.getState().reports,
-          )
-        } while (savePending.current)
-      } finally {
-        setState(previous => ({ ...previous, isSaving: false }))
-      }
-    }
-    const inFlight = save()
-    saveInFlight.current = inFlight
-    try {
-      await inFlight
-    } finally {
-      if (saveInFlight.current === inFlight) saveInFlight.current = null
-    }
-  }, [])
-  const flushProjectSave = useCallback(async () => {
-    await saveLatestProject()
-    const projectId = useProjectStore.getState().projectId
-    if (!projectId) return
-    try {
-      await flushProjectSaveWithSync(projectId)
-    } catch (error) {
-      if (!isRetryableRemoteDeferral(error)) throw error
-      console.warn('[AppContext] Retryable remote save deferred:', error)
-    }
-  }, [saveLatestProject])
+  const { saveLatestProject, flushProjectSave } = useProjectAutosave({
+    phase: state.phase,
+    isAuthenticated: state.isAuthenticated,
+    projectId: state.projectId,
+    setState,
+  })
   const setPhase = useCallback((phase: AppPhase, error?: string) => {
     setState(previous => ({
       ...previous,
@@ -146,9 +98,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     useDataStore.setState({ tableData: {} })
     useReportStore.getState().reset()
   }, [])
+  const documentIdentity = useDocumentSession({
+    projectId: state.projectId,
+    authToken: `${user?.id ?? 'none'}:${user?.tier ?? 'none'}`,
+  })
+  useDocumentCoordination({
+    identity: state.phase === 'ready' ? documentIdentity : null,
+    flush: flushProjectSave,
+  })
   usePersistenceLifecycle({
     user,
-    flushProjectSave,
     saveLatestProject,
     prepareProject,
     setState,
@@ -187,7 +146,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         setPhase('loading_project')
-        const { project, projectList } = await loadOrCreateProject()
+        const { project, projectList } = await loadOrCreateProject(
+          requestedDocumentProjectId(),
+        )
         await prepareProject(project)
         setState(previous => ({
           ...previous,
@@ -210,37 +171,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     void initialize()
   }, [performCheckAuth, prepareProject, setPhase])
-
-  useEffect(() => {
-    if (state.phase !== 'ready' || !state.isAuthenticated || !state.projectId) return
-    void saveLatestProject().catch((error) => {
-      console.error('[AppContext] Auto-save failed:', error)
-    })
-  }, [
-    edges,
-    nodes,
-    patches,
-    projectName,
-    state.isAuthenticated,
-    state.phase,
-    state.projectId,
-    saveLatestProject,
-  ])
-
-  useEffect(() => {
-    const store = useReportStore as typeof useReportStore & {
-      subscribe?: (listener: (state: ReturnType<typeof useReportStore.getState>) => void) => () => void
-    }
-    if (typeof store.subscribe !== 'function') return
-    let previousReports = store.getState().reports
-    return store.subscribe(reportState => {
-      if (reportState.reports === previousReports) return
-      previousReports = reportState.reports
-      void saveLatestProject().catch(error => {
-        console.error('[AppContext] Report sync failed:', error)
-      })
-    })
-  }, [saveLatestProject])
 
   const postLoginSetup = useCallback(async (tier: Tier) => {
     setPhase('loading_project')

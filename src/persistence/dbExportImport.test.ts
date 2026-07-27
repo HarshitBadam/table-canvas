@@ -9,11 +9,7 @@ import {
 describe('Export/Import Operations', () => {
   it('exports project with embedded files', async () => {
     const db = await getDB()
-    const table = {
-      ...createMockSourceTableNode('table_1', 'Data Table'),
-      cacheInfo: { isDirty: true, isComputing: true },
-    }
-    const nodes = { table_1: table }
+    const nodes = { table_1: createMockSourceTableNode('table_1', 'Data Table') }
     const fileData = new TextEncoder().encode('id,name\n1,Alice\n2,Bob').buffer
     await db.saveFile('file_table_1', 'data.csv', 'text/csv', fileData)
     await db.saveProject('export-test', 'Export Test', nodes, {}, {})
@@ -27,7 +23,7 @@ describe('Export/Import Operations', () => {
     expect(exportData.version).toBeDefined()
     expect(exportData.formatType).toBe('tablecanvas-full')
     expect(exportData.project.name).toBe('Export Test')
-    expect(exportData.project.nodes.table_1.cacheInfo.isComputing).toBeUndefined()
+    expect(exportData.project.nodes.table_1.cacheInfo).toBeUndefined()
     expect(exportData.files.file_table_1).toBeDefined()
     expect(exportData.files.file_table_1.data).toBeDefined()
   })

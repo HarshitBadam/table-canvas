@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useReportStore } from '@/report/reportStore'
 import { useApp, useAppAuth } from '@/state/AppContext'
+import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { focusMenuItem } from '@/lib/focusMenuItem'
 import { useNavigation } from './NavigationContext'
@@ -28,6 +29,7 @@ export function AppHeader({
 }: AppHeaderProps) {
   const { user, logout, leaveGuest } = useAppAuth()
   const { isSaving } = useApp()
+  const { canEdit } = useWorkspaceLease()
   const canUndo = useProjectStore(state => state.history.past.length > 0)
   const canRedo = useProjectStore(state => state.history.future.length > 0)
   const undo = useProjectStore(state => state.undo)
@@ -257,10 +259,10 @@ export function AppHeader({
           <button
             type="button"
             onClick={undo}
-            disabled={!canUndo}
+            disabled={!canUndo || !canEdit}
             className="btn btn-ghost p-1.5 disabled:opacity-40"
             aria-label="Undo"
-            title="Undo"
+            title={canEdit ? 'Undo' : EDITING_ELSEWHERE_TOOLTIP}
           >
             <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m15 18-6-6 6-6" />
@@ -269,10 +271,10 @@ export function AppHeader({
           <button
             type="button"
             onClick={redo}
-            disabled={!canRedo}
+            disabled={!canRedo || !canEdit}
             className="btn btn-ghost p-1.5 disabled:opacity-40"
             aria-label="Redo"
-            title="Redo"
+            title={canEdit ? 'Redo' : EDITING_ELSEWHERE_TOOLTIP}
           >
             <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m9 18 6-6-6-6" />

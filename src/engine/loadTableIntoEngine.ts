@@ -8,6 +8,7 @@ import {
 } from './cacheUtils'
 import type { LoadTableResult } from './EngineAdapter'
 import { useProjectStore } from '@/state/projectStore'
+import { getNodeCacheInfo, updateNodeCacheInfo } from '@/state/tableRuntimeStore'
 import type { TableRow } from '@/state/dataStore'
 import type { CellValue, Patches, TableSchema } from '@/types'
 
@@ -16,7 +17,7 @@ function captureLoadGeneration(tableId: string): string | undefined {
   const node = state.getTableNode(tableId)
   if (!node || node.kind !== 'source_table') return undefined
   return simpleHash(JSON.stringify({
-    revision: node.cacheInfo?.dataRevision ?? 0,
+    revision: getNodeCacheInfo(tableId)?.dataRevision ?? 0,
     updatedAt: node.updatedAt,
     fileRef: node.plan.fileRef,
     schema: computeSchemaFingerprint(node.schema),
@@ -55,7 +56,7 @@ export async function loadTableIntoEngine(
       computeSchemaFingerprint(schema),
     )
 
-    useProjectStore.getState().updateCacheInfo(tableId, {
+    updateNodeCacheInfo(tableId, {
       isDirty: false,
       isComputing: false,
       lastComputedAt: new Date().toISOString(),
@@ -67,7 +68,7 @@ export async function loadTableIntoEngine(
     return true
   } catch (error) {
     if (startGeneration === captureLoadGeneration(tableId)) {
-      useProjectStore.getState().updateCacheInfo(tableId, {
+      updateNodeCacheInfo(tableId, {
         isDirty: true,
         isComputing: false,
         error: error instanceof Error ? error.message : 'Failed to load into engine',

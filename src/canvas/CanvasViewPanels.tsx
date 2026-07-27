@@ -1,5 +1,6 @@
 import { Panel } from 'reactflow'
 import { ImportButton } from '@/components/ImportButton'
+import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import type { LayoutDirection } from './autoLayout'
 
 interface AutoArrangePanelProps {
@@ -7,6 +8,7 @@ interface AutoArrangePanelProps {
 }
 
 export function CanvasAutoArrangePanel({ onArrange }: AutoArrangePanelProps) {
+  const { canEdit } = useWorkspaceLease()
   return (
     <Panel position="top-left" className="!z-sticky ml-3 mt-3">
       <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1 shadow-md">
@@ -15,8 +17,9 @@ export function CanvasAutoArrangePanel({ onArrange }: AutoArrangePanelProps) {
         <button
           type="button"
           onClick={() => onArrange('TB')}
-          className="canvas-touch-target rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-accent-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
-          title="Arrange tables top to bottom"
+          disabled={!canEdit}
+          className="canvas-touch-target rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-accent-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-tertiary"
+          title={canEdit ? 'Arrange tables top to bottom' : EDITING_ELSEWHERE_TOOLTIP}
           aria-label="Arrange tables top to bottom"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -26,8 +29,9 @@ export function CanvasAutoArrangePanel({ onArrange }: AutoArrangePanelProps) {
         <button
           type="button"
           onClick={() => onArrange('LR')}
-          className="canvas-touch-target rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-accent-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
-          title="Arrange tables left to right"
+          disabled={!canEdit}
+          className="canvas-touch-target rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-accent-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-tertiary"
+          title={canEdit ? 'Arrange tables left to right' : EDITING_ELSEWHERE_TOOLTIP}
           aria-label="Arrange tables left to right"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -44,6 +48,7 @@ interface EmptyStateProps {
 }
 
 export function CanvasEmptyState({ onNewTable }: EmptyStateProps) {
+  const { canEdit } = useWorkspaceLease()
   return (
     <Panel position="top-center" className="mt-12 max-w-[calc(100vw-2rem)] sm:mt-16">
       <div className="max-w-md rounded-xl border border-border bg-surface p-6 text-center shadow-md sm:p-8">
@@ -66,6 +71,8 @@ export function CanvasEmptyState({ onNewTable }: EmptyStateProps) {
             type="button"
             className="btn btn-secondary px-6"
             onClick={onNewTable}
+            disabled={!canEdit}
+            title={canEdit ? undefined : EDITING_ELSEWHERE_TOOLTIP}
           >
             <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

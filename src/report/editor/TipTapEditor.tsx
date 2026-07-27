@@ -178,6 +178,22 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editor, reportId]);
 
+    // `useEditor` deliberately keeps the editor's own editable flag when it re-applies
+    // options, so handover has to switch it explicitly.
+    useEffect(() => {
+      if (!editor || editor.isEditable === editable) return;
+      editor.setEditable(editable);
+    }, [editable, editor]);
+
+    // A read-only editor has no cursor to protect, so it can follow live content from the
+    // tab that is editing.
+    useEffect(() => {
+      if (!editor || editable || !content) return;
+      if (JSON.stringify(editor.getJSON()) !== JSON.stringify(content)) {
+        editor.commands.setContent(content);
+      }
+    }, [content, editable, editor]);
+
     const handleContainerClick = useCallback((event: React.MouseEvent) => {
       if (event.target === event.currentTarget) editor?.commands.focus('end');
     }, [editor]);

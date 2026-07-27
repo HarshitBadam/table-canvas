@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
+import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
+import { useWorkspaceLease } from '@/state/useWorkspaceLease'
 import type { AggregationType, ChartType, TableNode, ProjectNode } from '@/types'
 import { SelectField } from '@/components/SelectField'
 import { isLikelyIdColumn, computeChartPosition, buildChartNodeSpec } from './chartBuilderUtils'
@@ -17,6 +19,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
   const nodes = useProjectStore((state) => state.nodes)
   const addNode = useProjectStore((state) => state.addNode)
   const saveSnapshot = useProjectStore((state) => state.saveSnapshot)
+  const { canEdit } = useWorkspaceLease()
 
   const tables = useMemo(() => 
     (Object.values(nodes) as ProjectNode[]).filter((n): n is TableNode => n.kind === 'source_table' || n.kind === 'derived_table'),
@@ -34,6 +37,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
     return tables.find(t => t.id === tableId)
   }, [tables, sourceTableId, selectedTableId])
 
+  const selectedCacheInfo = useNodeCacheInfo(selectedTable?.id)
   const columns = useMemo(() => selectedTable?.schema?.columns ?? [], [selectedTable?.schema?.columns])
   const numericColumns = useMemo(() => 
     columns.filter(c => c.type === 'number' && !isLikelyIdColumn(c.name)),
@@ -91,7 +95,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
     onClose()
   }
 
-  const isValid = Boolean((sourceTableId || selectedTableId) && xAxis && yAxis)
+  const isValid = canEdit && Boolean((sourceTableId || selectedTableId) && xAxis && yAxis)
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -115,7 +119,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                       <>
                         <span className="truncate font-medium text-text-primary">{selectedTable.name}</span>
                         <span className="rounded bg-surface px-1.5 py-0.5 text-text-secondary shadow-sm">
-                          {(selectedTable.cacheInfo?.lastRowCount
+                          {(selectedCacheInfo?.lastRowCount
                             ?? selectedTable.schema?.rowCount
                             ?? 0).toLocaleString()} rows
                         </span>

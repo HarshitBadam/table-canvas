@@ -8,7 +8,7 @@ import { generateId, readFileAsArrayBuffer } from '@/lib/utils'
 import { detectCycles } from '@/engine/dependencyGraph'
 import { getTransformSourceTableIds } from '@/engine/workflowGraph'
 import { deleteFileWithSync, uploadFileWithSync } from './fileSync'
-import { withoutTransientComputeState } from '@/state/transientProjectState'
+import { withoutRuntimeNodeState } from '@/state/transientProjectState'
 
 const EXPORT_VERSION = '2.0.0'
 const EXPORT_FORMAT_TYPE = 'tablecanvas-full'
@@ -158,7 +158,7 @@ export async function exportProjectFile(projectId: string): Promise<Blob> {
     project: {
       id: project.id,
       name: project.name,
-      nodes: withoutTransientComputeState(project.nodes),
+      nodes: withoutRuntimeNodeState(project.nodes),
       edges: project.edges,
       patches: project.patches,
     },
@@ -300,7 +300,7 @@ export async function parseImportFile(
 
     remappedNodes[nodeId] = clonedNode
   }
-  const normalizedNodes = withoutTransientComputeState(remappedNodes)
+  const normalizedNodes = withoutRuntimeNodeState(remappedNodes)
 
   const normalizedEdges: Record<string, Edge> = {}
   for (const node of Object.values(normalizedNodes)) {

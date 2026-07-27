@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ensureTableMaterialized } from '@/engine/materializationService'
+import { updateNodeCacheInfo, useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import { useGridData } from './useGridData'
 
 const mocks = vi.hoisted(() => ({
@@ -43,21 +44,21 @@ describe('useGridData patch invalidation', () => {
     mocks.tableData = {}
     mocks.windowedTotalRows = 10
     vi.mocked(ensureTableMaterialized).mockClear()
+    useTableRuntimeStore.getState().resetRuntime()
+    updateNodeCacheInfo('table-1', {
+      isDirty: false,
+      isComputing: false,
+      lastComputedAt: '2026-01-01T00:00:00.000Z',
+      dataRevision: 0,
+    })
     mocks.projectState = {
       nodes: {},
       patches: {},
-      dataRevision: 0,
       getTableNode: () => ({
         id: 'table-1',
         kind: 'source_table',
         schema: {
           columns: [{ id: 'name', name: 'Name', type: 'string', nullable: true }],
-        },
-        cacheInfo: {
-          isDirty: false,
-          isComputing: false,
-          lastComputedAt: '2026-01-01T00:00:00.000Z',
-          dataRevision: mocks.projectState.dataRevision as number,
         },
       }),
       setTableFilters: vi.fn(),
@@ -74,7 +75,7 @@ describe('useGridData patch invalidation', () => {
           highlightedCells: new Set<string>(),
         },
       }
-      mocks.projectState.dataRevision = 1
+      updateNodeCacheInfo('table-1', { dataRevision: 1 })
       rerender()
     })
 
@@ -88,7 +89,7 @@ describe('useGridData patch invalidation', () => {
         highlightedCells: new Set<string>(),
       },
     }
-    mocks.projectState.dataRevision = 1
+    updateNodeCacheInfo('table-1', { dataRevision: 1 })
     const { rerender } = renderHook(() => useGridData('table-1'))
 
     act(() => {
@@ -121,11 +122,7 @@ describe('useGridData patch invalidation', () => {
   })
 
   it('leaves materialization ownership to the windowed row hook', async () => {
-    const getTableNode = mocks.projectState.getTableNode as () => Record<string, unknown>
-    mocks.projectState.getTableNode = () => ({
-      ...getTableNode(),
-      cacheInfo: { isDirty: true, isComputing: false, dataRevision: 0 },
-    })
+    updateNodeCacheInfo('table-1', { isDirty: true, isComputing: false, dataRevision: 0 })
 
     renderHook(() => useGridData('table-1'))
     await act(async () => {

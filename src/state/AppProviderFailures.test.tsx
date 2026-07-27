@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/client'
 import { useApp } from './appContextValue'
@@ -133,7 +134,11 @@ beforeEach(() => {
 })
 
 async function renderReady(): Promise<void> {
-  render(<AppProvider><Harness /></AppProvider>)
+  render(
+    <MemoryRouter>
+      <AppProvider><Harness /></AppProvider>
+    </MemoryRouter>,
+  )
   await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
 }
 

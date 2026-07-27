@@ -1,7 +1,13 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  act, fireEvent, render, screen, waitFor, type RenderResult,
+} from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useApp } from './appContextValue'
 import { useProjectStore } from './projectStore'
+
+/** Longer than the autosave debounce window in useProjectAutosave. */
+const AUTOSAVE_TIMEOUT = 2_000
 
 const saveProjectWithSync = vi.hoisted(() => vi.fn())
 const flushProjectSaveWithSync = vi.hoisted(() => vi.fn())
@@ -97,6 +103,16 @@ function project(id: string, name: string) {
   }
 }
 
+function renderApp(): RenderResult {
+  return render(
+    <MemoryRouter>
+      <AppProvider>
+        <Harness />
+      </AppProvider>
+    </MemoryRouter>,
+  )
+}
+
 function Harness() {
   const app = useApp()
   const storeProjectId = useProjectStore(state => state.projectId)
@@ -155,11 +171,7 @@ beforeEach(() => {
 
 describe('AppProvider project lifecycle', () => {
   it('renames the active project and persists the new name', async () => {
-    render(
-      <AppProvider>
-        <Harness />
-      </AppProvider>,
-    )
+    renderApp()
     await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
     saveProjectWithSync.mockClear()
 
@@ -175,40 +187,35 @@ describe('AppProvider project lifecycle', () => {
         {},
         {},
       )
-    })
+    }, { timeout: AUTOSAVE_TIMEOUT })
   })
 
-  it('persists project mutations immediately so a reload cannot beat local saving', async () => {
-    render(
-      <AppProvider>
-        <Harness />
-      </AppProvider>,
-    )
+  it('coalesces an edit burst into a single debounced local save', async () => {
+    renderApp()
     await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
     saveProjectWithSync.mockClear()
 
     act(() => {
-      useProjectStore.setState({ projectName: 'Immediately durable' })
+      useProjectStore.setState({ projectName: 'First' })
+      useProjectStore.setState({ projectName: 'Second' })
+      useProjectStore.setState({ projectName: 'Debounced durable' })
     })
 
     await waitFor(() => {
       expect(saveProjectWithSync).toHaveBeenCalledWith(
         'current-project',
-        'Immediately durable',
+        'Debounced durable',
         {},
         {},
         {},
         {},
       )
-    })
+    }, { timeout: AUTOSAVE_TIMEOUT })
+    expect(saveProjectWithSync).toHaveBeenCalledOnce()
   })
 
   it('flushes the current project and report saves before switching projects', async () => {
-    render(
-      <AppProvider>
-        <Harness />
-      </AppProvider>,
-    )
+    renderApp()
     await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
 
     act(() => {
@@ -238,11 +245,7 @@ describe('AppProvider project lifecycle', () => {
   it('still switches from the local save when the remote flush is unavailable', async () => {
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
     flushProjectSaveWithSync.mockRejectedValueOnce(new TypeError('Load failed'))
-    render(
-      <AppProvider>
-        <Harness />
-      </AppProvider>,
-    )
+    renderApp()
     await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Load next' }))
@@ -266,11 +269,7 @@ describe('AppProvider project lifecycle', () => {
     loadProjectWithSync.mockReturnValueOnce(new Promise((resolve) => {
       resolveLoad = resolve
     }))
-    render(
-      <AppProvider>
-        <Harness />
-      </AppProvider>,
-    )
+    renderApp()
     await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Load next' }))
@@ -291,11 +290,7 @@ describe('AppProvider project lifecycle', () => {
     loadProjectWithSync.mockReturnValueOnce(new Promise((resolve) => {
       resolveLoad = resolve
     }))
-    render(
-      <AppProvider>
-        <Harness />
-      </AppProvider>,
-    )
+    renderApp()
     await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Load next' }))
@@ -312,11 +307,7 @@ describe('AppProvider project lifecycle', () => {
     materializeProjectTables.mockReturnValueOnce(new Promise((resolve) => {
       resolveMaterialization = () => resolve({ completedTableIds: [], failures: [] })
     }))
-    render(
-      <AppProvider>
-        <Harness />
-      </AppProvider>,
-    )
+    renderApp()
     await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Load next' }))
@@ -338,11 +329,7 @@ describe('AppProvider project lifecycle', () => {
       project: current,
       projectList: [current, next],
     })
-    render(
-      <AppProvider>
-        <Harness />
-      </AppProvider>,
-    )
+    renderApp()
     await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete current' }))
@@ -363,11 +350,7 @@ describe('AppProvider project lifecycle', () => {
       projectList: [current, next],
     })
     deleteProjectWithSync.mockRejectedValueOnce(new Error('IndexedDB delete failed'))
-    render(
-      <AppProvider>
-        <Harness />
-      </AppProvider>,
-    )
+    renderApp()
     await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete current' }))

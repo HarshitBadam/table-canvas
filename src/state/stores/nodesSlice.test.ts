@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addSource, resetStore } from '@/engine/integrationTestUtils'
 import { useProjectStore } from '@/state/projectStore'
+import { updateNodeCacheInfo } from '@/state/tableRuntimeStore'
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -18,7 +19,7 @@ describe('node cache metadata', () => {
     const originalUpdatedAt = useProjectStore.getState().nodes[tableId].updatedAt
     vi.setSystemTime(new Date('2026-01-01T00:01:00.000Z'))
 
-    useProjectStore.getState().updateCacheInfo(tableId, {
+    updateNodeCacheInfo(tableId, {
       isComputing: true,
       lastRowCount: 100,
     })

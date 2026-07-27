@@ -6,6 +6,7 @@ import type { WorkBook } from 'xlsx'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
 import { useAppAuth } from '@/state/AppContext'
+import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { checkFileSize, checkRowCount, checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import type { SheetInfo } from '@/persistence/importParsers'
@@ -22,6 +23,7 @@ export function ImportButton() {
   const addSourceTable = useProjectStore((state) => state.addSourceTable)
   const setTableData = useDataStore((state) => state.setTableData)
   const { user } = useAppAuth()
+  const { canEdit } = useWorkspaceLease()
 
   const [isImporting, setIsImporting] = useState(false)
   const [sheetModalOpen, setSheetModalOpen] = useState(false)
@@ -217,7 +219,8 @@ export function ImportButton() {
 
       <button
         onClick={handleClick}
-        disabled={isImporting}
+        disabled={isImporting || !canEdit}
+        title={canEdit ? undefined : EDITING_ELSEWHERE_TOOLTIP}
         className="btn btn-primary w-full gap-2"
       >
         {isImporting ? (

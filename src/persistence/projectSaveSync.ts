@@ -2,8 +2,9 @@ import { deleteProject, updateProject } from '@/api/projects.api'
 import { ApiError } from '@/api/client'
 import type { Edge, Patches, ProjectNode } from '@/types'
 import { saveProject as saveProjectLocal } from './db'
+import type { ProjectSyncOperation } from './dbCore'
 import { isNetworkOnline } from './syncState'
-import { withoutTransientComputeState } from '@/state/transientProjectState'
+import { withoutRuntimeNodeState } from '@/state/transientProjectState'
 import {
   getStorageScope,
   GUEST_STORAGE_SCOPE,
@@ -17,21 +18,106 @@ import {
   listProjectSyncOperations,
   saveProjectAndEnqueue,
 } from './projectSyncQueue'
+import { preserveConflictCopy } from './projectConflictCopy'
+import {
+  combineMergeNotices,
+  MAX_SAVE_ATTEMPTS,
+  recoverQueuedSave,
+  type MergeNotice,
+} from './projectSaveConflict'
+import { captureProjectSyncBase, dropProjectSyncBase } from './projectSyncBase'
+import {
+  notifyProjectMerge,
+  reportProjectSyncError,
+} from './syncNotifications'
 import { deleteUnreferencedLocalFiles } from './fileGarbageCollection'
+import { loadReportsForProject } from './reportStorage'
+
+export {
+  reportProjectSyncError,
+  setProjectSyncErrorHandler,
+} from './syncNotifications'
 
 const saveTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 const flushes = new Map<string, Promise<void>>()
 
-let projectSyncErrorHandler: ((message: string | null) => void) | null = null
-
-export function setProjectSyncErrorHandler(
-  handler: ((message: string | null) => void) | null,
-): void {
-  projectSyncErrorHandler = handler
+/**
+ * The queued payload holds the reports as they stood when it was enqueued, but report
+ * edits are persisted on their own schedule and can outrun it. Sending the older copy
+ * makes the server authoritative for reports it has never seen, and the next load then
+ * deletes them locally, so the durable copy goes out instead.
+ */
+async function withDurableReports(
+  projectId: string,
+  scope: string,
+  queued: ProjectSyncOperation,
+): Promise<ProjectSyncOperation> {
+  const payload = queued.payload
+  if (!payload) return queued
+  const durable = await loadReportsForProject(projectId, scope)
+  if (!Object.keys(durable).length) return queued
+  return { ...queued, payload: { ...payload, reports: { ...payload.reports, ...durable } } }
 }
 
-export function reportProjectSyncError(message: string): void {
-  projectSyncErrorHandler?.(message)
+async function flushQueuedSave(
+  projectId: string,
+  scope: string,
+  queued: ProjectSyncOperation,
+): Promise<void> {
+  let pending = await withDurableReports(projectId, scope, queued)
+  let merge: MergeNotice | null = null
+  for (let attempt = 1; attempt <= MAX_SAVE_ATTEMPTS; attempt += 1) {
+    const payload = pending.payload
+    if (!payload) throw new Error('Queued project save has no payload')
+    try {
+      const updated = await updateProject(projectId, {
+        ...payload,
+        expectedRevision: pending.expectedRevision,
+      })
+      await acknowledgeProjectSave(
+        projectId,
+        pending.generation,
+        updated.revision,
+        updated.updatedAt,
+        scope,
+      )
+      await captureProjectSyncBase(projectId, updated.revision, payload, scope)
+      if (merge) notifyProjectMerge({ projectId, ...merge })
+      return
+    } catch (error) {
+      const recovery = attempt < MAX_SAVE_ATTEMPTS
+        ? await recoverQueuedSave(projectId, scope, pending, error)
+        : null
+      if (!recovery) {
+        if (error instanceof ApiError && error.statusCode === 409) {
+          await preserveConflictCopy(projectId, payload, scope)
+        }
+        throw error
+      }
+      pending = recovery.operation
+      if (recovery.merge) merge = combineMergeNotices(merge, recovery.merge)
+    }
+  }
+}
+
+async function flushQueuedDelete(
+  projectId: string,
+  scope: string,
+  pending: ProjectSyncOperation,
+): Promise<void> {
+  try {
+    await deleteProject(projectId, pending.expectedRevision)
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.statusCode !== 404) throw error
+  }
+  const deletedNodes = await finalizeProjectDelete(
+    projectId,
+    pending.generation,
+    scope,
+  )
+  if (!deletedNodes) return
+  await dropProjectSyncBase(projectId, scope)
+  await deleteUnreferencedLocalFiles(deletedNodes, scope)
 }
 
 async function flushQueuedOperation(
@@ -42,32 +128,11 @@ async function flushQueuedOperation(
     const pending = await getProjectSyncOperation(projectId, scope)
     if (!pending) return
     if (pending.operation === 'save') {
-      if (!pending.payload) throw new Error('Queued project save has no payload')
-      const updated = await updateProject(projectId, {
-        ...pending.payload,
-        expectedRevision: pending.expectedRevision,
-      })
-      await acknowledgeProjectSave(
-        projectId,
-        pending.generation,
-        updated.revision,
-        updated.updatedAt,
-        scope,
-      )
+      await flushQueuedSave(projectId, scope, pending)
     } else {
-      try {
-        await deleteProject(projectId, pending.expectedRevision)
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.statusCode !== 404) throw error
-      }
-      const deletedNodes = await finalizeProjectDelete(
-        projectId,
-        pending.generation,
-        scope,
-      )
-      if (deletedNodes) await deleteUnreferencedLocalFiles(deletedNodes, scope)
+      await flushQueuedDelete(projectId, scope, pending)
     }
-    projectSyncErrorHandler?.(null)
+    reportProjectSyncError(null)
   }
 }
 
@@ -106,7 +171,7 @@ export async function saveProjectWithSync(
   reports: Record<string, Report> = {},
 ): Promise<void> {
   const scope = getStorageScope()
-  const persistedNodes = withoutTransientComputeState(nodes)
+  const persistedNodes = withoutRuntimeNodeState(nodes)
   if (scope === GUEST_STORAGE_SCOPE || projectId.startsWith('local_')) {
     await saveProjectLocal(projectId, name, persistedNodes, edges, patches, undefined, scope)
     return
@@ -126,7 +191,7 @@ export async function saveProjectWithSync(
   const timeout = setTimeout(() => {
     void flushProjectSaveWithSync(projectId, scope).catch((error) => {
       console.error('[Sync] Failed to save to backend:', error)
-      projectSyncErrorHandler?.(
+      reportProjectSyncError(
         error instanceof Error ? error.message : 'Project sync failed',
       )
     })

@@ -4,6 +4,7 @@ import type { ProfileResult } from '@/engine/types'
 import type { CellValue, TableNode } from '@/types'
 import { useDataStore } from '@/state/dataStore'
 import { useProjectStore } from '@/state/projectStore'
+import { getNodeCacheInfo, useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import { ensureTableMaterialized } from '@/engine/materializationService'
 import { detectSemanticHints } from './semanticHints'
 
@@ -19,7 +20,7 @@ export function getTableProfileVersionForNode(node: TableNode | undefined): stri
   ])
   return JSON.stringify([
     node.updatedAt,
-    node.cacheInfo?.dataRevision ?? 0,
+    getNodeCacheInfo(node.id)?.dataRevision ?? 0,
     schemaVersion,
   ])
 }
@@ -139,9 +140,8 @@ export const useProfilingStore = create<ProfilingState>((set, get) => ({
   },
 }))
 
-useProjectStore.subscribe((state, previousState) => {
-  if (state.nodes === previousState.nodes) return
-
+function evictStaleProfiles(): void {
+  const nodes = useProjectStore.getState().nodes
   useProfilingStore.setState((profilingState) => {
     const profiles = { ...profilingState.profiles }
     const profileVersions = { ...profilingState.profileVersions }
@@ -154,7 +154,7 @@ useProjectStore.subscribe((state, previousState) => {
     ])
 
     for (const tableId of tableIds) {
-      const node = state.nodes[tableId]
+      const node = nodes[tableId]
       const tableNode = node?.kind === 'source_table' || node?.kind === 'derived_table'
         ? node
         : undefined
@@ -175,6 +175,14 @@ useProjectStore.subscribe((state, previousState) => {
       ? { profiles, profileVersions, loading, loadingVersions }
       : profilingState
   })
+}
+
+useProjectStore.subscribe((state, previousState) => {
+  if (state.nodes !== previousState.nodes) evictStaleProfiles()
+})
+
+useTableRuntimeStore.subscribe((state, previousState) => {
+  if (state.cacheInfo !== previousState.cacheInfo) evictStaleProfiles()
 })
 
 export async function ensureTableInEngine(tableId: string, _force: boolean = false): Promise<boolean> {
