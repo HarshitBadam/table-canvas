@@ -58,6 +58,7 @@ suites are split by behavior:
 | Persistence | `persistence/db*.test.ts`, `persistence/exportService*.test.ts`, `persistence/sync*.test.ts` |
 | Grid | `grid/filter{Evaluation,Metadata}.test.ts`, `grid/hooks/useWindowedRows.test.ts` |
 | Suggestions | `suggestions/suggestionEngine.{analysis,classification,cleaning,detection}.test.ts` |
+| Concurrency | `state/document{Lease,Mirror}.test.ts`, `state/useDocumentCoordination.test.ts`, `persistence/projectMerge*.test.ts`, `persistence/projectSaveConflict.test.ts` |
 
 **Backend** (`server/src/`) tests cover models, project/file routes, Google integration, file
 service behavior, and limit enforcement.
@@ -70,7 +71,8 @@ service behavior, and limit enforcement.
 
 **E2E**: `e2e/derived-tables.{canvas,interactions,layout}.spec.ts` covers canvas rendering,
 interactions, and responsive layout. `sample-workbook.spec.ts` and `report-workflow.spec.ts`
-cover persisted import/edit/clean/report/export workflows. All specs use the deterministic
+cover persisted import/edit/clean/report/export workflows. `tab-ownership.spec.ts` drives two real
+tabs to check mirroring, focus handover, and project independence. All specs use the deterministic
 mock API in `e2e/derived-tables.support.ts`.
 
 `e2e/ux/` is the release-blocking UX contract: committed visual baselines, WCAG checks,

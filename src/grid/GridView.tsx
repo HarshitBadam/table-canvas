@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, lazy, Suspense, useMemo } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { useProjectStore } from '@/state/projectStore'
+import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
+import { EDITING_ELSEWHERE_TOOLTIP } from '@/state/useWorkspaceLease'
 import { FilterPanel } from './FilterPanel'
 import { FormulaColumnModal } from './FormulaColumnModal'
 import { GridContextMenu } from './GridContextMenu'
@@ -28,11 +30,11 @@ interface GridViewProps {
 export function GridView({ tableId }: GridViewProps) {
   const toggleCellHighlight = useProjectStore((state) => state.toggleCellHighlight)
   const clearHighlights = useProjectStore((state) => state.clearHighlights)
-  const updateCacheInfo = useProjectStore((state) => state.updateCacheInfo)
+  const updateCacheInfo = useTableRuntimeStore((state) => state.updateCacheInfo)
 
   const {
     node, columns, rows, filteredRows, unfilteredTotalRows,
-    isEditable, isDirty, isComputing, isMaterializing,
+    isEditable, canEdit, canMutate, isDirty, isComputing, isMaterializing,
     materializationError, setMaterializationError, computationError,
     highlightedCells, tableData, getDisplayValue,
     filters, handleFiltersChange,
@@ -59,7 +61,7 @@ export function GridView({ tableId }: GridViewProps) {
     editingColumnId, editColumnName, setEditColumnName,
     handleColumnDoubleClick, commitColumnNameEdit, cancelColumnNameEdit,
     saveSnapshot, setCellValue,
-  } = useGridEditing(tableId, columns, filteredRows, isEditable)
+  } = useGridEditing(tableId, columns, filteredRows, canMutate)
 
   const {
     selection, setSelection,
@@ -70,14 +72,14 @@ export function GridView({ tableId }: GridViewProps) {
     getRowInsertionIndex, getColumnInsertionIndex,
     getRowInsertionDescription, getColumnInsertionDescription,
     toggleHighlightForSelection,
-  } = useGridSelection(tableId, columns, rows, filteredRows, isEditable)
+  } = useGridSelection(tableId, columns, rows, filteredRows, canMutate)
 
   const {
     contextMenu, setContextMenu, newColumnModal, setNewColumnModal,
     doInsertRow, openNewColumnModal, doInsertColumn, handleContextMenu, openContextMenu,
     handleInsertRowAbove, handleInsertRowBelow, handleDeleteRow,
     handleInsertColumnLeft, handleInsertColumnRight,
-  } = useGridOperations(tableId, columns, filteredRows, isEditable, saveSnapshot, showGridFeedback)
+  } = useGridOperations(tableId, columns, filteredRows, canMutate, saveSnapshot, showGridFeedback)
   const closeContextMenu = useCallback(() => setContextMenu(null), [setContextMenu])
   const formulaLifecycle = useFormulaColumnLifecycle(
     tableId,
@@ -90,7 +92,7 @@ export function GridView({ tableId }: GridViewProps) {
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
     handleAutofillStart, handleAutofillMove, handleAutofillOneRow,
   } = useGridAutofill({
-    isEditable, columns, rows: filteredRows, cellRangeSelection,
+    isEditable: canMutate, columns, rows: filteredRows, cellRangeSelection,
     getDisplayValue, saveSnapshot, setCellValue, tableId,
   })
 
@@ -99,7 +101,7 @@ export function GridView({ tableId }: GridViewProps) {
   )
 
   useGridKeyboard({
-    editingCell, selectedCell, selection, columns, rows: filteredRows, isEditable,
+    editingCell, selectedCell, selection, columns, rows: filteredRows, isEditable: canMutate,
     cellRangeSelection, setSelection, selectCell, commitEdit, cancelEdit, startEditing,
     getDisplayValue, saveSnapshot, setCellValue, tableId,
     getSelectedCellData, formatClipboardText,
@@ -153,7 +155,7 @@ export function GridView({ tableId }: GridViewProps) {
   const handleToggleFilters = useCallback(() => setShowFilterPanel(prev => !prev), [])
 
   const contextValue: GridContextValue = useMemo(() => ({
-    tableId, isEditable, columns, getDisplayValue, getColumnWidth,
+    tableId, isEditable, canEdit, columns, getDisplayValue, getColumnWidth,
     selection, selectedCell, selectedColumn, isHeaderRowSelected,
     isIndexColumnSelected, isCornerSelected, cellRangeSelection,
     setSelection, selectCell, handleCellMouseDown, handleCellMouseEnter,
@@ -183,7 +185,7 @@ export function GridView({ tableId }: GridViewProps) {
     onEditFormulaColumn: formulaLifecycle.openEditor,
     onDeleteFormulaColumn: formulaLifecycle.deleteColumn,
   }), [
-    tableId, isEditable, columns, getDisplayValue, getColumnWidth,
+    tableId, isEditable, canEdit, columns, getDisplayValue, getColumnWidth,
     selection, selectedCell, selectedColumn, isHeaderRowSelected,
     isIndexColumnSelected, isCornerSelected, cellRangeSelection,
     setSelection, selectCell, handleCellMouseDown, handleCellMouseEnter,
@@ -320,7 +322,16 @@ export function GridView({ tableId }: GridViewProps) {
               <p className="text-sm text-text-secondary mb-4">
                 This table has no data yet. {isEditable && 'Click "Add Row" to start entering data.'}
               </p>
-              {isEditable && <button onClick={handleAddRow} className="btn btn-primary">Add First Row</button>}
+              {isEditable && (
+                <button
+                  onClick={handleAddRow}
+                  disabled={!canEdit}
+                  title={canEdit ? undefined : EDITING_ELSEWHERE_TOOLTIP}
+                  className="btn btn-primary"
+                >
+                  Add First Row
+                </button>
+              )}
             </div>
           </div>
         )}

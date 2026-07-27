@@ -28,16 +28,16 @@ services:
     container_name: tablecanvas-backend
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "5173:5173"
     environment:
       - NODE_ENV=development
-      - PORT=3001
+      - PORT=5173
       - MONGODB_URI=mongodb://mongodb:27017/table-canvas
       - JWT_ACCESS_SECRET=docker-dev-access-secret-not-for-production
       - JWT_REFRESH_SECRET=docker-dev-refresh-secret-not-for-production
       - JWT_ACCESS_EXPIRES_IN=15m
       - JWT_REFRESH_EXPIRES_IN=7d
-      - FRONTEND_URL=http://localhost:5173
+      - FRONTEND_URL=http://localhost:3000
     volumes:
       - ./server/src:/app/src:ro
       - ./server/scripts:/app/scripts:ro
@@ -55,9 +55,9 @@ services:
     container_name: tablecanvas-frontend
     restart: unless-stopped
     ports:
-      - "5173:80"
+      - "3000:80"
     environment:
-      - VITE_API_URL=http://localhost:3001/api
+      - VITE_API_URL=http://localhost:5173/api
     depends_on:
       - backend
 

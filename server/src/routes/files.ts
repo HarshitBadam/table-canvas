@@ -23,9 +23,29 @@ import { Project } from '../models/Project.js';
 import { checkFileSize } from '../config/enforce.js';
 import { getLimits, type Tier } from '../config/limits.js';
 import { reserveStorage, releaseStorage } from '../services/storageQuota.service.js';
+import { createApiRateLimit } from '../middleware/apiRateLimit.js';
 import { Types } from 'mongoose';
 
 const router = Router();
+
+// Uploads are the most expensive request the API serves: they buffer up to
+// 50MB, reserve quota, and write GridFS chunks. Tier quotas cap total stored
+// bytes but nothing else caps the rate of attempts, including failed ones.
+const uploadLimiter = createApiRateLimit({
+  prefix: 'files-upload',
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  message: 'Too many uploads. Wait a few minutes and try again.',
+});
+
+// Downloads stream GridFS chunks, so they are cheaper than uploads but still
+// far more costly than a metadata read.
+const downloadLimiter = createApiRateLimit({
+  prefix: 'files-download',
+  windowMs: 15 * 60 * 1000,
+  limit: 300,
+  message: 'Too many file downloads. Wait a few minutes and try again.',
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -73,6 +93,7 @@ router.get(
 
 router.post(
   '/upload',
+  uploadLimiter,
   upload.single('file'),
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
@@ -194,6 +215,7 @@ router.post(
 
 router.get(
   '/:id',
+  downloadLimiter,
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const fileId = req.params.id;

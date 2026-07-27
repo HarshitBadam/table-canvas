@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { addFilter, addSource, clean, resetStore } from '@/engine/integrationTestUtils'
+import { addFilter, addSource, cacheOf, clean, resetStore } from '@/engine/integrationTestUtils'
 import { useDataStore } from '@/state/dataStore'
 import { useProjectStore } from '@/state/projectStore'
 
@@ -17,30 +17,26 @@ describe('history slice', () => {
     useProjectStore.getState().saveSnapshot('Before edit')
     useProjectStore.getState().setCellValue(tableId, 'row-1', 'col1', 'edited')
     useDataStore.getState().setTableData(tableId, [{ __rowId: 'row-1', col1: 'edited' }])
-    const editedRevision = useProjectStore.getState()
-      .getTableNode(tableId)?.cacheInfo?.dataRevision ?? 0
+    const editedRevision = cacheOf(tableId)?.dataRevision ?? 0
 
     useProjectStore.getState().undo()
 
     expect(useProjectStore.getState().patches[tableId]?.cellPatches).toEqual({})
-    expect(useProjectStore.getState().getTableNode(tableId)?.cacheInfo).toMatchObject({
+    expect(cacheOf(tableId)).toMatchObject({
       isDirty: true,
       isComputing: false,
     })
-    const undoRevision = useProjectStore.getState()
-      .getTableNode(tableId)?.cacheInfo?.dataRevision ?? 0
+    const undoRevision = cacheOf(tableId)?.dataRevision ?? 0
     expect(undoRevision).toBeGreaterThan(editedRevision)
-    expect(useProjectStore.getState().getTableNode(derivedId)?.cacheInfo?.isDirty).toBe(true)
+    expect(cacheOf(derivedId)?.isDirty).toBe(true)
     expect(useDataStore.getState().tableData).toEqual({})
     expect(useProjectStore.getState().canRedo()).toBe(true)
 
     useProjectStore.getState().redo()
 
     expect(useProjectStore.getState().patches[tableId].cellPatches.col1['row-1']).toBe('edited')
-    expect(useProjectStore.getState().getTableNode(tableId)?.cacheInfo?.isDirty).toBe(true)
-    expect(
-      useProjectStore.getState().getTableNode(tableId)?.cacheInfo?.dataRevision ?? 0,
-    ).toBeGreaterThan(undoRevision)
+    expect(cacheOf(tableId)?.isDirty).toBe(true)
+    expect(cacheOf(tableId)?.dataRevision ?? 0).toBeGreaterThan(undoRevision)
     expect(useDataStore.getState().tableData).toEqual({})
   })
 
@@ -55,8 +51,8 @@ describe('history slice', () => {
 
     useProjectStore.getState().undo()
 
-    expect(useProjectStore.getState().getTableNode(tableId)?.cacheInfo?.isDirty).toBe(true)
-    expect(useProjectStore.getState().getTableNode(derivedId)?.cacheInfo?.isDirty).toBe(true)
+    expect(cacheOf(tableId)?.isDirty).toBe(true)
+    expect(cacheOf(derivedId)?.isDirty).toBe(true)
     expect(Object.values(useProjectStore.getState().edges)).toContainEqual(
       expect.objectContaining({
         fromNodeId: tableId,

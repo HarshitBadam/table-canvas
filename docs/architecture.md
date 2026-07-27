@@ -205,8 +205,17 @@ interface TableCanvasDB {
 ### Server sync
 
 When the backend is available, `syncService` saves local changes through the API to MongoDB and
-loads them back on startup. There's no conflict resolution — the last write wins. When the
-backend is unreachable, all of this is skipped and the app stays purely local.
+loads them back on startup. Saves carry the revision they were based on and the server applies
+them only if it still matches, so a save built on stale data is rejected rather than allowed to
+overwrite newer work. A rejection is resolved on the client by `projectMerge`, which merges the
+last acknowledged base, the local payload, and the current server state entity by entity, and
+retries the save against the fresh revision. Only an unmergeable conflict falls back to keeping
+the local work as a separate conflict copy. When the backend is unreachable, all of this is
+skipped and the app stays purely local.
+
+Within one browser, `documentLease` gives a single tab the right to write a given project while
+`documentMirror` broadcasts its state to the others, so multiple tabs never race on the same
+document. See [Reliability](reliability.md) for the ownership and merge contract in full.
 
 ## Export
 

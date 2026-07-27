@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useProjectStore } from '@/state/projectStore'
+import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import {
   useTableNodes,
   useChartNodes,
@@ -14,13 +15,14 @@ export function useLineageData(): {
   const tableNodes = useTableNodes()
   const chartNodes = useChartNodes()
   const storeEdges = useProjectStore((state) => state.edges)
+  const runtimeCacheInfo = useTableRuntimeStore((state) => state.cacheInfo)
 
   return useMemo(() => {
     const tableLineageNodes: LineageNode[] = tableNodes.map(table => ({
       id: table.id,
       name: table.name,
       kind: table.kind as 'source_table' | 'derived_table',
-      rowCount: table.cacheInfo?.lastRowCount ?? table.schema?.rowCount ?? 0,
+      rowCount: runtimeCacheInfo[table.id]?.lastRowCount ?? table.schema?.rowCount ?? 0,
     }))
 
     const chartLineageNodes: LineageNode[] = chartNodes.map(chart => ({
@@ -43,5 +45,5 @@ export function useLineageData(): {
       }))
 
     return { nodes, edges }
-  }, [tableNodes, chartNodes, storeEdges])
+  }, [tableNodes, chartNodes, runtimeCacheInfo, storeEdges])
 }

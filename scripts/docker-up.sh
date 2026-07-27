@@ -47,7 +47,7 @@ if [ "$SEED_SUCCESS" = true ]; then
     echo ""
     echo "Ready."
     echo ""
-    echo "   Open http://localhost:5173"
+    echo "   Open http://localhost:3000"
     echo ""
     echo "   Email: demo@tablecanvas.app"
     echo "   Password: 1234"
@@ -65,6 +65,6 @@ else
     echo ""
     echo "   Try manually: docker compose exec backend npm run seed"
     echo ""
-    echo "   Open http://localhost:5173"
+    echo "   Open http://localhost:3000"
     echo ""
 fi

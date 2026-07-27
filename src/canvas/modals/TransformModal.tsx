@@ -3,6 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import type { TableRow } from '@/state/dataStore'
 import { useAppAuth } from '@/state/AppContext'
+import { useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { JoinType } from '@/types'
 import { ensureTableMaterialized } from '@/engine/materializationService'
 import { getTableData } from '@/engine/tableDataService'
@@ -28,6 +29,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
   const nodes = useProjectStore(s => s.nodes)
   const addDerivedTable = useProjectStore(s => s.addDerivedTable)
   const { user } = useAppAuth()
+  const { canEdit } = useWorkspaceLease()
 
   const leftNode = nodes[sourceNodeId]
   const rightNode = nodes[targetNodeId]
@@ -213,9 +215,9 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
   const includedColumnCount = allCols.filter(
     (column) => selected.has(column.id) && !(column.side === 'R' && column.colId === rightKey),
   ).length
-  const canCreate = operation === 'join'
+  const canCreate = canEdit && (operation === 'join'
     ? Boolean(leftKey && rightKey && includedColumnCount > 0)
-    : canUnion
+    : canUnion)
 
   return (
     <Dialog.Root

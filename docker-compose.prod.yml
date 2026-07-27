@@ -26,10 +26,10 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "${BACKEND_PORT:-3001}:3001"
+      - "${BACKEND_PORT:-5173}:5173"
     environment:
       - NODE_ENV=production
-      - PORT=3001
+      - PORT=5173
       - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/table-canvas}
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
@@ -42,7 +42,7 @@ services:
       mongodb:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/ready"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:5173/api/ready"]
       interval: 15s
       timeout: 5s
       retries: 3

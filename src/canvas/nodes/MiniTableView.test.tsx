@@ -12,9 +12,10 @@ vi.mock('@/engine/tableDataService', () => ({
   getTableData: mocks.getTableData,
 }))
 
-vi.mock('@/state/projectStore', () => ({
-  useProjectStore: (selector: (state: { updateCacheInfo: typeof mocks.updateCacheInfo }) => unknown) =>
-    selector({ updateCacheInfo: mocks.updateCacheInfo }),
+vi.mock('@/state/tableRuntimeStore', () => ({
+  useTableRuntimeStore: (
+    selector: (state: { updateCacheInfo: typeof mocks.updateCacheInfo }) => unknown,
+  ) => selector({ updateCacheInfo: mocks.updateCacheInfo }),
 }))
 
 const columns: ColumnSchema[] = [

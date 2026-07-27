@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { MulterError } from 'multer';
 import { config } from '../config/env.js';
+import { captureServerError } from '../observability/sentry.js';
 
 
 export class AppError extends Error {
@@ -46,7 +47,7 @@ export class ConflictError extends AppError {
 
 export function errorHandler(
   err: Error,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void {
@@ -63,6 +64,10 @@ export function errorHandler(
   }
 
   if (err instanceof AppError) {
+    if (err.statusCode >= 500) {
+      captureServerError(err, req, err.statusCode);
+    }
+
     if (err instanceof ValidationError) {
       res.status(err.statusCode).json({
         success: false,
@@ -135,6 +140,8 @@ export function errorHandler(
   }
 
   const statusCode = 500;
+  captureServerError(err, req, statusCode);
+
   const message =
     config.nodeEnv === 'production'
       ? 'Internal server error'

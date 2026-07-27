@@ -14,8 +14,10 @@ import { revokeLegacyRefreshSessions } from './services/auth.service.js';
 import { initializeFileIndexes } from './services/file.service.js';
 import { initializeRateLimitIndexes } from './services/rateLimitStore.js';
 import { createCsrfProtection } from './middleware/csrfProtection.js';
+import { closeServerTelemetry, initializeServerTelemetry } from './observability/sentry.js';
 
 validateConfig();
+initializeServerTelemetry();
 
 const app = express();
 if (config.trustProxy) app.set('trust proxy', config.trustProxy);
@@ -107,6 +109,7 @@ async function shutdown(signal: string): Promise<void> {
       });
     }
     await mongoose.disconnect();
+    await closeServerTelemetry();
     clearTimeout(forceExit);
     process.exit(0);
   } catch (error) {

@@ -1,6 +1,8 @@
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
+import { useNodeCacheInfo, useTableRuntimeStore } from '@/state/tableRuntimeStore'
+import { useWorkspaceLease } from '@/state/useWorkspaceLease'
 import type { CellValue, ColumnSchema, ViewFilterConfig } from '@/types'
 import { hasActiveFilters, createEmptyFilterConfig } from './filterUtils'
 import { computeDisplayValue } from './displayUtils'
@@ -10,9 +12,9 @@ import type { GridRow } from './types'
 export function useGridData(tableId: string) {
   const node = useProjectStore((state) => state.getTableNode(tableId))
   const patches = useProjectStore((state) => state.patches[tableId])
-  const dataRevision = useProjectStore(
-    (state) => state.getTableNode(tableId)?.cacheInfo?.dataRevision ?? 0
-  )
+  const cacheInfo = useNodeCacheInfo(tableId)
+  const dataRevision = cacheInfo?.dataRevision ?? 0
+  const materializedSchema = useTableRuntimeStore(state => state.schemas[tableId])
   const setTableFilters = useProjectStore((state) => state.setTableFilters)
 
   const highlightedCells = patches?.highlightedCells
@@ -22,16 +24,18 @@ export function useGridData(tableId: string) {
 
   const [localMaterializationError, setMaterializationError] = useState<string | null>(null)
 
-  const cacheInfo = node && (node.kind === 'source_table' || node.kind === 'derived_table')
-    ? node.cacheInfo
-    : undefined
   const isDirty = cacheInfo?.isDirty ?? false
   const isComputing = cacheInfo?.isComputing ?? false
   const computationError = cacheInfo?.error
 
-  const schema = node?.schema
+  const schema = materializedSchema ?? node?.schema
   const columns: ColumnSchema[] = useMemo(() => schema?.columns ?? [], [schema])
+  // `isEditable` drives layout (derived tables have no insert affordances at all);
+  // `canMutate` additionally requires this tab to hold editing, so mirror tabs keep the
+  // controls visible but inert.
+  const { canEdit } = useWorkspaceLease()
   const isEditable = node?.kind === 'source_table'
+  const canMutate = isEditable && canEdit
 
   const filters: ViewFilterConfig = useMemo(() => {
     return persistedFilters ?? createEmptyFilterConfig()
@@ -90,6 +94,8 @@ export function useGridData(tableId: string) {
     filteredRows,
     unfilteredTotalRows,
     isEditable,
+    canEdit,
+    canMutate,
     isDirty,
     isComputing,
     isMaterializing,

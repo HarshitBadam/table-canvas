@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createMockReport, getDB } from './dbTestSupport'
+import {
+  createMockReport,
+  createMockSourceTableNode,
+  getDB,
+} from './dbTestSupport'
 
 describe('durable project sync queue', () => {
   it('keeps a newer generation when an older save is acknowledged', async () => {
@@ -52,6 +56,76 @@ describe('durable project sync queue', () => {
 
     expect((await db.listProjectSyncOperations(accountA))[0].payload?.name).toBe('A')
     expect((await db.listProjectSyncOperations(accountB))[0].payload?.name).toBe('B')
+  })
+
+  it('replaces a queued payload, its revision and the local project together', async () => {
+    const db = await getDB()
+    const queue = await import('./projectSyncQueue')
+    const scope = db.accountStorageScope('merge-retry-user')
+    db.setStorageScope(scope)
+    await db.saveProject('project-1', 'Before merge', {}, {}, {}, { revision: 4 })
+    const queued = await db.enqueueProjectSave('project-1', {
+      name: 'Before merge',
+      nodes: {},
+      edges: {},
+      patches: {},
+      reports: {},
+    }, 4)
+
+    const replaced = await queue.replaceQueuedProjectSave('project-1', {
+      name: 'After merge',
+      nodes: { node_1: createMockSourceTableNode('node_1', 'Merged') },
+      edges: {},
+      patches: {
+        node_1: {
+          cellPatches: { row_1: { col_1: 'merged' } },
+          deletedRows: [],
+          insertedRows: [],
+          highlightedCells: [],
+        },
+      },
+      reports: {},
+    }, 9)
+
+    expect(replaced).toMatchObject({
+      generation: queued.generation + 1,
+      expectedRevision: 9,
+      payload: { name: 'After merge' },
+    })
+    expect(await db.getProjectSyncOperation('project-1')).toMatchObject({
+      generation: queued.generation + 1,
+      expectedRevision: 9,
+      payload: { nodes: { node_1: { name: 'Merged' } } },
+    })
+    const project = await db.loadProject('project-1')
+    expect(project).toMatchObject({ name: 'After merge', revision: 9 })
+    expect(project?.patches.node_1.cellPatches).toEqual({ row_1: { col_1: 'merged' } })
+  })
+
+  it('refuses to replace anything but a queued save', async () => {
+    const db = await getDB()
+    const queue = await import('./projectSyncQueue')
+    const scope = db.accountStorageScope('merge-retry-delete-user')
+    db.setStorageScope(scope)
+    await db.saveProject('project-1', 'Delete requested', {}, {}, {}, { revision: 4 })
+    await db.enqueueProjectDelete('project-1', 4)
+    const snapshot = {
+      name: 'After merge',
+      nodes: {},
+      edges: {},
+      patches: {},
+      reports: {},
+    }
+
+    expect(await queue.replaceQueuedProjectSave('project-1', snapshot, 9)).toBeNull()
+    expect(await db.getProjectSyncOperation('project-1')).toMatchObject({
+      operation: 'delete',
+      expectedRevision: 4,
+    })
+    expect(await db.loadProject('project-1')).toMatchObject({
+      name: 'Delete requested',
+      revision: 4,
+    })
   })
 
   it('finalizes a delete atomically with its project and reports', async () => {

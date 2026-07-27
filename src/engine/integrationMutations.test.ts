@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useProjectStore } from '@/state/projectStore'
+import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import {
   addFilter,
   addSource,
+  cacheOf,
   clean,
-  derived,
   resetStore,
-  source,
 } from './integrationTestUtils'
 
 beforeEach(resetStore)
@@ -19,7 +19,7 @@ describe('schema change propagation', () => {
 
     useProjectStore.getState().addColumn(sourceId, 'NewColumn', 'string')
 
-    expect(derived(derivedId).cacheInfo?.isDirty).toBe(true)
+    expect(cacheOf(derivedId)?.isDirty).toBe(true)
   })
 
   it('marks downstream dirty when a column is renamed', () => {
@@ -29,7 +29,7 @@ describe('schema change propagation', () => {
 
     useProjectStore.getState().renameColumn(sourceId, 'col1', 'RenamedID')
 
-    expect(derived(derivedId).cacheInfo?.isDirty).toBe(true)
+    expect(cacheOf(derivedId)?.isDirty).toBe(true)
   })
 })
 
@@ -41,7 +41,7 @@ describe('row operation propagation', () => {
 
     useProjectStore.getState().insertRow(sourceId, 'new_row_id', { col1: 'test', col2: 42 }, 0)
 
-    expect(derived(derivedId).cacheInfo?.isDirty).toBe(true)
+    expect(cacheOf(derivedId)?.isDirty).toBe(true)
   })
 
   it('marks downstream dirty when a row is deleted', () => {
@@ -51,7 +51,7 @@ describe('row operation propagation', () => {
 
     useProjectStore.getState().deleteRow(sourceId, 'row_1')
 
-    expect(derived(derivedId).cacheInfo?.isDirty).toBe(true)
+    expect(cacheOf(derivedId)?.isDirty).toBe(true)
   })
 })
 
@@ -59,14 +59,14 @@ describe('cache info management', () => {
   it('updates cache info', () => {
     const sourceId = addSource('A')
     const timestamp = new Date().toISOString()
-    useProjectStore.getState().updateCacheInfo(sourceId, {
+    useTableRuntimeStore.getState().updateCacheInfo(sourceId, {
       isDirty: false,
       lastComputedAt: timestamp,
       currentVersionHash: 'abc123',
       lastRowCount: 100,
     })
 
-    const cacheInfo = source(sourceId).cacheInfo
+    const cacheInfo = cacheOf(sourceId)
     expect(cacheInfo?.isDirty).toBe(false)
     expect(cacheInfo?.lastComputedAt).toBe(timestamp)
     expect(cacheInfo?.currentVersionHash).toBe('abc123')
@@ -75,12 +75,12 @@ describe('cache info management', () => {
 
   it('clears node errors', () => {
     const sourceId = addSource('A')
-    const store = useProjectStore.getState()
-    store.updateCacheInfo(sourceId, { error: 'Test error' })
-    expect(source(sourceId).cacheInfo?.error).toBe('Test error')
+    const runtime = useTableRuntimeStore.getState()
+    runtime.updateCacheInfo(sourceId, { error: 'Test error' })
+    expect(cacheOf(sourceId)?.error).toBe('Test error')
 
-    store.clearNodeError(sourceId)
+    runtime.clearNodeError(sourceId)
 
-    expect(source(sourceId).cacheInfo?.error).toBeUndefined()
+    expect(cacheOf(sourceId)?.error).toBeUndefined()
   })
 })

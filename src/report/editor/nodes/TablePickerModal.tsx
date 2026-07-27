@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import { useSelectableTables } from '../tableData';
+import { useTableRuntimeStore } from '@/state/tableRuntimeStore';
 import { useDialogFocus } from '@/components/useDialogFocus';
 
 interface TablePickerModalProps {
@@ -18,6 +19,7 @@ export const TablePickerModal = memo(function TablePickerModal({
   const tables = useSelectableTables();
   const [query, setQuery] = useState('');
   const dialogRef = useDialogFocus<HTMLDivElement>(true, onClose);
+  const runtimeCacheInfo = useTableRuntimeStore((state) => state.cacheInfo);
   const visibleTables = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return tables;
@@ -77,7 +79,7 @@ export const TablePickerModal = memo(function TablePickerModal({
                   <div className="table-picker-item-info">
                     <span className="table-picker-item-name">{table.name}</span>
                     <span className="table-picker-item-meta">
-                      {(table.cacheInfo?.lastRowCount
+                      {(runtimeCacheInfo[table.id]?.lastRowCount
                         ?? table.schema?.rowCount
                         ?? 0).toLocaleString()} rows -{' '}
                       {table.schema?.columns?.length ?? 0} columns

@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { ColumnHeader } from './ColumnHeader'
 import { GridCell } from './GridCell'
 import { HEADER_HEIGHT, ROW_HEIGHT, TOUCH_ROW_HEIGHT } from './constants'
+import { EDITING_ELSEWHERE_TOOLTIP } from '@/state/useWorkspaceLease'
 import { useGridContext } from './useGridContext'
 import type { WindowedRowsState } from './hooks/useWindowedRows'
 
@@ -23,7 +24,7 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
   )
   const { ensureRange, isLoading, totalRows: windowedTotalRows } = windowed
   const {
-    columns, filteredRows, getColumnWidth, isEditable, isCornerSelected, selection, selectedCell,
+    columns, filteredRows, getColumnWidth, isEditable, canEdit, isCornerSelected, selection, selectedCell,
     isIndexColumnSelected, handleCornerClick, handleContextMenu, handleRowClick,
     openContextMenu,
   } = useGridContext()
@@ -112,7 +113,7 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
           ))}
           {isEditable && (
             <div role="columnheader" aria-label="Table actions">
-              <button type="button" onClick={onAddColumn} aria-label="Add column" className="flex cursor-pointer items-center justify-center border-l border-border px-2 text-xs text-text-tertiary transition-colors hover:bg-surface-tertiary hover:text-accent-text" style={{ width: 40, minWidth: 40, height: '100%' }} title="Add column">
+              <button type="button" onClick={onAddColumn} disabled={!canEdit} aria-label="Add column" className="flex cursor-pointer items-center justify-center border-l border-border px-2 text-xs text-text-tertiary transition-colors hover:bg-surface-tertiary hover:text-accent-text disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-tertiary" style={{ width: 40, minWidth: 40, height: '100%' }} title={canEdit ? 'Add column' : EDITING_ELSEWHERE_TOOLTIP}>
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
               </button>
             </div>

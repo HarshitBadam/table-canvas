@@ -1,5 +1,6 @@
 import { generateId } from '@/lib/utils'
 import type { Edge, Patches, ProjectNode } from '@/types'
+import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import type { ProjectStoreState } from './types'
 
 interface NodeDuplicate {
@@ -36,15 +37,6 @@ export function prepareNodeDuplicate(
   }
   node.createdAt = now
   node.updatedAt = now
-  if (node.kind === 'source_table' || node.kind === 'derived_table') {
-    node.cacheInfo = {
-      ...node.cacheInfo,
-      isDirty: true,
-      isComputing: false,
-      error: undefined,
-      currentVersionHash: undefined,
-    }
-  }
 
   return {
     id,
@@ -63,6 +55,9 @@ export function applyNodeDuplicate(
   duplicate: NodeDuplicate,
 ) {
   state.nodes[duplicate.id] = duplicate.node
+  if (duplicate.node.kind !== 'chart') {
+    useTableRuntimeStore.getState().invalidateNodes([duplicate.id])
+  }
   if (duplicate.patches) {
     state.patches[duplicate.id] = duplicate.patches
   }

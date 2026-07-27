@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DerivedTableNode, SourceTableNode, TableSchema } from '@/types'
+import type { CacheInfo, DerivedTableNode, SourceTableNode, TableSchema } from '@/types'
 
 const projectStore = {
   projectId: 'project_1',
@@ -7,7 +7,6 @@ const projectStore = {
   edges: {} as Record<string, { id: string; fromNodeId: string; toNodeId: string }>,
   patches: {} as Record<string, unknown>,
   getTableNode: vi.fn(),
-  updateCacheInfo: vi.fn(),
   setMaterializedTableSchema: vi.fn(),
 }
 const dataStore = {
@@ -41,6 +40,7 @@ vi.mock('papaparse', () => ({
   },
 }))
 vi.mock('xlsx', () => ({ read: vi.fn(), utils: { sheet_to_json: vi.fn() } }))
+import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import { ensureTableMaterialized } from './materializationService'
 import { getTableData } from './tableDataService'
 import { computeDerivedTable } from './derivedTableComputation'
@@ -54,7 +54,12 @@ const schema: TableSchema = {
   ],
   rowCount: 10,
 }
-function sourceNode(id: string, cacheInfo: Partial<SourceTableNode['cacheInfo']> = {}): SourceTableNode {
+const cacheOf = (id: string) => useTableRuntimeStore.getState().cacheInfo[id]
+function sourceNode(id: string, cacheInfo: Partial<CacheInfo> = {}): SourceTableNode {
+  useTableRuntimeStore.getState().updateCacheInfo(id, {
+    isDirty: false, isComputing: false, currentVersionHash: 'hash_123',
+    lastComputedAt: new Date().toISOString(), lastRowCount: 10, ...cacheInfo,
+  })
   return {
     id,
     kind: 'source_table',
@@ -67,14 +72,6 @@ function sourceNode(id: string, cacheInfo: Partial<SourceTableNode['cacheInfo']>
       inferredSchemaVersion: 1,
     },
     schema,
-    cacheInfo: {
-      isDirty: false,
-      isComputing: false,
-      currentVersionHash: 'hash_123',
-      lastComputedAt: new Date().toISOString(),
-      lastRowCount: 10,
-      ...cacheInfo,
-    },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
@@ -82,9 +79,10 @@ function sourceNode(id: string, cacheInfo: Partial<SourceTableNode['cacheInfo']>
 function derivedNode(
   id: string,
   upstreamNodeIds: string[],
-  cacheInfo: Partial<DerivedTableNode['cacheInfo']> = {},
+  cacheInfo: Partial<CacheInfo> = {},
   nodeSchema?: TableSchema
 ): DerivedTableNode {
+  useTableRuntimeStore.getState().updateCacheInfo(id, { isDirty: true, isComputing: false, ...cacheInfo })
   return {
     id,
     kind: 'derived_table',
@@ -100,7 +98,6 @@ function derivedNode(
       upstreamNodeIds,
     },
     schema: nodeSchema,
-    cacheInfo: { isDirty: true, isComputing: false, ...cacheInfo },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
@@ -114,6 +111,7 @@ const edge = (fromNodeId: string, toNodeId: string) => ({
 const csv = (contents = 'ID,Value\n1,100') => new TextEncoder().encode(contents).buffer
 beforeEach(() => {
   vi.clearAllMocks()
+  useTableRuntimeStore.getState().resetRuntime()
   projectStore.nodes = {}
   projectStore.projectId = 'project_1'
   projectStore.edges = {}
@@ -152,17 +150,14 @@ describe('source table materialization', () => {
     await ensureTableMaterialized('table_1')
     expect(engine.init).toHaveBeenCalled()
     expect(engine.loadTable).toHaveBeenCalled()
-    expect(projectStore.updateCacheInfo).toHaveBeenCalled()
+    expect(cacheOf('table_1')?.lastComputedAt).toBeDefined()
   })
   it('updates cache info after successful materialization', async () => {
     projectStore.nodes.table_1 = sourceNode('table_1', { isDirty: true })
     loadFile.mockResolvedValue(csv())
     engine.getSlice.mockRejectedValue(new Error('Not in engine'))
     await ensureTableMaterialized('table_1')
-    expect(projectStore.updateCacheInfo).toHaveBeenCalledWith('table_1', expect.objectContaining({
-      isDirty: false,
-      isComputing: false,
-    }))
+    expect(cacheOf('table_1')).toMatchObject({ isDirty: false, isComputing: false })
   })
   it('reloads a source table when the engine row count is incomplete', async () => {
     const node = sourceNode('table_1', {
@@ -278,9 +273,11 @@ describe('derived table materialization', () => {
       { isDirty: false, lastUpstreamHash: 'hash_a', lastRowCount: 10 },
       { columns: [], rowCount: 10 },
     )
-    node.cacheInfo!.currentVersionHash = computeDerivedVersionHash(
-      'table_b', JSON.stringify(node.plan.transformDef), ['hash_a'],
-    )
+    useTableRuntimeStore.getState().updateCacheInfo('table_b', {
+      currentVersionHash: computeDerivedVersionHash(
+        'table_b', JSON.stringify(node.plan.transformDef), ['hash_a'],
+      ),
+    })
     projectStore.nodes = {
       table_a: sourceNode('table_a', { currentVersionHash: 'hash_a' }),
       table_b: node,
@@ -351,11 +348,11 @@ describe('materialization concurrency and errors', () => {
     const result = await ensureTableMaterialized('table_1')
     expect(result.status).toBe('error')
     expect(result.error).toContain('Engine crashed')
-    expect(projectStore.updateCacheInfo).toHaveBeenCalledWith('table_1', expect.objectContaining({
+    expect(cacheOf('table_1')).toMatchObject({
       isDirty: true,
       isComputing: false,
       error: expect.stringContaining('Engine crashed'),
-    }))
+    })
   })
 
   it('handles transform execution errors', async () => {

@@ -3,7 +3,7 @@
 REST API for the **optional** backend. The app runs fully in local mode without it; these
 endpoints only matter when you're running the server for auth and cross-device sync.
 
-Base URL: `http://localhost:3001/api`
+Base URL: `http://localhost:5173/api`
 
 All endpoints except the health check return JSON with the structure:
 ```typescript

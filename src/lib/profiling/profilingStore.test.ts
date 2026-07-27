@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { addSource, resetStore } from '@/engine/integrationTestUtils'
 import { useProjectStore } from '@/state/projectStore'
+import { updateNodeCacheInfo } from '@/state/tableRuntimeStore'
 
 const ensureTableMaterialized = vi.hoisted(() => vi.fn())
 const loadTable = vi.hoisted(() => vi.fn())
@@ -74,7 +75,7 @@ describe('profile cache versions', () => {
     useProfilingStore.getState().setProfile(tableId, profile)
     expect(useProfilingStore.getState().getProfile(tableId)).toBe(profile)
 
-    useProjectStore.getState().updateCacheInfo(tableId, { dataRevision: 1 })
+    updateNodeCacheInfo(tableId, { dataRevision: 1 })
 
     expect(useProfilingStore.getState().getProfile(tableId)).toBeUndefined()
     expect(useProfilingStore.getState().profiles[tableId]).toBeUndefined()
@@ -148,7 +149,7 @@ describe('profile cache versions', () => {
     getProfile.mockResolvedValue(profile)
     useProfilingStore.getState().setProfile(tableId, profile)
     const oldVersion = getTableProfileVersion(tableId)
-    useProjectStore.getState().updateCacheInfo(tableId, { dataRevision: 2 })
+    updateNodeCacheInfo(tableId, { dataRevision: 2 })
 
     await loadProfileForTable(tableId)
 

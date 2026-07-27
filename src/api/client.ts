@@ -21,13 +21,33 @@ export interface RequestOptions extends RequestInit {
 export class ApiError extends Error {
   statusCode: number;
   errors?: string[];
+  retryAfterSeconds?: number;
 
-  constructor(message: string, statusCode: number, errors?: string[]) {
+  constructor(
+    message: string,
+    statusCode: number,
+    errors?: string[],
+    retryAfterSeconds?: number
+  ) {
     super(message);
     this.name = 'ApiError';
     this.statusCode = statusCode;
     this.errors = errors;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+/** Supports both `Retry-After` forms: delta-seconds and an HTTP-date. */
+function parseRetryAfter(response: Response): number | undefined {
+  const header = response.headers?.get('Retry-After');
+  if (!header) return undefined;
+
+  const trimmed = header.trim();
+  if (/^\d+$/.test(trimmed)) return Number(trimmed);
+
+  const dateMs = Date.parse(trimmed);
+  if (Number.isNaN(dateMs)) return undefined;
+  return Math.max(0, Math.ceil((dateMs - Date.now()) / 1000));
 }
 
 class AuthError extends ApiError {
@@ -118,6 +138,7 @@ async function request<T>(
   }
 
   if (!response.ok) {
+    const retryAfterSeconds = parseRetryAfter(response);
     let errorData: ApiResponse;
     try {
       errorData = await response.json();
@@ -125,14 +146,17 @@ async function request<T>(
       console.error('[client] Failed to parse error response body as JSON:', error);
       throw new ApiError(
         `Request failed with status ${response.status}`,
-        response.status
+        response.status,
+        undefined,
+        retryAfterSeconds
       );
     }
 
     throw new ApiError(
       errorData.error || 'Request failed',
       response.status,
-      errorData.errors
+      errorData.errors,
+      retryAfterSeconds
     );
   }
 
@@ -218,7 +242,8 @@ export const api = {
       throw new ApiError(
         errorData.error || 'Upload failed',
         response.status,
-        errorData.errors
+        errorData.errors,
+        parseRetryAfter(response)
       );
     }
 

@@ -9,12 +9,10 @@ import { useReportStore } from '@/report/reportStore'
 import type { User } from '@/api/auth.api'
 import type { ProjectWithSync } from '@/persistence/projectSync'
 import { useProjectStore } from './projectStore'
-import { setBeforeTabRelease } from './tabOwnership'
 import type { AppProviderState } from './appContextValue'
 
 interface PersistenceLifecycleOptions {
   user: User | null
-  flushProjectSave: () => Promise<void>
   saveLatestProject: () => Promise<void>
   prepareProject: (project: ProjectWithSync) => Promise<void>
   setState: Dispatch<SetStateAction<AppProviderState>>
@@ -22,22 +20,12 @@ interface PersistenceLifecycleOptions {
 
 export function usePersistenceLifecycle({
   user,
-  flushProjectSave,
   saveLatestProject,
   prepareProject,
   setState,
 }: PersistenceLifecycleOptions): void {
   useEffect(() => {
-    setBeforeTabRelease(async () => {
-      await flushProjectSave()
-      await useReportStore.getState().flushSaves()
-    })
-    return () => setBeforeTabRelease(null)
-  }, [flushProjectSave])
-
-  useEffect(() => {
-    const persistBeforeSuspension = () => {
-      if (document.visibilityState !== 'hidden') return
+    const persist = () => {
       void saveLatestProject().catch(error => {
         console.error('[AppContext] Page suspension save failed:', error)
       })
@@ -45,8 +33,16 @@ export function usePersistenceLifecycle({
         console.error('[AppContext] Page suspension report save failed:', error)
       })
     }
-    document.addEventListener('visibilitychange', persistBeforeSuspension)
-    return () => document.removeEventListener('visibilitychange', persistBeforeSuspension)
+    const persistWhenHidden = () => {
+      if (document.visibilityState !== 'hidden') return
+      persist()
+    }
+    document.addEventListener('visibilitychange', persistWhenHidden)
+    window.addEventListener('pagehide', persist)
+    return () => {
+      document.removeEventListener('visibilitychange', persistWhenHidden)
+      window.removeEventListener('pagehide', persist)
+    }
   }, [saveLatestProject])
 
   useEffect(() => {
@@ -67,7 +63,7 @@ export async function synchronizeAfterReconnect({
   saveLatestProject,
   prepareProject,
   setState,
-}: Omit<PersistenceLifecycleOptions, 'user' | 'flushProjectSave'>): Promise<void> {
+}: Omit<PersistenceLifecycleOptions, 'user'>): Promise<void> {
   try {
     await saveLatestProject()
     await useReportStore.getState().flushSaves()

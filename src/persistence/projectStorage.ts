@@ -1,7 +1,7 @@
 import type { ProjectNode, Edge, Patches } from '@/types'
 import { getDB } from './dbCore'
 import { serializePatches, type SerializedPatches } from './patchSerialization'
-import { withoutTransientComputeState } from '@/state/transientProjectState'
+import { withoutRuntimeNodeState } from '@/state/transientProjectState'
 import {
   getStorageScope,
   scopedStorageKey,
@@ -46,7 +46,7 @@ export async function saveProject(
     entityId: id,
     ownerId: scope,
     name,
-    nodes: withoutTransientComputeState(nodes),
+    nodes: withoutRuntimeNodeState(nodes),
     edges,
     patches: serializePatches(patches),
     createdAt:
@@ -75,7 +75,7 @@ export async function loadProject(
   return {
     ...stored,
     id: stored.entityId ?? stored.id,
-    nodes: withoutTransientComputeState(stored.nodes),
+    nodes: withoutRuntimeNodeState(stored.nodes),
   }
 }
 

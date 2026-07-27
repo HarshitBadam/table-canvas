@@ -2,6 +2,7 @@ import { useMemo, useCallback, useRef, useState } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { SelectField } from '@/components/SelectField'
 import { useProjectStore } from '@/state/projectStore'
+import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { ChartRenderer } from './ChartRenderer'
 import { ChartTypeIcon } from './ChartTypeIcon'
 import { useChartData } from './useChartData'
@@ -30,8 +31,9 @@ export function ChartView({ chartId }: ChartViewProps) {
   const sourceTable = useProjectStore((state) => 
     sourceTableId ? state.nodes[sourceTableId] as TableNode | undefined : undefined
   )
-  const sourceVersionHash = `${sourceTable?.cacheInfo?.currentVersionHash ?? ''}:${
-    sourceTable?.cacheInfo?.dataRevision ?? 0
+  const sourceCacheInfo = useNodeCacheInfo(sourceTable?.id)
+  const sourceVersionHash = `${sourceCacheInfo?.currentVersionHash ?? ''}:${
+    sourceCacheInfo?.dataRevision ?? 0
   }`
   
   const columns = useMemo(() => sourceTable?.schema?.columns ?? [], [sourceTable?.schema?.columns])

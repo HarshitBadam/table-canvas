@@ -140,8 +140,10 @@ Notion-style rich-text documents (TipTap) that embed live tables and charts (`sr
 - **Local (IndexedDB)**: projects auto-save: graph (nodes/edges/patches), imported files,
   cached results, and reports. Everything lives locally by default.
 - **Server sync**: when connected to the backend, the project graph (nodes, edges, patches)
-  syncs to MongoDB on save. Files are stored in GridFS and fetched on load. Reports stay
-  local-only and are not part of server sync.
+  and its reports sync to MongoDB on save. Files are stored in GridFS and fetched on load.
+- **Concurrency**: one tab writes a project at a time and other tabs mirror it live;
+  editing follows focus. Conflicting saves from another device merge on the client
+  (see [Reliability](reliability.md)).
 
 ## Export
 

@@ -30,6 +30,7 @@ export const createPatchesSlice: StateCreator<
       patches.cellPatches[columnId][rowId] = value
     })
 
+    get().touchNodeUpdatedAt(tableId)
     get().markNodeAndDescendantsDirty(tableId)
   },
 
@@ -40,13 +41,9 @@ export const createPatchesSlice: StateCreator<
       }
 
       state.patches[tableId].deletedRows.add(rowId)
-
-      const node = state.nodes[tableId]
-      if (node) {
-        node.updatedAt = new Date().toISOString()
-      }
     })
 
+    get().touchNodeUpdatedAt(tableId)
     get().markNodeAndDescendantsDirty(tableId)
   },
 
@@ -61,13 +58,9 @@ export const createPatchesSlice: StateCreator<
         values,
         insertedAt: index,
       })
-
-      const node = state.nodes[tableId]
-      if (node) {
-        node.updatedAt = new Date().toISOString()
-      }
     })
 
+    get().touchNodeUpdatedAt(tableId)
     get().markNodeAndDescendantsDirty(tableId)
   },
 

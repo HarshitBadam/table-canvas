@@ -5,7 +5,7 @@ import type { SerializedPatches } from './patchSerialization'
 
 export type { SerializedPatches } from './patchSerialization'
 
-interface ScopedRecord {
+export interface ScopedRecord {
   /** IndexedDB key. Never expose this value outside the persistence layer. */
   id: string
   /** Missing only on records written by the legacy, unscoped schema. */
@@ -14,19 +14,29 @@ interface ScopedRecord {
   ownerId?: string
 }
 
+export interface ProjectSnapshot {
+  name: string
+  nodes: Record<string, ProjectNode>
+  edges: Record<string, Edge>
+  patches: Record<string, SerializedPatches>
+  reports: Record<string, Report>
+}
+
 export interface ProjectSyncOperation extends ScopedRecord {
   projectId: string
   generation: number
   expectedRevision: number
   operation: 'save' | 'delete'
   updatedAt: string
-  payload?: {
-    name: string
-    nodes: Record<string, ProjectNode>
-    edges: Record<string, Edge>
-    patches: Record<string, SerializedPatches>
-    reports: Record<string, Report>
-  }
+  payload?: ProjectSnapshot
+}
+
+/** Last snapshot known to match `revision` on the server, for three-way merges. */
+export interface ProjectSyncBaseRecord extends ScopedRecord {
+  projectId: string
+  revision: number
+  capturedAt: string
+  snapshot: ProjectSnapshot
 }
 
 export interface TableCanvasDB extends DBSchema {
@@ -70,10 +80,15 @@ export interface TableCanvasDB extends DBSchema {
     value: ProjectSyncOperation
     indexes: { 'by-owner': string }
   }
+  projectSyncBase: {
+    key: string
+    value: ProjectSyncBaseRecord
+    indexes: { 'by-owner': string }
+  }
 }
 
 const DB_NAME = 'table-canvas-v2'
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 let dbInstance: IDBPDatabase<TableCanvasDB> | null = null
 
@@ -99,6 +114,10 @@ export async function getDB(): Promise<IDBPDatabase<TableCanvasDB>> {
         reportsStore.createIndex('by-owner-project', ['ownerId', 'projectId'])
         const syncStore = db.createObjectStore('projectSync', { keyPath: 'id' })
         syncStore.createIndex('by-owner', 'ownerId')
+      }
+      if (oldVersion < 3) {
+        const baseStore = db.createObjectStore('projectSyncBase', { keyPath: 'id' })
+        baseStore.createIndex('by-owner', 'ownerId')
       }
     },
   })

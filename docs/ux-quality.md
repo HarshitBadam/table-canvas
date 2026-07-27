@@ -53,9 +53,10 @@ Playwright suite, which includes the UX contract.
 - unhandled promise rejections
 - React error-boundary failures
 
-Set `VITE_TELEMETRY_ENDPOINT` in production to send the same structured envelopes to
-the monitoring collector with `sendBeacon`/keepalive fetch. The payload contains no
-table contents, cell values, email addresses, or project names.
+The buffer is local to the tab and is what the performance budget asserts against.
+Web vitals stay there. Errors are additionally sent to Sentry when `VITE_SENTRY_DSN`
+is set on a production build; see [Error monitoring](reliability.md#error-monitoring).
+No payload contains table contents, cell values, email addresses, or project names.
 
 ## Review rule
 

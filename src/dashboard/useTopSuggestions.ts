@@ -3,6 +3,7 @@ import { generateSuggestions } from '@/suggestions/engine'
 import { getExistingDerivedTables } from '@/suggestions/derivedTableContext'
 import { generateTableVersionHash, useSuggestionsStore } from '@/suggestions/suggestionsStore'
 import type { Suggestion } from '@/types'
+import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import { useTableNodes, useAllProfiles } from './dashboardHelpers'
 
 export function useTopSuggestions(limit: number = 5): {
@@ -12,6 +13,7 @@ export function useTopSuggestions(limit: number = 5): {
   const tableNodes = useTableNodes()
   const { profiles, isLoading } = useAllProfiles()
   const consumed = useSuggestionsStore((state) => state.consumed)
+  const runtimeCacheInfo = useTableRuntimeStore((state) => state.cacheInfo)
 
   const suggestions = useMemo(() => {
     const allSuggestions: Array<Suggestion & { tableName: string }> = []
@@ -21,7 +23,7 @@ export function useTopSuggestions(limit: number = 5): {
 
       if (!table.schema || !profile) continue
 
-      const rowCount = table.cacheInfo?.lastRowCount
+      const rowCount = runtimeCacheInfo[table.id]?.lastRowCount
         ?? profile.rowCount
         ?? table.schema.rowCount
         ?? 0
@@ -67,7 +69,7 @@ export function useTopSuggestions(limit: number = 5): {
         return categoryOrder[a.category] - categoryOrder[b.category]
       })
       .slice(0, limit)
-  }, [tableNodes, profiles, consumed, limit])
+  }, [tableNodes, profiles, runtimeCacheInfo, consumed, limit])
 
   return { suggestions, isLoading }
 }

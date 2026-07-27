@@ -7,9 +7,11 @@ export {
   importProjectWithSync,
   loadProjectWithSync,
   saveProjectWithSync,
+  setProjectMergeHandler,
   setProjectSyncErrorHandler,
   syncLocalProjectsToBackend,
 } from './projectSync'
+export type { ProjectMergeEvent } from './projectSync'
 export {
   deleteFileWithSync,
   loadFileWithSync,

@@ -15,6 +15,8 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 
 import { useProjectStore } from '@/state/projectStore'
+import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
+import { useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { useProfilingStore } from '@/lib/profiling'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import type { ProjectNode, Edge as ProjectEdge } from '@/types'
@@ -63,6 +65,8 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const selectNode = useProjectStore((state) => state.selectNode)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
   
+  const runtimeCacheInfo = useTableRuntimeStore((state) => state.cacheInfo)
+  const runtimeSchemas = useTableRuntimeStore((state) => state.schemas)
   const profiles = useProfilingStore((state) => state.profiles)
   const profilesLoading = useProfilingStore((state) => state.loading)
   
@@ -77,6 +81,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const [cycleWarning, setCycleWarning] = useState<string | null>(null)
   
   const { handleSetViewMode } = useCanvasViewMode()
+  const { canEdit } = useWorkspaceLease()
 
   const requestConnection = useCallback((sourceId: string, targetId: string) => {
     const sourceNode = projectNodes[sourceId]
@@ -107,6 +112,8 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
       position: node.ui.position,
       data: {
         ...node,
+        schema: runtimeSchemas[node.id] ?? ('schema' in node ? node.schema : undefined),
+        cacheInfo: runtimeCacheInfo[node.id],
         selected: node.id === selectedNodeId,
         profile: (node.kind === 'source_table' || node.kind === 'derived_table') 
           ? profiles[node.id] 
@@ -123,6 +130,8 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     }))
   }, [
     projectNodes,
+    runtimeCacheInfo,
+    runtimeSchemas,
     selectedNodeId,
     profiles,
     profilesLoading,
@@ -292,6 +301,8 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         }}
         connectionLineType={ConnectionLineType.SmoothStep}
         connectionLineComponent={CustomConnectionLine}
+        nodesDraggable={canEdit}
+        nodesConnectable={canEdit}
         minZoom={0.2}
         maxZoom={2}
         elevateNodesOnSelect={false}

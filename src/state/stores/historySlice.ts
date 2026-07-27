@@ -3,31 +3,23 @@ import type { ProjectStoreState, HistorySliceState, HistoryEntry } from './types
 import type { Patches, ProjectNode } from '@/types'
 import { useDataStore } from '@/state/dataStore'
 import { invalidateMaterializations } from '@/engine/materializationCoordinator'
-import { withoutTransientComputeState } from '@/state/transientProjectState'
+import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 const MAX_UNDO_HISTORY = 50
 
-function invalidateAllTableCaches(
-  nodes: Record<string, ProjectNode>,
-  replacedNodes: Record<string, ProjectNode> = {},
-) {
+/**
+ * Restoring a snapshot brings back its old `updatedAt` values, which would make the
+ * cross-device merge treat an undo as the older edit. Re-stamp the restored tables so
+ * an explicit user action wins.
+ */
+function restoreTableState(nodes: Record<string, ProjectNode>) {
+  const restamped = new Date().toISOString()
+  const tableIds: string[] = []
   Object.values(nodes).forEach((node) => {
-    if (node.kind === 'source_table' || node.kind === 'derived_table') {
-      node.cacheInfo ??= {}
-      const replacedNode = replacedNodes[node.id]
-      const replacedRevision = replacedNode?.kind === 'source_table'
-        || replacedNode?.kind === 'derived_table'
-        ? replacedNode.cacheInfo?.dataRevision ?? 0
-        : 0
-      node.cacheInfo.isDirty = true
-      node.cacheInfo.isComputing = false
-      node.cacheInfo.error = undefined
-      node.cacheInfo.currentVersionHash = undefined
-      node.cacheInfo.dataRevision = Math.max(
-        node.cacheInfo.dataRevision ?? 0,
-        replacedRevision,
-      ) + 1
-    }
+    if (node.kind !== 'source_table' && node.kind !== 'derived_table') return
+    node.updatedAt = restamped
+    tableIds.push(node.id)
   })
+  useTableRuntimeStore.getState().invalidateNodes(tableIds)
 }
 
 export const createHistorySlice: StateCreator<
@@ -44,7 +36,7 @@ export const createHistorySlice: StateCreator<
   saveSnapshot: (description) => {
     set((state) => {
       const snapshot: HistoryEntry = {
-        nodes: JSON.parse(JSON.stringify(withoutTransientComputeState(state.nodes))),
+        nodes: JSON.parse(JSON.stringify(state.nodes)),
         edges: JSON.parse(JSON.stringify(state.edges)),
         patches: JSON.parse(JSON.stringify(state.patches, (_, v) =>
           v instanceof Set ? [...v] : v
@@ -68,7 +60,7 @@ export const createHistorySlice: StateCreator<
 
     set((state) => {
       const current: HistoryEntry = {
-        nodes: JSON.parse(JSON.stringify(withoutTransientComputeState(state.nodes))),
+        nodes: JSON.parse(JSON.stringify(state.nodes)),
         edges: JSON.parse(JSON.stringify(state.edges)),
         patches: JSON.parse(JSON.stringify(state.patches, (_, v) =>
           v instanceof Set ? [...v] : v
@@ -91,7 +83,7 @@ export const createHistorySlice: StateCreator<
           highlightedCells: new Set((patches as unknown as { highlightedCells: string[] }).highlightedCells || []),
         }
       })
-      invalidateAllTableCaches(state.nodes, current.nodes)
+      restoreTableState(state.nodes)
     })
     useDataStore.setState({ tableData: {} })
   },
@@ -103,7 +95,7 @@ export const createHistorySlice: StateCreator<
 
     set((state) => {
       const current: HistoryEntry = {
-        nodes: JSON.parse(JSON.stringify(withoutTransientComputeState(state.nodes))),
+        nodes: JSON.parse(JSON.stringify(state.nodes)),
         edges: JSON.parse(JSON.stringify(state.edges)),
         patches: JSON.parse(JSON.stringify(state.patches, (_, v) =>
           v instanceof Set ? [...v] : v
@@ -126,7 +118,7 @@ export const createHistorySlice: StateCreator<
           highlightedCells: new Set((patches as unknown as { highlightedCells: string[] }).highlightedCells || []),
         }
       })
-      invalidateAllTableCaches(state.nodes, current.nodes)
+      restoreTableState(state.nodes)
     })
     useDataStore.setState({ tableData: {} })
   },

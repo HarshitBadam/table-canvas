@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
+import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { TableRow } from '@/state/dataStore'
 import { computeSuggestionEffect } from './computeEffects'
 import { useCleaningApply } from './useCleaningApply'
@@ -16,6 +17,7 @@ interface CleaningPanelProps {
 export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, onCountChange }: CleaningPanelProps) {
   const node = useProjectStore((state) => state.getTableNode(tableId))
   const patches = useProjectStore((state) => state.patches[tableId])
+  const { canEdit } = useWorkspaceLease()
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
@@ -272,7 +274,8 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       <div className="p-3 border-t border-border">
         <button
           onClick={handleApply}
-          disabled={selectedCount === 0 || isApplying}
+          disabled={selectedCount === 0 || isApplying || !canEdit}
+          title={canEdit ? undefined : EDITING_ELSEWHERE_TOOLTIP}
           className="w-full btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isApplying ? 'Applying...' : `Apply ${selectedCount} fix${selectedCount !== 1 ? 'es' : ''}`}

@@ -1,14 +1,29 @@
 import type { ProjectNode } from '@/types'
 
-export function withoutTransientComputeState(
+/**
+ * Per-tab compute state used to live on the node (`cacheInfo`) and now lives in
+ * `tableRuntimeStore`. Documents written before that change still carry it, so strip it
+ * on the way in and out: leaving it in place would make an untouched document look
+ * changed to the cross-device merge.
+ */
+export function withoutRuntimeNodeState(
   nodes: Record<string, ProjectNode>,
 ): Record<string, ProjectNode> {
   return Object.fromEntries(Object.entries(nodes).map(([id, node]) => {
-    if (node.kind !== 'source_table' && node.kind !== 'derived_table') {
-      return [id, node]
-    }
-    const cacheInfo = node.cacheInfo ? { ...node.cacheInfo } : undefined
-    if (cacheInfo) delete cacheInfo.isComputing
-    return [id, { ...node, cacheInfo }]
+    if (!('cacheInfo' in node)) return [id, node]
+    const stripped = { ...node } as ProjectNode & { cacheInfo?: unknown }
+    delete stripped.cacheInfo
+    return [id, stripped as ProjectNode]
   }))
+}
+
+let documentWriteGuard: (() => boolean) | null = null
+
+/** Installed by the write-lease hook; absent means this tab is the only writer. */
+export function setDocumentWriteGuard(guard: (() => boolean) | null): void {
+  documentWriteGuard = guard
+}
+
+export function canWriteDocument(): boolean {
+  return documentWriteGuard?.() ?? true
 }

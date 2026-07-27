@@ -3,7 +3,7 @@ import { loadReportsForProject } from '@/persistence/reportStorage'
 import { useReportStore } from '@/report/reportStore'
 import { useDataStore } from './dataStore'
 import { useProjectStore } from './projectStore'
-import { withoutTransientComputeState } from './transientProjectState'
+import { withoutRuntimeNodeState } from './transientProjectState'
 import {
   clearProjectRuntime,
   hasProjectTables,
@@ -12,7 +12,7 @@ import {
 import { ProjectActionError } from './projectOperations'
 
 export async function prepareProjectState(project: ProjectWithSync): Promise<void> {
-  const nodes = withoutTransientComputeState(project.nodes)
+  const nodes = withoutRuntimeNodeState(project.nodes)
   const reports = await loadReportsForProject(project.id)
   const previousProject = useProjectStore.getState()
   const previousReports = useReportStore.getState()

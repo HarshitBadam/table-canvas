@@ -1,12 +1,16 @@
 import type { Edge, Patches, ProjectNode } from '@/types'
 import type { Report } from '@/report/types'
-import { getDB, type ProjectSyncOperation } from './dbCore'
+import {
+  getDB,
+  type ProjectSnapshot,
+  type ProjectSyncOperation,
+} from './dbCore'
 import {
   serializePatches,
   type SerializedPatches,
 } from './patchSerialization'
 import { getStorageScope, scopedStorageKey } from './storageScope'
-import { withoutTransientComputeState } from '@/state/transientProjectState'
+import { withoutRuntimeNodeState } from '@/state/transientProjectState'
 
 export interface ProjectSavePayload {
   name: string
@@ -35,7 +39,7 @@ export async function saveProjectAndEnqueue(
     syncStore.get(id),
   ])
   const now = new Date().toISOString()
-  const persistedNodes = withoutTransientComputeState(nodes)
+  const persistedNodes = withoutRuntimeNodeState(nodes)
   const serializedPatches = serializePatches(patches)
   await projectStore.put({
     id,
@@ -95,6 +99,55 @@ export async function enqueueProjectSave(
     payload,
   }
   await db.put('projectSync', operation)
+  return operation
+}
+
+/**
+ * The merge retry cannot go through `enqueueProjectSave`: that path deliberately keeps
+ * `expectedRevision` sticky. Payload and revision move together here, and the local
+ * project record moves with them so a reload cannot resurrect the pre-merge document.
+ */
+export async function replaceQueuedProjectSave(
+  projectId: string,
+  snapshot: ProjectSnapshot,
+  expectedRevision: number,
+  scope = getStorageScope(),
+): Promise<ProjectSyncOperation | null> {
+  const db = await getDB()
+  const id = scopedStorageKey(scope, projectId)
+  const tx = db.transaction(['projects', 'projectSync'], 'readwrite')
+  const projectStore = tx.objectStore('projects')
+  const syncStore = tx.objectStore('projectSync')
+  const [project, current] = await Promise.all([
+    projectStore.get(id),
+    syncStore.get(id),
+  ])
+  if (!current || current.operation !== 'save') {
+    await tx.done
+    return null
+  }
+
+  const now = new Date().toISOString()
+  if (project) {
+    await projectStore.put({
+      ...project,
+      name: snapshot.name,
+      nodes: snapshot.nodes,
+      edges: snapshot.edges,
+      patches: snapshot.patches,
+      updatedAt: now,
+      revision: expectedRevision,
+    })
+  }
+  const operation: ProjectSyncOperation = {
+    ...current,
+    generation: current.generation + 1,
+    expectedRevision,
+    updatedAt: now,
+    payload: snapshot,
+  }
+  await syncStore.put(operation)
+  await tx.done
   return operation
 }
 

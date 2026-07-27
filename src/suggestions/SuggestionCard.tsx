@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import type { Suggestion, SuggestionCategory, SuggestionConfidence } from '@/types'
 
 function ConfidenceBadge({ confidence }: { confidence: SuggestionConfidence }) {
@@ -116,6 +117,7 @@ export function SuggestionCard({
   onDismiss: () => void
 }) {
   const [showWhy, setShowWhy] = useState(false)
+  const { canEdit } = useWorkspaceLease()
 
   const actionLabel = getActionLabel(suggestion)
   const detailsId = `suggestion-details-${suggestion.id}`
@@ -207,7 +209,8 @@ export function SuggestionCard({
             <button
               type="button"
               onClick={onApply}
-              disabled={isApplying}
+              disabled={isApplying || !canEdit}
+              title={canEdit ? undefined : EDITING_ELSEWHERE_TOOLTIP}
               className="btn btn-primary flex-1 text-xs py-2 flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isApplying ? (

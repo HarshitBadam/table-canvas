@@ -5,8 +5,8 @@ import {
   addFilter,
   addJoin,
   addSource,
+  cacheOf,
   clean,
-  derived,
   resetStore,
 } from './integrationTestUtils'
 
@@ -18,13 +18,13 @@ describe('dirty propagation', () => {
     const middleId = addFilter(sourceId, 'B')
     const finalId = addFilter(middleId, 'C')
     clean(middleId, finalId)
-    expect(derived(middleId).cacheInfo?.isDirty).toBeFalsy()
-    expect(derived(finalId).cacheInfo?.isDirty).toBeFalsy()
+    expect(cacheOf(middleId)?.isDirty).toBeFalsy()
+    expect(cacheOf(finalId)?.isDirty).toBeFalsy()
 
     useProjectStore.getState().setCellValue(sourceId, 'row_1', 'col1', 'new value')
 
-    expect(derived(middleId).cacheInfo?.isDirty).toBe(true)
-    expect(derived(finalId).cacheInfo?.isDirty).toBe(true)
+    expect(cacheOf(middleId)?.isDirty).toBe(true)
+    expect(cacheOf(finalId)?.isDirty).toBe(true)
   })
 
   it('propagates dirty state to all branches', () => {
@@ -35,8 +35,8 @@ describe('dirty propagation', () => {
 
     useProjectStore.getState().setCellValue(sourceId, 'row_1', 'col1', 'changed')
 
-    expect(derived(leftId).cacheInfo?.isDirty).toBe(true)
-    expect(derived(rightId).cacheInfo?.isDirty).toBe(true)
+    expect(cacheOf(leftId)?.isDirty).toBe(true)
+    expect(cacheOf(rightId)?.isDirty).toBe(true)
   })
 
   it('handles a diamond dependency pattern', () => {
@@ -48,9 +48,9 @@ describe('dirty propagation', () => {
 
     useProjectStore.getState().setCellValue(sourceId, 'row_1', 'col1', 'new')
 
-    expect(derived(leftId).cacheInfo?.isDirty).toBe(true)
-    expect(derived(rightId).cacheInfo?.isDirty).toBe(true)
-    expect(derived(joinedId).cacheInfo?.isDirty).toBe(true)
+    expect(cacheOf(leftId)?.isDirty).toBe(true)
+    expect(cacheOf(rightId)?.isDirty).toBe(true)
+    expect(cacheOf(joinedId)?.isDirty).toBe(true)
   })
 
   it('does not affect unrelated tables', () => {
@@ -62,8 +62,8 @@ describe('dirty propagation', () => {
 
     useProjectStore.getState().setCellValue(sourceAId, 'row_1', 'col1', 'new')
 
-    expect(derived(derivedAId).cacheInfo?.isDirty).toBe(true)
-    expect(derived(derivedXId).cacheInfo?.isDirty).toBe(false)
+    expect(cacheOf(derivedAId)?.isDirty).toBe(true)
+    expect(cacheOf(derivedXId)?.isDirty).toBe(false)
   })
 })
 

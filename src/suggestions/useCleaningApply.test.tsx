@@ -4,6 +4,7 @@ import type { Suggestion } from '@/types'
 import { addFilter, addSource, clean, resetStore } from '@/engine/integrationTestUtils'
 import { useDataStore, type TableRow } from '@/state/dataStore'
 import { useProjectStore } from '@/state/projectStore'
+import { getNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { useSuggestionsStore } from './suggestionsStore'
 
 const loadProfileForTable = vi.hoisted(() => vi.fn())
@@ -86,8 +87,8 @@ describe('useCleaningApply', () => {
 
     expect(useDataStore.getState().tableData[tableId].rows[0].col1).toBe('Alpha')
     expect(useProjectStore.getState().patches[tableId].cellPatches.col1['row-1']).toBe('Alpha')
-    expect(useProjectStore.getState().getTableNode(tableId)?.cacheInfo?.isDirty).toBe(true)
-    expect(useProjectStore.getState().getTableNode(derivedId)?.cacheInfo?.isDirty).toBe(true)
+    expect(getNodeCacheInfo(tableId)?.isDirty).toBe(true)
+    expect(getNodeCacheInfo(derivedId)?.isDirty).toBe(true)
     expect(useProjectStore.getState().history.past.at(-1)?.description).toBe(
       'Apply cleaning operations',
     )

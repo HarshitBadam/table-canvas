@@ -16,7 +16,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` and choose **Continue as guest**. Everything persists in
+Open `http://localhost:3000` and choose **Continue as guest**. Everything persists in
 IndexedDB and remains in that browser with no cross-device sync. Development can set
 `VITE_AUTO_GUEST=true` to skip the explicit choice.
 
@@ -34,14 +34,14 @@ npm run docker:down:volumes  # stop and wipe data
 
 | Service | URL |
 |---------|-----|
-| Frontend | http://localhost:5173 |
-| Backend | http://localhost:3001 |
+| Frontend | http://localhost:3000 |
+| Backend | http://localhost:5173 |
 | MongoDB | localhost:27017 |
 
 ### 3. Manual backend (no Docker)
 
 ```bash
-# Terminal 1: MongoDB (needs a local install)
+# Terminal 1: MongoDB (needs a local install, or use a hosted cluster instead)
 mongod --dbpath ./data/db
 
 # Terminal 2: backend
@@ -51,6 +51,35 @@ cd server && npm install && npm run dev
 npm run dev
 ```
 
+## Choosing a database
+
+`MONGODB_URI` must name a database, not just a host. A connection string that ends
+at the host or at `/?` connects to a database called `test`, which is why data can
+appear to vanish after the name is added later:
+
+```
+mongodb+srv://user:password@cluster.mongodb.net/table-canvas?retryWrites=true&w=majority
+                                               ^^^^^^^^^^^^ required
+```
+
+Give each environment its own database name so local work never writes where
+production reads. One cluster is fine; the separation is the database name.
+
+| Environment | Database |
+|-------------|----------|
+| Local development | `table-canvas-dev` |
+| Production | `table-canvas` |
+
+A hosted cluster works for local development, but check two things in its console
+first. Network access provisioned by a platform integration is often open to
+`0.0.0.0/0`; narrow it once the backend has a stable address. And an integration's
+generated user is usually a cluster administrator, so create a separate user
+scoped to the application database for the server to use.
+
+Platform database integrations inject the connection string into the project they
+are attached to. The Vercel deployment serves only the static frontend and never
+connects to MongoDB, so the backend host needs the value set on it directly.
+
 ## Environment variables
 
 Only needed when running the backend. In local mode you can skip all of this.
@@ -58,7 +87,7 @@ Only needed when running the backend. In local mode you can skip all of this.
 **Frontend**: `.env.local` in the project root:
 
 ```env
-VITE_API_URL=http://localhost:3001/api
+VITE_API_URL=http://localhost:5173/api
 VITE_AUTO_GUEST=false
 ```
 
@@ -66,7 +95,7 @@ VITE_AUTO_GUEST=false
 
 ```env
 NODE_ENV=development
-PORT=3001
+PORT=5173
 MONGODB_URI=mongodb://localhost:27017/table-canvas
 
 JWT_ACCESS_SECRET=<32+ char secret>
@@ -74,7 +103,7 @@ JWT_REFRESH_SECRET=<32+ char secret>
 JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
-FRONTEND_URL=http://localhost:5173   # must match the frontend origin for CORS
+FRONTEND_URL=http://localhost:3000   # must match the frontend origin for CORS
 COOKIE_SAME_SITE=lax
 
 # Optional — enables Google Sign-In (get from Google Cloud Console → Credentials)
@@ -84,7 +113,7 @@ GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
 **Frontend**: also add the same Google client ID in the project-root `.env`:
 
 ```env
-VITE_API_URL=http://localhost:3001/api
+VITE_API_URL=http://localhost:5173/api
 VITE_GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
 ```
 

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useReportStore } from './reportStore';
 import type { Report } from './types';
 import { focusMenuItem } from '@/lib/focusMenuItem';
+import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease';
 
 interface ReportToolbarProps {
   activeReportId: string | null;
@@ -27,6 +28,8 @@ export function ReportToolbar({
   const updateReport = useReportStore((state) => state.updateReport);
   const persistenceStatus = useReportStore((state) => state.persistenceStatus);
   const persistenceError = useReportStore((state) => state.persistenceError);
+  const { canEdit } = useWorkspaceLease();
+  const blocked = canEdit ? {} : { disabled: true, title: EDITING_ELSEWHERE_TOOLTIP };
 
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -92,6 +95,7 @@ export function ReportToolbar({
   }, [showInsertMenu]);
 
   const handleStartRename = () => {
+    if (!canEdit) return;
     if (activeReport) {
       setEditValue(activeReport.name);
       setIsEditing(true);
@@ -175,6 +179,7 @@ export function ReportToolbar({
           onClick={handleCreateReport}
           title="New report"
           aria-label="New report"
+          {...blocked}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M12 5v14M5 12h14" />
@@ -212,8 +217,8 @@ export function ReportToolbar({
             <div className="report-toolbar-v2-list" role="listbox" aria-label="Reports">
               {activeReport && (
                 <div className="report-toolbar-v2-list-actions">
-                  <button type="button" onClick={handleStartRename}>Rename</button>
-                  <button type="button" onClick={handleDuplicateReport}>Duplicate</button>
+                  <button type="button" onClick={handleStartRename} {...blocked}>Rename</button>
+                  <button type="button" onClick={handleDuplicateReport} {...blocked}>Duplicate</button>
                 </div>
               )}
               {Object.keys(reports).length > 5 && (
@@ -257,6 +262,7 @@ export function ReportToolbar({
                     onClick={(e) => handleDeleteReport(report, e)}
                     title="Delete report"
                     aria-label={`Delete report ${report.name}`}
+                    {...blocked}
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M6 18L18 6M6 6l12 12" />
@@ -297,6 +303,7 @@ export function ReportToolbar({
             className="report-toolbar-v2-action max-sm:!h-10 max-sm:!w-10 max-sm:!p-0"
             onClick={onHighlight}
             title="Highlight text"
+            {...blocked}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
@@ -326,6 +333,7 @@ export function ReportToolbar({
               aria-haspopup="menu"
               aria-expanded={showInsertMenu}
               aria-controls={showInsertMenu ? 'report-insert-menu' : undefined}
+              {...blocked}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M12 5v14M5 12h14" />

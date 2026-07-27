@@ -15,8 +15,19 @@ import {
   createProjectWithinCapacity,
   restoreProjectWithinCapacity,
 } from '../services/projectCapacity.js';
+import { createApiRateLimit } from '../middleware/apiRateLimit.js';
 
 const router = Router();
+
+// The client debounces saves at one every two seconds per project, so 300 in
+// five minutes leaves headroom for offline queue replay across several
+// projects while still capping a runaway client or a scripted writer.
+const projectWriteLimiter = createApiRateLimit({
+  prefix: 'projects-write',
+  windowMs: 5 * 60 * 1000,
+  limit: 300,
+  message: 'Too many project changes. Wait a moment and try again.',
+});
 
 function expectedRevision(value: unknown): number {
   if (!Number.isInteger(value) || (value as number) < 0) {
@@ -131,6 +142,7 @@ router.get(
 
 router.post(
   '/',
+  projectWriteLimiter,
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     validateProjectPayload(req.body);
@@ -202,6 +214,7 @@ router.get(
 
 router.put(
   '/:id',
+  projectWriteLimiter,
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const projectId = req.params.id;
@@ -229,6 +242,7 @@ router.put(
 
 router.patch(
   '/:id',
+  projectWriteLimiter,
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const projectId = req.params.id;
@@ -257,6 +271,7 @@ router.patch(
 
 router.delete(
   '/:id',
+  projectWriteLimiter,
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const projectId = req.params.id;
@@ -312,6 +327,7 @@ router.delete(
 
 router.post(
   '/:id/restore',
+  projectWriteLimiter,
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const projectId = req.params.id;

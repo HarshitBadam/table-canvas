@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addSource, resetStore, source } from '@/engine/integrationTestUtils'
 import { evaluateComputedColumns } from '@/formula'
 import { useProjectStore } from '@/state/projectStore'
+import { getNodeCacheInfo, updateNodeCacheInfo } from '@/state/tableRuntimeStore'
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -82,13 +83,8 @@ describe('column operations', () => {
       transformDef: { type: 'filter', sourceTableId: tableId, conditions: [], logic: 'and' },
       upstreamNodeIds: [tableId],
     })
-    useProjectStore.setState(state => ({
-      nodes: {
-        ...state.nodes,
-        [tableId]: { ...state.nodes[tableId], cacheInfo: { isDirty: false } },
-        [derivedId]: { ...state.nodes[derivedId], cacheInfo: { isDirty: false } },
-      },
-    }))
+    updateNodeCacheInfo(tableId, { isDirty: false })
+    updateNodeCacheInfo(derivedId, { isDirty: false })
 
     expect(useProjectStore.getState().updateFormulaColumn(
       tableId,
@@ -101,10 +97,8 @@ describe('column operations', () => {
       canonicalFormula: '[col2] > 10',
       type: 'boolean',
     })
-    const currentSource = useProjectStore.getState().nodes[tableId]
-    const currentDerived = useProjectStore.getState().nodes[derivedId]
-    expect(currentSource.kind === 'source_table' && currentSource.cacheInfo?.isDirty).toBe(true)
-    expect(currentDerived.kind === 'derived_table' && currentDerived.cacheInfo?.isDirty).toBe(true)
+    expect(getNodeCacheInfo(tableId)?.isDirty).toBe(true)
+    expect(getNodeCacheInfo(derivedId)?.isDirty).toBe(true)
 
     useProjectStore.getState().undo()
     expect(source(tableId).schema?.columns.find(column => column.id === added.columnId)).toMatchObject({
