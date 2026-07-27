@@ -4,7 +4,7 @@ import {
   updateNodeCacheInfo,
   useTableRuntimeStore,
 } from '@/state/tableRuntimeStore'
-import type { CacheInfo, DerivedTableNode, SourceTableNode, TableSchema } from '@/types'
+import type { CacheInfo, SourceTableNode, TableSchema } from '@/types'
 
 const sampleSchema: TableSchema = {
   columns: [
@@ -62,10 +62,6 @@ export function addJoin(leftTableId: string, rightTableId: string, name: string)
 
 export function clean(...tableIds: string[]): void {
   for (const tableId of tableIds) updateNodeCacheInfo(tableId, { isDirty: false })
-}
-
-export function derived(tableId: string): DerivedTableNode {
-  return useProjectStore.getState().nodes[tableId] as DerivedTableNode
 }
 
 export function source(tableId: string): SourceTableNode {

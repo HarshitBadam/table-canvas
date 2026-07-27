@@ -13,7 +13,7 @@ export interface DocumentIdentity {
 
 const PROJECT_PATH_PREFIX = '/p/'
 
-export function documentKey(scope: string, projectId: string): string {
+function documentKey(scope: string, projectId: string): string {
   return scopedStorageKey(scope, projectId)
 }
 
