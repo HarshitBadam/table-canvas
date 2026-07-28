@@ -60,7 +60,7 @@ export function GridContextMenu() {
       ref={menuRef}
       role="menu"
       aria-label="Grid actions"
-      className="fixed z-popover min-w-[180px] rounded-lg border border-border bg-surface py-1 shadow-xl"
+      className="fixed z-popover min-w-[180px] overflow-hidden rounded-lg border border-border bg-surface shadow-xl"
       style={position}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(event) => {
@@ -118,7 +118,7 @@ export function GridContextMenu() {
             </svg>
             Insert Row Below
           </button>
-          <div className="border-t border-border my-1" />
+          <div className="border-t border-border" />
           <button
             type="button"
             role="menuitem"
@@ -135,7 +135,7 @@ export function GridContextMenu() {
       
       {contextMenu.type === 'cell' && contextMenu.rowIndex !== undefined && contextMenu.columnId && (
         <>
-          <div className="border-t border-border my-1" />
+          <div className="border-t border-border" />
           {(() => {
             const row = filteredRows[contextMenu.rowIndex!]
             const cellKey = row ? `${row.__rowId}:${contextMenu.columnId}` : ''
@@ -236,7 +236,7 @@ export function GridContextMenu() {
       
       {(contextMenu.type === 'cell' || contextMenu.type === 'column') && contextMenu.columnId && (
         <>
-          {contextMenu.type === 'cell' && <div className="border-t border-border my-1" />}
+          {contextMenu.type === 'cell' && <div className="border-t border-border" />}
           <button
             type="button"
             role="menuitem"
@@ -259,7 +259,7 @@ export function GridContextMenu() {
             </svg>
             Insert Column Right
           </button>
-          <div className="border-t border-border my-1" />
+          <div className="border-t border-border" />
           {columns.find(column => column.id === contextMenu.columnId)?.isComputed && (
             <>
               <button
@@ -282,7 +282,7 @@ export function GridContextMenu() {
                 </svg>
                 Delete Formula Column
               </button>
-              <div className="border-t border-border my-1" />
+              <div className="border-t border-border" />
             </>
           )}
           <button

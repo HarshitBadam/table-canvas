@@ -17,6 +17,7 @@ interface GridViewportProps {
 
 export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [isAddColumnHovered, setIsAddColumnHovered] = useState(false)
   const [rowHeight, setRowHeight] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia(TOUCH_ROW_QUERY).matches
       ? TOUCH_ROW_HEIGHT
@@ -80,7 +81,7 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
         <div
           role="row"
           aria-rowindex={1}
-          className="sticky top-0 z-sticky flex border-b border-border bg-surface-secondary"
+          className="sticky top-0 z-sticky relative flex border-b border-border bg-surface-secondary"
           style={{ height: HEADER_HEIGHT }}
         >
           <div
@@ -111,10 +112,36 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
           {columns.map((column, index) => (
             <ColumnHeader key={column.id} column={column} columnIndex={index + 2} />
           ))}
+          {isEditable && isAddColumnHovered && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 z-0 bg-surface-tertiary"
+              style={{
+                left: 50 + columns.reduce((sum, column) => sum + getColumnWidth(column.id), 0),
+                right: 0,
+              }}
+            />
+          )}
           {isEditable && (
-            <div role="columnheader" aria-label="Table actions">
-              <button type="button" onClick={onAddColumn} disabled={!canEdit} aria-label="Add column" className="flex cursor-pointer items-center justify-center border-l border-border px-2 text-xs text-text-tertiary transition-colors hover:bg-surface-tertiary hover:text-accent-text disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-tertiary" style={{ width: 40, minWidth: 40, height: '100%' }} title={canEdit ? 'Add column' : EDITING_ELSEWHERE_TOOLTIP}>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            <div
+              role="columnheader"
+              aria-label="Table actions"
+              className="relative z-10 w-10 shrink-0"
+              style={{ height: '100%' }}
+            >
+              <button
+                type="button"
+                onClick={onAddColumn}
+                onMouseEnter={() => setIsAddColumnHovered(true)}
+                onMouseLeave={() => setIsAddColumnHovered(false)}
+                onFocus={() => setIsAddColumnHovered(true)}
+                onBlur={() => setIsAddColumnHovered(false)}
+                disabled={!canEdit}
+                aria-label="Add column"
+                className="flex h-full w-full cursor-pointer items-center justify-center px-2 text-xs text-text-tertiary hover:bg-surface-tertiary hover:text-accent-text disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-tertiary"
+                title={canEdit ? 'Add column' : EDITING_ELSEWHERE_TOOLTIP}
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
               </button>
             </div>
           )}

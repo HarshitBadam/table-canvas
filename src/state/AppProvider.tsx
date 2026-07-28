@@ -28,6 +28,7 @@ import { usePersistenceLifecycle } from './usePersistenceLifecycle'
 import { requestedDocumentProjectId, useDocumentSession } from './useDocumentSession'
 import { useDocumentCoordination } from './useDocumentCoordination'
 import { useProjectAutosave } from './useProjectAutosave'
+import { useBackgroundTableRefresh } from './useBackgroundTableRefresh'
 const PHASE_MESSAGES: Record<AppPhase, string> = {
   idle: 'Starting...',
   initializing_engine: 'Starting data engine...',
@@ -70,6 +71,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     projectId: state.projectId,
     setState,
   })
+  useBackgroundTableRefresh(state.phase === 'ready' && state.engineReady)
   const setPhase = useCallback((phase: AppPhase, error?: string) => {
     setState(previous => ({
       ...previous,
@@ -137,9 +139,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setPhase('checking_auth')
         const authResult = await performCheckAuth()
         if (!authResult.shouldContinue || !authResult.user) {
+          setState(previous => ({
+            ...previous,
+            user: null,
+            isAuthenticated: false,
+          }))
           setPhase('ready')
           return
         }
+        setState(previous => ({
+          ...previous,
+          user: authResult.user,
+          isAuthenticated: true,
+        }))
         if (authResult.user.tier !== 'guest') {
           await syncLocalProjectsToBackend()
           await flushAllProjectSavesWithSync()
