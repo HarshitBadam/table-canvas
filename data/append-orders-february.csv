@@ -1,0 +1,6 @@
+order_id,customer,region,order_date,items,total
+1006,Casey Wilson,West,2026-02-02,2,76.25
+1007,Riley Morgan,East,2026-02-08,6,415.60
+1008,Jamie Kim,South,2026-02-14,1,28.50
+1009,Alex Nguyen,North,2026-02-21,3,156.00
+1010,Drew Johnson,West,2026-02-27,4,247.80

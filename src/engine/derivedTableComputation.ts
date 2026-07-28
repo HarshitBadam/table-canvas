@@ -98,8 +98,6 @@ export async function computeDerivedTable(
     }
   }
 
-  updateNodeCacheInfo(tableId, { isComputing: true })
-
   try {
     const engine = getEngine()
     await engine.init()
@@ -134,6 +132,8 @@ export async function computeDerivedTable(
         schema: effectiveTableSchema(snapshot.node),
       }
     }
+
+    updateNodeCacheInfo(tableId, { isComputing: true })
 
     const nameToId = new Map<string, string>()
     const idToName = new Map<string, string>()

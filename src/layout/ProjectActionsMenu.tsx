@@ -12,7 +12,7 @@ export function ProjectActionsMenu({
   const { canEdit } = useWorkspaceLease()
   return (
     <div
-      id="project-export-menu"
+      id="project-actions-menu"
       role="menu"
       aria-label="Project actions"
       className="absolute right-0 top-full z-popover mt-1 w-64 overflow-hidden rounded-lg border border-border bg-surface shadow-lg"

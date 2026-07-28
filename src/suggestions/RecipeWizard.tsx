@@ -106,7 +106,7 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fade-in z-[60]" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-md bg-surface rounded-2xl shadow-2xl border border-border animate-scale-in z-[60] overflow-hidden">
+        <Dialog.Content className="fixed inset-0 z-[60] m-auto h-fit w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl motion-safe:animate-scale-in">
           <div className="px-6 pt-5 pb-4">
             <div className="flex items-center justify-between">
               <Dialog.Title className="text-lg font-semibold text-text-primary">

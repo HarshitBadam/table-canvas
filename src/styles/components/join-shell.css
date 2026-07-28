@@ -1,8 +1,8 @@
 .join-overlay {
   position: fixed;
   inset: 0;
-  background: color-mix(in srgb, #1d1d1f 60%, transparent);
-  backdrop-filter: blur(8px);
+  background: rgb(0 0 0 / 0.5);
+  backdrop-filter: blur(4px);
   animation: join-fade-in 0.2s ease-out;
 }
 
@@ -11,43 +11,12 @@
   to { opacity: 1; }
 }
 
-.join-modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 520px;
-  max-height: calc(100vh - 100px);
-  background: var(--color-surface);
-  border-radius: 16px;
-  box-shadow:
-    0 0 0 1px var(--color-border-elevation),
-    0 24px 64px rgba(0, 0, 0, 0.16),
-    0 8px 24px rgba(0, 0, 0, 0.08);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  animation: join-scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes join-scale-in {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-}
-
-[data-theme="dark"] .join-modal {
-  box-shadow:
-    0 0 0 1px var(--color-border-elevation),
-    0 24px 64px rgba(0, 0, 0, 0.5),
-    0 8px 24px rgba(0, 0, 0, 0.3);
-}
-
 .join-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 24px;
-  background: var(--color-surface-secondary);
+  gap: 16px;
+  flex-shrink: 0;
+  padding: 16px;
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
@@ -58,14 +27,14 @@
 
 .join-header-text h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1.5;
   font-weight: 600;
   color: var(--color-text-primary);
-  letter-spacing: -0.02em;
 }
 
 .join-header-text p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   font-size: 13px;
   color: var(--color-text-secondary);
 }
@@ -76,12 +45,13 @@
 }
 
 .join-close {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 6px;
   border: none;
-  background: var(--color-surface-secondary);
-  color: var(--color-text-secondary);
+  background: transparent;
+  color: var(--color-text-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -91,10 +61,26 @@
 
 .join-close:hover {
   background: var(--color-surface-tertiary);
-  color: var(--color-text-primary);
+  color: var(--color-text-secondary);
 }
 
 .join-close svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
+}
+
+.join-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb) / 0.3);
+}
+
+.join-close:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (min-width: 640px) {
+  .join-header {
+    padding-inline: 24px;
+  }
 }

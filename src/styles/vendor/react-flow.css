@@ -42,28 +42,25 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: transparent;
 }
 
 .react-flow__handle:hover {
-  transform: scale(1.25);
   background: var(--color-accent-green-light);
   box-shadow: var(--shadow-md), 0 0 0 4px rgb(var(--color-accent-rgb) / 0.2);
 }
 
 .react-flow__handle.connectingfrom,
 .react-flow__handle.connectingto {
-  transform: scale(1.35);
   background: var(--color-accent-green-light);
   box-shadow: 0 0 0 6px rgb(var(--color-accent-rgb) / 0.35), var(--shadow-md);
 }
 
 .react-flow__handle.valid {
-  transform: scale(1.4);
   background: var(--color-accent-green-light);
   box-shadow: 0 0 0 8px rgb(var(--color-accent-rgb) / 0.4), var(--shadow-md);
 }
@@ -99,7 +96,6 @@
 }
 
 .table-handle:hover {
-  transform: scale(1.25) !important;
   background: var(--color-accent-green-light) !important;
   box-shadow: var(--shadow-md), 0 0 0 4px rgb(var(--color-accent-rgb) / 0.25) !important;
 }

@@ -81,21 +81,26 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
 
   return (
     <div
-      className="overflow-hidden rounded-2xl bg-surface transition-shadow duration-200 ease-out"
+      className="relative"
       style={{
         width: NODE_WIDTH,
+      }}
+    >
+      <div
+        className="overflow-hidden rounded-2xl bg-surface transition-shadow duration-200 ease-out"
+        style={{
         boxShadow: selected
           ? '0 14px 40px -10px rgba(0,0,0,0.24), 0 5px 18px -5px rgba(0,0,0,0.16), 0 0 0 1px var(--color-border-elevation)'
           : '0 4px 16px -4px rgba(0,0,0,0.15), 0 12px 32px -8px rgba(0,0,0,0.12), 0 0 0 1px var(--color-border-elevation)',
-      }}
-    >
+        }}
+      >
       <div className="bg-surface-secondary px-4 py-3.5">
         <div className="flex items-center gap-3">
           <div className={`
             w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0
             ${isSource 
-              ? 'bg-accent-green shadow-md shadow-accent-green/30' 
-              : 'bg-accent-purple shadow-md shadow-accent-purple/30'
+              ? 'bg-accent-green shadow-md shadow-accent-green/30 dark:shadow-sm dark:shadow-black/20'
+              : 'bg-accent-purple shadow-md shadow-accent-purple/30 dark:shadow-sm dark:shadow-black/20'
             }
           `}>
             {isSource ? (
@@ -207,17 +212,13 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
 
       </div>
 
+      </div>
+
       <Handle
         type="target"
         position={Position.Left}
         id="left"
         className="table-handle table-handle-left"
-      />
-      <Handle
-        type="source"
-        position={Position.Left}
-        id="left"
-        className="table-handle table-handle-left !opacity-0"
       />
       
       <Handle
@@ -226,12 +227,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
         id="right"
         className="table-handle table-handle-right"
       />
-      <Handle
-        type="target"
-        position={Position.Right}
-        id="right"
-        className="table-handle table-handle-right !opacity-0"
-      />
       
       <Handle
         type="target"
@@ -239,24 +234,12 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
         id="top"
         className="table-handle table-handle-top"
       />
-      <Handle
-        type="source"
-        position={Position.Top}
-        id="top"
-        className="table-handle table-handle-top !opacity-0"
-      />
       
       <Handle
         type="source"
         position={Position.Bottom}
         id="bottom"
         className="table-handle table-handle-bottom"
-      />
-      <Handle
-        type="target"
-        position={Position.Bottom}
-        id="bottom"
-        className="table-handle table-handle-bottom !opacity-0"
       />
     </div>
   )

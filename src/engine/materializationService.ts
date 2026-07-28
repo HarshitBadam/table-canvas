@@ -138,7 +138,6 @@ async function loadSourceTable(
       error: 'Source table not found',
     }
   }
-  updateNodeCacheInfo(tableId, { isComputing: true })
   try {
     const engineRowCount = await getEngineTableRowCount(tableId)
     if (!sourceGenerationIsCurrent(tableId, snapshot.generation, scope)) {
@@ -165,6 +164,8 @@ async function loadSourceTable(
         schema: snapshot.schema,
       }
     }
+
+    updateNodeCacheInfo(tableId, { isComputing: true })
     let rows: TableRow[] = []
     if (snapshot.node.plan.fileRef) {
       const fileData = await loadFileWithSync(snapshot.node.plan.fileRef)

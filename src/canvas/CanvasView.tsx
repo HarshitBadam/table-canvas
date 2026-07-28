@@ -9,6 +9,7 @@ import ReactFlow, {
   NodeTypes,
   NodeMouseHandler,
   ConnectionLineType,
+  ConnectionMode,
   type NodeProps,
   type ReactFlowInstance,
 } from 'reactflow'
@@ -84,6 +85,10 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const { canEdit } = useWorkspaceLease()
 
   const requestConnection = useCallback((sourceId: string, targetId: string) => {
+    if (sourceId === targetId) {
+      return
+    }
+
     const sourceNode = projectNodes[sourceId]
     const targetNode = projectNodes[targetId]
     const sourceIsTable = sourceNode?.kind === 'source_table' || sourceNode?.kind === 'derived_table'
@@ -146,7 +151,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
       target: edge.toNodeId,
       type: 'smoothstep',
       animated: false,
-      label: edge.transformType,
       pathOptions: {
         offset: 25,
         borderRadius: 10,
@@ -156,19 +160,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         strokeWidth: 2.5,
         stroke: 'var(--edge-color)',
       },
-      labelStyle: { 
-        fontSize: 10, 
-        fontWeight: 600,
-        fill: 'var(--color-text-secondary)',
-        letterSpacing: '0.02em',
-      },
-      labelBgStyle: {
-        fill: 'var(--color-surface)',
-        fillOpacity: 0.95,
-        rx: 4,
-        ry: 4,
-      },
-      labelBgPadding: [8, 5] as [number, number],
     }))
   }, [projectEdges])
 
@@ -301,8 +292,12 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         }}
         connectionLineType={ConnectionLineType.SmoothStep}
         connectionLineComponent={CustomConnectionLine}
+        connectionMode={ConnectionMode.Loose}
         nodesDraggable={canEdit}
         nodesConnectable={canEdit}
+        connectionRadius={36}
+        nodeDragThreshold={4}
+        connectOnClick={false}
         minZoom={0.2}
         maxZoom={2}
         elevateNodesOnSelect={false}

@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 interface JoinColumnSelectProps {
@@ -17,20 +17,13 @@ export function JoinColumnSelect({
   ariaLabel,
 }: JoinColumnSelectProps) {
   const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const listboxId = useId()
   const ref = useRef<HTMLDivElement>(null)
   const popupRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
   const [popupPosition, setPopupPosition] = useState({ left: 0, top: 0, width: 0 })
   const selected = options.find((option) => option.value === value)
-  const filtered = useMemo(() => {
-    if (!search) return options
-    const query = search.toLowerCase()
-    return options.filter((option) => option.label.toLowerCase().includes(query))
-  }, [options, search])
 
   useEffect(() => {
     if (!open) return
@@ -42,14 +35,12 @@ export function JoinColumnSelect({
         && !popupRef.current?.contains(target)
       ) {
         setOpen(false)
-        setSearch('')
       }
     }
     const focusHandler = (event: FocusEvent) => {
       const target = event.target as Node
       if (!ref.current?.contains(target) && !popupRef.current?.contains(target)) {
         setOpen(false)
-        setSearch('')
       }
     }
     document.addEventListener('mousedown', handler)
@@ -87,14 +78,12 @@ export function JoinColumnSelect({
 
   useEffect(() => {
     if (!open) return
-    const selectedIndex = filtered.findIndex((option) => option.value === value)
+    const selectedIndex = options.findIndex((option) => option.value === value)
     setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0)
-    inputRef.current?.focus()
-  }, [filtered, open, value])
+  }, [open, options, value])
 
   const close = (restoreFocus = false) => {
     setOpen(false)
-    setSearch('')
     if (restoreFocus) requestAnimationFrame(() => triggerRef.current?.focus())
   }
 
@@ -109,16 +98,16 @@ export function JoinColumnSelect({
       close(true)
       return
     }
-    if (filtered.length === 0) return
+    if (options.length === 0) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       const direction = event.key === 'ArrowDown' ? 1 : -1
-      setActiveIndex((current) => (current + direction + filtered.length) % filtered.length)
+      setActiveIndex((current) => (current + direction + options.length) % options.length)
       return
     }
     if (event.key === 'Enter') {
       event.preventDefault()
-      selectOption(filtered[activeIndex]?.value ?? filtered[0].value)
+      selectOption(options[activeIndex]?.value ?? options[0].value)
     }
   }
 
@@ -132,7 +121,15 @@ export function JoinColumnSelect({
           if (event.key === 'Escape') close()
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault()
-            setOpen(true)
+            if (open) {
+              handleListKeyDown(event)
+            } else {
+              setOpen(true)
+            }
+          }
+          if (event.key === 'Enter' && open && options.length > 0) {
+            event.preventDefault()
+            selectOption(options[activeIndex]?.value ?? options[0].value)
           }
         }}
         aria-label={ariaLabel}
@@ -166,30 +163,8 @@ export function JoinColumnSelect({
             width: popupPosition.width,
           }}
         >
-          <div className="join-select-search-wrap">
-            <svg className="join-select-search-icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-              <path d="M11.5 7a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zm-.82 4.74a6 6 0 111.06-1.06l2.79 2.79a.75.75 0 11-1.06 1.06l-2.79-2.79z"/>
-            </svg>
-            <input
-              ref={inputRef}
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search columns"
-              aria-label={`Search ${ariaLabel.toLowerCase()}`}
-              role="combobox"
-              aria-autocomplete="list"
-              aria-expanded={open}
-              aria-controls={listboxId}
-              aria-activedescendant={filtered.length > 0 ? `${listboxId}-option-${activeIndex}` : undefined}
-              onKeyDown={handleListKeyDown}
-              className="join-select-search"
-            />
-          </div>
           <div id={listboxId} className="join-select-list" role="listbox" aria-label={ariaLabel}>
-            {filtered.length === 0 ? (
-              <div className="join-select-empty">No columns match this search.</div>
-            ) : filtered.map((option, index) => (
+            {options.map((option, index) => (
               <button
                 key={option.value}
                 id={`${listboxId}-option-${index}`}
@@ -199,15 +174,10 @@ export function JoinColumnSelect({
                 onClick={() => selectOption(option.value)}
                 onMouseEnter={() => setActiveIndex(index)}
                 onKeyDown={handleListKeyDown}
-                className={`join-select-option ${value === option.value ? 'selected' : ''} ${index === activeIndex ? 'bg-surface-secondary' : ''}`}
+                className={`join-select-option ${value === option.value ? 'selected' : ''}`}
               >
                 <span className="join-select-option-name">{option.label}</span>
                 <span className="join-select-option-type">{option.type}</span>
-                {value === option.value && (
-                  <svg className="join-select-check" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                    <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
-                  </svg>
-                )}
               </button>
             ))}
           </div>

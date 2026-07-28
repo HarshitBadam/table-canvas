@@ -4,19 +4,26 @@
 
 .join-select-btn {
   width: 100%;
+  min-height: 40px;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: var(--color-surface);
-  border: 1.5px solid var(--color-border);
+  background: var(--color-surface-secondary);
+  border: 1.5px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: border-color 0.15s ease;
 }
 
 .join-select-btn:hover {
-  border-color: var(--color-text-tertiary);
+  background: var(--color-surface-tertiary);
+  border-color: transparent;
+}
+
+.join-select-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb) / 0.3);
 }
 
 .join-select-value {
@@ -60,10 +67,10 @@
   left: 0;
   right: 0;
   background: var(--color-surface);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-elevation);
+  border-radius: 8px;
   box-shadow: var(--shadow-lg);
-  z-index: 100;
+  z-index: 60;
   overflow: hidden;
   animation: join-dropdown-in 0.15s ease-out;
 }
@@ -73,49 +80,22 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-.join-select-search-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.join-select-search-icon {
-  width: 14px;
-  height: 14px;
-  color: var(--color-text-tertiary);
-  flex-shrink: 0;
-}
-
-.join-select-search {
-  flex: 1;
-  border: none;
-  background: none;
-  font-size: 13px;
-  color: var(--color-text-primary);
-  outline: none;
-}
-
-.join-select-search::placeholder {
-  color: var(--color-text-tertiary);
-}
-
 .join-select-list {
   max-height: 200px;
   overflow-y: auto;
-  padding: 6px;
+  padding: 0;
 }
 
 .join-select-option {
   width: 100%;
+  min-height: 40px !important;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border: none;
   background: none;
-  border-radius: 8px;
+  border-radius: 0;
   cursor: pointer;
   text-align: left;
   transition: background 0.1s ease;
@@ -127,6 +107,11 @@
 
 .join-select-option.selected {
   background: rgb(var(--color-accent-rgb) / 0.1);
+}
+
+.join-select-option.selected .join-select-option-name,
+.join-select-option.selected .join-select-option-type {
+  color: var(--color-accent-text);
 }
 
 .join-select-option-name {
@@ -142,15 +127,3 @@
   text-transform: uppercase;
 }
 
-.join-select-check {
-  width: 14px;
-  height: 14px;
-  color: var(--color-accent-text);
-}
-
-.join-select-empty {
-  padding: 20px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--color-text-tertiary);
-}

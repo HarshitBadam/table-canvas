@@ -4,18 +4,21 @@
   font-size: 13px;
   font-weight: 500;
   color: var(--color-text-primary);
-  background: var(--color-surface);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
-  transition: border-color 0.15s ease;
+  background: var(--color-surface-secondary);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .join-name-input:hover {
-  border-color: var(--color-text-tertiary);
+  background: var(--color-surface-tertiary);
 }
 
 .join-name-input:focus {
-  border-color: var(--color-accent);
+  outline: none;
+  background: var(--color-surface);
+  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb) / 0.3);
 }
 
 .join-name-input::placeholder {
@@ -25,28 +28,30 @@
 
 .join-footer {
   display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 24px;
-  background: var(--color-surface-secondary);
+  gap: 8px;
+  padding: 16px;
+  background: rgb(var(--color-surface-secondary-rgb) / 0.5);
   border-top: 1px solid var(--color-border-subtle);
 }
 
 .join-btn-cancel {
-  padding: 10px 18px;
+  padding: 8px 16px;
   font-size: 13px;
   font-weight: 500;
   color: var(--color-text-secondary);
-  background: none;
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .join-btn-cancel:hover {
   background: var(--color-surface-tertiary);
-  border-color: var(--color-text-tertiary);
   color: var(--color-text-primary);
 }
 
@@ -54,13 +59,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 20px;
+  padding: 8px 16px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: #fff;
   background: var(--color-accent);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.15s ease;
   box-shadow: var(--shadow-sm);
@@ -71,7 +76,19 @@
 }
 
 .join-btn-create:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+.join-btn-cancel:focus-visible,
+.join-btn-create:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb) / 0.3);
+}
+
+@media (min-width: 640px) {
+  .join-footer {
+    padding-inline: 24px;
+  }
 }

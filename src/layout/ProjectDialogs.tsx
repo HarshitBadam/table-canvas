@@ -30,7 +30,7 @@ export function CreateProjectDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/40 motion-safe:animate-fade-in" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-modal w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-surface p-5 shadow-2xl motion-safe:animate-scale-in">
+        <Dialog.Content className="fixed inset-0 z-modal m-auto h-fit w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-5 shadow-2xl motion-safe:animate-scale-in">
           <Dialog.Title className="text-base font-semibold text-text-primary">
             Create project
           </Dialog.Title>
@@ -130,7 +130,7 @@ export function DeleteProjectDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/40 motion-safe:animate-fade-in" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-modal w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-surface p-5 shadow-2xl motion-safe:animate-scale-in">
+        <Dialog.Content className="fixed inset-0 z-modal m-auto h-fit w-[min(26rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-5 shadow-2xl motion-safe:animate-scale-in">
           <Dialog.Title className="text-base font-semibold text-text-primary">
             Delete “{projectName}”?
           </Dialog.Title>

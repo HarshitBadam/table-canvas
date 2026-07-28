@@ -183,12 +183,12 @@ export default {
           '100%': { opacity: '1', transform: 'translateX(0)' },
         },
         scaleIn: {
-          '0%': { transform: 'scale(0.95)' },
-          '100%': { transform: 'scale(1)' },
+          '0%': { opacity: '0', scale: '0.96' },
+          '100%': { opacity: '1', scale: '1' },
         },
         scaleOut: {
-          '0%': { transform: 'scale(1)' },
-          '100%': { transform: 'scale(0.95)' },
+          '0%': { opacity: '1', scale: '1' },
+          '100%': { opacity: '0', scale: '0.96' },
         },
         pulseSubtle: {
           '0%, 100%': { opacity: '1' },

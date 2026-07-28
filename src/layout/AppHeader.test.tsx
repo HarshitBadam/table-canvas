@@ -41,7 +41,7 @@ function HeaderHarness() {
 describe('AppHeader export menu modality', () => {
   it('keeps focus on the trigger when opened by pointer', async () => {
     render(<HeaderHarness />)
-    const trigger = screen.getByRole('button', { name: 'Export' })
+    const trigger = screen.getByRole('button', { name: 'Import or export project' })
     trigger.focus()
 
     fireEvent.pointerDown(trigger)
@@ -53,7 +53,7 @@ describe('AppHeader export menu modality', () => {
 
   it('moves keyboard focus into the menu and restores it on Escape', async () => {
     render(<HeaderHarness />)
-    const trigger = screen.getByRole('button', { name: 'Export' })
+    const trigger = screen.getByRole('button', { name: 'Import or export project' })
     trigger.focus()
 
     fireEvent.keyDown(trigger, { key: 'Enter' })
