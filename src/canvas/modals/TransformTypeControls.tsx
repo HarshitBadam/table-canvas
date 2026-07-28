@@ -113,6 +113,7 @@ export function TransformTypeControls({
             type="button"
             onClick={() => onOperationChange('union')}
             aria-pressed={operation === 'union'}
+            aria-describedby={!canUnion ? 'append-unavailable-reason' : undefined}
             disabled={!canUnion}
             className={`join-type-card ${TYPE_BUTTON_FOCUS} ${operation === 'union' ? ACTIVE_TYPE_BUTTON : ''}`}
           >
@@ -122,6 +123,11 @@ export function TransformTypeControls({
             </span>
           </button>
         </div>
+        {!canUnion && (
+          <p id="append-unavailable-reason" className="mt-2 text-xs leading-relaxed text-text-secondary">
+            Append needs the same number of columns in the same order, with matching data types.
+          </p>
+        )}
       </section>
 
       {operation === 'join' && (

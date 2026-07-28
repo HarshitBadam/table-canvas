@@ -31,11 +31,24 @@
   flex-shrink: 0;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 8px;
   padding: 16px;
   background: rgb(var(--color-surface-secondary-rgb) / 0.5);
   border-top: 1px solid var(--color-border-subtle);
+}
+
+.join-footer-summary {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.join-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .join-btn-cancel {

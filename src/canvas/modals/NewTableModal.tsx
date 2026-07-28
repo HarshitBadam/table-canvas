@@ -198,13 +198,25 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
           }}
           className="fixed inset-0 z-50 m-auto flex h-[min(32rem,calc(100dvh-2rem))] w-full max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl motion-safe:animate-scale-in sm:max-w-md"
         >
-          <div className="shrink-0 border-b border-border-subtle px-4 py-4 sm:px-6">
-            <Dialog.Title className="text-base font-semibold text-text-primary">
-              Create New Table
-            </Dialog.Title>
-            <Dialog.Description className="text-sm text-text-secondary mt-0.5">
-              Name the table, choose its columns, and set the starting row count.
-            </Dialog.Description>
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border-subtle px-4 py-4 sm:px-6">
+            <div className="min-w-0">
+              <Dialog.Title className="text-base font-semibold text-text-primary">
+                Create New Table
+              </Dialog.Title>
+              <Dialog.Description className="mt-0.5 text-sm text-text-secondary">
+                Set up a blank table you can start editing right away.
+              </Dialog.Description>
+            </div>
+            <Dialog.Close
+              type="button"
+              disabled={isCreating}
+              className="canvas-touch-target join-close"
+              aria-label="Close create table dialog"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </Dialog.Close>
           </div>
 
           <div ref={formBodyRef} className="scrollbar-hide min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 pb-5 pt-4 sm:px-6">
@@ -340,8 +352,8 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
 
           <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle bg-surface-secondary/50 p-4 sm:px-6">
             <div>
-              <span className="text-xs text-text-secondary">
-                {rowCount} rows × {columns.length} columns
+              <span className="text-xs font-medium text-text-secondary">
+                Ready to create {rowCount} {rowCount === 1 ? 'row' : 'rows'} × {columns.length} {columns.length === 1 ? 'column' : 'columns'}
               </span>
               {createError && (
                 <p className="mt-1 text-xs text-red-600" role="alert">

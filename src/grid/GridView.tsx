@@ -118,6 +118,7 @@ export function GridView({ tableId }: GridViewProps) {
 
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const [filterTargetColumnId, setFilterTargetColumnId] = useState<string>()
   const [chartBuilderOpen, setChartBuilderOpen] = useState(false)
   const [chartPreselectedColumn, setChartPreselectedColumn] = useState<string | undefined>(undefined)
   const handleRetry = useCallback(() => {
@@ -127,7 +128,13 @@ export function GridView({ tableId }: GridViewProps) {
   }, [setMaterializationError, tableId, updateCacheInfo, windowed])
 
   const totalRows = filteredRows.length
-  const isInitialLoad = (isMaterializing || isComputing) && totalRows === 0 && !tableData?.rows?.length
+  // A zero-result filter refresh must not replace the existing grid with the full-page
+  // loading state. `version` advances after the first successful window fetch, so only
+  // show that state while the table is genuinely loading for the first time.
+  const isInitialLoad = (isMaterializing || isComputing)
+    && windowed.version === 0
+    && totalRows === 0
+    && !tableData?.rows?.length
   const [loadingElapsedSeconds, setLoadingElapsedSeconds] = useState(0)
 
   useEffect(() => {
@@ -152,7 +159,10 @@ export function GridView({ tableId }: GridViewProps) {
 
   const handleAddRow = useCallback(() => doInsertRow(getRowInsertionIndex()), [getRowInsertionIndex, doInsertRow])
   const handleAddColumn = useCallback(() => openNewColumnModal(getColumnInsertionIndex()), [getColumnInsertionIndex, openNewColumnModal])
-  const handleToggleFilters = useCallback(() => setShowFilterPanel(prev => !prev), [])
+  const handleToggleFilters = useCallback((columnId?: string) => {
+    setFilterTargetColumnId(columnId)
+    setShowFilterPanel(previous => columnId ? true : !previous)
+  }, [])
 
   const contextValue: GridContextValue = useMemo(() => ({
     tableId, isEditable, canEdit, columns, getDisplayValue, getColumnWidth,
@@ -352,9 +362,13 @@ export function GridView({ tableId }: GridViewProps) {
           </Suspense>
         )}
 
-        <FilterPanel isOpen={showFilterPanel} onClose={() => setShowFilterPanel(false)} columns={columns} filters={filters}
+        <FilterPanel tableId={tableId} isOpen={showFilterPanel} onClose={() => {
+          setShowFilterPanel(false)
+          setFilterTargetColumnId(undefined)
+        }} columns={columns} filters={filters}
           onFiltersChange={handleFiltersChange} rows={rows} getDisplayValue={getDisplayValue}
           matchingRowCount={totalRows} totalRowCount={unfilteredTotalRows}
+          initialColumnId={filterTargetColumnId}
         />
 
         <FormulaColumnModal isOpen={newColumnModal.isOpen} columns={columns}

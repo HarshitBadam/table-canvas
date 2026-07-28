@@ -280,6 +280,15 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               onJoinTypeChange={setJoinType}
             />
 
+            {operation === 'union' && (
+              <div className="rounded-lg border border-accent-green/20 bg-accent-green/5 px-3 py-2.5">
+                <p className="text-sm font-medium text-text-primary">Rows will be stacked in table order</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
+                  Columns stay aligned by position and type. The original tables remain unchanged.
+                </p>
+              </div>
+            )}
+
             {operation === 'join' && (
               <>
             <section className="join-section">
@@ -364,24 +373,31 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
           </div>
 
           <div className="join-footer">
-            <Dialog.Close
-              className="canvas-touch-target join-btn-cancel"
-              disabled={isCreating}
-            >
-              Cancel
-            </Dialog.Close>
-            <button 
-              type="button"
-              onClick={() => void handleCreate()}
-              disabled={!canCreate || isCreating}
-              className="canvas-touch-target join-btn-create"
-            >
-              {isCreating
-                ? 'Creating table…'
-                : operation === 'join'
-                  ? 'Create joined table'
-                  : 'Create appended table'}
-            </button>
+            <span className="join-footer-summary">
+              {operation === 'join'
+                ? `${includedColumnCount} ${includedColumnCount === 1 ? 'column' : 'columns'} in the result`
+                : `${leftCols.length} aligned ${leftCols.length === 1 ? 'column' : 'columns'}`}
+            </span>
+            <div className="join-footer-actions">
+              <Dialog.Close
+                className="canvas-touch-target join-btn-cancel"
+                disabled={isCreating}
+              >
+                Cancel
+              </Dialog.Close>
+              <button
+                type="button"
+                onClick={() => void handleCreate()}
+                disabled={!canCreate || isCreating}
+                className="canvas-touch-target join-btn-create"
+              >
+                {isCreating
+                  ? 'Creating table…'
+                  : operation === 'join'
+                    ? 'Create joined table'
+                    : 'Create appended table'}
+              </button>
+            </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

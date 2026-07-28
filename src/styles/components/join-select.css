@@ -101,7 +101,8 @@
   transition: background 0.1s ease;
 }
 
-.join-select-option:hover {
+.join-select-option:hover,
+.join-select-option.active {
   background: var(--color-surface-secondary);
 }
 

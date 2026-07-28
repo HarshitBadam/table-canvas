@@ -84,7 +84,9 @@ export function useGridData(tableId: string) {
 
   const filteredRows = rows
 
-  const unfilteredTotalRows = windowedTotalRows
+  const unfilteredTotalRows = hasActiveFilters(filters)
+    ? (schema?.rowCount ?? tableData?.rows.length ?? windowedTotalRows)
+    : windowedTotalRows
 
   return {
     node,

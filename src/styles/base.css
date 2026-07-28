@@ -264,6 +264,11 @@ input[type="number"] {
   outline-offset: 0 !important;
 }
 
+.filter-value-input:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
 
 * {
   -ms-overflow-style: none;

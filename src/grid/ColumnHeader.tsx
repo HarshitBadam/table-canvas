@@ -122,7 +122,7 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                handleToggleFilters()
+                handleToggleFilters(column.id)
               }}
               className="column-filter-trigger inline-flex flex-shrink-0 items-center justify-center p-0.5 text-accent-text hover:text-accent-green"
               title={`Column "${column.name}" is filtered`}
