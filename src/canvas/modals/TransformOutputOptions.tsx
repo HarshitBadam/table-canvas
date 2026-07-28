@@ -72,7 +72,7 @@ export function TransformOutputOptions({
 
         <div className="join-output-subsection">
           <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-text-tertiary" htmlFor="join-output-name">
-            Table Name
+            New Table Name
           </label>
           <input
             id="join-output-name"
@@ -83,6 +83,9 @@ export function TransformOutputOptions({
             className="join-name-input"
             placeholder="Enter a table name"
           />
+          <p className="mt-1.5 text-xs text-text-tertiary">
+            Your source tables will keep their current names and data.
+          </p>
         </div>
       </div>
     </section>

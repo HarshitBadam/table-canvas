@@ -1,4 +1,4 @@
-import type { CellValue, ColumnSchema } from '@/types'
+import type { CellValue, ColumnSchema, ViewFilterConfig } from '@/types'
 import type { GridRow, SelectionType, ContextMenuState } from './types'
 import type { CellRangeSelection } from './useGridSelection'
 import { gridContext } from './gridContextStore'
@@ -88,8 +88,8 @@ export interface GridContextValue {
   handleAutofillMove: (targetRowIndex: number) => void
   handleAutofillOneRow: (rowIndex: number, columnId: string) => void
 
-  filters: { conditions: { columnId: string }[] }
-  handleToggleFilters: () => void
+  filters: ViewFilterConfig
+  handleToggleFilters: (columnId?: string) => void
 
   resizingColumn: string | null
   handleResizeStart: (columnId: string, e: React.MouseEvent) => void

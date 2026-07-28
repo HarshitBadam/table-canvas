@@ -105,6 +105,11 @@ export function JoinColumnSelect({
       setActiveIndex((current) => (current + direction + options.length) % options.length)
       return
     }
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault()
+      setActiveIndex(event.key === 'Home' ? 0 : options.length - 1)
+      return
+    }
     if (event.key === 'Enter') {
       event.preventDefault()
       selectOption(options[activeIndex]?.value ?? options[0].value)
@@ -119,6 +124,10 @@ export function JoinColumnSelect({
         onClick={() => setOpen(!open)}
         onKeyDown={(event) => {
           if (event.key === 'Escape') close()
+          if (event.key === ' ' && !open) {
+            event.preventDefault()
+            setOpen(true)
+          }
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault()
             if (open) {
@@ -136,6 +145,7 @@ export function JoinColumnSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listboxId}
+        aria-activedescendant={open ? `${listboxId}-option-${activeIndex}` : undefined}
         className="canvas-touch-target join-select-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
       >
         {selected ? (
@@ -174,7 +184,7 @@ export function JoinColumnSelect({
                 onClick={() => selectOption(option.value)}
                 onMouseEnter={() => setActiveIndex(index)}
                 onKeyDown={handleListKeyDown}
-                className={`join-select-option ${value === option.value ? 'selected' : ''}`}
+                className={`join-select-option ${value === option.value ? 'selected' : ''} ${activeIndex === index ? 'active' : ''}`}
               >
                 <span className="join-select-option-name">{option.label}</span>
                 <span className="join-select-option-type">{option.type}</span>

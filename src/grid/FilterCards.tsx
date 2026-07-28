@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { CellValue, ColumnSchema, FilterCondition, FilterOperator } from '@/types'
 import {
   FilterColumnType,
@@ -43,15 +43,66 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Remove filter"
-      className="rounded-lg p-1.5 text-error-text transition-colors hover:bg-error-light"
+      className="canvas-touch-target rounded-lg p-2 text-text-tertiary transition-colors hover:bg-surface-tertiary hover:text-text-primary"
     >
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
       </svg>
     </button>
   )
 }
 
+function FilterConditionRow({
+  index,
+  onRemove,
+  columnControl,
+  operatorControl,
+  valueControl,
+  wideValue = false,
+  isUnary = false,
+  children,
+}: {
+  index: number
+  onRemove: () => void
+  columnControl: ReactNode
+  operatorControl?: ReactNode
+  valueControl?: ReactNode
+  wideValue?: boolean
+  isUnary?: boolean
+  children?: ReactNode
+}) {
+  return (
+    <fieldset className="group">
+      <legend className="sr-only">Filter condition {index + 1}</legend>
+      <div className={`grid grid-cols-[minmax(0,1fr)_auto] items-stretch overflow-hidden rounded-lg border border-border bg-surface ${
+        isUnary
+          ? 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]'
+          : 'sm:grid-cols-[minmax(9rem,1fr)_minmax(8rem,0.8fr)_minmax(11rem,1.2fr)_auto]'
+      }`}>
+        <label className="flex min-w-0 items-center border-b border-border-subtle px-1.5 py-1 sm:border-b-0 sm:border-r">
+          <span className="sr-only">Column</span>
+          {columnControl}
+        </label>
+        {operatorControl && (
+          <label className={`flex min-w-0 items-center border-b border-border-subtle px-1.5 py-1 sm:border-b-0 ${isUnary ? '' : 'sm:border-r'}`}>
+            <span className="sr-only">Condition</span>
+            {operatorControl}
+          </label>
+        )}
+        {valueControl && (
+          <div className={`flex min-w-0 items-center px-1.5 py-1 ${wideValue ? 'col-span-2 sm:col-span-2' : ''}`}>
+            <span className="sr-only">Value</span>
+            {valueControl}
+          </div>
+        )}
+        <div className="flex self-stretch items-center px-1">
+          <RemoveButton onClick={onRemove} />
+        </div>
+      </div>
+      {children}
+    </fieldset>
+  )
+}
 
 export function DateFilterCard({
   condition,
@@ -66,6 +117,18 @@ export function DateFilterCard({
   const operatorOptions = operators.map(op => ({ value: op, label: getOperatorLabel(op, 'date') }))
   const isBetween = condition.operator === 'between'
   const isNullCheck = condition.operator === 'is_null'
+
+  useEffect(() => {
+    if (condition.operator !== 'between') {
+      setQuickFilter(null)
+      return
+    }
+    const matchingPreset = quickDateOptions.find(option => {
+      const range = option.getRange()
+      return range.start === String(condition.value ?? '') && range.end === String(condition.value2 ?? '')
+    })
+    setQuickFilter(matchingPreset?.id ?? null)
+  }, [condition.operator, condition.value, condition.value2])
 
   const handleQuickFilter = (filter: QuickDateFilter) => {
     const option = quickDateOptions.find(o => o.id === filter)
@@ -92,64 +155,52 @@ export function DateFilterCard({
   }
 
   return (
-    <div className="relative rounded-lg border border-border bg-surface p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-green/10 text-xs font-semibold text-accent-text">
-            {index + 1}
-          </span>
-          <span className="text-xs font-medium text-text-secondary">Date filter</span>
-        </div>
-        <RemoveButton onClick={onRemove} />
-      </div>
-
-      <div className="mb-3">
+    <FilterConditionRow
+      index={index}
+      onRemove={onRemove}
+      columnControl={
         <CustomSelect
           value={condition.columnId}
           options={columnOptions}
           onChange={onColumnChange}
+          placeholder="Choose a column"
           compact
+          className="!border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface"
         />
-      </div>
-
-      <div className="mb-3">
-        <QuickDateFilters
-          selectedQuickFilter={quickFilter}
-          onSelect={handleQuickFilter}
+      }
+      operatorControl={
+        <CustomSelect
+          value={condition.operator}
+          options={operatorOptions}
+          onChange={(val) => {
+            setQuickFilter(null)
+            onUpdate({ operator: val as FilterOperator, value: '', value2: undefined })
+          }}
+          placeholder="Choose a condition"
+          compact
+          className="!border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface"
         />
-      </div>
-
-      <div className="space-y-2">
-        <div className="w-full">
-          <CustomSelect
-            value={condition.operator}
-            options={operatorOptions}
-            onChange={(val) => {
-              setQuickFilter(null)
-              onUpdate({ operator: val as FilterOperator, value: '', value2: undefined })
-            }}
-            compact
+      }
+      valueControl={!isNullCheck && (
+        isBetween ? (
+          <DateRangeInput
+            startValue={String(condition.value || '')}
+            endValue={String(condition.value2 || '')}
+            onStartChange={handleStartChange}
+            onEndChange={handleEndChange}
+            className="filter-value-input !border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface focus-visible:!ring-0"
           />
-        </div>
-        {!isNullCheck && (
-          <div className="w-full">
-            {isBetween ? (
-              <DateRangeInput
-                startValue={String(condition.value || '')}
-                endValue={String(condition.value2 || '')}
-                onStartChange={handleStartChange}
-                onEndChange={handleEndChange}
-              />
-            ) : (
-              <DateInput
-                value={String(condition.value || '')}
-                onChange={handleDateChange}
-              />
-            )}
-          </div>
-        )}
+        ) : (
+          <DateInput value={String(condition.value || '')} onChange={handleDateChange} className="filter-value-input !border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface focus-visible:!ring-0" />
+        )
+      )}
+      isUnary={isNullCheck}
+    >
+      <div className="mt-3 flex items-center gap-3">
+        <span className="text-xs text-text-tertiary">Quickly set a range</span>
+        <QuickDateFilters selectedQuickFilter={quickFilter} onSelect={handleQuickFilter} />
       </div>
-    </div>
+    </FilterConditionRow>
   )
 }
 
@@ -167,54 +218,48 @@ export function NumberFilterCard({
   const isNullCheck = condition.operator === 'is_null'
 
   return (
-    <div className="relative rounded-lg border border-border bg-surface p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-green/10 text-xs font-semibold text-accent-text">
-            {index + 1}
-          </span>
-          <span className="text-xs font-medium text-text-secondary">Number filter</span>
-        </div>
-        <RemoveButton onClick={onRemove} />
-      </div>
-
-      <div className="mb-3">
+    <FilterConditionRow
+      index={index}
+      onRemove={onRemove}
+      columnControl={
         <CustomSelect
           value={condition.columnId}
           options={columnOptions}
           onChange={onColumnChange}
+          placeholder="Choose a column"
           compact
+          className="!border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface"
         />
-      </div>
-
-      <div className="space-y-2">
-        <div className="w-full">
-          <CustomSelect
-            value={condition.operator}
-            options={operatorOptions}
-            onChange={(val) => onUpdate({ operator: val as FilterOperator, value: '', value2: undefined })}
-            compact
+      }
+      operatorControl={
+        <CustomSelect
+          value={condition.operator}
+          options={operatorOptions}
+          onChange={(val) => onUpdate({ operator: val as FilterOperator, value: '', value2: undefined })}
+          placeholder="Choose a condition"
+          compact
+          className="!border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface"
+        />
+      }
+      valueControl={!isNullCheck && (
+        isBetween ? (
+          <NumberRangeInput
+            startValue={typeof condition.value === 'boolean' ? '' : (condition.value ?? '')}
+            endValue={typeof condition.value2 === 'boolean' ? '' : (condition.value2 ?? '')}
+            onStartChange={(val) => onUpdate({ value: val ? Number(val) : '' })}
+            onEndChange={(val) => onUpdate({ value2: val ? Number(val) : undefined })}
+            className="filter-value-input !border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface focus-visible:!ring-0"
           />
-        </div>
-        {!isNullCheck && (
-          <div className="w-full">
-            {isBetween ? (
-              <NumberRangeInput
-                startValue={typeof condition.value === 'boolean' ? '' : (condition.value ?? '')}
-                endValue={typeof condition.value2 === 'boolean' ? '' : (condition.value2 ?? '')}
-                onStartChange={(val) => onUpdate({ value: val ? Number(val) : '' })}
-                onEndChange={(val) => onUpdate({ value2: val ? Number(val) : undefined })}
-              />
-            ) : (
-              <NumberInput
-                value={typeof condition.value === 'boolean' ? '' : (condition.value ?? '')}
-                onChange={(val) => onUpdate({ value: val ? Number(val) : '' })}
-              />
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+        ) : (
+          <NumberInput
+            value={typeof condition.value === 'boolean' ? '' : (condition.value ?? '')}
+            onChange={(val) => onUpdate({ value: val ? Number(val) : '' })}
+            className="filter-value-input !border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface focus-visible:!ring-0"
+          />
+        )
+      )}
+      isUnary={isNullCheck}
+    />
   )
 }
 
@@ -227,31 +272,26 @@ export function BooleanFilterCard({
   columnOptions,
 }: FilterCardProps) {
   return (
-    <div className="relative rounded-lg border border-border bg-surface p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-green/10 text-xs font-semibold text-accent-text">
-            {index + 1}
-          </span>
-          <span className="text-xs font-medium text-text-secondary">Yes/no filter</span>
-        </div>
-        <RemoveButton onClick={onRemove} />
-      </div>
-
-      <div className="mb-3">
+    <FilterConditionRow
+      index={index}
+      onRemove={onRemove}
+      columnControl={
         <CustomSelect
           value={condition.columnId}
           options={columnOptions}
           onChange={onColumnChange}
+          placeholder="Choose a column"
           compact
+          className="!border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface"
         />
-      </div>
-
-      <BooleanToggle
-        value={String(condition.value)}
-        onChange={(val) => onUpdate({ value: val })}
-      />
-    </div>
+      }
+      valueControl={
+        <BooleanToggle
+          value={String(condition.value)}
+          onChange={(val) => onUpdate({ value: val })}
+        />
+      }
+    />
   )
 }
 
@@ -274,32 +314,28 @@ export function EnumFilterCard({
   }
 
   return (
-    <div className="relative rounded-lg border border-border bg-surface p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-green/10 text-xs font-semibold text-accent-text">
-            {index + 1}
-          </span>
-          <span className="text-xs font-medium text-text-secondary">Select values</span>
-        </div>
-        <RemoveButton onClick={onRemove} />
-      </div>
-
-      <div className="mb-3">
+    <FilterConditionRow
+      index={index}
+      onRemove={onRemove}
+      columnControl={
         <CustomSelect
           value={condition.columnId}
           options={columnOptions}
           onChange={onColumnChange}
+          placeholder="Choose a column"
           compact
+          className="!border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface"
         />
-      </div>
-
-      <EnumMultiSelect
-        selectedValues={selectedValues}
-        availableValues={uniqueValues}
-        onChange={handleChange}
-      />
-    </div>
+      }
+      valueControl={
+        <EnumMultiSelect
+          selectedValues={selectedValues}
+          availableValues={uniqueValues}
+          onChange={handleChange}
+        />
+      }
+      wideValue
+    />
   )
 }
 
@@ -316,44 +352,37 @@ export function StringFilterCard({
   const isNullCheck = condition.operator === 'is_null'
 
   return (
-    <div className="relative rounded-lg border border-border bg-surface p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-green/10 text-xs font-semibold text-accent-text">
-            {index + 1}
-          </span>
-          <span className="text-xs font-medium text-text-secondary">Text filter</span>
-        </div>
-        <RemoveButton onClick={onRemove} />
-      </div>
-
-      <div className="mb-3">
+    <FilterConditionRow
+      index={index}
+      onRemove={onRemove}
+      columnControl={
         <CustomSelect
           value={condition.columnId}
           options={columnOptions}
           onChange={onColumnChange}
+          placeholder="Choose a column"
           compact
+          className="!border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface"
         />
-      </div>
-
-      <div className="space-y-2">
-        <div className="w-full">
-          <CustomSelect
-            value={condition.operator}
-            options={operatorOptions}
-            onChange={(val) => onUpdate({ operator: val as FilterOperator, value: '' })}
-            compact
-          />
-        </div>
-        {!isNullCheck && (
-          <div className="w-full">
-            <StringInput
-              value={String(condition.value || '')}
-              onChange={(val) => onUpdate({ value: val })}
-            />
-          </div>
-        )}
-      </div>
-    </div>
+      }
+      operatorControl={
+        <CustomSelect
+          value={condition.operator}
+          options={operatorOptions}
+          onChange={(val) => onUpdate({ operator: val as FilterOperator, value: '' })}
+          placeholder="Choose a condition"
+          compact
+          className="!border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface"
+        />
+      }
+      valueControl={!isNullCheck && (
+        <StringInput
+          value={String(condition.value || '')}
+          onChange={(val) => onUpdate({ value: val })}
+          className="filter-value-input !border-0 !bg-transparent !shadow-none hover:!bg-surface focus-visible:!bg-surface focus-visible:!ring-0"
+        />
+      )}
+      isUnary={isNullCheck}
+    />
   )
 }

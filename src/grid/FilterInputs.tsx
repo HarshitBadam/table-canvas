@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import * as Select from '@radix-ui/react-select'
 
 export { DateInput, DateRangeInput, QuickDateFilters } from './DateFilterInputs'
 export { NumberInput, NumberRangeInput } from './NumberFilterInputs'
@@ -10,88 +10,55 @@ export function CustomSelect({
   onChange,
   placeholder = 'Select...',
   compact = false,
+  className = '',
 }: {
   value: string
   options: { value: string; label: string }[]
   onChange: (value: string) => void
   placeholder?: string
   compact?: boolean
+  className?: string
 }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const selectedOption = options.find(o => o.value === value)
-
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`
-          w-full flex items-center justify-between gap-2
-          bg-white dark:bg-gray-800
-          border border-gray-200 dark:border-gray-700 rounded-lg
-          text-gray-900 dark:text-gray-100 text-sm font-medium
-          transition-all duration-150
-          hover:border-gray-300 dark:hover:border-gray-600
-          focus:border-accent-green
-          ${compact ? 'h-9 px-3' : 'h-10 px-3'}
-          ${isOpen ? 'border-accent-green' : ''}
-        `}
+    <Select.Root value={value} onValueChange={onChange}>
+      <Select.Trigger
+        aria-label={placeholder === 'Select...' ? 'Choose an option' : placeholder}
+        className={`flex h-10 w-full items-center justify-between gap-2 rounded-md bg-surface-secondary px-3 text-left text-sm font-medium text-text-primary outline-none transition-[background-color,box-shadow] hover:bg-surface-tertiary focus-visible:ring-2 focus-visible:ring-accent-green/30 ${compact ? '!h-9' : ''} ${className}`}
       >
-        <span className={`truncate ${!selectedOption ? 'text-gray-400' : ''}`}>
-          {selectedOption?.label || placeholder}
-        </span>
-        <svg
-          className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
+        <Select.Value placeholder={placeholder} />
+        <Select.Icon className="shrink-0 text-text-tertiary">
+          <ChevronDownIcon />
+        </Select.Icon>
+      </Select.Trigger>
+      <Select.Portal>
+        <Select.Content
+          position="popper"
+          sideOffset={6}
+          collisionPadding={8}
+          className="z-popover min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg bg-surface shadow-lg ring-1 ring-border-elevation motion-safe:animate-scale-in"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 z-50
-          bg-white dark:bg-gray-800
-          border border-gray-200 dark:border-gray-700
-          rounded-lg shadow-lg
-          py-1 overflow-hidden"
-        >
-          <div className="max-h-[200px] overflow-y-auto">
-            {options.map((option) => (
-              <button
+          <Select.Viewport>
+            {options.map(option => (
+              <Select.Item
                 key={option.value}
-                onClick={() => {
-                  onChange(option.value)
-                  setIsOpen(false)
-                }}
-                className={`
-                  w-full px-3 py-2 text-left text-sm transition-colors duration-100
-                  ${value === option.value
-                    ? 'bg-accent-green/10 text-accent-text font-medium'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }
-                `}
+                value={option.value}
+                className="flex min-h-10 w-full cursor-pointer select-none items-center px-3 text-sm font-medium text-text-secondary outline-none transition-colors hover:bg-surface-tertiary hover:text-text-primary data-[highlighted]:bg-surface-tertiary data-[highlighted]:text-text-primary data-[state=checked]:text-accent-text"
               >
-                {option.label}
-              </button>
+                <Select.ItemText>{option.label}</Select.ItemText>
+              </Select.Item>
             ))}
-          </div>
-        </div>
-      )}
-    </div>
+          </Select.Viewport>
+        </Select.Content>
+      </Select.Portal>
+    </Select.Root>
+  )
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
+      <path d="m6 8 4 4 4-4" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} />
+    </svg>
   )
 }
 
@@ -105,26 +72,30 @@ export function BooleanToggle({
   const isTrue = value === 'true' || value === 'True'
 
   return (
-    <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+    <div className="grid grid-cols-2 gap-1 rounded-lg bg-surface-tertiary p-1" role="group" aria-label="Boolean value">
       <button
+        type="button"
         onClick={() => onChange('true')}
+        aria-pressed={isTrue}
         className={`
           flex-1 py-2.5 text-sm font-semibold rounded-md transition-all duration-150
           ${isTrue
             ? 'bg-accent-green text-white shadow-sm'
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+            : 'text-text-secondary hover:bg-surface hover:text-text-primary'
           }
         `}
       >
         True
       </button>
       <button
+        type="button"
         onClick={() => onChange('false')}
+        aria-pressed={!isTrue}
         className={`
           flex-1 py-2.5 text-sm font-semibold rounded-md transition-all duration-150
           ${!isTrue
             ? 'bg-accent-green text-white shadow-sm'
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+            : 'text-text-secondary hover:bg-surface hover:text-text-primary'
           }
         `}
       >
@@ -138,10 +109,12 @@ export function StringInput({
   value,
   onChange,
   placeholder = 'Enter text',
+  className = '',
 }: {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  className?: string
 }) {
   return (
     <input
@@ -149,12 +122,10 @@ export function StringInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full h-10 px-3 text-sm
-        bg-white dark:bg-gray-800
-        border border-gray-200 dark:border-gray-700 rounded-lg
-        text-gray-900 dark:text-gray-100 placeholder:text-gray-400
-        focus:border-accent-green
-        transition-all duration-150"
+      aria-label="Filter value"
+      className={`h-10 w-full rounded-lg border border-border bg-surface-secondary px-3 text-sm text-text-primary
+        placeholder:text-text-tertiary transition-colors hover:border-text-tertiary focus-visible:outline-none
+        focus-visible:ring-2 focus-visible:ring-accent-green/30 ${className}`}
     />
   )
 }
