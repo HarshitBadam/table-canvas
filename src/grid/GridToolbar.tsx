@@ -9,7 +9,6 @@ interface GridToolbarProps {
   unfilteredTotalRows: number
   columnCount: number
   isDirty: boolean
-  isMaterializing: boolean
   isComputing: boolean
   showFilterPanel: boolean
   showSuggestions: boolean
@@ -26,7 +25,6 @@ export function GridToolbar({
   unfilteredTotalRows,
   columnCount,
   isDirty,
-  isMaterializing,
   isComputing,
   showFilterPanel,
   showSuggestions,
@@ -55,12 +53,12 @@ export function GridToolbar({
         ) : (
           <>{formatNumber(totalRows)} rows × {columnCount} columns</>
         )}
-        {isDirty && !isMaterializing && !isComputing && (
+        {isDirty && !isComputing && (
           <span className="ml-2 text-xs font-medium text-warning-text">
             Refresh needed
           </span>
         )}
-        {(isMaterializing || isComputing) && (
+        {isComputing && (
           <span className="ml-2 animate-pulse text-xs text-text-secondary">
             Updating table…
           </span>
@@ -100,7 +98,7 @@ export function GridToolbar({
 
         <div role="group" aria-label="Explore" className="flex min-w-0 flex-wrap items-center gap-2">
           <button 
-            onClick={handleToggleFilters}
+            onClick={() => handleToggleFilters()}
             className={`btn min-h-11 gap-1.5 px-2.5 py-0 text-xs sm:min-h-0 sm:px-3 sm:py-1.5 ${showFilterPanel || hasActiveFilters(filters) ? 'btn-primary' : 'btn-ghost'}`}
             aria-label="Filter table"
             aria-pressed={showFilterPanel}

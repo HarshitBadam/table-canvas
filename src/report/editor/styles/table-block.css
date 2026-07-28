@@ -207,7 +207,7 @@
   position: fixed;
   z-index: 1000;
   min-width: 180px;
-  padding: 4px;
+  overflow: hidden;
   background: var(--color-surface, #fff);
   border: 1px solid var(--color-border, #e4e4e7);
   border-radius: 8px;
@@ -228,7 +228,7 @@
   padding: 8px 10px;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 0;
   font-size: 13px;
   color: var(--color-text-primary, #18181b);
   cursor: pointer;
@@ -283,7 +283,6 @@
 
 .context-menu-divider {
   height: 1px;
-  margin: 4px 0;
   background: var(--color-border, #e4e4e7);
 }
 

@@ -141,7 +141,7 @@ export function computeSuggestionEffect(
     let newValue: CellValue
 
     if (operation.type === 'fill_missing_numeric' &&
-        (oldValue === null || oldValue === undefined || oldValue === '')) {
+        (oldValue === null || oldValue === undefined || oldValue === '' || isPlaceholder(oldValue))) {
       if ((operation.strategy === 'mean' || operation.strategy === 'median') && numericFillValue !== undefined) {
         newValue = Math.round(numericFillValue * 100) / 100
       } else if (operation.strategy === 'zero') {
@@ -151,7 +151,7 @@ export function computeSuggestionEffect(
       }
     } else if (
       operation.type === 'fill_missing_string' &&
-      (oldValue === null || oldValue === undefined || oldValue === '')
+      (oldValue === null || oldValue === undefined || oldValue === '' || isPlaceholder(oldValue))
     ) {
       newValue = operation.value
     } else {
@@ -203,17 +203,25 @@ export function computeCombinedSuggestionEffect(
   const fixes = suggestions.filter(
     suggestion => suggestion.context.cleaningOperation?.type !== 'highlight_outliers'
       && suggestion.context.cleaningOperation?.type !== 'nullify_placeholders'
+      && suggestion.context.cleaningOperation?.type !== 'fill_missing_numeric'
+      && suggestion.context.cleaningOperation?.type !== 'fill_missing_string'
       && suggestion.context.cleaningOperation?.type !== 'remove_outliers',
   )
-  const terminalFixes = suggestions.filter(
-    suggestion => suggestion.context.cleaningOperation?.type === 'nullify_placeholders'
-      || suggestion.context.cleaningOperation?.type === 'remove_outliers',
+  const nullifications = suggestions.filter(
+    suggestion => suggestion.context.cleaningOperation?.type === 'nullify_placeholders',
+  )
+  const fills = suggestions.filter(
+    suggestion => suggestion.context.cleaningOperation?.type === 'fill_missing_numeric'
+      || suggestion.context.cleaningOperation?.type === 'fill_missing_string',
+  )
+  const removals = suggestions.filter(
+    suggestion => suggestion.context.cleaningOperation?.type === 'remove_outliers',
   )
   const reviews = suggestions.filter(
     suggestion => suggestion.context.cleaningOperation?.type === 'highlight_outliers',
   )
 
-  for (const suggestion of [...fixes, ...terminalFixes, ...reviews]) {
+  for (const suggestion of [...fixes, ...nullifications, ...fills, ...removals, ...reviews]) {
     const operation = suggestion.context.cleaningOperation
     const columnId = suggestion.context.columnId
     const fillValue = operation?.type === 'fill_missing_numeric' && columnId

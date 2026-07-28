@@ -1,8 +1,10 @@
 import { useMemo } from 'react'
 import { generateSuggestions } from '@/suggestions/engine'
 import { getExistingDerivedTables } from '@/suggestions/derivedTableContext'
+import { removeSatisfiedChartSuggestions } from '@/suggestions/existingChartContext'
 import { generateTableVersionHash, useSuggestionsStore } from '@/suggestions/suggestionsStore'
 import type { Suggestion } from '@/types'
+import { useProjectStore } from '@/state/projectStore'
 import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import { useTableNodes, useAllProfiles } from './dashboardHelpers'
 
@@ -14,6 +16,7 @@ export function useTopSuggestions(limit: number = 5): {
   const { profiles, isLoading } = useAllProfiles()
   const consumed = useSuggestionsStore((state) => state.consumed)
   const runtimeCacheInfo = useTableRuntimeStore((state) => state.cacheInfo)
+  const projectNodes = useProjectStore((state) => state.nodes)
 
   const suggestions = useMemo(() => {
     const allSuggestions: Array<Suggestion & { tableName: string }> = []
@@ -37,7 +40,7 @@ export function useTopSuggestions(limit: number = 5): {
       try {
         const existingDerivedTables = getExistingDerivedTables(tableNodes, table.id)
 
-        const tableSuggestions = generateSuggestions({
+        const tableSuggestions = removeSatisfiedChartSuggestions(generateSuggestions({
           tableId: table.id,
           tableName: table.name,
           schema: table.schema,
@@ -47,7 +50,7 @@ export function useTopSuggestions(limit: number = 5): {
           },
           tableVersionHash: versionHash,
           existingDerivedTables,
-        })
+        }), Object.values(projectNodes))
 
         for (const suggestion of tableSuggestions) {
           if (!consumed.has(suggestion.id)) {
@@ -69,7 +72,7 @@ export function useTopSuggestions(limit: number = 5): {
         return categoryOrder[a.category] - categoryOrder[b.category]
       })
       .slice(0, limit)
-  }, [tableNodes, profiles, runtimeCacheInfo, consumed, limit])
+  }, [tableNodes, profiles, runtimeCacheInfo, projectNodes, consumed, limit])
 
   return { suggestions, isLoading }
 }

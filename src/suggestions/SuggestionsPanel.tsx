@@ -119,9 +119,15 @@ export function SuggestionsPanel({
             />
 
             {dismissedCount > 0 && (
-              <div className="flex items-center justify-between border-b border-border px-4 py-2 text-xs">
-                <span className="text-text-tertiary">{dismissedCount} dismissed</span>
-                <button onClick={restoreDismissed} className="text-accent-green hover:underline">
+              <div className="flex items-center justify-between border-b border-border-subtle bg-surface-secondary/40 px-4 py-2">
+                <span className="text-xs font-medium text-text-tertiary">
+                  {dismissedCount} dismissed
+                </span>
+                <button
+                  type="button"
+                  onClick={restoreDismissed}
+                  className="-mr-1 rounded-md px-1 py-0.5 text-xs font-semibold text-accent-green transition-colors hover:bg-accent-green/10 hover:text-accent-green/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2"
+                >
                   Restore
                 </button>
               </div>

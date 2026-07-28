@@ -83,6 +83,9 @@ export const createHistorySlice: StateCreator<
           highlightedCells: new Set((patches as unknown as { highlightedCells: string[] }).highlightedCells || []),
         }
       })
+      if (state.selectedNodeId && !state.nodes[state.selectedNodeId]) {
+        state.selectedNodeId = null
+      }
       restoreTableState(state.nodes)
     })
     useDataStore.setState({ tableData: {} })
@@ -118,6 +121,9 @@ export const createHistorySlice: StateCreator<
           highlightedCells: new Set((patches as unknown as { highlightedCells: string[] }).highlightedCells || []),
         }
       })
+      if (state.selectedNodeId && !state.nodes[state.selectedNodeId]) {
+        state.selectedNodeId = null
+      }
       restoreTableState(state.nodes)
     })
     useDataStore.setState({ tableData: {} })

@@ -139,11 +139,14 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
             </div>
           </div>
           
-          <div className="flex min-h-0 flex-1 flex-col">
-          <div className="overflow-y-auto px-4 sm:px-5">
-            <fieldset className="py-5">
-              <legend className="mb-3 text-sm font-semibold text-text-primary">Chart type</legend>
-              <div className="flex flex-wrap gap-1.5">
+          <div className="flex min-h-0 flex-col">
+          <div className="max-h-[60dvh] overflow-y-auto bg-surface">
+            <section className="px-5 py-5 sm:px-6" aria-labelledby="chart-type-heading">
+              <div className="mb-3">
+                <h3 id="chart-type-heading" className="text-sm font-semibold text-text-primary">Chart type</h3>
+                <p className="mt-0.5 text-xs text-text-secondary">Choose how to visualize this data.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
                   { type: 'bar' as ChartType, label: 'Bar' },
                   { type: 'line' as ChartType, label: 'Line' },
@@ -152,10 +155,10 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                 ].map((ct) => (
                   <label
                     key={ct.type}
-                    className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3.5 py-2 text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-accent-green focus-within:ring-offset-2 ${
+                    className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold transition-colors focus-within:ring-2 focus-within:ring-accent-green focus-within:ring-offset-2 ${
                       chartType === ct.type
-                        ? 'border-accent-green bg-accent-green text-white shadow-sm'
-                        : 'border-border bg-surface text-text-secondary hover:border-text-tertiary hover:bg-surface-secondary'
+                        ? 'border-accent-green bg-accent-green/10 text-accent-text'
+                        : 'border-transparent bg-surface-secondary text-text-secondary hover:bg-surface-tertiary hover:text-text-primary'
                     }`}
                   >
                     <input
@@ -166,23 +169,26 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                       checked={chartType === ct.type}
                       onChange={() => { setChartType(ct.type); setXAxis(''); setYAxis(''); }}
                     />
-                    <ChartTypeIcon type={ct.type} className="h-3.5 w-3.5" />
+                    <ChartTypeIcon type={ct.type} className="h-4 w-4" />
                     {ct.label}
                   </label>
                 ))}
               </div>
-            </fieldset>
+            </section>
 
             {selectedTable && (
-              <>
-                <fieldset className="border-t border-border-subtle py-5">
-                  <legend className="mb-4 text-sm font-semibold text-text-primary">Field mapping</legend>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="text-xs font-medium text-text-primary">
+              <div>
+                <section className="border-t border-border-subtle px-5 py-5 sm:px-6" aria-labelledby="field-mapping-heading">
+                  <div className="mb-4">
+                    <h3 id="field-mapping-heading" className="text-sm font-semibold text-text-primary">Field mapping</h3>
+                    <p className="mt-0.5 text-xs text-text-secondary">Select the columns used to build the chart.</p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-text-primary">
                         {chartType === 'scatter' ? 'X axis column' : 'Category column'}
                       </label>
-                      <p className="mb-1.5 mt-0.5 text-xs text-text-tertiary">
+                      <p className="text-xs text-text-tertiary">
                         {chartType === 'scatter' ? 'Numeric values' : 'Text or date values'}
                       </p>
                       <SelectField
@@ -190,21 +196,23 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                         onValueChange={setXAxis}
                         ariaLabel={chartType === 'scatter' ? 'X axis column' : 'Category column'}
                         placeholder="Choose a column"
+                        variant="soft"
                         options={(chartType === 'scatter' ? numericColumns : categoricalColumns.length > 0 ? categoricalColumns : columns)
                           .map(column => ({ value: column.id, label: column.name }))}
                       />
                     </div>
-                    <div>
-                      <label className="text-xs font-medium text-text-primary">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-text-primary">
                         {chartType === 'pie' ? 'Value column' : 'Y axis column'}
                       </label>
-                      <p className="mb-1.5 mt-0.5 text-xs text-text-tertiary">Numeric values</p>
+                      <p className="text-xs text-text-tertiary">Numeric values</p>
                       <SelectField
                         value={yAxis}
                         onValueChange={setYAxis}
                         ariaLabel={chartType === 'pie' ? 'Value column' : 'Y axis column'}
                         placeholder="Choose a column"
                         disabled={numericColumns.length === 0}
+                        variant="soft"
                         options={numericColumns.map(column => ({ value: column.id, label: column.name }))}
                       />
                     </div>
@@ -219,12 +227,15 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                       Scatter charts need two numeric columns. Add or convert another numeric column to continue.
                     </p>
                   )}
-                </fieldset>
+                </section>
 
                 {chartType !== 'scatter' && (
-                  <fieldset className="border-t border-border-subtle py-5">
-                    <legend className="mb-3 text-sm font-semibold text-text-primary">Summarize values</legend>
-                    <div className="flex flex-wrap gap-1.5">
+                  <section className="border-t border-border-subtle px-5 py-5 sm:px-6" aria-labelledby="chart-summary-heading">
+                    <div className="mb-3">
+                      <h3 id="chart-summary-heading" className="text-sm font-semibold text-text-primary">Summarize values</h3>
+                      <p className="mt-0.5 text-xs text-text-secondary">Choose how values are grouped for each category.</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                       {[
                         { value: 'sum', label: 'Sum' },
                         { value: 'avg', label: 'Average' },
@@ -235,10 +246,10 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                       ].map((agg) => (
                         <label
                           key={agg.value}
-                          className={`min-h-9 cursor-pointer rounded-md border px-3 py-2 text-xs font-medium transition-colors focus-within:ring-2 focus-within:ring-accent-green focus-within:ring-offset-2 ${
+                          className={`flex min-h-11 cursor-pointer items-center justify-center rounded-md border px-2 py-2 text-xs font-semibold transition-colors focus-within:ring-2 focus-within:ring-accent-green focus-within:ring-offset-2 ${
                             aggregation === agg.value
                               ? 'border-accent-green bg-accent-green/10 text-accent-text'
-                              : 'border-border bg-surface text-text-secondary hover:border-text-tertiary hover:bg-surface-secondary'
+                              : 'border-transparent bg-surface-secondary text-text-secondary hover:bg-surface-tertiary hover:text-text-primary'
                           }`}
                         >
                           <input
@@ -253,14 +264,14 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                         </label>
                       ))}
                     </div>
-                  </fieldset>
+                  </section>
                 )}
-              </>
+              </div>
             )}
           </div>
 
           <div 
-            className="shrink-0 border-t border-border-subtle bg-accent-green/5 px-4 py-3 sm:px-5"
+            className="shrink-0 border-t border-border-subtle bg-surface-secondary/40 px-4 py-3 sm:px-5"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">

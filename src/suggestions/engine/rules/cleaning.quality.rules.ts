@@ -5,34 +5,28 @@ import {
   detectOutliers,
 } from '../detection';
 
-
 registerRule({
   id: 'fill_missing',
   category: 'cleaning',
   scope: 'column',
   when: (_ctx, meta) => {
     if (!meta.columnProfile || !meta.column) return false;
-    if (meta.column.type !== 'number' && meta.column.type !== 'string') return false;
+    if (meta.column.type !== 'number') return false;
     return meta.columnProfile.missingPercent > 5 && meta.columnProfile.missingPercent < 100;
   },
   build: (ctx, meta) => {
-    const isNumeric = meta.column?.type === 'number';
-    const fillMethod = isNumeric ? 'mean' : 'Unknown';
-    
     return {
       id: createSuggestionId('fill_missing', ctx.tableId, meta.column?.id),
       category: 'cleaning',
       scope: 'column',
       title: `Fill missing values in "${meta.column!.name}"`,
-      description: `${meta.columnProfile!.missingPercent.toFixed(1)}% of values are missing. Fill with ${fillMethod}.`,
+      description: `${meta.columnProfile!.missingPercent.toFixed(1)}% of values are missing. Fill with mean.`,
       confidence: meta.columnProfile!.missingPercent > 20 ? 'high' : 'medium',
       context: {
         tableId: ctx.tableId,
         columnId: meta.column!.id,
         tableVersionHash: getVersionHash(ctx),
-        cleaningOperation: isNumeric 
-          ? { type: 'fill_missing_numeric', strategy: 'mean' as const }
-          : { type: 'fill_missing_string', value: 'Unknown' },
+        cleaningOperation: { type: 'fill_missing_numeric', strategy: 'mean' as const },
       },
       why: [
         `${meta.columnProfile!.missingPercent.toFixed(1)}% values are missing`,

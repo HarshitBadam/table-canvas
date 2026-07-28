@@ -1,8 +1,9 @@
 import { memo, useCallback } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { Handle, Position, NodeProps } from 'reactflow'
-import { TableSchema, CacheInfo, NodeUI, NodeViewMode, CellValue, ViewFilterConfig } from '@/types'
+import { TableSchema, NodeUI, NodeViewMode, CellValue, ViewFilterConfig } from '@/types'
 import { formatNumber } from '@/lib/utils'
+import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { MiniTableView } from './MiniTableView'
 import { NODE_WIDTH } from '../canvasConstants'
 import { ColumnTypeBadge } from '@/components/ColumnTypeBadge'
@@ -12,7 +13,6 @@ interface TableNodeData {
   kind: 'source_table' | 'derived_table'
   name: string
   schema?: TableSchema
-  cacheInfo?: CacheInfo
   ui: NodeUI
   selected: boolean
   patches?: {
@@ -71,7 +71,8 @@ function ViewModeControl({
 export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeData>) => {
   const isSource = data.kind === 'source_table'
   const schema = data.schema
-  const rowCount = data.cacheInfo?.lastRowCount ?? schema?.rowCount ?? 0
+  const cacheInfo = useNodeCacheInfo(data.id)
+  const rowCount = cacheInfo?.lastRowCount ?? schema?.rowCount ?? 0
   const colCount = schema?.columns.length ?? 0
   const viewMode = getViewMode(data.ui)
 
@@ -177,31 +178,31 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             maxHeight={240}
             patches={data.patches}
             viewFilters={data.viewFilters}
-            versionHash={data.cacheInfo?.currentVersionHash}
-            dataRevision={data.cacheInfo?.dataRevision}
+            versionHash={cacheInfo?.currentVersionHash}
+            dataRevision={cacheInfo?.dataRevision}
           />
         )}
 
         
-        {data.cacheInfo?.error && (
+        {cacheInfo?.error && (
           <div className="px-4 py-2.5 text-xs font-medium text-error-text bg-error/10 flex items-center gap-2">
             <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <span className="truncate" title={data.cacheInfo.error}>
-              Could not update table: {data.cacheInfo.error}
+            <span className="truncate" title={cacheInfo.error}>
+              Could not update table: {cacheInfo.error}
             </span>
           </div>
         )}
         
-        {data.cacheInfo?.isComputing && !data.cacheInfo?.error && (
+        {cacheInfo?.isComputing && !cacheInfo?.error && (
           <div className="px-4 py-2.5 text-xs font-medium text-text-secondary bg-surface-secondary flex items-center gap-2">
             <LoadingSpinner size="sm" />
             Updating table…
           </div>
         )}
         
-        {data.cacheInfo?.isDirty && !data.cacheInfo?.error && !data.cacheInfo?.isComputing && (
+        {cacheInfo?.isDirty && !cacheInfo?.error && !cacheInfo?.isComputing && (
           <div className="px-4 py-2.5 text-xs font-medium text-warning-text bg-warning/10 flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

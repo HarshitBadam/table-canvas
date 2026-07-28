@@ -9,6 +9,7 @@ import {
 } from './suggestionsStore'
 import { useCategoryCounts } from './useCategoryCounts'
 import { getExistingDerivedTables } from './derivedTableContext'
+import { removeSatisfiedChartSuggestions } from './existingChartContext'
 import type { Suggestion, SuggestionCategory, TableNode } from '@/types'
 
 interface SuggestionsPanelHookResult {
@@ -177,13 +178,16 @@ export function useSuggestionsPanel(
 
   const cachedSuggestions = useMemo(() => {
     if (!contextKey) return []
-    const suggestions = suggestionsCache.get(contextKey) ?? []
+    const suggestions = removeSatisfiedChartSuggestions(
+      suggestionsCache.get(contextKey) ?? [],
+      Object.values(nodes),
+    )
     if (node?.kind === 'source_table') return suggestions
 
     // Cleaning applies patches to editable source rows. Derived tables are
     // view-only, so do not advertise cleaning actions that cannot be opened.
     return suggestions.filter((suggestion) => suggestion.category !== 'cleaning')
-  }, [contextKey, suggestionsCache, node?.kind])
+  }, [contextKey, suggestionsCache, nodes, node?.kind])
 
   const filteredSuggestions = useMemo(() => {
     let suggestions = cachedSuggestions

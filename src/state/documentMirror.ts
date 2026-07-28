@@ -1,4 +1,5 @@
 import type { Edge, Patches, ProjectNode } from '@/types'
+import { computePatchesVersion } from '@/engine/cacheUtils'
 import type { Report } from '@/report/types'
 import { useReportStore } from '@/report/reportStore'
 import { invalidateMaterializations } from '@/engine/materializationCoordinator'
@@ -67,7 +68,8 @@ function changedTableIds(
     if (node?.kind !== 'source_table' && node?.kind !== 'derived_table') continue
     if (
       previous[id]?.updatedAt !== node.updatedAt
-      || previousPatches[id] !== nextPatches[id]
+      || computePatchesVersion(previousPatches[id])
+        !== computePatchesVersion(nextPatches[id])
     ) changed.push(id)
   }
   return changed
@@ -91,6 +93,9 @@ export function applyDocumentSnapshot(snapshot: {
     nodes: snapshot.nodes,
     edges: snapshot.edges,
     patches,
+    selectedNodeId: project.selectedNodeId && snapshot.nodes[project.selectedNodeId]
+      ? project.selectedNodeId
+      : null,
     // Another tab's edits are not this tab's undo stack.
     history: { past: [], future: [] },
   })

@@ -22,11 +22,34 @@ const LOCAL_USER: User = {
   createdAt: new Date(0),
 }
 
+const GUEST_SESSION_KEY = 'table-canvas:guest-session'
+
+function hasGuestSession(): boolean {
+  try {
+    return localStorage.getItem(GUEST_SESSION_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+function setGuestSession(active: boolean): void {
+  try {
+    if (active) {
+      localStorage.setItem(GUEST_SESSION_KEY, 'true')
+    } else {
+      localStorage.removeItem(GUEST_SESSION_KEY)
+    }
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
+
 export function useAuthState() {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   const handleAuthError = useCallback(() => {
+    setGuestSession(false)
     setUser(null)
     setIsAuthenticated(false)
   }, [])
@@ -38,6 +61,7 @@ export function useAuthState() {
 
   const performLogin = useCallback(async (credentials: LoginCredentials) => {
     const { user } = await apiLogin(credentials)
+    setGuestSession(false)
     setStorageScope(accountStorageScope(user.id))
     setUser(user)
     setIsAuthenticated(true)
@@ -46,6 +70,7 @@ export function useAuthState() {
 
   const performGoogleLogin = useCallback(async (credential: string) => {
     const { user } = await apiLoginWithGoogle(credential)
+    setGuestSession(false)
     setStorageScope(accountStorageScope(user.id))
     setUser(user)
     setIsAuthenticated(true)
@@ -54,6 +79,7 @@ export function useAuthState() {
 
   const performLogout = useCallback(async () => {
     await apiLogout()
+    setGuestSession(false)
     setStorageScope(GUEST_STORAGE_SCOPE)
     setUser(null)
     setIsAuthenticated(false)
@@ -69,6 +95,10 @@ export function useAuthState() {
     shouldContinue: boolean
   }> => {
     let authedUser = await checkAuth()
+
+    if (!authedUser && hasGuestSession()) {
+      authedUser = LOCAL_USER
+    }
 
     if (!authedUser) {
       let backendReachable = false
@@ -121,6 +151,7 @@ export function useAuthState() {
   }, [])
 
   const continueAsGuest = useCallback((): User => {
+    setGuestSession(true)
     setStorageScope(GUEST_STORAGE_SCOPE)
     setUser(LOCAL_USER)
     setIsAuthenticated(true)
@@ -128,6 +159,7 @@ export function useAuthState() {
   }, [])
 
   const leaveGuest = useCallback(() => {
+    setGuestSession(false)
     setStorageScope(GUEST_STORAGE_SCOPE)
     setUser(null)
     setIsAuthenticated(false)

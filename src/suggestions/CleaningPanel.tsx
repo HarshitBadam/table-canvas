@@ -102,8 +102,15 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         }
         return s.changes.length > 0 || s.highlights.length > 0
       })
-    
-    return result
+
+    // Keep review-only outlier suggestions after actionable cleaning fixes.
+    return result.sort((a, b) => {
+      const aIsOutlier = a.suggestion.context.cleaningOperation?.type === 'highlight_outliers'
+        || a.suggestion.context.cleaningOperation?.type === 'remove_outliers'
+      const bIsOutlier = b.suggestion.context.cleaningOperation?.type === 'highlight_outliers'
+        || b.suggestion.context.cleaningOperation?.type === 'remove_outliers'
+      return Number(aIsOutlier) - Number(bIsOutlier)
+    })
   }, [suggestions, rows, existingHighlights])
 
   useEffect(() => {
@@ -186,8 +193,8 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
   if (suggestionsWithEffects.length === 0) {
     return (
       <div className="p-4 text-center">
-        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-          <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-accent-green flex items-center justify-center">
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
@@ -200,21 +207,20 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b border-border flex items-center justify-between">
-        <span className="text-sm font-medium text-text-primary">
+      <div className="flex items-center justify-between border-b border-border-subtle bg-surface-secondary/40 px-4 py-3">
+        <span className="text-xs font-medium text-text-tertiary">
           {suggestionsWithEffects.length} issue{suggestionsWithEffects.length !== 1 ? 's' : ''}
-          {selectedCount > 0 && ` - ${selectedCount} selected`}
         </span>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1">
           <button
             onClick={selectAll}
-            className="text-xs text-accent-green hover:underline"
+            className="rounded-md px-1.5 py-0.5 text-xs font-semibold text-accent-green transition-colors hover:bg-accent-green/10 hover:text-accent-green/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
           >
             All
           </button>
           <button
             onClick={deselectAll}
-            className="text-xs text-text-tertiary hover:text-text-secondary"
+            className="rounded-md px-1.5 py-0.5 text-xs font-semibold text-text-tertiary transition-colors hover:bg-surface-tertiary hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
           >
             None
           </button>
@@ -225,13 +231,12 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         {suggestionsWithEffects.map(({ suggestion, changes, highlights, operationType }) => {
           const isSelected = selectedIds.has(suggestion.id)
           const count = operationType === 'review' ? highlights.length : changes.length
-          const Icon = operationType === 'review' ? ReviewIcon : FixIcon
           
           return (
             <label
               key={suggestion.id}
-              className={`block p-3 border-b border-border cursor-pointer transition-colors ${
-                isSelected ? 'bg-accent-green/10' : 'hover:bg-surface-secondary'
+              className={`block min-h-[76px] cursor-pointer border-b border-border-subtle px-4 py-3.5 transition-colors ${
+                isSelected ? 'bg-accent-green/10' : 'hover:bg-surface-secondary/70'
               }`}
             >
               <input
@@ -240,28 +245,28 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
                 onChange={() => toggleSelection(suggestion.id)}
                 className="sr-only"
               />
-              <div className="flex items-start gap-3">
-                <div aria-hidden="true" className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+              <div className={`flex gap-3 ${changes.length > 0 ? 'items-start' : 'items-center'}`}>
+                <div aria-hidden="true" className={`${changes.length > 0 ? 'mt-0.5' : ''} flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
                   isSelected 
                     ? 'bg-accent-green text-white' 
                     : 'bg-surface-tertiary text-text-tertiary'
                 }`}>
-                  <Icon />
+                  <FixIcon />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-text-primary truncate">
+                    <span className="truncate text-[13px] font-medium leading-5 text-text-primary">
                       {suggestion.title}
                     </span>
-                    <span className="text-xs font-medium text-text-tertiary flex-shrink-0">
+                    <span className="shrink-0 text-xs font-medium tabular-nums text-text-tertiary">
                       {count}
                     </span>
                   </div>
                   {changes.length > 0 && (
-                    <div className="mt-1 text-xs text-text-secondary">
-                      e.g. <code className="px-1 py-0.5 bg-surface-tertiary rounded text-red-500">{String(changes[0].oldValue)}</code>
+                    <div className="mt-1.5 text-xs leading-5 text-text-secondary">
+                      e.g. <code className="rounded bg-surface-tertiary px-1 py-px text-red-500">{String(changes[0].oldValue)}</code>
                       {' → '}
-                      <code className="px-1 py-0.5 bg-surface-tertiary rounded text-green-500">{changes[0].newValue === null ? '∅ empty' : String(changes[0].newValue)}</code>
+                      <code className="rounded bg-surface-tertiary px-1 py-px text-green-500">{changes[0].newValue === null ? '∅ empty' : String(changes[0].newValue)}</code>
                     </div>
                   )}
                 </div>
@@ -289,15 +294,6 @@ function FixIcon() {
   return (
     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  )
-}
-
-function ReviewIcon() {
-  return (
-    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
     </svg>
   )
 }

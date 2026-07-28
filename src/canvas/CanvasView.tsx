@@ -66,7 +66,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const selectNode = useProjectStore((state) => state.selectNode)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
   
-  const runtimeCacheInfo = useTableRuntimeStore((state) => state.cacheInfo)
   const runtimeSchemas = useTableRuntimeStore((state) => state.schemas)
   const profiles = useProfilingStore((state) => state.profiles)
   const profilesLoading = useProfilingStore((state) => state.loading)
@@ -118,7 +117,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
       data: {
         ...node,
         schema: runtimeSchemas[node.id] ?? ('schema' in node ? node.schema : undefined),
-        cacheInfo: runtimeCacheInfo[node.id],
         selected: node.id === selectedNodeId,
         profile: (node.kind === 'source_table' || node.kind === 'derived_table') 
           ? profiles[node.id] 
@@ -135,7 +133,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     }))
   }, [
     projectNodes,
-    runtimeCacheInfo,
     runtimeSchemas,
     selectedNodeId,
     profiles,

@@ -311,7 +311,7 @@ export function GridView({ tableId }: GridViewProps) {
         <GridToolbar
           totalRows={totalRows} unfilteredTotalRows={unfilteredTotalRows} columnCount={columns.length}
           isDirty={isDirty}
-          isMaterializing={isMaterializing} isComputing={isComputing}
+          isComputing={isComputing}
           showFilterPanel={showFilterPanel} showSuggestions={showSuggestions}
           rowInsertionDescription={getRowInsertionDescription()} columnInsertionDescription={getColumnInsertionDescription()}
           onAddColumn={handleAddColumn}
