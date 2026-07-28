@@ -188,6 +188,17 @@ export function AppHeader({
             </div>
           )}
 
+          {isSaving && (
+            <div
+              className="flex shrink-0 items-center gap-1.5 text-text-tertiary"
+              role="status"
+              aria-live="polite"
+            >
+              <LoadingSpinner size="sm" className="h-3 w-3" />
+              <span className="hidden text-xs sm:inline">Saving...</span>
+            </div>
+          )}
+
           <div
             className="relative"
             ref={dropdownRef}
@@ -212,8 +223,8 @@ export function AppHeader({
               disabled={isExporting || isImporting}
               aria-haspopup="menu"
               aria-expanded={exportDropdownOpen}
-              aria-controls="project-export-menu"
-              aria-label="Export"
+              aria-controls="project-actions-menu"
+              aria-label="Import or export project"
               className="btn btn-secondary min-h-11 min-w-11 gap-2 p-0 sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5"
             >
               {(isExporting || isImporting) ? (
@@ -228,7 +239,7 @@ export function AppHeader({
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                   </svg>
-                  <span className="hidden sm:inline">Export</span>
+                  <span className="hidden sm:inline">Import / Export</span>
                   <svg className="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -283,9 +294,9 @@ export function AppHeader({
         </div>
       )}
 
-      {isSaving && (
+      {viewMode !== 'canvas' && isSaving && (
         <div className="flex items-center gap-1.5 text-text-tertiary" role="status" aria-live="polite">
-          <LoadingSpinner size="sm" className="w-3 h-3" />
+          <LoadingSpinner size="sm" className="h-3 w-3" />
           <span className="hidden text-xs sm:inline">Saving...</span>
         </div>
       )}
@@ -316,8 +327,11 @@ export function AppHeader({
               .then(() => window.location.assign('/login'))
               .catch(() => undefined)
           }}
-          className="btn btn-secondary ml-2"
+          className="btn btn-primary ml-2 gap-2"
         >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
           Sign in to sync
         </button>
       )}

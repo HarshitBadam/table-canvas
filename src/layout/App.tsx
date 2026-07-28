@@ -10,7 +10,6 @@ import { useProjectStore } from '@/state/projectStore'
 import { useReportStore } from '@/report/reportStore'
 import { useApp } from '@/state/AppContext'
 import { LoginPage } from '@/auth/LoginPage'
-import { EarlyAccessPage } from '@/auth/EarlyAccessPage'
 import { LoadingScreen } from '@/components/LoadingScreen'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -61,10 +60,6 @@ export default function App() {
           element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
         />
         <Route
-          path="/early-access"
-          element={isAuthenticated ? <Navigate to="/" replace /> : <EarlyAccessPage />}
-        />
-        <Route
           path="/p/:projectId/*"
           element={isAuthenticated ? <MainApp /> : <Navigate to="/login" replace />}
         />
@@ -103,9 +98,10 @@ function MainApp() {
   }, [activeProjectId])
 
   const handleBackToCanvas = useCallback(() => {
+    selectNode(null)
     setViewMode('canvas')
     setNavigationOpen(false)
-  }, [])
+  }, [selectNode])
 
   const exportState = useProjectExport(handleBackToCanvas)
 

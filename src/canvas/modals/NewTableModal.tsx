@@ -46,6 +46,8 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
   const [createError, setCreateError] = useState<string | null>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const creatingRef = useRef(false)
+  const formBodyRef = useRef<HTMLDivElement | null>(null)
+  const rowProgress = ((rowCount - 1) / 99) * 100
 
   useEffect(() => {
     if (isOpen && document.activeElement instanceof HTMLElement) {
@@ -71,6 +73,10 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
       ...columns,
       { id: generateId(), name: `Column ${columns.length + 1}`, type: 'string' }
     ])
+    requestAnimationFrame(() => {
+      const formBody = formBodyRef.current
+      formBody?.scrollTo({ top: formBody.scrollHeight, behavior: 'smooth' })
+    })
   }
 
   const removeColumn = (id: string) => {
@@ -190,9 +196,9 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
             returnFocusElement.focus()
             returnFocusRef.current = null
           }}
-          className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-1rem)] w-full max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl sm:max-w-md"
+          className="fixed inset-0 z-50 m-auto flex h-[min(32rem,calc(100dvh-2rem))] w-full max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl motion-safe:animate-scale-in sm:max-w-md"
         >
-          <div className="border-b border-border-subtle px-4 py-4 sm:px-6">
+          <div className="shrink-0 border-b border-border-subtle px-4 py-4 sm:px-6">
             <Dialog.Title className="text-base font-semibold text-text-primary">
               Create New Table
             </Dialog.Title>
@@ -201,7 +207,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
             </Dialog.Description>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 sm:px-6">
+          <div ref={formBodyRef} className="scrollbar-hide min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 pb-5 pt-4 sm:px-6">
             <div>
               <label
                 htmlFor="new-table-name"
@@ -220,7 +226,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                 maxLength={MAX_TABLE_NAME_LENGTH}
                 aria-invalid={Boolean(tableNameError)}
                 aria-describedby={tableNameError ? 'new-table-name-error' : undefined}
-                className="w-full rounded-lg border border-border bg-surface-secondary px-3 py-2.5 text-sm text-text-primary placeholder-text-tertiary focus-visible:border-accent-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green/20"
+                className="w-full rounded-lg bg-surface-secondary px-4 py-3 text-sm font-medium text-text-primary placeholder-text-tertiary shadow-sm transition-[background-color,box-shadow] hover:bg-surface-tertiary focus-visible:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green/30"
                 placeholder="Enter table name"
               />
               {tableNameError && (
@@ -246,11 +252,21 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                   value={rowCount}
                   onChange={(e) => setRowCount(parseInt(e.target.value))}
                   aria-valuetext={`${rowCount} ${rowCount === 1 ? 'row' : 'rows'}`}
-                  className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-surface-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-accent-green [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent-green [&::-webkit-slider-thumb]:shadow-sm"
+                  style={{ background: `linear-gradient(to right, rgb(var(--color-accent-rgb)) ${rowProgress}%, var(--color-surface-secondary) ${rowProgress}%)` }}
+                  className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-accent-green [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent-green [&::-webkit-slider-thumb]:shadow-sm"
                 />
-                <div className="w-14 px-2 py-1.5 text-sm bg-surface-secondary border border-border rounded-lg text-text-primary text-center font-medium">
-                  {rowCount}
-                </div>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={rowCount}
+                  onChange={(event) => {
+                    const nextValue = Number(event.target.value)
+                    setRowCount(Math.min(100, Math.max(1, Number.isFinite(nextValue) ? nextValue : 1)))
+                  }}
+                  aria-label="Starting row count"
+                  className="w-14 rounded-lg bg-surface-secondary px-2 py-2 text-center text-sm font-semibold text-text-primary tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-accent-green/30"
+                />
               </div>
             </div>
 
@@ -271,13 +287,13 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                 </button>
               </div>
               
-              <div className="space-y-2 max-h-52 overflow-y-auto">
+              <div className="space-y-2">
                 {columns.map((col, index) => (
                   <div
                     key={col.id} 
                     className="group flex flex-wrap items-center gap-2 rounded-lg bg-surface-secondary p-2 sm:flex-nowrap"
                   >
-                    <span className="text-xs text-text-tertiary w-5 text-center tabular-nums font-medium">
+                    <span className="w-6 shrink-0 text-center text-xs font-semibold tabular-nums text-text-tertiary">
                       {index + 1}
                     </span>
                     <input
@@ -292,7 +308,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                       maxLength={MAX_COLUMN_NAME_LENGTH}
                       aria-invalid={Boolean(columnError)}
                       aria-describedby={columnError ? 'new-table-column-error' : undefined}
-                      className="min-w-36 flex-1 rounded border border-border bg-surface px-2 py-1.5 text-sm text-text-primary focus-visible:border-accent-green focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green/20"
+                      className="min-w-36 flex-1 rounded-md bg-surface px-3 py-2 text-sm font-medium text-text-primary placeholder-text-tertiary shadow-sm transition-[background-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green/30"
                       placeholder="Column name"
                     />
                     <ColumnTypeDropdown
@@ -305,8 +321,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                       onClick={() => removeColumn(col.id)}
                       disabled={columns.length <= 1}
                       aria-label={`Remove ${col.name || `column ${index + 1}`}`}
-                      className="canvas-touch-target rounded p-1.5 text-text-tertiary transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-text-tertiary dark:hover:bg-red-900/20"
-                      title={columns.length <= 1 ? 'A table needs at least one column' : `Remove ${col.name || `column ${index + 1}`}`}
+                      className="canvas-touch-target rounded-md p-2 text-text-tertiary transition-[background-color,color,transform] hover:scale-105 hover:bg-surface-tertiary hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green/30 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100 disabled:hover:bg-transparent disabled:hover:text-text-tertiary"
                     >
                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -323,7 +338,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle bg-surface-secondary/50 p-4 sm:px-6">
+          <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle bg-surface-secondary/50 p-4 sm:px-6">
             <div>
               <span className="text-xs text-text-secondary">
                 {rowCount} rows × {columns.length} columns

@@ -1,9 +1,9 @@
 .join-cols-badge {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--color-text-secondary);
   background: var(--color-surface-tertiary);
-  padding: 4px 10px;
+  padding: 2px 6px;
   border-radius: var(--radius-sm);
 }
 
@@ -18,25 +18,25 @@
 }
 
 .join-col-item {
+  width: 100%;
   display: flex;
   align-items: center;
-  gap: 10px;
   padding: 10px 12px;
   background: var(--color-surface-secondary);
-  border: 1.5px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  border-radius: 8px;
   cursor: pointer;
+  text-align: left;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .join-col-item:hover {
-  border-color: var(--color-text-tertiary);
   background: var(--color-surface-tertiary);
 }
 
-.join-col-item.checked {
-  border-color: rgb(var(--color-accent-rgb) / 0.35);
-  background: rgb(var(--color-accent-rgb) / 0.06);
+.join-col-item.active {
+  background: rgb(var(--color-accent-rgb) / 0.08);
+  border-color: var(--color-accent);
 }
 
 .join-col-item.disabled {
@@ -44,37 +44,9 @@
   cursor: not-allowed;
 }
 
-.join-col-item input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.join-col-checkbox {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.join-col-checkbox svg {
-  width: 12px;
-  height: 12px;
-  color: transparent;
-}
-
-.join-col-item.checked .join-col-checkbox {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-}
-
-.join-col-item.checked .join-col-checkbox svg {
-  color: white;
+.join-col-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb) / 0.3);
 }
 
 .join-col-info {
@@ -101,11 +73,11 @@
   text-overflow: ellipsis;
 }
 
-.join-col-source.left {
+.join-col-source.source {
   color: var(--color-accent-text);
 }
 
-.join-col-source.right {
+.join-col-source.derived {
   color: var(--color-node-derived-text);
 }
 

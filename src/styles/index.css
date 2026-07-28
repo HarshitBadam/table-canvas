@@ -7,6 +7,8 @@
 @import './components.css';
 @import './utilities.css';
 @import './vendor/react-flow.css';
+@import '../auth/login-page.css';
+@import '../auth/legal-dialog.css';
 @import '../dashboard/PrintStyles.css';
 
 @tailwind base;

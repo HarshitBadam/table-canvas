@@ -31,7 +31,7 @@ export function UpgradePrompt({ open, onOpenChange, violation }: UpgradePromptPr
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/40 motion-safe:animate-fade-in" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-modal w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl focus:outline-none motion-safe:animate-scale-in">
+        <Dialog.Content className="fixed inset-0 z-modal m-auto h-fit w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-surface shadow-2xl focus:outline-none motion-safe:animate-scale-in">
           <div className="px-5 pb-4 pt-5">
             <div className="flex items-start gap-3">
               <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${

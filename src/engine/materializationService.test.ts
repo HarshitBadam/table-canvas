@@ -266,6 +266,36 @@ describe('derived table materialization', () => {
     expect(engine.init).toHaveBeenCalled()
   })
 
+  it('does not publish a computing state for a valid derived cache hit', async () => {
+    const node = derivedNode(
+      'table_b',
+      ['table_a'],
+      { isDirty: false, lastUpstreamHash: 'hash_a', lastRowCount: 10 },
+      { columns: [], rowCount: 10 },
+    )
+    useTableRuntimeStore.getState().updateCacheInfo('table_b', {
+      currentVersionHash: computeDerivedVersionHash(
+        'table_b', JSON.stringify(node.plan.transformDef), ['hash_a'],
+      ),
+    })
+    projectStore.nodes = {
+      table_a: sourceNode('table_a', { currentVersionHash: 'hash_a' }),
+      table_b: node,
+    }
+    engine.getSlice.mockResolvedValue({ rows: [], totalRows: 10 })
+    const computingStates: Array<boolean | undefined> = []
+    const unsubscribe = useTableRuntimeStore.subscribe((state) => {
+      computingStates.push(state.cacheInfo.table_b?.isComputing)
+    })
+
+    const result = await computeDerivedTable('table_b')
+    unsubscribe()
+
+    expect(result.status).toBe('cached')
+    expect(engine.executeTransform).not.toHaveBeenCalled()
+    expect(computingStates).not.toContain(true)
+  })
+
   it('recomputes a derived table when its cached engine row count is incomplete', async () => {
     const node = derivedNode(
       'table_b',

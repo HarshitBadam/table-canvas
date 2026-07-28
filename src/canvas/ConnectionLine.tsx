@@ -50,35 +50,6 @@ export function CustomConnectionLine({
         className="connection-line-animated"
       />
       
-      <circle
-        cx={fromX}
-        cy={fromY}
-        r={5}
-        fill="#3d6b52"
-        stroke="white"
-        strokeWidth={2}
-      />
-      
-      <circle
-        cx={toX}
-        cy={toY}
-        r={12}
-        fill="none"
-        stroke="rgba(61, 107, 82, 0.5)"
-        strokeWidth={2}
-        className="connection-target-ring"
-      />
-      
-      <circle
-        cx={toX}
-        cy={toY}
-        r={7}
-        fill="#3d6b52"
-        stroke="white"
-        strokeWidth={2.5}
-        className="animate-pulse"
-      />
-      
       <defs>
         <filter id="connectionGlow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />

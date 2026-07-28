@@ -58,7 +58,7 @@ export function NodeDeletionProvider({ children }: { children: ReactNode }) {
       {children}
       <Dialog.Root open={nodeId !== null} onOpenChange={(open) => !open && closeDialog()}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/50" />
+          <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/50 motion-safe:animate-fade-in" />
           <Dialog.Content
             role="alertdialog"
             onKeyDown={event => {
@@ -67,7 +67,7 @@ export function NodeDeletionProvider({ children }: { children: ReactNode }) {
               event.stopPropagation()
               closeDialog()
             }}
-            className="fixed left-1/2 top-1/2 z-modal w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border-elevation bg-surface p-5 shadow-xl focus:outline-none"
+            className="fixed inset-0 z-modal m-auto h-fit w-[calc(100vw-2rem)] max-w-sm rounded-lg border border-border-elevation bg-surface p-5 shadow-xl focus:outline-none motion-safe:animate-scale-in"
           >
             <Dialog.Title className="text-base font-semibold text-text-primary">
               Delete node?

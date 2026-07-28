@@ -1,0 +1,18 @@
+/*
+ * The document area scrolls once the dialog reaches its viewport-bound cap.
+ * Scrollbars remain visually hidden so the reading surface stays uncluttered.
+ */
+
+.legal-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.legal-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.legal-prose {
+  max-width: 62ch;
+}

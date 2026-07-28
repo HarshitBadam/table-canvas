@@ -245,23 +245,23 @@ export function ImportButton() {
 
       <Dialog.Root open={sheetModalOpen} onOpenChange={setSheetModalOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface rounded-xl shadow-2xl w-full max-w-sm z-50 overflow-hidden border border-border-elevation">
-            <div className="px-5 pt-5 pb-3">
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 motion-safe:animate-fade-in" />
+          <Dialog.Content className="fixed inset-0 z-50 m-auto h-fit w-full max-w-sm overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl motion-safe:animate-scale-in">
+            <div className="flex flex-col items-start border-b border-border-subtle px-5 pb-4 pt-5 text-left">
               <Dialog.Title className="text-base font-semibold text-text-primary">
                 Select Sheets to Import
               </Dialog.Title>
-              <Dialog.Description className="text-sm text-text-secondary mt-0.5">
+              <Dialog.Description className="mt-0.5 text-sm text-text-secondary">
                 This file contains {sheets.length} sheets
               </Dialog.Description>
             </div>
 
-            <div className="max-h-[min(60vh,30rem)] overflow-y-auto px-3 pb-3">
-              <div className="divide-y divide-border-subtle overflow-hidden rounded-lg border border-border-subtle bg-surface">
+            <div className="max-h-[min(60vh,30rem)] overflow-y-auto">
+              <div className="divide-y divide-border-subtle">
                 {sheets.map((sheet, index) => (
                   <label
                     key={sheet.name}
-                    className="flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-surface-secondary focus-within:relative focus-within:z-10 focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-accent-green"
+                    className="flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-secondary"
                   >
                     <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
                       sheet.selected
@@ -293,7 +293,7 @@ export function ImportButton() {
               </div>
             </div>
 
-            <div className="px-5 py-3 border-t border-border-subtle flex items-center justify-between bg-surface-secondary/50">
+            <div className="flex items-center justify-between border-t border-border-subtle bg-surface-secondary/50 px-5 py-3">
               <span className="text-sm text-text-secondary">
                 {selectedCount} selected
               </span>

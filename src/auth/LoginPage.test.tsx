@@ -27,10 +27,31 @@ describe('LoginPage guest entry', () => {
     )
 
     fireEvent.click(screen.getByRole('button', {
-      name: 'Continue without an account',
+      name: 'Continue as guest',
     }))
 
     await waitFor(() => expect(auth.continueAsGuest).toHaveBeenCalledOnce())
-    expect(screen.getByText(/Work stays in this browser/)).toBeInTheDocument()
+    expect(screen.getByText(/Your work stays in this browser/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
+  })
+
+  it('opens the legal documents from the consent notice', () => {
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <LoginPage />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Terms of Service' }))
+    expect(screen.getByRole('dialog', { name: 'Terms of Service' })).toBeVisible()
+    expect(screen.getByText('Using Table Canvas')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Terms of Service' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Privacy Policy' }))
+    expect(screen.getByRole('dialog', { name: 'Privacy Policy' })).toBeVisible()
+    expect(screen.getByText('Guest sessions')).toBeInTheDocument()
   })
 })

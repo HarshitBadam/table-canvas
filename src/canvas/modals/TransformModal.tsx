@@ -63,9 +63,15 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
   , [rightNode])
 
   const allCols = useMemo(() => [
-    ...leftCols.map(c => ({ id: `L:${c.id}`, colId: c.id, name: c.name, type: c.type, side: 'L' as const, table: leftNode?.name })),
-    ...rightCols.map(c => ({ id: `R:${c.id}`, colId: c.id, name: c.name, type: c.type, side: 'R' as const, table: rightNode?.name }))
-  ], [leftCols, rightCols, leftNode?.name, rightNode?.name])
+    ...leftCols.map(c => ({
+      id: `L:${c.id}`, colId: c.id, name: c.name, type: c.type, side: 'L' as const,
+      table: leftNode?.name, sourceTone: leftNode?.kind === 'derived_table' ? 'derived' as const : 'source' as const,
+    })),
+    ...rightCols.map(c => ({
+      id: `R:${c.id}`, colId: c.id, name: c.name, type: c.type, side: 'R' as const,
+      table: rightNode?.name, sourceTone: rightNode?.kind === 'derived_table' ? 'derived' as const : 'source' as const,
+    }))
+  ], [leftCols, rightCols, leftNode?.kind, leftNode?.name, rightNode?.kind, rightNode?.name])
 
   useEffect(() => {
     if (leftNode && rightNode) setOutputName(`${leftNode.name} + ${rightNode.name}`)
@@ -227,9 +233,9 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay className="join-overlay" />
+        <Dialog.Overlay className="join-overlay z-50" />
         <Dialog.Content
-          className="join-modal w-[min(520px,calc(100vw-2rem))]"
+          className="fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl motion-safe:animate-scale-in sm:max-w-lg"
           onCloseAutoFocus={event => {
             const connectSelect = document.getElementById(`connect-${sourceNodeId}`)
             const returnFocusElement = connectSelect instanceof HTMLElement && isVisibleElement(connectSelect)
@@ -240,7 +246,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
             returnFocusElement.focus()
           }}
         >
-          <div className="join-header !gap-3 !px-4 !py-4 sm:!px-6">
+          <div className="join-header">
             <div className="join-header-text">
               <Dialog.Title asChild>
                 <h2>Combine Tables</h2>
@@ -250,7 +256,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               </Dialog.Description>
             </div>
             <Dialog.Close
-              className="canvas-touch-target join-close focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-50"
+              className="canvas-touch-target join-close"
               aria-label="Close combine tables"
               disabled={isCreating}
             >
@@ -260,7 +266,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
             </Dialog.Close>
           </div>
 
-          <div className="join-body !gap-6 !p-4 sm:!p-6">
+          <div className="join-body">
             {(!leftNode || !rightNode) && (
               <p className="text-sm text-red-600" role="alert">
                 One of these tables is no longer available. Close this dialog and choose two tables again.
@@ -278,8 +284,11 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               <>
             <section className="join-section">
               <h3>Columns to Match</h3>
+              <p className="join-section-help">
+                Choose one column from each table to use as the matching key.
+              </p>
               <div className="join-keys max-sm:!flex-col max-sm:!items-stretch">
-                <div className="join-key-group">
+                <div className={`join-key-group ${leftNode?.kind === 'derived_table' ? 'join-key-group-derived' : 'join-key-group-source'}`}>
                   <span className="join-key-label">{leftNode?.name}</span>
                   <JoinColumnSelect
                     value={leftKey}
@@ -293,7 +302,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
                   />
                 </div>
                 <div className="join-key-equals max-sm:!self-center max-sm:!pb-0">=</div>
-                <div className="join-key-group">
+                <div className={`join-key-group ${rightNode?.kind === 'derived_table' ? 'join-key-group-derived' : 'join-key-group-source'}`}>
                   <span className="join-key-label">{rightNode?.name}</span>
                   <JoinColumnSelect
                     value={rightKey}
@@ -322,7 +331,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
                     </button>
                   </>
                 ) : match.rate > 0 ? (
-                  <>{match.rate}% match - {match.rows} rows</>
+                  <>{match.rate}% match across {match.rows} rows</>
                 ) : (
                   <>No values match. Try different columns.</>
                 )}
@@ -354,9 +363,9 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
             />
           </div>
 
-          <div className="join-footer !gap-3 !p-4 sm:!px-6">
+          <div className="join-footer">
             <Dialog.Close
-              className="canvas-touch-target join-btn-cancel focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+              className="canvas-touch-target join-btn-cancel"
               disabled={isCreating}
             >
               Cancel
@@ -365,7 +374,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               type="button"
               onClick={() => void handleCreate()}
               disabled={!canCreate || isCreating}
-              className="canvas-touch-target join-btn-create focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+              className="canvas-touch-target join-btn-create"
             >
               {isCreating
                 ? 'Creating table…'

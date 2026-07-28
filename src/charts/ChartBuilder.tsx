@@ -102,7 +102,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/40 motion-safe:animate-fade-in" />
         <Dialog.Content 
-          className="fixed left-1/2 top-1/2 z-modal flex max-h-[calc(100dvh-1rem)] w-[600px] max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl motion-safe:animate-scale-in"
+          className="fixed inset-0 z-modal m-auto flex h-fit max-h-[calc(100dvh-1rem)] w-[600px] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl motion-safe:animate-scale-in"
         >
           <div className="border-b border-border-subtle bg-accent-green/5 px-5 py-4">
             <div className="flex items-center justify-between">
