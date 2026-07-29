@@ -264,9 +264,9 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
                   </div>
                   {changes.length > 0 && (
                     <div className="mt-1.5 text-xs leading-5 text-text-secondary">
-                      e.g. <code className="rounded bg-surface-tertiary px-1 py-px text-red-500">{String(changes[0].oldValue)}</code>
+                      e.g. <code className="rounded bg-surface-tertiary px-1 py-px text-error-text">{String(changes[0].oldValue)}</code>
                       {' → '}
-                      <code className="rounded bg-surface-tertiary px-1 py-px text-green-500">{changes[0].newValue === null ? '∅ empty' : String(changes[0].newValue)}</code>
+                      <code className="rounded bg-surface-tertiary px-1 py-px text-success-dark">{changes[0].newValue === null ? '∅ empty' : String(changes[0].newValue)}</code>
                     </div>
                   )}
                 </div>

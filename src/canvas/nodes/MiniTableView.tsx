@@ -197,14 +197,14 @@ export const MiniTableView = memo(({
           }}
         >
           <div 
-            className="table-header-bg sticky top-0 z-10 grid border-b border-border"
+            className="table-header-bg sticky top-0 z-10 grid border-y border-border"
             style={{ height: HEADER_HEIGHT, gridTemplateColumns }}
             role="row"
           >
             {columns.map((col, idx) => (
               <div
                 key={col.id}
-                className={`flex items-center px-1.5 text-xs font-medium text-accent-green dark:text-accent-text truncate ${
+                className={`flex items-center px-1.5 text-xs font-medium text-text-secondary truncate ${
                   idx < columns.length - 1 ? 'border-r border-border' : ''
                 }`}
                 title={col.name}

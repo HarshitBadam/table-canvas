@@ -6,7 +6,6 @@ import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { ChartRenderer } from './ChartRenderer'
 import { ChartTypeIcon } from './ChartTypeIcon'
 import { useChartData } from './useChartData'
-import { useNavigation } from '@/layout/NavigationContext'
 import type { ChartNode, ChartConfig, ChartType, AggregationType, TableNode } from '@/types'
 
 interface ChartViewProps {
@@ -14,7 +13,6 @@ interface ChartViewProps {
 }
 
 export function ChartView({ chartId }: ChartViewProps) {
-  const { openTable } = useNavigation()
   const nodes = useProjectStore((state) => state.nodes)
   const chartNode = useProjectStore((state) => state.nodes[chartId]) as ChartNode | undefined
   const updateNode = useProjectStore((state) => state.updateNode)
@@ -184,20 +182,18 @@ export function ChartView({ chartId }: ChartViewProps) {
               </div>
             </div>
             <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:gap-3">
+              <span className="hidden text-xs font-medium text-text-tertiary sm:inline">Source</span>
               <SelectField
                 value={sourceTableId}
                 onValueChange={handleSourceChange}
                 ariaLabel="Chart source table"
-                className="h-9 min-w-36 max-w-40 sm:max-w-56"
+                variant="soft"
+                className="h-9 min-w-36 max-w-44 rounded-md px-2.5 text-xs font-medium shadow-none sm:max-w-56"
                 options={tables.map(table => ({ value: table.id, label: table.name }))}
               />
-              <button
-                onClick={() => openTable(sourceTableId)}
-                className="max-w-40 truncate rounded-md bg-accent-green/10 px-3 py-1.5 text-sm font-medium text-accent-green transition-colors hover:bg-accent-green/20 sm:max-w-56"
-              >
-                {sourceTable?.name}
-              </button>
-              <span className="hidden text-sm text-gray-400 sm:inline">{chartData.length} points</span>
+              <span className="whitespace-nowrap text-xs font-medium text-text-tertiary">
+                {chartData.length} points
+              </span>
             </div>
           </div>
           

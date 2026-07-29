@@ -13,10 +13,7 @@ interface TableStatsSectionProps {
 export function TableStatsSection({ 
   tableMetrics, 
 }: TableStatsSectionProps) {
-  const [expandedTables, setExpandedTables] = useState<Set<string>>(() => {
-    const first = tableMetrics[0]?.tableId
-    return first ? new Set([first]) : new Set()
-  })
+  const [expandedTables, setExpandedTables] = useState<Set<string>>(() => new Set())
 
   if (tableMetrics.length === 0) return null
 
@@ -118,48 +115,58 @@ function TableCard({
 
   return (
     <div className="table-card bg-surface rounded border border-border shadow-sm overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-secondary/30 transition-colors text-left"
-      >
-        <div className="flex items-center gap-3">
+      <div className="flex items-center hover:bg-surface-secondary/30 transition-colors">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="min-w-0 flex-1 flex items-center gap-3 px-4 py-3 text-left"
+          aria-expanded={isExpanded}
+        >
           <svg 
-            className={`w-4 h-4 text-text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            className={`w-4 h-4 shrink-0 text-text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            aria-hidden="true"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary">{table.tableName}</h3>
-            <p className="text-xs text-text-secondary mt-0.5">
-              {table.rowCount.toLocaleString()} rows - {table.columnCount} columns - {table.freshnessLabel}
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-3">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-text-primary truncate">{table.tableName}</h3>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-secondary">
+              <span>{table.rowCount.toLocaleString()} rows</span>
+              <span>{table.columnCount} columns</span>
+              <span className="text-text-tertiary">{table.freshnessLabel}</span>
+            </div>
+          </div>
+        </button>
+
+        <div className="flex shrink-0 items-center gap-3 pr-4">
           {table.issueCount > 0 ? (
             <span className="px-2.5 py-1 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-xs font-medium">
               {table.issueCount} issue{table.issueCount !== 1 ? 's' : ''}
             </span>
           ) : (
-            <span className="px-2.5 py-1 rounded bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-xs font-medium">
-              Clean
+            <span
+              className="rounded bg-success-light px-2.5 py-1 text-xs font-medium text-success-dark"
+              title="No missing values or other detected quality issues"
+            >
+              No issues found
             </span>
           )}
           
           <button
-            onClick={(e) => { e.stopPropagation(); onOpen() }}
+            type="button"
+            onClick={onOpen}
             className="p-1.5 rounded hover:bg-surface-secondary text-text-tertiary hover:text-text-primary"
-            title="Open table"
+            aria-label={`Open ${table.tableName}`}
+            title={`Open ${table.tableName}`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </button>
         </div>
-      </button>
+      </div>
 
       {/* Column Details - Always rendered for PDF export, hidden via CSS when collapsed */}
       {schema && (

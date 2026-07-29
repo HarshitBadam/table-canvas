@@ -101,7 +101,7 @@
   }
 
   .table-header-bg {
-    background-color: var(--color-accent-soft);
+    background-color: var(--color-surface-secondary);
   }
 
   [data-theme="dark"] .table-header-bg {

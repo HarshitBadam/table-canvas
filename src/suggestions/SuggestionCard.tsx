@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import type { Suggestion, SuggestionCategory, SuggestionConfidence } from '@/types'
 
 function ConfidenceBadge({ confidence }: { confidence: SuggestionConfidence }) {
   const colors = {
-    high: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    high: 'bg-success-light text-success-dark',
     medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
     low: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
   }
@@ -116,13 +116,18 @@ export function SuggestionCard({
   onApply: () => void
   onDismiss: () => void
 }) {
-  const [showWhy, setShowWhy] = useState(false)
+  const [isWhyCollapsed, setIsWhyCollapsed] = useState(false)
   const { canEdit } = useWorkspaceLease()
 
   const actionLabel = getActionLabel(suggestion)
   const detailsId = `suggestion-details-${suggestion.id}`
   const summaryId = `suggestion-summary-${suggestion.id}`
   const whyId = `suggestion-why-${suggestion.id}`
+  const showWhy = isExpanded && !isWhyCollapsed
+
+  useEffect(() => {
+    if (!isExpanded) setIsWhyCollapsed(false)
+  }, [isExpanded])
 
   return (
     <li className={`transition-colors ${isExpanded ? 'bg-surface-secondary/60' : 'bg-surface hover:bg-surface-secondary/40'}`}>
@@ -174,13 +179,13 @@ export function SuggestionCard({
           id={detailsId}
           role="region"
           aria-labelledby={summaryId}
-          className="mx-4 border-t border-border-subtle pb-4 pl-9 pt-3"
+          className="mx-4 pb-4 pl-9"
         >
           {suggestion.why && suggestion.why.length > 0 && (
             <div className="mb-3">
               <button 
                 type="button"
-                onClick={() => setShowWhy(!showWhy)}
+                onClick={() => setIsWhyCollapsed(showWhy)}
                 aria-expanded={showWhy}
                 aria-controls={whyId}
                 className="text-xs text-accent-green hover:text-accent-green/80 flex items-center gap-1 transition-colors"

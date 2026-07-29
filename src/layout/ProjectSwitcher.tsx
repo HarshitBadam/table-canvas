@@ -9,7 +9,12 @@ interface MenuPosition {
   width: number
   maxHeight: number
 }
-export function ProjectSwitcher() {
+
+interface ProjectSwitcherProps {
+  mode?: 'full' | 'switch-only'
+}
+
+export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
   const {
     projectId,
     projectName,
@@ -329,71 +334,77 @@ export function ProjectSwitcher() {
               </p>
             )}
 
-            <ProjectSwitcherActions
-              isRenaming={isRenaming}
-              renameName={renameName}
-              projectName={projectName}
-              isDuplicating={isDuplicating}
-              isPending={isProjectOperationPending}
-              canDelete={projects.length > 1}
-              onRenameNameChange={setRenameName}
-              onRenameStart={() => {
-                setRenameName(projectName)
-                setIsRenaming(true)
-              }}
-              onRenameCancel={() => setIsRenaming(false)}
-              onRenameSubmit={handleRename}
-              onCreate={() => {
-                setMenuOpen(false)
-                setCreateOpen(true)
-              }}
-              onDuplicate={() => void handleDuplicate()}
-              onDelete={() => {
-                setError(null)
-                setMenuOpen(false)
-                setDeleteOpen(true)
-              }}
-            />
+            {mode === 'full' && (
+              <ProjectSwitcherActions
+                isRenaming={isRenaming}
+                renameName={renameName}
+                projectName={projectName}
+                isDuplicating={isDuplicating}
+                isPending={isProjectOperationPending}
+                canDelete={projects.length > 1}
+                onRenameNameChange={setRenameName}
+                onRenameStart={() => {
+                  setRenameName(projectName)
+                  setIsRenaming(true)
+                }}
+                onRenameCancel={() => setIsRenaming(false)}
+                onRenameSubmit={handleRename}
+                onCreate={() => {
+                  setMenuOpen(false)
+                  setCreateOpen(true)
+                }}
+                onDuplicate={() => void handleDuplicate()}
+                onDelete={() => {
+                  setError(null)
+                  setMenuOpen(false)
+                  setDeleteOpen(true)
+                }}
+              />
+            )}
           </div>
           , document.body)}
       </div>
 
-      <CreateProjectDialog
-        open={createOpen}
-        name={name}
-        error={error}
-        isCreating={isCreating}
-        showCapacityFeedback={showCapacityFeedback}
-        tier={user?.tier ?? 'guest'}
-        onNameChange={setName}
-        onSubmit={() => void handleCreate()}
-        onSignIn={() => void handleSignIn()}
-        onOpenChange={(open) => {
-          if (isCreating) return
-          setCreateOpen(open)
-          if (!open) {
-            setError(null)
-            setShowCapacityFeedback(false)
-            requestAnimationFrame(() => triggerRef.current?.focus())
-          }
-        }}
-      />
+      {mode === 'full' && (
+        <>
+          <CreateProjectDialog
+            open={createOpen}
+            name={name}
+            error={error}
+            isCreating={isCreating}
+            showCapacityFeedback={showCapacityFeedback}
+            tier={user?.tier ?? 'guest'}
+            onNameChange={setName}
+            onSubmit={() => void handleCreate()}
+            onSignIn={() => void handleSignIn()}
+            onOpenChange={(open) => {
+              if (isCreating) return
+              setCreateOpen(open)
+              if (!open) {
+                setError(null)
+                setShowCapacityFeedback(false)
+                requestAnimationFrame(() => triggerRef.current?.focus())
+              }
+            }}
+          />
 
-      <DeleteProjectDialog
-        open={deleteOpen}
-        projectName={projectName}
-        error={error}
-        isDeleting={isDeleting}
-        onDelete={() => void handleDelete()}
-        onOpenChange={(open) => {
-          if (isDeleting) return
-          setDeleteOpen(open)
-          if (!open) {
-            setError(null)
-            requestAnimationFrame(() => triggerRef.current?.focus())
-          }
-        }}
-      />
+          <DeleteProjectDialog
+            open={deleteOpen}
+            projectName={projectName}
+            error={error}
+            isDeleting={isDeleting}
+            onDelete={() => void handleDelete()}
+            onOpenChange={(open) => {
+              if (isDeleting) return
+              setDeleteOpen(open)
+              if (!open) {
+                setError(null)
+                requestAnimationFrame(() => triggerRef.current?.focus())
+              }
+            }}
+          />
+        </>
+      )}
     </div>
   )
 }
