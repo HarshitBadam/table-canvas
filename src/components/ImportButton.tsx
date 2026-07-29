@@ -5,7 +5,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import type { WorkBook } from 'xlsx'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore } from '@/state/dataStore'
-import { useAppAuth } from '@/state/AppContext'
+import { useApp, useAppAuth } from '@/state/AppContext'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { checkFileSize, checkRowCount, checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
@@ -23,6 +23,7 @@ export function ImportButton() {
   const addSourceTable = useProjectStore((state) => state.addSourceTable)
   const setTableData = useDataStore((state) => state.setTableData)
   const { user } = useAppAuth()
+  const { importProject } = useApp()
   const { canEdit } = useWorkspaceLease()
 
   const [isImporting, setIsImporting] = useState(false)
@@ -49,6 +50,33 @@ export function ImportButton() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    const extension = file.name.split('.').pop()?.toLowerCase()
+
+    if (extension === 'json' || extension === 'zip') {
+      setIsImporting(true)
+      setImportError(null)
+      setFileName(file.name)
+      try {
+        const { parseImportFile } = await import('@/persistence/exportImport')
+        const parsed = await parseImportFile(file)
+        await importProject({
+          name: parsed.name,
+          nodes: parsed.nodes,
+          edges: parsed.edges,
+          patches: parsed.patches,
+          reports: parsed.reports,
+        })
+      } catch (error: unknown) {
+        console.error('Project import error:', error)
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        setImportError(`Failed to import project: ${message}`)
+      } finally {
+        setIsImporting(false)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+      return
+    }
+
     const sizeCheck = checkFileSize(file.size, tier)
     if (!sizeCheck.ok) {
       showViolation(sizeCheck)
@@ -61,8 +89,6 @@ export function ImportButton() {
     setFileName(file.name)
 
     try {
-      const extension = file.name.split('.').pop()?.toLowerCase()
-
       if (extension === 'csv') {
         const { parseCSVFile } = await import('@/persistence/importParsers')
         const nodes = useProjectStore.getState().nodes
@@ -124,7 +150,7 @@ export function ImportButton() {
           setSheetModalOpen(true)
         }
       } else {
-        setImportError('Unsupported file type. Please use CSV or Excel files.')
+        setImportError('Unsupported file type. Please use a CSV, Excel, or TableCanvas project file.')
       }
     } catch (error: unknown) {
       console.error('Import error:', error)
@@ -212,7 +238,7 @@ export function ImportButton() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv,.xlsx,.xls"
+        accept=".csv,.xlsx,.xls,.json,.tablecanvas.json,.zip,.tablecanvas.zip"
         onChange={handleFileSelect}
         className="hidden"
       />

@@ -154,7 +154,7 @@ export function DeleteProjectDialog({
               disabled={isDeleting}
               onClick={onDelete}
               aria-busy={isDeleting}
-              className="btn bg-red-600 text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn btn-danger"
             >
               {isDeleting ? 'Deleting…' : error ? 'Try again' : 'Delete project'}
             </button>

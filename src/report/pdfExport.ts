@@ -186,7 +186,7 @@ export async function exportReportToPDF(
   const contentClone = contentElement.cloneNode(true) as HTMLElement;
   
   const selectorsToRemove = [
-    '.report-toolbar-v2',
+    '[data-report-toolbar]',
     '.block-toolbar',
     '.slash-command-menu',
     '.ProseMirror-gapcursor',

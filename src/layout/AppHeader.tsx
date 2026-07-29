@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useProjectStore } from '@/state/projectStore'
-import { useReportStore } from '@/report/reportStore'
 import { useApp, useAppAuth } from '@/state/AppContext'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
@@ -32,8 +31,6 @@ export function AppHeader({
   const canRedo = useProjectStore(state => state.history.future.length > 0)
   const undo = useProjectStore(state => state.undo)
   const redo = useProjectStore(state => state.redo)
-  const [isExportingReport, setIsExportingReport] = useState(false)
-  const [reportExportError, setReportExportError] = useState<string | null>(null)
   const exportButtonRef = useRef<HTMLButtonElement>(null)
   const exportMenuModalityRef = useRef<'pointer' | 'keyboard'>('pointer')
 
@@ -98,29 +95,6 @@ export function AppHeader({
     handleImportClick()
   }, [handleImportClick, restoreExportTriggerFocus])
 
-  const handleExportPDF = useCallback(async () => {
-    const reportContent = document.querySelector('.report-view .tiptap-editor-content')
-    const currentReportId = useReportStore.getState().selectedReportId
-    const report = currentReportId ? useReportStore.getState().reports[currentReportId] : null
-    if (!reportContent || !report) {
-      setReportExportError('Open a report before exporting.')
-      return
-    }
-    setIsExportingReport(true)
-    setReportExportError(null)
-    try {
-      await useReportStore.getState().flushSaves()
-      const { exportReportToPDF } = await import('@/report/pdfExport')
-      await exportReportToPDF(reportContent as HTMLElement, {
-        reportName: report.name || 'Report',
-      })
-    } catch (error) {
-      setReportExportError(error instanceof Error ? error.message : 'PDF export failed')
-    } finally {
-      setIsExportingReport(false)
-    }
-  }, [])
-
   return (
     <header className="safe-area-top flex min-h-16 shrink-0 items-center gap-2 border-b border-border bg-surface px-2 sm:gap-3 sm:px-3">
       <button
@@ -145,25 +119,17 @@ export function AppHeader({
         <ChartHeaderContent selectedNode={selectedNode} />
       )}
       {viewMode === 'dashboard' && (
-        <ProjectSwitcherHeader />
+        <ProjectSwitcherHeader mode="switch-only" />
       )}
       {viewMode === 'report' && (
         <>
-          <ProjectSwitcherHeader />
-          {reportExportError && (
-            <span className="sr-only max-w-48 truncate text-xs text-error-text md:not-sr-only md:inline" role="alert">{reportExportError}</span>
+          <ProjectSwitcherHeader mode="switch-only" />
+          {isSaving && (
+            <div className="flex shrink-0 items-center gap-1.5 text-text-tertiary" role="status" aria-live="polite">
+              <LoadingSpinner size="sm" className="h-3 w-3" />
+              <span className="hidden text-xs sm:inline">Saving...</span>
+            </div>
           )}
-          <button
-            onClick={handleExportPDF}
-            disabled={isExportingReport}
-            className="btn btn-secondary min-h-11 min-w-11 gap-2 p-0 text-sm sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5"
-            aria-label={isExportingReport ? 'Exporting report' : 'Export report as PDF'}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span className="hidden sm:inline">{isExportingReport ? 'Exporting…' : 'Export PDF'}</span>
-          </button>
         </>
       )}
       {viewMode === 'canvas' && (
@@ -288,7 +254,7 @@ export function AppHeader({
         </div>
       )}
 
-      {viewMode !== 'canvas' && isSaving && (
+      {viewMode !== 'canvas' && viewMode !== 'report' && isSaving && (
         <div className="flex items-center gap-1.5 text-text-tertiary" role="status" aria-live="polite">
           <LoadingSpinner size="sm" className="h-3 w-3" />
           <span className="hidden text-xs sm:inline">Saving...</span>
@@ -372,11 +338,11 @@ function ChartHeaderContent({
   )
 }
 
-function ProjectSwitcherHeader() {
+function ProjectSwitcherHeader({ mode = 'full' }: { mode?: 'full' | 'switch-only' }) {
   return (
     <>
       <div className="flex self-stretch items-center border-r border-border-subtle pr-2 sm:pr-3">
-        <ProjectSwitcher mode="switch-only" />
+        <ProjectSwitcher mode={mode} />
       </div>
       <div className="flex-1" />
     </>

@@ -218,9 +218,7 @@ body {
   }
 
   .grid-autofill-handle,
-  .column-filter-trigger,
-  .report-toolbar-v2-add,
-  .report-toolbar-v2-action {
+  .column-filter-trigger {
     min-width: 44px;
     min-height: 44px;
   }
@@ -230,9 +228,6 @@ body {
     bottom: 16px;
   }
 
-  .report-toolbar-v2-insert-menu > button {
-    min-height: 44px;
-  }
 }
 
 @media (hover: none) {

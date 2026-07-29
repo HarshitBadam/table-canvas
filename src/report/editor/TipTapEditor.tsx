@@ -32,6 +32,7 @@ export interface TipTapEditorProps {
   editable?: boolean;
   placeholder?: string;
   onOpenTable?: (tableId: string) => void;
+  onEditorReady?: (editor: Editor | null) => void;
   className?: string;
 }
 
@@ -55,6 +56,7 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
       editable = true,
       placeholder = "Type '/' for commands...",
       onOpenTable,
+      onEditorReady,
       className = '',
     },
     ref
@@ -107,6 +109,11 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
         },
       },
     });
+
+    useEffect(() => {
+      onEditorReady?.(editor);
+      return () => onEditorReady?.(null);
+    }, [editor, onEditorReady]);
 
     useEffect(() => {
       const container = containerRef.current;
