@@ -155,7 +155,7 @@ export function SuggestionsPanel({
                   onCountChange={setEffectiveCleaningCount}
                 />
               ) : !error ? (
-                <div className="flex-1 overflow-y-auto py-3" aria-busy={showLoading}>
+                <div className="flex-1 overflow-y-auto" aria-busy={showLoading}>
                   {showLoading && (
                     <div className="space-y-3 px-4" role="status" aria-label="Analyzing table">
                       {[1, 2, 3, 4].map((i) => (
@@ -177,7 +177,7 @@ export function SuggestionsPanel({
                   {!showLoading && filteredSuggestions.length > 0 && (
                     <ul
                       aria-label="Suggestions"
-                      className="divide-y divide-border-subtle"
+                      className="divide-y divide-border-subtle border-b border-border-subtle"
                     >
                       {filteredSuggestions.map((suggestion) => (
                         <SuggestionCard

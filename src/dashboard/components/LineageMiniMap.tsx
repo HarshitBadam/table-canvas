@@ -147,8 +147,8 @@ function LineageVisualization({
         >
         <defs>
           <linearGradient id="flowEdgeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#217346" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0.5" />
+            <stop offset="0%" stopColor="#217346" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0.8" />
           </linearGradient>
           
           {/* Solid color for print */}
@@ -168,7 +168,20 @@ function LineageVisualization({
             <path
               d="M 0 0 L 10 5 L 0 10 Z"
               fill="#8B5CF6"
-              opacity="0.6"
+              opacity="0.9"
+            />
+          </marker>
+          <marker
+            id="flowArrowheadChart"
+            markerWidth="10"
+            markerHeight="10"
+            refX="8"
+            refY="5"
+            orient="auto"
+          >
+            <path
+              d="M 0 0 L 10 5 L 0 10 Z"
+              fill="#3B82F6"
             />
           </marker>
         </defs>
@@ -176,6 +189,7 @@ function LineageVisualization({
         {edges.map((edge) => {
           const fromPos = nodePositions.get(edge.from)
           const toPos = nodePositions.get(edge.to)
+          const targetNode = nodes.find(node => node.id === edge.to)
           
           if (!fromPos || !toPos) return null
           
@@ -204,10 +218,12 @@ function LineageVisualization({
               <path
                 d={path}
                 fill="none"
-                stroke="url(#flowEdgeGradient)"
-                strokeWidth={2}
+                stroke={targetNode?.kind === 'chart' ? '#3B82F6' : 'url(#flowEdgeGradient)'}
+                strokeWidth={2.25}
                 strokeLinecap="round"
-                markerEnd="url(#flowArrowhead)"
+                markerEnd={targetNode?.kind === 'chart'
+                  ? 'url(#flowArrowheadChart)'
+                  : 'url(#flowArrowhead)'}
                 className="lineage-edge transition-all"
               />
             </g>

@@ -34,7 +34,7 @@ export function SelectField({
     <Select.Root value={value} onValueChange={onValueChange} disabled={disabled}>
       <Select.Trigger
         aria-label={ariaLabel}
-        className={`flex h-10 w-full items-center justify-between gap-3 text-left outline-none disabled:cursor-not-allowed disabled:opacity-50 ${triggerStyle} ${className}`}
+        className={`flex h-10 w-full items-center justify-between gap-3 text-left outline-none [&>span]:min-w-0 [&>span]:truncate disabled:cursor-not-allowed disabled:opacity-50 ${triggerStyle} ${className}`}
       >
         <Select.Value placeholder={placeholder} />
         <Select.Icon className="shrink-0 text-text-tertiary">
@@ -46,16 +46,20 @@ export function SelectField({
           position="popper"
           sideOffset={6}
           collisionPadding={8}
-          className="z-popover max-h-64 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg bg-surface shadow-lg ring-1 ring-border-elevation motion-safe:animate-scale-in"
+          className="z-popover max-h-64 min-w-[var(--radix-select-trigger-width)] w-max max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg bg-surface shadow-lg ring-1 ring-border-elevation motion-safe:animate-scale-in"
         >
           <Select.Viewport>
             {options.map(option => (
               <Select.Item
                 key={option.value}
                 value={option.value}
-                className="relative flex min-h-10 w-full cursor-default select-none items-center px-3 pr-9 text-sm font-medium text-text-secondary outline-none transition-colors data-[highlighted]:bg-surface-tertiary data-[highlighted]:text-text-primary data-[state=checked]:text-accent-text"
+                className="relative flex min-h-10 w-full min-w-0 cursor-default select-none items-center px-3 pr-9 text-sm font-medium text-text-secondary outline-none transition-colors data-[highlighted]:bg-surface-tertiary data-[highlighted]:text-text-primary data-[state=checked]:text-accent-text"
               >
-                <Select.ItemText>{option.label}</Select.ItemText>
+                <Select.ItemText asChild>
+                  <span className="block min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" title={option.label}>
+                    {option.label}
+                  </span>
+                </Select.ItemText>
                 <Select.ItemIndicator className="absolute right-3 text-accent-green">
                   <CheckIcon />
                 </Select.ItemIndicator>

@@ -16,7 +16,6 @@ interface AppHeaderProps {
   viewMode: ViewMode
   selectedNode: ProjectNode | null
   exportState: ProjectExportState
-  onBackToCanvas: () => void
   onOpenNavigation: () => void
 }
 
@@ -24,7 +23,6 @@ export function AppHeader({
   viewMode,
   selectedNode,
   exportState,
-  onBackToCanvas,
   onOpenNavigation,
 }: AppHeaderProps) {
   const { user, logout, leaveGuest } = useAppAuth()
@@ -135,11 +133,11 @@ export function AppHeader({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
-      <div className="flex self-stretch items-center border-r border-border-subtle pr-2 sm:pr-3">
-        {viewMode === 'canvas'
-          ? <ProjectSwitcher />
-          : <BackToCanvasButton onClick={onBackToCanvas} />}
-      </div>
+      {viewMode === 'canvas' && (
+        <div className="flex self-stretch items-center border-r border-border-subtle pr-2 sm:pr-3">
+          <ProjectSwitcher />
+        </div>
+      )}
       {viewMode === 'grid' && selectedNode && (
         <GridHeaderContent selectedNode={selectedNode} />
       )}
@@ -147,15 +145,11 @@ export function AppHeader({
         <ChartHeaderContent selectedNode={selectedNode} />
       )}
       {viewMode === 'dashboard' && (
-        <SimpleHeaderContent label="Dashboard" />
+        <ProjectSwitcherHeader />
       )}
       {viewMode === 'report' && (
         <>
-          <svg className="hidden w-4 h-4 text-text-tertiary sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span className="hidden text-sm font-medium sm:inline">Report</span>
-          <div className="flex-1" />
+          <ProjectSwitcherHeader />
           {reportExportError && (
             <span className="sr-only max-w-48 truncate text-xs text-error-text md:not-sr-only md:inline" role="alert">{reportExportError}</span>
           )}
@@ -339,17 +333,6 @@ export function AppHeader({
   )
 }
 
-function BackToCanvasButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="btn btn-ghost min-h-11 min-w-11 shrink-0 gap-2 p-0 sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5" aria-label="Back to Canvas">
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-      </svg>
-      <span className="hidden sm:inline">Back to Canvas</span>
-    </button>
-  )
-}
-
 function GridHeaderContent({ selectedNode }: { selectedNode: ProjectNode }) {
   return (
     <>
@@ -389,10 +372,12 @@ function ChartHeaderContent({
   )
 }
 
-function SimpleHeaderContent({ label }: { label: string }) {
+function ProjectSwitcherHeader() {
   return (
     <>
-      <span className="min-w-0 truncate text-sm font-medium">{label}</span>
+      <div className="flex self-stretch items-center border-r border-border-subtle pr-2 sm:pr-3">
+        <ProjectSwitcher mode="switch-only" />
+      </div>
       <div className="flex-1" />
     </>
   )

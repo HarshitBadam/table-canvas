@@ -11,7 +11,6 @@ import { useSuggestionNavigation } from '@/suggestions/useSuggestionNavigation'
 import { LineageMiniMap } from './components/LineageMiniMap'
 import { TableStatsSection } from './components/TableStatsSection'
 import { QuickActionsSection } from './components/QuickActionsSection'
-import { CompletenessBar } from './components/ColumnStatComponents'
 import { useProjectHealthMetrics } from './useProjectHealthMetrics'
 import { useDataQualityMetrics } from './useDataQualityMetrics'
 import { useTopSuggestions } from './useTopSuggestions'
@@ -60,21 +59,19 @@ export function Dashboard() {
 
   return (
     <div className="h-full flex flex-col bg-canvas">
-      <header className="flex items-center justify-between border-b border-border bg-surface px-3 py-2.5 print:hidden sm:px-5">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+      <header className="border-b border-border bg-surface px-3 py-3 print:hidden sm:px-5">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
           <h1 className="text-sm font-semibold text-text-primary">Project Overview</h1>
           {hasData && (
-            <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-text-secondary">
-              <span className="hidden text-text-tertiary sm:inline">-</span>
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
               <Stat value={totalTables} label="Tables" />
-              <span className="text-text-tertiary">-</span>
               <Stat value={formatNumber(totalRows)} label="Rows" />
-              <span className="text-text-tertiary">-</span>
-              <Stat value={totalColumns} label="Cols" />
-              <span className="hidden text-text-tertiary sm:inline">-</span>
-              <span className="hidden sm:inline-flex">
-                <CompletenessBar value={overallCompleteness} barWidth="w-12" barHeight="h-1" />
-              </span>
+              <Stat value={totalColumns} label="Columns" />
+              <Stat
+                value={`${overallCompleteness}%`}
+                label="Complete"
+                status={overallCompleteness >= 95 ? 'good' : overallCompleteness >= 80 ? 'warning' : 'critical'}
+              />
             </div>
           )}
         </div>
@@ -117,10 +114,29 @@ export function Dashboard() {
   )
 }
 
-function Stat({ value, label }: { value: string | number; label: string }) {
+function Stat({
+  value,
+  label,
+  status,
+}: {
+  value: string | number
+  label: string
+  status?: 'good' | 'warning' | 'critical'
+}) {
+  const valueColor = status === 'good'
+    ? 'text-success-dark'
+    : status === 'warning'
+      ? 'text-amber-600 dark:text-amber-400'
+      : status === 'critical'
+        ? 'text-red-600 dark:text-red-400'
+        : 'text-text-primary'
+
   return (
-    <span className="text-text-secondary">
-      <span className="font-medium text-text-primary">{value}</span> {label}
+    <span className="inline-flex items-baseline gap-1 rounded-md bg-surface-secondary px-2 py-1 text-text-secondary">
+      <span className={`font-semibold ${valueColor}`}>
+        {value}
+      </span>
+      <span>{label}</span>
     </span>
   )
 }

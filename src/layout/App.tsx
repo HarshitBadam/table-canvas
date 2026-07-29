@@ -175,7 +175,6 @@ function MainApp() {
               viewMode={visibleViewMode}
               selectedNode={selectedNode}
               exportState={exportState}
-              onBackToCanvas={handleBackToCanvas}
               onOpenNavigation={() => setNavigationOpen(true)}
             />
 

@@ -10,7 +10,7 @@ export const Toast = forwardRef<HTMLDivElement, {
     return () => clearTimeout(timer)
   }, [onDismiss])
 
-  const bgColor = notification.type === 'success' ? 'bg-green-600' :
+  const bgColor = notification.type === 'success' ? 'bg-success' :
                   notification.type === 'error' ? 'bg-red-600' : 'bg-blue-600'
 
   return (

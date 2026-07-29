@@ -17,7 +17,7 @@
   --color-accent-green-dark: #185c37;
   --color-accent-green-light: #2d8b57;
   --color-accent-green-hover: #185c37;
-  --color-success: #107c41;
+  --color-success: #217346;
   --color-warning: #ff9500;
   --color-error: #ff3b30;
   --color-warning-text: #92400e;
@@ -34,7 +34,7 @@
   --color-data-blue-text: oklch(46% 0.18 262.9);
 
   --color-accent-rgb: 33 115 70;
-  --color-success-rgb: 16 124 65;
+  --color-success-rgb: 33 115 70;
   --color-warning-rgb: 255 149 0;
   --color-error-rgb: 255 59 48;
   --color-node-derived-rgb: 168 85 247;

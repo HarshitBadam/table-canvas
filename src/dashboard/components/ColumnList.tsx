@@ -1,5 +1,6 @@
-import type { ColumnProfile, TableSchema } from '@/types'
+import type { ColumnProfile, ColumnSchema, TableSchema } from '@/types'
 import { ColumnTypeBadge } from '@/components/ColumnTypeBadge'
+import { isUniqueIdentifier } from '@/suggestions/engine/classification'
 import {
   Stat,
   CompletenessBar,
@@ -60,7 +61,7 @@ function ColumnRow({
   profile,
   rowCount,
 }: {
-  column: { id: string; name: string; type: string }
+  column: ColumnSchema
   profile?: ColumnProfile
   rowCount: number
 }) {
@@ -72,6 +73,7 @@ function ColumnRow({
 
   const completeness = profile ? Math.round(100 - (profile.missingPercent || 0)) : 100
   const missingCount = profile?.missingCount || 0
+  const isIdentifier = profile ? isUniqueIdentifier(column, profile, rowCount) : false
 
   return (
     <div className="px-4 py-3">
@@ -93,17 +95,21 @@ function ColumnRow({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3">
         {profile ? (
           <>
-            {isNumeric && <NumericStats profile={profile} rowCount={rowCount} />}
-            {isString && <StringStats profile={profile} rowCount={rowCount} />}
+            {isNumeric && (
+              <NumericStats profile={profile} rowCount={rowCount} isIdentifier={isIdentifier} />
+            )}
+            {isString && (
+              <StringStats profile={profile} rowCount={rowCount} isIdentifier={isIdentifier} />
+            )}
             {isBoolean && <BooleanStats profile={profile} />}
             {isDate && <DateStats profile={profile} />}
             
-            {profile.distinctCount !== undefined && (
+            {profile.distinctCount !== undefined && !isString && !isIdentifier && (
               <Stat label="Distinct Values" value={profile.distinctCount.toLocaleString()} />
             )}
           </>
         ) : (
-          <Stat label="Values" value={rowCount.toLocaleString()} subtext="(profiling pending)" />
+          <Stat label="Values" value={rowCount.toLocaleString()} subtext="Profiling pending" />
         )}
       </div>
     </div>

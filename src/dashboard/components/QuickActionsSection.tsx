@@ -7,22 +7,6 @@ interface QuickActionsSectionProps {
   isLoading: boolean
 }
 
-function getActionLabel(suggestion: Suggestion): string {
-  const action = suggestion.action
-
-  if (suggestion.category === 'cleaning' || action.kind === 'launchRecipe') {
-    return 'Review in Table'
-  }
-  
-  if (action.kind === 'createChart') {
-    return 'Create Chart'
-  }
-  if (action.kind === 'createDerivedTable') {
-    return 'Create Table'
-  }
-  return 'Apply'
-}
-
 function getSuggestionIcon(suggestion: Suggestion) {
   const category = suggestion.category
   
@@ -71,42 +55,51 @@ export function QuickActionsSection({
 
   if (isLoading) {
     return (
-      <div>
-        <h2 className="mb-3 text-base font-semibold text-text-primary">Suggested Actions</h2>
-        <div className="divide-y divide-border border-y border-border">
+      <section>
+        <header className="mb-3">
+          <h2 className="text-sm font-semibold text-text-primary">Suggested Actions</h2>
+          <p className="text-xs text-text-tertiary">Recommended next steps based on your data</p>
+        </header>
+        <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="flex animate-pulse items-center gap-3 py-4">
+            <div key={i} className="flex animate-pulse items-center gap-3 px-4 py-4">
               <div className="h-8 w-8 shrink-0 rounded bg-surface-secondary" />
               <div className="min-w-0 flex-1">
                 <div className="mb-2 h-4 w-40 rounded bg-surface-secondary" />
                 <div className="h-3 w-64 max-w-full rounded bg-surface-secondary" />
               </div>
-              <div className="h-8 w-24 rounded bg-surface-secondary" />
+              <div className="h-8 w-8 rounded bg-surface-secondary" />
             </div>
           ))}
         </div>
-      </div>
+      </section>
     )
   }
 
   if (topSuggestions.length === 0) {
     return (
-      <div>
-        <h2 className="mb-3 text-base font-semibold text-text-primary">Suggested Actions</h2>
-        <p className="border-y border-border py-5 text-sm text-text-tertiary">
+      <section>
+        <header className="mb-3">
+          <h2 className="text-sm font-semibold text-text-primary">Suggested Actions</h2>
+          <p className="text-xs text-text-tertiary">Recommended next steps based on your data</p>
+        </header>
+        <p className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-text-tertiary shadow-sm">
           No suggestions yet. Import more data to discover insights.
         </p>
-      </div>
+      </section>
     )
   }
 
   return (
-    <div>
-      <h2 className="mb-3 text-base font-semibold text-text-primary">Suggested Actions</h2>
+    <section>
+      <header className="mb-3">
+        <h2 className="text-sm font-semibold text-text-primary">Suggested Actions</h2>
+        <p className="text-xs text-text-tertiary">Recommended next steps based on your data</p>
+      </header>
 
-      <div className="divide-y divide-border border-y border-border">
+      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
         {topSuggestions.map((suggestion) => (
-          <div key={suggestion.id} className="flex items-center gap-3 py-4">
+          <div key={suggestion.id} className="flex items-center gap-3 px-4 py-4">
             <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${getCategoryColor(suggestion.category)}`}>
               {getSuggestionIcon(suggestion)}
             </div>
@@ -134,13 +127,17 @@ export function QuickActionsSection({
                   onApply(suggestion)
                 }
               }}
-              className="btn btn-secondary shrink-0"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
+              aria-label={`Apply suggestion: ${suggestion.title}`}
+              title="Apply suggestion"
             >
-              {getActionLabel(suggestion)}
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m10 6 6 6-6 6" />
+              </svg>
             </button>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   )
 }

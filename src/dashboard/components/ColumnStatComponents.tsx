@@ -27,23 +27,36 @@ export function CompletenessBar({
   value,
   barWidth = 'w-20',
   barHeight = 'h-1.5',
+  label = 'Completeness',
 }: {
   value: number
   /** Tailwind width class for the track. @default 'w-20' */
   barWidth?: string
   /** Tailwind height class for the track. @default 'h-1.5' */
   barHeight?: string
+  /** Visible context for the percentage. @default 'Completeness' */
+  label?: string
 }) {
-  const color = value >= 95 ? 'bg-green-500' : value >= 80 ? 'bg-amber-500' : 'bg-red-500'
+  const color = value >= 95 ? 'bg-success' : value >= 80 ? 'bg-amber-500' : 'bg-red-500'
   const textColor = value >= 95 
-    ? 'text-green-600 dark:text-green-400' 
+    ? 'text-success-dark'
     : value >= 80 
     ? 'text-amber-600 dark:text-amber-400' 
     : 'text-red-600 dark:text-red-400'
 
   return (
-    <div className="flex items-center gap-2">
-      <div className={`${barWidth} ${barHeight} bg-surface-tertiary rounded-sm overflow-hidden`}>
+    <div className="flex items-center gap-2" aria-label={`${label}: ${value}%`}>
+      <span className="text-[10px] font-medium uppercase tracking-wider text-text-tertiary">
+        {label}
+      </span>
+      <div
+        className={`${barWidth} ${barHeight} bg-surface-tertiary rounded-sm overflow-hidden`}
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={value}
+        aria-label={label}
+      >
         <div className={`h-full ${color}`} style={{ width: `${value}%` }} />
       </div>
       <span className={`text-xs font-medium tabular-nums ${textColor}`}>{value}%</span>
@@ -52,14 +65,22 @@ export function CompletenessBar({
 }
 
 
-export function NumericStats({ profile, rowCount }: { profile: ColumnProfile; rowCount: number }) {
-  const isId = profile.isKeyCandidate || 
-    profile.distinctCount === rowCount ||
-    profile.semanticHints?.includes('id')
-  
-  if (isId) {
+export function NumericStats({
+  profile,
+  rowCount,
+  isIdentifier,
+}: {
+  profile: ColumnProfile
+  rowCount: number
+  isIdentifier: boolean
+}) {
+  if (isIdentifier) {
     return (
-      <Stat label="Role" value="Identifier" subtext={`${profile.distinctCount?.toLocaleString() || rowCount} unique`} />
+      <Stat
+        label="Role"
+        value="Identifier"
+        subtext={`${profile.distinctCount?.toLocaleString() || rowCount} unique values, one per row`}
+      />
     )
   }
 
@@ -76,30 +97,34 @@ export function NumericStats({ profile, rowCount }: { profile: ColumnProfile; ro
 }
 
 
-export function StringStats({ profile, rowCount }: { profile: ColumnProfile; rowCount: number }) {
-  const isUnique = profile.distinctCount === rowCount && rowCount > 0
-  const isId = profile.isKeyCandidate || profile.semanticHints?.includes('id')
-  
-  if (isUnique || isId) {
-    const sample = profile.topValues?.[0]?.value
+export function StringStats({
+  profile,
+  rowCount,
+  isIdentifier,
+}: {
+  profile: ColumnProfile
+  rowCount: number
+  isIdentifier: boolean
+}) {
+  if (isIdentifier) {
     return (
       <Stat 
         label="Role" 
         value="Identifier" 
-        subtext={sample ? `e.g. ${String(sample).slice(0, 20)}` : undefined}
+        subtext={`${profile.distinctCount?.toLocaleString() || rowCount} unique values, one per row`}
       />
     )
   }
 
   const distinctPct = rowCount > 0 ? Math.round((profile.distinctCount / rowCount) * 100) : 0
-  const topValues = profile.topValues?.slice(0, 5) || []
+  const topValues = distinctPct < 95 ? profile.topValues?.slice(0, 5) || [] : []
   
   return (
     <>
       <Stat 
         label="Distinct" 
         value={profile.distinctCount?.toLocaleString() || '—'} 
-        subtext={`${distinctPct}% of ${rowCount}`}
+        subtext={distinctPct === 100 ? 'Every value is unique' : `${distinctPct}% of ${rowCount} rows`}
       />
       {topValues.length > 0 && (
         <div className="col-span-2 lg:col-span-3">

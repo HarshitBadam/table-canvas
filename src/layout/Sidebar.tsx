@@ -68,7 +68,7 @@ export function Sidebar({ isOpen = false, onClose = () => undefined }: SidebarPr
         role={isOpen ? 'dialog' : undefined}
         aria-modal={isOpen ? true : undefined}
         aria-label="Primary navigation"
-        className={`safe-area-top fixed inset-y-0 left-0 z-modal flex w-[min(20rem,calc(100vw-3rem))] flex-col border-r border-border bg-surface shadow-lg transition-transform duration-200 lg:visible lg:static lg:z-auto lg:w-64 lg:translate-x-0 lg:shadow-none ${
+        className={`safe-area-top fixed inset-y-0 left-0 z-modal flex w-[min(20rem,calc(100vw-3rem))] flex-col border-r border-border bg-surface shadow-lg transition-transform duration-200 lg:visible lg:static lg:z-auto lg:w-64 lg:translate-x-0 lg:shadow-none lg:transition-none ${
           isOpen ? 'visible translate-x-0' : 'invisible -translate-x-full'
         }`}
       >

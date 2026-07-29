@@ -32,7 +32,6 @@ function HeaderHarness() {
       viewMode="canvas"
       selectedNode={null}
       exportState={exportState}
-      onBackToCanvas={vi.fn()}
       onOpenNavigation={vi.fn()}
     />
   )
