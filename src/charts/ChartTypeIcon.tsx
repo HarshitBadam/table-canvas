@@ -1,32 +1,40 @@
+import type { SVGProps } from 'react'
 import type { ChartType } from '@/types'
 
-export function ChartTypeIcon({ type, className }: { type: ChartType; className?: string }) {
+interface ChartTypeIconProps extends SVGProps<SVGSVGElement> {
+  type: ChartType
+}
+
+export function ChartTypeIcon({ type, className, ...props }: ChartTypeIconProps) {
   switch (type) {
     case 'bar':
       return (
-        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-          <path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z" />
+        <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+          <rect x="4" y="11" width="4" height="9" rx="1" />
+          <rect x="10" y="5" width="4" height="15" rx="1" />
+          <rect x="16" y="13" width="4" height="7" rx="1" />
         </svg>
       )
     case 'line':
       return (
-        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 4 4 6-6" />
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} aria-hidden="true" {...props}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m4 16 4-5 4 3 8-9" />
         </svg>
       )
     case 'pie':
       return (
-        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+        <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true" {...props}>
           <path d="M11 2v20c-5.07-.5-9-4.79-9-10s3.93-9.5 9-10zm2.03 0v8.99H22c-.47-4.74-4.24-8.52-8.97-8.99zm0 11.01V22c4.74-.47 8.5-4.25 8.97-8.99h-8.97z" />
         </svg>
       )
     case 'scatter':
       return (
-        <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-          <circle cx="7" cy="14" r="2" />
-          <circle cx="11" cy="10" r="2" />
-          <circle cx="15" cy="16" r="2" />
-          <circle cx="17" cy="8" r="2" />
+        <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true" {...props}>
+          <circle cx="5.5" cy="15" r="1.75" />
+          <circle cx="9.5" cy="9.5" r="1.75" />
+          <circle cx="13" cy="16" r="1.75" />
+          <circle cx="16.5" cy="10.5" r="1.75" />
+          <circle cx="18.5" cy="5.5" r="1.75" />
         </svg>
       )
     default:

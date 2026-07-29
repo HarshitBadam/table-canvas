@@ -6,6 +6,8 @@ import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspa
 
 interface ReportToolbarProps {
   activeReportId: string | null;
+  onNewReport: () => void;
+  onSelectReport?: () => void;
   onHighlight?: () => void;
   onInsertTable?: () => void;
   onInsertEmbeddedTable?: () => void;
@@ -15,13 +17,14 @@ interface ReportToolbarProps {
 
 export function ReportToolbar({
   activeReportId,
+  onNewReport,
+  onSelectReport,
   onHighlight,
   onInsertTable,
   onInsertEmbeddedTable,
   onInsertChart,
 }: ReportToolbarProps) {
   const reports = useReportStore((state) => state.reports);
-  const addReport = useReportStore((state) => state.addReport);
   const deleteReport = useReportStore((state) => state.deleteReport);
   const duplicateReport = useReportStore((state) => state.duplicateReport);
   const selectReport = useReportStore((state) => state.selectReport);
@@ -132,9 +135,9 @@ export function ReportToolbar({
   };
 
   const handleCreateReport = useCallback(() => {
-    addReport('Untitled Report');
+    onNewReport();
     setShowReportList(false);
-  }, [addReport]);
+  }, [onNewReport]);
 
   const handleDuplicateReport = useCallback(() => {
     if (activeReport) duplicateReport(activeReport.id);
@@ -143,6 +146,7 @@ export function ReportToolbar({
 
   const handleSelectReport = (id: string) => {
     selectReport(id);
+    onSelectReport?.();
     setShowReportList(false);
   };
 
@@ -206,7 +210,7 @@ export function ReportToolbar({
               aria-haspopup="listbox"
               aria-expanded={showReportList}
             >
-              <span>{activeReport?.name || 'Select Report'}</span>
+              <span>{activeReport?.name || 'New report'}</span>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M6 9l6 6 6-6" />
               </svg>

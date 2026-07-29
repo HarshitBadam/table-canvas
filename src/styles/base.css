@@ -71,13 +71,15 @@
   
   --color-border-elevation: rgba(0, 0, 0, 0.04);
   
-  --color-node-source: var(--color-accent-soft);
-  --color-node-source-border: var(--color-accent);
   --color-node-derived: var(--color-derived-soft);
   --color-node-derived-border: oklch(62.7% 0.233 303.9);
   --color-node-derived-text: oklch(54.1% 0.247 293);
-  --color-node-chart: var(--color-success-soft);
-  --color-node-chart-border: var(--color-success);
+  --color-node-source: #e1eee5;
+  --color-node-source-border: #3f624b;
+  --color-node-chart: #ddeee7;
+  --color-node-chart-border: #386856;
+  --color-sidebar-nav-active: var(--color-node-source);
+  --color-sidebar-nav-active-text: var(--color-node-source-border);
   
   --grid-line-color: rgba(33, 115, 70, 0.12);
   --grid-line-subtle: rgba(33, 115, 70, 0.06);
@@ -152,6 +154,8 @@
   --color-node-derived-text: oklch(78% 0.12 300);
   --color-node-chart: var(--color-success-soft);
   --color-node-chart-border: oklch(72% 0.09 152.5);
+  --color-sidebar-nav-active: var(--color-node-source);
+  --color-sidebar-nav-active-text: var(--color-node-source-border);
   
   --edge-color: var(--color-accent);
   

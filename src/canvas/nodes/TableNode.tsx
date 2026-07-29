@@ -7,6 +7,7 @@ import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { MiniTableView } from './MiniTableView'
 import { NODE_WIDTH } from '../canvasConstants'
 import { ColumnTypeBadge } from '@/components/ColumnTypeBadge'
+import { TableTypeIcon } from '@/components/TableTypeIcon'
 
 interface TableNodeData {
   id: string
@@ -104,15 +105,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
               : 'bg-accent-purple shadow-md shadow-accent-purple/30 dark:shadow-sm dark:shadow-black/20'
             }
           `}>
-            {isSource ? (
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3zM4 7v10c0 1.657 3.582 3 8 3s8-1.343 8-3V7M4 12c0 1.657 3.582 3 8 3s8-1.343 8-3" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            )}
+            <TableTypeIcon className="h-4 w-4 text-white" />
           </div>
           
           <div className="min-w-0 flex-1">
