@@ -32,6 +32,24 @@
     color: var(--color-text-primary);
   }
 
+  .sidebar-view-active {
+    background-color: var(--color-sidebar-nav-active);
+    color: var(--color-sidebar-nav-active-text);
+  }
+
+  .sidebar-view-active:hover {
+    background-color: color-mix(in srgb, var(--color-sidebar-nav-active) 82%, var(--color-sidebar-nav-active-text));
+    color: var(--color-sidebar-nav-active-text);
+  }
+
+  .sidebar-node-active {
+    background-color: var(--color-sidebar-nav-active);
+  }
+
+  .sidebar-node-active:hover {
+    background-color: color-mix(in srgb, var(--color-sidebar-nav-active) 82%, var(--color-sidebar-nav-active-text));
+  }
+
   .btn-danger {
     @apply text-white;
     background-color: var(--color-error-solid);

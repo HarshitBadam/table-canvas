@@ -6,6 +6,8 @@ import { useProjectStore } from '@/state/projectStore'
 import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { focusMenuItem } from '@/lib/focusMenuItem'
+import { ChartTypeIcon } from '@/charts/ChartTypeIcon'
+import { TableTypeIcon } from '@/components/TableTypeIcon'
 
 interface SidebarNodeItemProps {
   node: ProjectNode
@@ -109,7 +111,7 @@ export function SidebarNodeItem({
   return (
     <li
       className={`group flex min-h-14 items-center rounded-lg transition-colors ${
-        selected ? 'bg-accent-green/10 hover:bg-accent-green/15' : 'hover:bg-surface-secondary'
+        selected ? 'sidebar-node-active' : 'hover:bg-surface-secondary'
       }`}
     >
       {renaming ? (
@@ -146,7 +148,7 @@ export function SidebarNodeItem({
             onClick={() => onOpen(node.id)}
             aria-current={selected ? 'page' : undefined}
             className={`min-w-0 flex-1 rounded-lg px-2 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-green ${
-              selected ? 'text-accent-green' : 'text-text-primary'
+              selected ? 'text-node-source-border' : 'text-text-primary'
             }`}
           >
             <div className="flex items-center gap-2.5">
@@ -166,7 +168,7 @@ export function SidebarNodeItem({
             aria-expanded={menuOpen}
             className={`sidebar-node-action mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-[opacity,color,background-color] focus:opacity-100 focus-visible:ring-2 focus-visible:ring-accent-green group-hover:opacity-100 group-focus-within:opacity-100 ${
               selected
-                ? 'hover:bg-accent-green/15 hover:text-accent-text'
+                ? 'hover:bg-node-source hover:text-node-source-border'
                 : 'hover:bg-surface-tertiary hover:text-text-primary'
             } ${
               selected || menuOpen ? 'opacity-100' : 'opacity-0'
@@ -216,7 +218,7 @@ function TableDimensions({ node, selected }: { node: TableNode; selected: boolea
   const rows = cacheInfo?.lastRowCount ?? node.schema.rowCount ?? 0
   return (
     <span className={`mt-0.5 text-xs tabular-nums ${
-      selected ? 'text-accent-text' : 'text-text-tertiary'
+      selected ? 'text-node-source-border' : 'text-text-tertiary'
     }`}>
       {rows.toLocaleString()} rows · {columns.toLocaleString()} columns
     </span>
@@ -227,9 +229,7 @@ function NodeIcon({ node }: { node: ProjectNode }) {
   if (node.kind === 'chart') {
     return (
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-node-chart text-node-chart-border">
-        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 19V9m7 10V5m7 14v-7" />
-        </svg>
+        <ChartTypeIcon type={node.plan.chartType} className="h-4 w-4" />
       </span>
     )
   }
@@ -238,10 +238,7 @@ function NodeIcon({ node }: { node: ProjectNode }) {
     <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
       source ? 'bg-node-source text-node-source-border' : 'bg-node-derived text-node-derived-border'
     }`}>
-      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden="true">
-        <rect x="4" y="4" width="16" height="16" rx="2" />
-        <path strokeLinecap="round" d="M4 9h16M9 9v11" />
-      </svg>
+      <TableTypeIcon className="h-4 w-4" />
     </span>
   )
 }

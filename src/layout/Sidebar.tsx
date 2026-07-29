@@ -14,9 +14,14 @@ import { SidebarNodeItem } from './SidebarNodeItem'
 interface SidebarProps {
   isOpen?: boolean
   onClose?: () => void
+  activeView?: 'canvas' | 'grid' | 'chart' | 'dashboard' | 'report'
 }
 
-export function Sidebar({ isOpen = false, onClose = () => undefined }: SidebarProps) {
+export function Sidebar({
+  isOpen = false,
+  onClose = () => undefined,
+  activeView = 'canvas',
+}: SidebarProps) {
   const { openTable, openChart, openCanvas, openDashboard, openReport } = useNavigation()
   const nodes = useProjectStore((state) => state.nodes)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
@@ -175,12 +180,18 @@ export function Sidebar({ isOpen = false, onClose = () => undefined }: SidebarPr
               : item.id === 'dashboard'
                 ? openDashboard
                 : openReport
+            const isActive = item.id === 'canvas'
+              ? ['canvas', 'grid', 'chart'].includes(activeView)
+              : activeView === item.id
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => { openView(); onClose() }}
-                className="btn btn-ghost w-full gap-2.5 justify-start text-sm"
+                aria-current={isActive ? 'page' : undefined}
+                className={`btn btn-ghost w-full gap-2.5 justify-start text-sm ${
+                  isActive ? 'sidebar-view-active' : ''
+                }`}
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.iconPath} />

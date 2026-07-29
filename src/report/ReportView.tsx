@@ -6,7 +6,7 @@
  * Includes toolbar for multi-report navigation and quick actions.
  */
 
-import { useCallback, useRef, useEffect, useMemo } from 'react';
+import { useCallback, useRef, useEffect, useMemo, useState } from 'react';
 import { useWorkspaceLease } from '@/state/useWorkspaceLease';
 import { useReportStore } from './reportStore';
 import { TipTapEditor, type TipTapEditorHandle } from './editor/TipTapEditor';
@@ -44,6 +44,7 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
   const persistenceError = useReportStore((state) => state.persistenceError);
   const { canEdit } = useWorkspaceLease();
   const editorRef = useRef<TipTapEditorHandle>(null);
+  const [isChoosingTemplate, setIsChoosingTemplate] = useState(false);
 
   // Resolve the content to display: the report's TipTap document, or a fresh
   // default document titled after the report when it has no content yet.
@@ -83,10 +84,16 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
     editorRef.current?.insertChart();
   }, []);
 
-  if (!reportId || !report) {
+  const showReportStart = isChoosingTemplate || !reportId || !report;
+
+  if (showReportStart) {
     return (
       <div className="h-full flex flex-col bg-surface report-view">
-        <ReportToolbar activeReportId={null} />
+        <ReportToolbar
+          activeReportId={null}
+          onNewReport={() => setIsChoosingTemplate(true)}
+          onSelectReport={() => setIsChoosingTemplate(false)}
+        />
         <div className="flex-1 overflow-auto">
           <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-16">
             {persistenceStatus === 'loading' ? (
@@ -94,7 +101,10 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
             ) : (
               <ReportStart
                 error={persistenceError}
-                onCreate={(name, template) => addReport(name, template)}
+                onCreate={(name, template) => {
+                  addReport(name, template);
+                  setIsChoosingTemplate(false);
+                }}
               />
             )}
           </div>
@@ -108,6 +118,7 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
       {/* Report Toolbar */}
       <ReportToolbar
         activeReportId={reportId}
+        onNewReport={() => setIsChoosingTemplate(true)}
         onHighlight={handleHighlight}
         onInsertTable={handleInsertTable}
         onInsertEmbeddedTable={handleInsertEmbeddedTable}
@@ -164,8 +175,10 @@ function ReportStart({
   return (
     <div>
       <div className="mb-7 max-w-xl sm:mb-10">
-        <h1 className="text-2xl font-semibold text-text-primary mb-2">Create a report</h1>
-        <p className="text-sm text-text-secondary leading-6">
+        <h1 className="mb-2 text-[26px] font-semibold leading-8 tracking-[-0.025em] text-text-primary">
+          Create a report
+        </h1>
+        <p className="text-[13px] leading-5 text-text-secondary">
           Reports combine narrative, live table excerpts, and charts. Linked data stays
           connected to this project and refreshes when the source changes.
         </p>
@@ -181,10 +194,14 @@ function ReportStart({
             key={template.id}
             type="button"
             onClick={() => onCreate(template.title, template.id)}
-            className="text-left rounded-lg border border-border bg-surface px-4 py-4 hover:bg-surface-secondary hover:border-accent-green transition-colors"
+            className="text-left rounded-lg border-0 bg-surface-secondary px-4 py-4 transition-[background-color,box-shadow,transform] duration-200 ease-out hover:bg-surface-tertiary hover:shadow-sm active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
           >
-            <div className="font-medium text-text-primary mb-1">{template.title}</div>
-            <div className="text-xs leading-5 text-text-secondary">{template.description}</div>
+            <div className="mb-1 text-[13px] font-semibold leading-5 text-text-primary transition-colors duration-200 ease-out">
+              {template.title}
+            </div>
+            <div className="text-[12px] leading-[1.45] text-text-secondary transition-colors duration-200 ease-out">
+              {template.description}
+            </div>
           </button>
         ))}
       </div>

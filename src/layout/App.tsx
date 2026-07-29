@@ -168,7 +168,11 @@ function MainApp() {
           </div>
         )}
         <div className="relative flex h-full min-h-0 bg-canvas">
-          <Sidebar isOpen={navigationOpen} onClose={() => setNavigationOpen(false)} />
+          <Sidebar
+            isOpen={navigationOpen}
+            onClose={() => setNavigationOpen(false)}
+            activeView={visibleViewMode}
+          />
 
           <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <AppHeader

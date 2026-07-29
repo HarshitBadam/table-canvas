@@ -6,6 +6,7 @@ import { MiniChart } from '@/charts/ChartRenderer'
 import { useChartData } from '@/charts/useChartData'
 import { useProjectStore } from '@/state/projectStore'
 import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
+import { ChartTypeIcon } from '@/charts/ChartTypeIcon'
 
 export interface ChartNodeData extends ChartNodeType {
   selected: boolean
@@ -61,23 +62,11 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
     >
       <div className="px-3 py-2 border-b border-border-subtle bg-surface-secondary/50">
         <div className="flex items-center gap-2">
-          <div 
-            className="w-5 h-5 rounded flex items-center justify-center"
-            style={{ backgroundColor: `${accentColor}15` }}
-          >
-            <svg 
-              className="w-3 h-3" 
-              style={{ color: accentColor }}
-              viewBox="0 0 24 24"
-              fill={chartType === 'line' ? 'none' : 'currentColor'}
-              stroke={chartType === 'line' ? 'currentColor' : 'none'}
-              strokeWidth={chartType === 'line' ? 2 : 0}
-            >
-              {chartType === 'bar' && <path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z" />}
-              {chartType === 'line' && <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 4 4 6-6" />}
-              {chartType === 'pie' && <path d="M11 2v20c-5.07-.5-9-4.79-9-10s3.93-9.5 9-10zm2.03 0v8.99H22c-.47-4.74-4.24-8.52-8.97-8.99zm0 11.01V22c4.74-.47 8.5-4.25 8.97-8.99h-8.97z" />}
-              {chartType === 'scatter' && <><circle cx="7" cy="14" r="2" /><circle cx="11" cy="10" r="2" /><circle cx="15" cy="16" r="2" /><circle cx="17" cy="8" r="2" /></>}
-            </svg>
+          <div className="flex h-5 w-5 items-center justify-center rounded bg-accent-green/10">
+            <ChartTypeIcon
+              type={chartType}
+              className="h-3 w-3 text-accent-green"
+            />
           </div>
           <span className="text-xs font-medium text-text-primary truncate flex-1">
             {data.name}
