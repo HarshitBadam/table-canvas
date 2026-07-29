@@ -180,9 +180,7 @@ export function Sidebar({
               : item.id === 'dashboard'
                 ? openDashboard
                 : openReport
-            const isActive = item.id === 'canvas'
-              ? ['canvas', 'grid', 'chart'].includes(activeView)
-              : activeView === item.id
+            const isActive = activeView === item.id
             return (
               <button
                 key={item.id}

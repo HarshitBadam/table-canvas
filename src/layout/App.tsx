@@ -93,7 +93,6 @@ function MainApp() {
     : viewMode
 
   useEffect(() => {
-    setViewMode('canvas')
     setNavigationOpen(false)
   }, [activeProjectId])
 
@@ -245,7 +244,6 @@ function MobileBottomNav({
   onOpenDashboard: () => void
   onOpenReport: () => void
 }) {
-  const canvasActive = viewMode === 'canvas' || viewMode === 'grid' || viewMode === 'chart'
   const actions: Record<WorkspaceNavId, () => void> = {
     canvas: onOpenCanvas,
     dashboard: onOpenDashboard,
@@ -253,7 +251,7 @@ function MobileBottomNav({
   }
   const items = WORKSPACE_NAV_ITEMS.map(item => ({
     ...item,
-    active: item.id === 'canvas' ? canvasActive : viewMode === item.id,
+    active: viewMode === item.id,
     onClick: actions[item.id],
   }))
 

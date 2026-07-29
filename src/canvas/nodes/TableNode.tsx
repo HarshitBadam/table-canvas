@@ -113,7 +113,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
               {data.name}
             </h3>
             <div className="mt-0.5 text-xs text-text-secondary">
-              <span>{formatNumber(rowCount)} rows · {formatNumber(colCount)} columns</span>
+              <span>{formatNumber(rowCount)} rows <span className="ml-1">{formatNumber(colCount)} columns</span></span>
             </div>
           </div>
           

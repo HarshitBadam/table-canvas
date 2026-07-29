@@ -11,7 +11,7 @@ import { useWorkspaceLease } from '@/state/useWorkspaceLease';
 import { useReportStore } from './reportStore';
 import { TipTapEditor, type TipTapEditorHandle } from './editor/TipTapEditor';
 import { ReportToolbar } from './ReportToolbar';
-import type { JSONContent } from '@tiptap/react';
+import type { Editor, JSONContent } from '@tiptap/react';
 import type { Report, ReportTemplateId } from './types';
 
 import './PrintStyles.css';
@@ -44,6 +44,7 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
   const persistenceError = useReportStore((state) => state.persistenceError);
   const { canEdit } = useWorkspaceLease();
   const editorRef = useRef<TipTapEditorHandle>(null);
+  const [editor, setEditor] = useState<Editor | null>(null);
   const [isChoosingTemplate, setIsChoosingTemplate] = useState(false);
 
   // Resolve the content to display: the report's TipTap document, or a fresh
@@ -70,10 +71,6 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
   }, [reportId]);
 
   // Toolbar action handlers
-  const handleHighlight = useCallback(() => {
-    editorRef.current?.toggleHighlight();
-  }, []);
-
   const handleInsertTable = useCallback(() => {
     editorRef.current?.insertTable();
   }, []);
@@ -91,7 +88,6 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
       <div className="h-full flex flex-col bg-surface report-view">
         <ReportToolbar
           activeReportId={null}
-          onNewReport={() => setIsChoosingTemplate(true)}
           onSelectReport={() => setIsChoosingTemplate(false)}
         />
         <div className="flex-1 overflow-auto">
@@ -118,8 +114,8 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
       {/* Report Toolbar */}
       <ReportToolbar
         activeReportId={reportId}
+        editor={editor}
         onNewReport={() => setIsChoosingTemplate(true)}
-        onHighlight={handleHighlight}
         onInsertTable={handleInsertTable}
         onInsertEmbeddedTable={handleInsertEmbeddedTable}
         onInsertChart={handleInsertChart}
@@ -134,6 +130,7 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
             onChange={handleContentChange}
             reportId={reportId}
             onOpenTable={onOpenTable}
+            onEditorReady={setEditor}
             editable={canEdit}
             placeholder="Type '/' for commands..."
           />

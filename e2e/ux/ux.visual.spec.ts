@@ -77,7 +77,7 @@ test.describe('Visual regression', () => {
     await page.getByRole('button', { name: /Blank report/ }).click()
     await expect(page.locator('.tiptap-editor-content')).toBeVisible()
     await expect(page).toHaveScreenshot('report-editor.png', {
-      mask: [page.locator('.report-toolbar-v2-info')],
+      mask: [page.locator('[data-report-info]')],
     })
   })
 })

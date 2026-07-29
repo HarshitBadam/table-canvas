@@ -26,7 +26,7 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
   const { ensureRange, isLoading, totalRows: windowedTotalRows } = windowed
   const {
     columns, filteredRows, getColumnWidth, isEditable, canEdit, isCornerSelected, selection, selectedCell,
-    isIndexColumnSelected, handleCornerClick, handleContextMenu, handleRowClick,
+    isIndexColumnSelected, setSelection, handleCornerClick, handleContextMenu, handleRowClick,
     openContextMenu,
   } = useGridContext()
   const rowVirtualizer = useVirtualizer({
@@ -72,6 +72,16 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
       aria-rowcount={totalRows + 1}
       aria-colcount={columns.length + 1}
       className="flex-1 overflow-auto select-none"
+      onMouseDown={(event) => {
+        const target = event.target
+        if (
+          target instanceof Element
+          && target.closest('[role="gridcell"], [role="columnheader"], [role="rowheader"], button')
+        ) {
+          return
+        }
+        setSelection(null)
+      }}
     >
       <div style={{
         height: rowVirtualizer.getTotalSize() + HEADER_HEIGHT,

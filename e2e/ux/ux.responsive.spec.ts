@@ -53,7 +53,7 @@ for (const viewport of [
       await page.locator('aside').getByRole('button', { name: 'Report', exact: true }).click()
       await expect(page.getByRole('heading', { name: 'Create a report' })).toBeVisible()
       await expectNoViewportOverflow(page)
-      await expectInsideViewport(page, page.locator('.report-toolbar-v2'))
+      await expectInsideViewport(page, page.locator('[data-report-toolbar]'))
     })
   })
 }
@@ -92,7 +92,7 @@ for (const viewport of [
       await workspaceNav.getByRole('button', { name: 'Report' }).click()
       await expect(page.getByRole('heading', { name: 'Create a report' })).toBeVisible()
       await expectNoViewportOverflow(page)
-      await expectInsideViewport(page, page.locator('.report-toolbar-v2'))
+      await expectInsideViewport(page, page.locator('[data-report-toolbar]'))
       await expectInsideViewport(page, workspaceNav)
     })
   })

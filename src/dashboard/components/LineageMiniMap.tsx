@@ -13,7 +13,7 @@ export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProp
   const derivedNodes = useMemo(() => nodes.filter(n => n.kind === 'derived_table'), [nodes])
   const chartNodes = useMemo(() => nodes.filter(n => n.kind === 'chart'), [nodes])
 
-  if (nodes.length === 0 || (derivedNodes.length === 0 && chartNodes.length === 0 && edges.length === 0)) {
+  if (nodes.length === 0) {
     return null
   }
 

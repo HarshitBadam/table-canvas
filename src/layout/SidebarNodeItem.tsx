@@ -166,10 +166,10 @@ export function SidebarNodeItem({
             aria-label={`Actions for ${node.name}`}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            className={`sidebar-node-action mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-[opacity,color,background-color] focus:opacity-100 focus-visible:ring-2 focus-visible:ring-accent-green group-hover:opacity-100 group-focus-within:opacity-100 ${
+            className={`sidebar-node-action mr-1 flex h-8 w-8 shrink-0 items-center justify-center text-text-tertiary outline-none transition-[opacity,color] focus:opacity-100 focus-visible:ring-2 focus-visible:ring-accent-green group-hover:opacity-100 group-focus-within:opacity-100 ${
               selected
-                ? 'hover:bg-node-source hover:text-node-source-border'
-                : 'hover:bg-surface-tertiary hover:text-text-primary'
+                ? 'hover:text-node-source-border'
+                : 'hover:text-text-primary'
             } ${
               selected || menuOpen ? 'opacity-100' : 'opacity-0'
             }`}
@@ -220,7 +220,7 @@ function TableDimensions({ node, selected }: { node: TableNode; selected: boolea
     <span className={`mt-0.5 text-xs tabular-nums ${
       selected ? 'text-node-source-border' : 'text-text-tertiary'
     }`}>
-      {rows.toLocaleString()} rows · {columns.toLocaleString()} columns
+      {rows.toLocaleString()} rows <span className="ml-1">{columns.toLocaleString()} columns</span>
     </span>
   )
 }
