@@ -309,7 +309,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
           showInteractive={false}
           position="bottom-left"
           style={{ marginLeft: 12, marginBottom: 12 }}
-          className="!z-sticky !bg-surface !border !border-border !rounded-lg !shadow-md [&>button]:!bg-surface [&>button]:!border-0 [&>button]:!text-text-secondary [&>button:hover]:!bg-surface-secondary"
+          className="!z-sticky !rounded-lg !border !border-border !bg-surface !shadow-md [&>button]:!border-0 [&>button]:!bg-surface [&>button]:!text-text-secondary [&>button:hover]:!bg-surface-secondary"
         />
         
         {Object.keys(projectNodes).length === 0 && (

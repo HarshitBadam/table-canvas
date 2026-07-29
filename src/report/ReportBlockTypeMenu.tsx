@@ -58,7 +58,7 @@ export function ReportBlockTypeMenu({ value, disabled, title, onChange }: Report
           event.preventDefault();
           setOpen(true);
         }}
-        className="flex h-9 w-[7.5rem] items-center gap-1.5 rounded-md border-0 bg-surface-secondary px-2.5 text-left text-xs font-medium text-text-primary outline-none transition-colors hover:bg-surface-tertiary focus-visible:ring-2 focus-visible:ring-accent-green disabled:cursor-not-allowed disabled:opacity-40 sm:h-8"
+        className="box-border flex h-9 w-[7.5rem] items-center gap-1.5 rounded-md border-0 bg-surface-secondary px-2.5 text-left text-xs font-medium text-text-primary outline-none transition-colors hover:bg-surface-tertiary focus-visible:ring-2 focus-visible:ring-accent-green disabled:cursor-not-allowed disabled:opacity-40 sm:h-8"
       >
         <span className="min-w-0 flex-1 truncate">{activeLabel}</span>
         <svg className="h-3.5 w-3.5 shrink-0 text-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">

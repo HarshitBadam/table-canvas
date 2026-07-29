@@ -287,12 +287,13 @@ export function AppHeader({
               .then(() => window.location.assign('/login'))
               .catch(() => undefined)
           }}
-          className="btn btn-primary ml-2 gap-2"
+          className="btn btn-primary ml-2 gap-2 max-lg:min-h-11 max-lg:min-w-11 max-lg:p-0"
+          aria-label="Sign in to sync"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Sign in to sync
+          <span className="hidden lg:inline">Sign in to sync</span>
         </button>
       )}
     </header>

@@ -5,12 +5,13 @@ import { toolbarDivider, toolbarIconButton, toolbarIconButtonActive } from './to
 interface ReportFormatBarProps {
   editor: Editor | null;
   blocked: { disabled?: boolean; title?: string };
+  showDividers?: boolean;
 }
 
-/** Controls that only earn their space on wider screens; `/` commands still reach them. */
-const extended = 'hidden md:flex';
+/** The compact toolbar scrolls horizontally instead of dropping editor controls. */
+const extended = 'flex';
 
-export function ReportFormatBar({ editor, blocked }: ReportFormatBarProps) {
+export function ReportFormatBar({ editor, blocked, showDividers = true }: ReportFormatBarProps) {
   const state = useEditorState({
     editor,
     selector: ({ editor: instance }) => {
@@ -48,17 +49,20 @@ export function ReportFormatBar({ editor, blocked }: ReportFormatBarProps) {
   };
 
   return (
-    <>
-      <ReportBlockTypeMenu
-        value={state.blockType}
-        onChange={setBlockType}
-        disabled={blocked.disabled}
-        title={blocked.title}
-      />
+    <div className="flex min-w-max w-full items-center">
+      <div className="shrink-0">
+        <ReportBlockTypeMenu
+          value={state.blockType}
+          onChange={setBlockType}
+          disabled={blocked.disabled}
+          title={blocked.title}
+        />
+      </div>
 
-      <span className={toolbarDivider} aria-hidden="true" />
+      {showDividers && <span className={toolbarDivider} aria-hidden="true" />}
 
-      <div className="flex items-center gap-0.5" role="group" aria-label="Text style">
+      <div className="flex min-w-0 flex-1">
+        <div className="flex items-center gap-0.5" role="group" aria-label="Text style">
         <button
           type="button"
           aria-label="Bold"
@@ -137,11 +141,13 @@ export function ReportFormatBar({ editor, blocked }: ReportFormatBarProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
           </svg>
         </button>
+        </div>
       </div>
 
-      <span className={toolbarDivider} aria-hidden="true" />
+      {showDividers && <span className={toolbarDivider} aria-hidden="true" />}
 
-      <div className="flex items-center gap-0.5" role="group" aria-label="Paragraph structure">
+      <div className="shrink-0">
+        <div className="flex items-center gap-0.5" role="group" aria-label="Paragraph structure">
         <button
           type="button"
           aria-label="Bullet list"
@@ -205,7 +211,8 @@ export function ReportFormatBar({ editor, blocked }: ReportFormatBarProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5v14M9 8h10M9 12h10M9 16h6" />
           </svg>
         </button>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

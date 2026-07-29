@@ -5,7 +5,7 @@ import { ReportSwitcher } from './ReportSwitcher';
 import { ReportFormatBar } from './ReportFormatBar';
 import { DeleteReportDialog } from './ReportDialogs';
 import { useReportPdfExport } from './useReportPdfExport';
-import { toolbarDanger, toolbarDivider, toolbarIconButton } from './toolbarStyles';
+import { toolbarDanger, toolbarIconButton } from './toolbarStyles';
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease';
 
 interface ReportToolbarProps {
@@ -52,6 +52,9 @@ export function ReportToolbar({
   const blocked = canEdit ? {} : { disabled: true, title: EDITING_ELSEWHERE_TOOLTIP };
   const { isExporting, error: exportError, exportPdf } = useReportPdfExport();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [compactActionsOpen, setCompactActionsOpen] = useState(false);
+  const [compactInsertOpen, setCompactInsertOpen] = useState(false);
+  const [compactFormatOpen, setCompactFormatOpen] = useState(false);
 
   const activeReport = activeReportId ? reports[activeReportId] || null : null;
   const wordCount = activeReport?.tiptapContent?.content
@@ -65,9 +68,13 @@ export function ReportToolbar({
   return (
     <div
       data-report-toolbar
-      className="flex min-h-14 flex-wrap items-center gap-x-1 gap-y-1 border-b border-border bg-surface px-2 py-1.5 print:hidden sm:px-3 xl:h-14 xl:flex-nowrap xl:py-0"
+      className="flex min-h-14 content-start flex-wrap items-center gap-x-1 border-b border-border bg-surface py-1.5 print:hidden xl:grid xl:h-14 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,auto)_minmax(0,1fr)] xl:gap-x-2 xl:py-0"
     >
-      <div className="flex min-w-0 flex-1 items-center gap-0.5 xl:flex-none">
+      <div
+        className="flex min-h-12 min-w-0 flex-1 self-start items-center gap-0.5 pl-2 sm:min-h-14 sm:pl-3"
+        role="group"
+        aria-label="Report actions"
+      >
         {onNewReport && (
           <button
             type="button"
@@ -92,7 +99,7 @@ export function ReportToolbar({
               onClick={() => duplicateReport(activeReport.id)}
               title="Duplicate report"
               aria-label="Duplicate report"
-              className={toolbarIconButton}
+              className={`${toolbarIconButton} hidden xl:flex`}
               {...blocked}
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
@@ -101,10 +108,22 @@ export function ReportToolbar({
             </button>
             <button
               type="button"
+              onClick={() => void exportPdf()}
+              disabled={isExporting}
+              aria-label={isExporting ? 'Exporting report' : 'Export report as PDF'}
+              title="Export report as PDF"
+              className={`${toolbarIconButton} hidden xl:flex`}
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </button>
+            <button
+              type="button"
               onClick={() => setConfirmingDelete(true)}
               title="Delete report"
               aria-label="Delete report"
-              className={`${toolbarIconButton} ${toolbarDanger}`}
+              className={`${toolbarIconButton} ${toolbarDanger} hidden xl:flex`}
               {...blocked}
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
@@ -113,19 +132,84 @@ export function ReportToolbar({
             </button>
           </>
         )}
+        {activeReport && (
+          <div className="relative xl:hidden">
+            <button
+              type="button"
+              aria-label="More report actions"
+              aria-haspopup="menu"
+              aria-expanded={compactActionsOpen}
+              onClick={() => {
+                setCompactActionsOpen(open => !open);
+                setCompactInsertOpen(false);
+              }}
+              className={toolbarIconButton}
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
+              </svg>
+            </button>
+            {compactActionsOpen && (
+              <div role="menu" className="absolute left-0 top-[calc(100%+0.375rem)] z-popover w-48 overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-lg">
+                <button type="button" role="menuitem" onClick={() => { duplicateReport(activeReport.id); setCompactActionsOpen(false); }} className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-text-primary hover:bg-surface-secondary">Duplicate report</button>
+                <button type="button" role="menuitem" onClick={() => { void exportPdf(); setCompactActionsOpen(false); }} className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-text-primary hover:bg-surface-secondary">Export as PDF</button>
+                <button type="button" role="menuitem" onClick={() => { setConfirmingDelete(true); setCompactActionsOpen(false); }} className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-error-text hover:bg-error/10">Delete report</button>
+              </div>
+            )}
+          </div>
+        )}
+        {activeReport && !statusMessage && (
+          <span className="hidden whitespace-nowrap pl-1 text-xs text-text-tertiary 2xl:inline">
+            {wordCount > 0 ? `${wordCount.toLocaleString()} words` : 'Empty report'}
+          </span>
+        )}
+        {statusMessage && (
+          <span
+            className={`hidden max-w-40 truncate whitespace-nowrap pl-1 text-xs sm:inline ${
+              exportError || persistenceStatus === 'error' ? 'text-error-text' : 'text-text-tertiary'
+            }`}
+            title={exportError || persistenceError || undefined}
+            role="status"
+            aria-live="polite"
+          >
+            {statusMessage}
+          </span>
+        )}
       </div>
 
       {activeReport && editor && (
-        <>
-          <span className={`${toolbarDivider} hidden xl:block`} aria-hidden="true" />
-          <ReportFormatBar editor={editor} blocked={blocked} />
-        </>
+        <button
+          type="button"
+          aria-label="Format text"
+          aria-expanded={compactFormatOpen}
+          onClick={() => {
+            setCompactFormatOpen(open => !open);
+            setCompactActionsOpen(false);
+            setCompactInsertOpen(false);
+          }}
+          className={`${toolbarIconButton} xl:hidden`}
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5h14M9 5v14m0-7h7" />
+          </svg>
+        </button>
       )}
 
-      <div className="flex shrink-0 items-center gap-0.5 xl:ml-auto">
+      {activeReport && editor && (
+        <div
+          className={`${compactFormatOpen ? 'flex' : 'hidden'} order-3 min-h-14 w-full basis-full items-center border-t border-border-subtle px-4 py-0 sm:px-5 xl:min-h-0 xl:order-none xl:flex xl:border-0 xl:px-0`}
+          role="group"
+          aria-label="Text formatting"
+        >
+          <div className="flex h-full w-full max-w-full translate-y-[2.5px] items-center overflow-x-auto scrollbar-none xl:translate-y-0">
+            <ReportFormatBar editor={editor} blocked={blocked} showDividers={!compactFormatOpen} />
+          </div>
+        </div>
+      )}
+
+      <div className="relative flex min-h-12 shrink-0 self-start items-center justify-self-end gap-0.5 pr-2 sm:min-h-14 sm:pr-3" role="group" aria-label="Insert blocks">
         {(onInsertEmbeddedTable || onInsertChart || onInsertTable) && (
-          <>
-            <div className="flex items-center gap-0.5" role="group" aria-label="Insert">
+          <div className="hidden items-center gap-0.5 xl:flex">
               {onInsertEmbeddedTable && (
                 <button
                   type="button"
@@ -169,42 +253,33 @@ export function ReportToolbar({
                   </svg>
                 </button>
               )}
-            </div>
-            <span className={toolbarDivider} aria-hidden="true" />
+          </div>
+        )}
+        {(onInsertEmbeddedTable || onInsertChart || onInsertTable) && (
+          <>
+            <button
+              type="button"
+              aria-label="Insert block"
+              aria-haspopup="menu"
+              aria-expanded={compactInsertOpen}
+              onClick={() => {
+                setCompactInsertOpen(open => !open);
+                setCompactActionsOpen(false);
+              }}
+              className={`${toolbarIconButton} xl:hidden`}
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+            {compactInsertOpen && (
+              <div role="menu" className="absolute right-0 top-[calc(100%+0.375rem)] z-popover w-56 overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-lg">
+                {onInsertEmbeddedTable && <button type="button" role="menuitem" onClick={() => { onInsertEmbeddedTable(); setCompactInsertOpen(false); }} className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-text-primary hover:bg-surface-secondary">Insert linked table</button>}
+                {onInsertChart && <button type="button" role="menuitem" onClick={() => { onInsertChart(); setCompactInsertOpen(false); }} className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-text-primary hover:bg-surface-secondary">Insert chart</button>}
+                {onInsertTable && <button type="button" role="menuitem" onClick={() => { onInsertTable(); setCompactInsertOpen(false); }} className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-text-primary hover:bg-surface-secondary">Insert manual table</button>}
+              </div>
+            )}
           </>
-        )}
-
-        {activeReport && (
-          <button
-            type="button"
-            onClick={() => void exportPdf()}
-            disabled={isExporting}
-            aria-label={isExporting ? 'Exporting report' : 'Export report as PDF'}
-            title="Export report as PDF"
-            className={toolbarIconButton}
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </button>
-        )}
-
-        {activeReport && !statusMessage && (
-          <span className="hidden whitespace-nowrap pl-1 text-xs text-text-tertiary 2xl:inline">
-            {wordCount > 0 ? `${wordCount.toLocaleString()} words` : 'Empty report'}
-          </span>
-        )}
-        {statusMessage && (
-          <span
-            className={`hidden max-w-40 truncate whitespace-nowrap pl-1 text-xs sm:inline ${
-              exportError || persistenceStatus === 'error' ? 'text-error-text' : 'text-text-tertiary'
-            }`}
-            title={exportError || persistenceError || undefined}
-            role="status"
-            aria-live="polite"
-          >
-            {statusMessage}
-          </span>
         )}
       </div>
 
