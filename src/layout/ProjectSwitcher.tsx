@@ -276,7 +276,7 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
   }
 
   return (
-    <div className="w-[min(18rem,52vw)] min-w-0 shrink-0">
+    <div className="w-[min(10rem,32vw)] min-w-0 shrink-0 lg:w-[min(18rem,52vw)]">
       <div ref={switcherRef} className="min-w-0">
         <button
           ref={triggerRef}
