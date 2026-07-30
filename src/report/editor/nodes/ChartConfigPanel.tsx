@@ -1,190 +1,263 @@
+import { useMemo, useState } from 'react';
 import { ChartTypeIcon } from '@/charts/ChartTypeIcon';
+import { useDialogFocus } from '@/components/useDialogFocus';
 import type { AggregationType, ChartType, ColumnSchema } from '@/types';
 import type { EnhancedChartConfig } from '../../types';
+import { BlockConfigSelect, type BlockConfigOption } from './BlockConfigSelect';
+import { useRevealPanel } from './useRevealPanel';
 
 interface ChartConfigPanelProps {
   config: EnhancedChartConfig;
   chartType: ChartType;
   columns: ColumnSchema[];
+  sourceName?: string;
   onConfigChange: (updates: Partial<EnhancedChartConfig>) => void;
   onChartTypeChange: (type: ChartType) => void;
   onChangeTable: () => void;
   onClose: () => void;
 }
 
-const CHART_TYPES: { type: ChartType; label: string }[] = [
-  { type: 'bar', label: 'Bar' },
-  { type: 'line', label: 'Line' },
-  { type: 'pie', label: 'Pie' },
-  { type: 'scatter', label: 'Scatter' },
+const CHART_TYPES: { type: ChartType; label: string; description: string }[] = [
+  { type: 'bar', label: 'Bar', description: 'Compare categories' },
+  { type: 'line', label: 'Line', description: 'Show change over time' },
+  { type: 'pie', label: 'Pie', description: 'Share of a total' },
+  { type: 'scatter', label: 'Scatter', description: 'Relate two numbers' },
 ];
+
+const AGGREGATIONS: BlockConfigOption[] = [
+  { value: 'none', label: 'Do not combine' },
+  { value: 'sum', label: 'Sum' },
+  { value: 'avg', label: 'Average' },
+  { value: 'min', label: 'Minimum' },
+  { value: 'max', label: 'Maximum' },
+  { value: 'count', label: 'Count rows' },
+  { value: 'count_distinct', label: 'Count distinct Y values' },
+];
+
+function toOptions(columns: ColumnSchema[]): BlockConfigOption[] {
+  return columns.map((column) => ({ value: column.id, label: column.name, meta: column.type }));
+}
 
 export function ChartConfigPanel({
   config,
   chartType,
   columns,
+  sourceName,
   onConfigChange,
   onChartTypeChange,
   onChangeTable,
   onClose,
 }: ChartConfigPanelProps) {
-  const xAxisColumns = chartType === 'scatter' ? columns.filter(column => column.type === 'number') : columns;
-  const yAxisColumns = columns.filter(column => column.type === 'number');
+  const panelRef = useDialogFocus<HTMLDivElement>(true, onClose);
+  useRevealPanel(panelRef);
+  const [openSelect, setOpenSelect] = useState<'xAxis' | 'yAxis' | 'aggregation' | null>(null);
 
-  return (
-    <div className="block-config-panel">
-      <div className="flex items-center justify-between mb-4">
-        <h4 className="font-medium text-sm text-gray-900 dark:text-white">Chart Configuration</h4>
-        <button onClick={onClose} className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <div className="block-config-section">
-        <label className="block-config-label">Source</label>
-        <button onClick={onChangeTable} className="input text-sm w-full text-left flex items-center justify-between">
-          <span>Change table…</span>
-          <svg className="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-
-      <div className="block-config-section">
-        <label className="block-config-label">Chart Type</label>
-        <div className="grid grid-cols-4 gap-2">
-          {CHART_TYPES.map(({ type, label }) => (
-            <button
-              key={type}
-              onClick={() => onChartTypeChange(type)}
-              className={`flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-lg border transition-all ${
-                chartType === type
-                  ? 'border-accent-green bg-accent-green/5 text-accent-green'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
-              }`}
-            >
-              <ChartTypeIcon type={type} className="w-4 h-4" />
-              <span className="text-xs font-medium">{label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <AxisPicker
-        label={chartType === 'scatter' ? 'X Axis (Numeric)' : 'X Axis'}
-        columns={xAxisColumns}
-        selectedId={config.xAxis}
-        onSelect={xAxis => onConfigChange({ xAxis })}
-      />
-      <AxisPicker
-        label="Y Axis (Numeric)"
-        columns={yAxisColumns}
-        selectedId={config.yAxis}
-        onSelect={yAxis => onConfigChange({ yAxis })}
-      />
-
-      {chartType !== 'scatter' && (
-        <div className="block-config-section">
-          <label className="block-config-label">Combine repeated X values</label>
-          <select
-            value={config.aggregation || ''}
-            onChange={(event) => onConfigChange({
-              aggregation: (event.target.value || undefined) as AggregationType | undefined,
-            })}
-            className="input text-sm w-full"
-          >
-            <option value="">Do not combine</option>
-            <option value="sum">Sum</option>
-            <option value="avg">Average</option>
-            <option value="min">Minimum</option>
-            <option value="max">Maximum</option>
-            <option value="count">Count rows</option>
-            <option value="count_distinct">Count distinct Y values</option>
-          </select>
-        </div>
-      )}
-
-      <div className="block-config-section">
-        <label className="block-config-label">Title (optional)</label>
-        <input
-          type="text"
-          value={config.title || ''}
-          onChange={event => onConfigChange({ title: event.target.value })}
-          placeholder="Chart title"
-          className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-accent-green transition-colors"
-        />
-      </div>
-
-      <div className="block-config-section">
-        <label className="block-config-label">Display Options</label>
-        <div className="space-y-3 mt-2">
-          <ToggleSwitch
-            checked={config.showLegend !== false}
-            onChange={showLegend => onConfigChange({ showLegend })}
-            label="Show Legend"
-          />
-          <ToggleSwitch
-            checked={config.showGrid !== false}
-            onChange={showGrid => onConfigChange({ showGrid })}
-            label="Show Grid"
-          />
-        </div>
-      </div>
-    </div>
+  const xAxisOptions = useMemo(
+    () => toOptions(chartType === 'scatter' ? columns.filter((column) => column.type === 'number') : columns),
+    [chartType, columns],
   );
-}
+  const yAxisOptions = useMemo(
+    () => toOptions(columns.filter((column) => column.type === 'number')),
+    [columns],
+  );
+  const columnLabel = (columnId?: string) =>
+    columns.find((column) => column.id === columnId)?.name;
+  const summary = config.xAxis && config.yAxis
+    ? `${columnLabel(config.yAxis) ?? 'Y'} by ${columnLabel(config.xAxis) ?? 'X'}`
+    : 'Choose both axes to plot this chart';
 
-function AxisPicker({ label, columns, selectedId, onSelect }: {
-  label: string;
-  columns: ColumnSchema[];
-  selectedId?: string;
-  onSelect: (columnId: string) => void;
-}) {
   return (
-    <div className="block-config-section">
-      <label className="block-config-label">{label}</label>
-      <div className="flex flex-wrap gap-2 mt-2">
-        {columns.slice(0, 8).map(column => (
-          <button
-            key={column.id}
-            onClick={() => onSelect(column.id)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-              selectedId === column.id
-                ? 'bg-accent-green text-white shadow-sm'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            {column.name}
+    <div
+      ref={panelRef}
+      className="block-config-panel"
+      role="dialog"
+      aria-label="Chart configuration"
+      tabIndex={-1}
+      onMouseDown={(event) => event.stopPropagation()}
+    >
+      <div className="block-config-header">
+        <div className="block-config-header-text">
+          <h2>Configure Chart</h2>
+          <p>
+            {sourceName
+              ? <>Showing data from <strong>{sourceName}</strong>.</>
+              : 'Choose how this chart reads your data.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="block-config-close"
+          aria-label="Close chart configuration"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="block-config-body">
+        <section className="block-config-section">
+          <h3>Chart Type</h3>
+          <div className="block-config-types">
+            {CHART_TYPES.map(({ type, label, description }) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => onChartTypeChange(type)}
+                aria-pressed={chartType === type}
+                className={`block-config-type-card ${chartType === type ? 'active' : ''}`}
+              >
+                <ChartTypeIcon type={type} className="block-config-type-icon w-4 h-4" />
+                <span className="block-config-type-name">{label}</span>
+                <span className="block-config-type-desc">{description}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="block-config-section">
+          <h3>Axes</h3>
+          <p className="block-config-section-help">
+            {chartType === 'scatter'
+              ? 'Scatter charts plot two numeric columns against each other.'
+              : 'Pick the column to group by and the numeric column to measure.'}
+          </p>
+          <div className="block-config-fields">
+            <div className="block-config-field">
+              <span className="block-config-field-label">
+                {chartType === 'scatter' ? 'X axis (numeric)' : 'X axis'}
+              </span>
+              <BlockConfigSelect
+                value={config.xAxis ?? ''}
+                options={xAxisOptions}
+                onChange={(xAxis) => onConfigChange({ xAxis })}
+                placeholder={xAxisOptions.length ? 'Select a column' : 'No eligible columns'}
+                disabled={xAxisOptions.length === 0}
+                ariaLabel="X axis column"
+                open={openSelect === 'xAxis'}
+                onOpenChange={(open) => setOpenSelect(open ? 'xAxis' : null)}
+              />
+            </div>
+            <div className="block-config-field">
+              <span className="block-config-field-label">Y axis (numeric)</span>
+              <BlockConfigSelect
+                value={config.yAxis ?? ''}
+                options={yAxisOptions}
+                onChange={(yAxis) => onConfigChange({ yAxis })}
+                placeholder={yAxisOptions.length ? 'Select a column' : 'No numeric columns'}
+                disabled={yAxisOptions.length === 0}
+                ariaLabel="Y axis column"
+                open={openSelect === 'yAxis'}
+                onOpenChange={(open) => setOpenSelect(open ? 'yAxis' : null)}
+              />
+            </div>
+          </div>
+          {yAxisOptions.length === 0 && (
+            <p className="block-config-note">
+              This table has no numeric columns, so there is nothing to plot yet.
+            </p>
+          )}
+        </section>
+
+        {chartType !== 'scatter' && (
+          <section className="block-config-section">
+            <h3>Repeated X Values</h3>
+            <p className="block-config-section-help">
+              Rows that share the same X value are merged using this calculation.
+            </p>
+            <BlockConfigSelect
+              value={config.aggregation ?? 'none'}
+              options={AGGREGATIONS}
+              onChange={(value) => onConfigChange({
+                aggregation: value === 'none' ? undefined : (value as AggregationType),
+              })}
+              ariaLabel="Combine repeated X values"
+              open={openSelect === 'aggregation'}
+              onOpenChange={(open) => setOpenSelect(open ? 'aggregation' : null)}
+            />
+          </section>
+        )}
+
+        <section className="block-config-section">
+          <label className="block-config-subsection-label" htmlFor="chart-config-title">
+            Chart Title
+          </label>
+          <input
+            id="chart-config-title"
+            type="text"
+            value={config.title || ''}
+            onChange={(event) => onConfigChange({ title: event.target.value })}
+            placeholder="Enter a chart title"
+            className="block-config-input"
+          />
+          <p className="block-config-note">Shown above the chart in the report and exported PDF.</p>
+
+          <div className="mt-4">
+            <span className="block-config-subsection-label">Options</span>
+            <div className="block-config-options">
+              <ToggleOption
+                checked={config.showLegend !== false}
+                onChange={(showLegend) => onConfigChange({ showLegend })}
+                label="Legend"
+                description="Name each series"
+              />
+              <ToggleOption
+                checked={config.showGrid !== false}
+                onChange={(showGrid) => onConfigChange({ showGrid })}
+                label="Grid"
+                description="Background guide lines"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="block-config-section">
+          <h3>Data Source</h3>
+          <button type="button" onClick={onChangeTable} className="block-config-select-btn">
+            <span className="block-config-select-value">{sourceName ?? 'Select a table'}</span>
+            <span className="block-config-select-meta">Change</span>
+            <svg className="block-config-select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
           </button>
-        ))}
+          <p className="block-config-note">Switching tables resets the selected axes.</p>
+        </section>
+      </div>
+
+      <div className="block-config-footer">
+        <span className="block-config-footer-summary">{summary}</span>
+        <button type="button" onClick={onClose} className="block-config-btn-done">
+          Done
+        </button>
       </div>
     </div>
   );
 }
 
-function ToggleSwitch({ checked, onChange, label }: {
+function ToggleOption({ checked, onChange, label, description }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
+  description: string;
 }) {
   return (
-    <label className="flex items-center justify-between cursor-pointer group">
-      <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-          checked ? 'bg-accent-green' : 'bg-gray-200 dark:bg-gray-700'
-        }`}
-      >
-        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${
-          checked ? 'translate-x-4' : 'translate-x-1'
-        }`} />
-      </button>
-    </label>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`block-config-option ${checked ? 'active' : ''}`}
+    >
+      <span className="block-config-option-info">
+        <span className="block-config-option-name">{label}</span>
+        <span className="block-config-option-desc">{description}</span>
+      </span>
+      <span className="block-config-option-check" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </span>
+    </button>
   );
 }

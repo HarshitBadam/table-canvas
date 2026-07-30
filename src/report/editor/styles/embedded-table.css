@@ -10,9 +10,26 @@
   background: var(--color-surface, #18181b);
 }
 
-.embedded-table-window.is-selected {
-  outline: 2px solid var(--color-accent-green);
+/*
+ * A permanent transparent outline keeps the hit area, the border box and the
+ * scroll metrics identical whether or not the block is selected; only the
+ * colour changes. `outline` is used rather than `border` so nothing reflows.
+ */
+.embedded-table-window {
+  outline: 2px solid transparent;
   outline-offset: -1px;
+  transition: outline-color 120ms ease;
+}
+
+.embedded-table-window.is-selected,
+.embedded-table-window.is-selected:hover {
+  outline-color: var(--color-accent-green);
+}
+
+/* Configuring is still "selected"; a muted ring keeps the link visible. */
+.embedded-table-window.is-configuring,
+.embedded-table-window.is-configuring:hover {
+  outline-color: rgba(33, 115, 70, 0.35);
 }
 
 .embedded-table-header {
@@ -66,9 +83,16 @@
   background: rgba(33, 115, 70, 0.2);
 }
 
+/*
+ * `overscroll-behavior: contain` stops the macOS rubber-band from chaining into
+ * the report scroller once the grid hits its end, which made the block feel
+ * detached from the document. The cap is generous enough that the default
+ * ten-row preview never scrolls, so the grid is normally a plain static block.
+ */
 .embedded-table-scroll {
-  max-height: 300px;
+  max-height: min(420px, 60vh);
   overflow: auto;
+  overscroll-behavior: none;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -77,13 +101,26 @@
   display: none;
 }
 
+.embedded-table-scroll .editable-table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.embedded-table-scroll .editable-table-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
 .embedded-table-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin: 0;
   padding: 6px 12px;
   background: var(--color-surface-secondary, #fafafa);
   border-top: 1px solid var(--color-border, #e4e4e7);
+  border-radius: 0 0 7px 7px;
   font-size: 11px;
   color: var(--color-text-tertiary, #a1a1aa);
 }
@@ -93,6 +130,10 @@
   border-top-color: var(--color-border, #3f3f46);
 }
 
+/*
+ * Kept mounted so the footer height and text position never change when the
+ * block is selected.
+ */
 .embedded-table-config-btn {
   font-size: 11px;
   font-weight: 500;
@@ -102,7 +143,17 @@
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 4px;
-  transition: all 100ms ease;
+  transition: opacity 100ms ease, background-color 100ms ease;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.embedded-table-window:hover .embedded-table-config-btn,
+.embedded-table-window.is-selected .embedded-table-config-btn,
+.embedded-table-window.is-configuring .embedded-table-config-btn,
+.embedded-table-config-btn:focus-visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 .embedded-table-config-btn:hover {

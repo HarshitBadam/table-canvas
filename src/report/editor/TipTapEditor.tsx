@@ -5,6 +5,7 @@ import Highlight from '@tiptap/extension-highlight';
 import Typography from '@tiptap/extension-typography';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
+import { NodeSelection, Selection } from '@tiptap/pm/state';
 import { useCallback, forwardRef, useImperativeHandle, useEffect, useRef } from 'react';
 import type { JSONContent } from '@tiptap/react';
 
@@ -15,7 +16,7 @@ import { EditableTableNode } from './nodes/EditableTableNode';
 import { ToggleNode } from './nodes/ToggleNode';
 import { CalloutNode } from './nodes/CalloutNode';
 import { SlashCommands } from './extensions/SlashCommands';
-import { AtomicBlockNavigation } from './extensions/AtomicBlockNavigation';
+import { AtomicBlockNavigation, withoutCaret } from './extensions/AtomicBlockNavigation';
 import {
   isMarkdownContent,
   isTabularData,
@@ -24,6 +25,15 @@ import {
 } from './markdownParser';
 
 import './EditorStyles.css';
+
+/**
+ * Surfaces that act on the selected block but are not rendered inside it: a
+ * menu or dialog is layered over the report, so containment cannot decide it.
+ * Everything else is judged by whether the click landed in the selected
+ * block's own DOM, which is the only test that distinguishes "this block" from
+ * "a block".
+ */
+const KEEPS_BLOCK_SELECTION = '.table-context-menu, [role="dialog"]';
 
 export interface TipTapEditorProps {
   content: JSONContent | null;
@@ -67,6 +77,7 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
         StarterKit.configure({
           heading: { levels: [1, 2, 3] },
           dropcursor: { color: 'rgba(255, 255, 255, 0.3)', width: 2 },
+          gapcursor: false,
         }),
         Placeholder.configure({
           placeholder: ({ node, editor: editorInstance }) => {
@@ -201,6 +212,43 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
       }
     }, [content, editable, editor]);
 
+    useEffect(() => {
+      if (!editor) return;
+
+      const clearBlockSelection = (event: MouseEvent) => {
+        const { selection } = editor.state;
+        if (!(selection instanceof NodeSelection)) return;
+
+        const target = event.target;
+        if (target instanceof Element) {
+          if (target.closest(KEEPS_BLOCK_SELECTION)) return;
+          // The selected block's own body, whatever it is made of. Matching a
+          // list of block surfaces instead answered "is this some block?", so
+          // clicking into a second block left the first one selected too.
+          const selectedDOM = editor.view.nodeDOM(selection.from);
+          if (selectedDOM instanceof Element && selectedDOM.contains(target)) return;
+        }
+
+        // A block stays selected only while the pointer is on the block itself.
+        // Node views swallow their own mouse events and a click can also land
+        // in app chrome outside the editor, so this listens once at the
+        // document boundary rather than in several overlapping places.
+        //
+        // The caret is deliberately not taken along. The position after a block
+        // is a structural gap, and this runs on mousedown: with a real caret in
+        // it the gap would expand for the frame between press and release and
+        // then collapse again once the click resolved to wherever it was
+        // actually aimed.
+        const { doc, tr } = editor.state;
+        editor.view.dispatch(
+          withoutCaret(tr.setSelection(Selection.near(doc.resolve(selection.to), 1))),
+        );
+      };
+
+      document.addEventListener('mousedown', clearBlockSelection, true);
+      return () => document.removeEventListener('mousedown', clearBlockSelection, true);
+    }, [editor]);
+
     const handleContainerClick = useCallback((event: React.MouseEvent) => {
       if (event.target === event.currentTarget) editor?.commands.focus('end');
     }, [editor]);
@@ -215,7 +263,11 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
     }
 
     return (
-      <div ref={containerRef} className={`tiptap-editor ${className}`} onClick={handleContainerClick}>
+      <div
+        ref={containerRef}
+        className={`tiptap-editor ${className}`}
+        onClick={handleContainerClick}
+      >
         <EditorContent editor={editor} />
       </div>
     );

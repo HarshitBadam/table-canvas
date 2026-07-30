@@ -90,14 +90,8 @@ function prepareChartsForPDF(container: HTMLElement): void {
   const textColor = '#111827';
   const gridColor = '#e5e5ea'; // Light mode grid color
   
-  container.querySelectorAll('.chart-block-container > div[class*="absolute"]').forEach(el => {
-    const element = el as HTMLElement;
-    if (element.className.includes('-top-10') || element.className.includes('absolute')) {
-      const hasButtons = element.querySelectorAll('button').length > 0;
-      if (hasButtons) {
-        element.remove();
-      }
-    }
+  container.querySelectorAll('.chart-block-toolbar, .chart-block-grid').forEach(el => {
+    el.remove();
   });
   
   container.querySelectorAll('.chart-block-footer button').forEach(el => {
@@ -192,6 +186,8 @@ export async function exportReportToPDF(
     '.ProseMirror-gapcursor',
     '.block-config-panel',
     '.embedded-table-config-btn',
+    '.table-add-btn',
+    '.table-select-grip',
     '.chart-block-footer button',
   ];
   selectorsToRemove.forEach(sel => {

@@ -24,6 +24,7 @@
     padding-bottom: 6pt !important;
     margin-bottom: 6pt !important;
     font-size: 11pt !important;
+    background: white !important;
   }
 
   .chart-block-footer {
@@ -32,9 +33,11 @@
     border-top: 1px solid #e5e5e5 !important;
     padding-top: 6pt !important;
     margin-top: 6pt !important;
+    background: white !important;
   }
 
-  .chart-block-container > div:first-child[style*="background"],
+  .chart-block-grid,
+  .chart-block-toolbar,
   .chart-block-footer button {
     display: none !important;
   }
@@ -108,6 +111,19 @@
   .table-block-header {
     page-break-after: avoid !important;
     break-after: avoid !important;
+  }
+
+  /* Editing chrome stays in the DOM so selection never reflows the block. */
+  .table-add-btn,
+  .table-select-grip,
+  .embedded-table-config-btn {
+    display: none !important;
+  }
+
+  /* The on-screen height cap would otherwise clip the printed grid. */
+  .embedded-table-scroll {
+    max-height: none !important;
+    overflow: visible !important;
   }
 
 }

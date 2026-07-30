@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
-import { useState, useCallback, useMemo, memo } from 'react';
+import { useState, useCallback, useMemo, useRef, memo } from 'react';
 import {
   useTableSource,
   resolveDisplayColumns,
@@ -11,6 +11,7 @@ import {
 import { TablePickerModal } from './TablePickerModal';
 import { EmbeddedTableConfigPanel } from './EmbeddedTableConfigPanel';
 import type { EmbeddedTableNodeAttrs, EmbeddedTableNodeOptions } from './embeddedTableTypes';
+import { useNodeSelect } from './useNodeSelect';
 
 const TableGlyph = ({ className = 'w-6 h-6' }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -27,18 +28,21 @@ function EmptyState({
   title,
   description,
   onClick,
+  onMouseDownCapture,
   spinning,
 }: {
   selected: boolean;
   title: string;
   description: string;
   onClick?: () => void;
+  onMouseDownCapture?: (event: React.MouseEvent) => void;
   spinning?: boolean;
 }) {
   return (
     <div
       className={`block-empty-state ${selected ? 'is-selected' : ''}`}
       onClick={onClick}
+      onMouseDownCapture={onMouseDownCapture}
       onKeyDown={(event) => {
         if (onClick && (event.key === 'Enter' || event.key === ' ')) {
           event.preventDefault();
@@ -72,6 +76,8 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
   updateAttributes,
   selected,
   extension,
+  editor,
+  getPos,
 }: NodeViewProps) {
   const attrs = node.attrs as EmbeddedTableNodeAttrs;
   const options = extension.options as EmbeddedTableNodeOptions;
@@ -92,6 +98,8 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
 
   const [showConfig, setShowConfig] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const tableWrapperRef = useRef<HTMLDivElement>(null);
+  const selectBlock = useNodeSelect(editor, getPos);
 
   const displayColumns = useMemo(
     () => resolveDisplayColumns(attrs.selectedColumns, columns),
@@ -117,6 +125,20 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
     [updateAttributes]
   );
 
+  const scrollToTable = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      tableWrapperRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+  }, []);
+  const closeConfig = useCallback(() => {
+    setShowConfig(false);
+    scrollToTable();
+  }, [scrollToTable]);
+  const toggleConfig = useCallback(() => {
+    if (showConfig) closeConfig();
+    else setShowConfig(true);
+  }, [closeConfig, showConfig]);
+
   const picker = showPicker ? (
     <TablePickerModal
       title="Select a table to embed"
@@ -133,6 +155,7 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
           title="Embed Table"
           description="Click to select a table from your workspace"
           onClick={() => setShowPicker(true)}
+          onMouseDownCapture={selectBlock}
         />
         {picker}
       </NodeViewWrapper>
@@ -147,6 +170,7 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
           title="Table not found"
           description="The linked table was removed. Click to pick another."
           onClick={() => setShowPicker(true)}
+          onMouseDownCapture={selectBlock}
         />
         {picker}
       </NodeViewWrapper>
@@ -159,6 +183,7 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
         <EmptyState
           selected={selected}
           spinning
+            onMouseDownCapture={selectBlock}
           title="Loading data…"
           description={tableNode ? `Preparing "${tableNode.name}"` : 'Preparing table'}
         />
@@ -169,7 +194,10 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
   if (status === 'error' || status === 'empty') {
     return (
       <NodeViewWrapper className="editable-table-block">
-        <div className={`block-empty-state ${selected ? 'is-selected' : ''}`}>
+        <div
+          onMouseDownCapture={selectBlock}
+          className={`block-empty-state ${selected ? 'is-selected' : ''}`}
+        >
           <TableGlyph />
           <div className="block-empty-state-title">
             {status === 'error' ? 'Could not load data' : 'No data'}
@@ -210,7 +238,11 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
 
   return (
     <NodeViewWrapper className="editable-table-block">
-      <div className={`embedded-table-window ${selected ? 'is-selected' : ''}`}>
+      <div
+        ref={tableWrapperRef}
+        onMouseDownCapture={selectBlock}
+        className={`embedded-table-window ${selected ? 'is-selected' : ''} ${showConfig ? 'is-configuring' : ''}`}
+      >
         <div className="embedded-table-header">
           <div className="embedded-table-title">
             <TableGlyph className="w-4 h-4" />
@@ -261,24 +293,26 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
             Showing {displayRows.length.toLocaleString()} of {rowCount.toLocaleString()} rows
             {isTruncated && attrs.rowSelectionMode === 'all' ? ' (report safety limit)' : ''}
           </span>
-          {selected && (
-            <button onClick={() => setShowConfig((v) => !v)} className="embedded-table-config-btn">
-              Configure
-            </button>
-          )}
+          <button
+            onClick={toggleConfig}
+            aria-expanded={showConfig}
+            className="embedded-table-config-btn"
+          >
+            Configure
+          </button>
         </div>
 
         {showConfig && (
           <EmbeddedTableConfigPanel
             attrs={attrs}
             columns={columns}
+            sourceName={tableNode?.name}
             onUpdate={updateAttributes}
             onColumnToggle={handleColumnToggle}
             onChangeTable={() => {
-              setShowConfig(false);
               setShowPicker(true);
             }}
-            onClose={() => setShowConfig(false)}
+            onClose={closeConfig}
           />
         )}
       </div>
