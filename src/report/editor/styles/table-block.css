@@ -4,26 +4,38 @@
 
 .editable-table-outer {
   position: relative;
+  width: 100%;
 }
 
-.editable-table-outer.is-selected .editable-table-container {
-  outline: 2px solid var(--color-accent-green);
+.editable-table-outer .editable-table-container,
+.editable-table-wrapper .editable-table-container {
+  transition: outline-color 120ms ease;
+  outline: 2px solid transparent;
   outline-offset: -1px;
 }
 
+.editable-table-outer.is-selected .editable-table-container,
+.editable-table-outer.is-selected:hover .editable-table-container {
+  outline-color: var(--color-accent-green);
+}
+
+/* An active cell is its own selection; two rings at once reads as a glitch. */
+.editable-table-outer.is-editing-cell .editable-table-container,
+.editable-table-outer.is-editing-cell:hover .editable-table-container {
+  outline-color: transparent;
+}
+
 .editable-table-layout {
-  display: flex;
-  align-items: stretch;
-  gap: 2px;
+  position: relative;
 }
 
 .editable-table-wrapper {
   position: relative;
 }
 
-.editable-table-wrapper.is-selected .editable-table-container {
-  outline: 2px solid var(--color-accent-green);
-  outline-offset: -1px;
+.editable-table-wrapper.is-selected .editable-table-container,
+.editable-table-wrapper.is-selected:hover .editable-table-container {
+  outline-color: var(--color-accent-green);
 }
 
 .editable-table-caption {
@@ -40,9 +52,17 @@
 .editable-table-container {
   border: 1px solid var(--color-border, #e4e4e7);
   border-radius: 8px;
-  overflow: hidden;
+  max-height: min(480px, 60vh);
+  overflow: auto;
+  overscroll-behavior: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   background: var(--color-surface, #fff);
-  flex: 1;
+  width: 100%;
+}
+
+.editable-table-container::-webkit-scrollbar {
+  display: none;
 }
 
 [data-theme="dark"] .editable-table-container {
@@ -50,11 +70,29 @@
   background: var(--color-surface, #18181b);
 }
 
+/*
+ * Separate borders with zero spacing look identical to collapsed ones here —
+ * every rule is drawn once, by the cell on its top-left side — but collapsed
+ * borders make the browser ignore `border-radius` on cells, and the corner
+ * cells need a radius to follow the container's rounded frame.
+ */
 .editable-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 13px;
   table-layout: auto;
+}
+
+/*
+ * Fixed layout is what keeps the grid stable: column widths come from the
+ * table box alone, so putting an input into a cell cannot resize anything.
+ * The node view sets an inline min-width of (columns x track width); when that
+ * exceeds the report width the container scrolls instead of squeezing.
+ */
+.editable-table-outer .editable-table {
+  width: 100%;
+  table-layout: fixed;
 }
 
 .editable-table-header {
@@ -63,12 +101,12 @@
   text-align: left;
   font-weight: 500;
   font-size: 12px;
-  background: var(--color-surface-secondary, #fafafa);
+  background-color: var(--color-surface-secondary, #fafafa);
   border-bottom: 1px solid var(--color-border, #e4e4e7);
   border-right: 1px solid var(--color-border, #e4e4e7);
   color: var(--color-text-secondary, #71717a);
-  cursor: text;
-  min-width: 80px;
+  /* A click selects the cell; editing it is a second, deliberate step. */
+  cursor: cell;
   white-space: nowrap;
 }
 
@@ -77,22 +115,31 @@
 }
 
 [data-theme="dark"] .editable-table-header {
-  background: var(--color-surface-secondary, #27272a);
+  background-color: var(--color-surface-secondary, #27272a);
   border-bottom-color: var(--color-border, #3f3f46);
   border-right-color: var(--color-border, #3f3f46);
   color: var(--color-text-secondary, #a1a1aa);
 }
 
+/*
+ * The header is sticky, so its background is the only thing hiding the rows
+ * that scroll underneath it. A translucent `background-color` would let those
+ * rows show through and read as two rows of text printed on top of each other,
+ * so every header state tints via `background-image` and leaves the opaque
+ * colour from the base rule in place.
+ */
 .editable-table-header:hover {
-  background: rgba(33, 115, 70, 0.06);
+  background-image: linear-gradient(
+    rgb(var(--color-accent-rgb) / 0.06),
+    rgb(var(--color-accent-rgb) / 0.06)
+  );
 }
 
 [data-theme="dark"] .editable-table-header:hover {
-  background: rgba(33, 115, 70, 0.1);
-}
-
-.editable-table-header.is-editing {
-  background: rgba(33, 115, 70, 0.1);
+  background-image: linear-gradient(
+    rgb(var(--color-accent-rgb) / 0.12),
+    rgb(var(--color-accent-rgb) / 0.12)
+  );
 }
 
 .editable-table-header-text {
@@ -107,16 +154,21 @@
   border-bottom: 1px solid var(--color-border-subtle, #f4f4f5);
   border-right: 1px solid var(--color-border-subtle, #f4f4f5);
   color: var(--color-text-primary, #18181b);
-  cursor: text;
+  cursor: cell;
   vertical-align: middle;
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .editable-table-cell:last-of-type {
   border-right: none;
 }
 
-.editable-table-row:last-child .editable-table-cell {
+/*
+ * Only tables that end at the block boundary drop the closing rule. The embedded
+ * table continues into a footer, which needs the divider to stay flush.
+ */
+.editable-table-container .editable-table-row:last-child .editable-table-cell {
   border-bottom: none;
 }
 
@@ -124,10 +176,6 @@
   border-bottom-color: var(--color-border, #27272a);
   border-right-color: var(--color-border, #27272a);
   color: var(--color-text-primary, #fafafa);
-}
-
-.editable-table-cell.is-editing {
-  background: rgba(33, 115, 70, 0.06);
 }
 
 .editable-table-cell-text {
@@ -145,11 +193,100 @@
   background: rgba(33, 115, 70, 0.05);
 }
 
+/*
+ * Declared after the hover rules so an active cell keeps its own surface while
+ * the pointer rests on the row.
+ *
+ * The ring is the cell's own edge, drawn with `outline` pulled fully inside:
+ * it takes no part in layout, it follows whatever radius the cell has (so the
+ * four corner cells round with the container), and — unlike the absolutely
+ * positioned overlay it replaces — it needs neither `position` nor a stacking
+ * context on a cell inside a scroller, which is what left a stale copy of the
+ * ring painted over the rows above once the table was scrolled.
+ */
+.editable-table-cell.is-editing,
+.editable-table-cell.is-selected-cell,
+.editable-table-header.is-editing,
+.editable-table-header.is-selected-cell {
+  outline: 2px solid var(--color-accent-green);
+  outline-offset: -2px;
+}
+
+/*
+ * Cells are focusable so the grid, not the document, gets the arrow keys. The
+ * ring above is that focus made visible, and it is drawn from the selection
+ * rather than from `:focus` so it survives the moment focus passes to the
+ * editor input inside the cell.
+ */
+.editable-table-cell:focus,
+.editable-table-cell:focus-visible,
+.editable-table-header:focus,
+.editable-table-header:focus-visible {
+  outline-color: var(--color-accent-green);
+}
+
+.editable-table-cell.is-editing,
+.editable-table-row:hover .editable-table-cell.is-editing {
+  background: rgb(var(--color-accent-rgb) / 0.08);
+}
+
+/* Tint only; see the header hover rule for why the colour must stay opaque. */
+.editable-table-header.is-editing {
+  background-image: linear-gradient(
+    rgb(var(--color-accent-rgb) / 0.08),
+    rgb(var(--color-accent-rgb) / 0.08)
+  );
+}
+
+/*
+ * The container clips to an 8px radius over a 1px border, so the cells meeting
+ * those corners are rounded to match; without this the selection ring squares
+ * off a corner the frame has already rounded away.
+ */
+.editable-table-container thead tr:first-child .editable-table-header:first-child {
+  border-top-left-radius: 7px;
+}
+
+.editable-table-container thead tr:first-child .editable-table-header:last-child {
+  border-top-right-radius: 7px;
+}
+
+.editable-table-container tbody tr:last-child .editable-table-cell:first-child {
+  border-bottom-left-radius: 7px;
+}
+
+.editable-table-container tbody tr:last-child .editable-table-cell:last-child {
+  border-bottom-right-radius: 7px;
+}
+
+.editable-table-container .editable-table-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.editable-table-container .editable-table-header.is-editing {
+  z-index: 3;
+}
+
+[data-theme="dark"] .editable-table-cell.is-editing,
+[data-theme="dark"] .editable-table-row:hover .editable-table-cell.is-editing {
+  background: var(--color-surface, #18181b);
+}
+
+/* `background-color` only, so the tint layer above is not reset. */
+[data-theme="dark"] .editable-table-header.is-editing {
+  background-color: var(--color-surface, #18181b);
+}
+
 .editable-table-input {
+  display: block;
+  box-sizing: border-box;
   width: 100%;
   background: transparent;
-  border: none;
-  outline: none;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
   padding: 0;
   margin: 0;
   font-size: inherit;
@@ -162,45 +299,147 @@
   font-weight: 500;
 }
 
+/*
+ * The add buttons are flex/flow siblings of the table, so mounting them only
+ * while the block is selected used to steal width and height from the grid at
+ * the moment of selection. They stay in the layout permanently and only their
+ * paint is toggled, which keeps the table exactly the same size in every state.
+ */
 .table-add-btn {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
   background: transparent;
-  border: none;
-  border-radius: 3px;
-  color: var(--color-accent-green);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--color-text-tertiary, #a1a1aa);
   cursor: pointer;
-  transition: all 100ms ease;
-  opacity: 0.5;
+  transition:
+    opacity 150ms ease 500ms,
+    color 120ms ease 500ms,
+    visibility 0s linear 650ms;
+  opacity: 0;
+  visibility: hidden;
+  /*
+   * The add-row triangle rests on the table's bottom edge and therefore hangs
+   * into the 1rem gap below the block, where the structural paragraph paints
+   * its click strip. Both sit in the same stacking context, and without a
+   * layer of its own the strip — being positioned later and higher — took the
+   * button's clicks: pressing the visible triangle opened the gap instead,
+   * which moved the button out from under the pointer. A control the user can
+   * see owns the pixels it covers. While it is hidden it takes no clicks at
+   * all, so the strip keeps the whole gap. Stays below `.block-toolbar`.
+   */
+  z-index: 5;
 }
 
-.table-add-btn:hover {
-  background: rgba(33, 115, 70, 0.15);
+.editable-table-outer:hover .table-add-btn,
+.table-add-btn:focus-visible {
+  opacity: 0.75;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.table-add-btn:hover,
+.table-add-btn:focus-visible {
+  color: var(--color-text-primary, #18181b);
   opacity: 1;
 }
 
 [data-theme="dark"] .table-add-btn {
-  color: var(--color-accent-green);
+  color: var(--color-text-tertiary, #a1a1aa);
 }
 
 [data-theme="dark"] .table-add-btn:hover {
-  background: rgba(33, 115, 70, 0.2);
+  color: var(--color-text-primary, #fafafa);
 }
 
+/*
+ * Each button is sized to its triangle exactly (base 14, height 14 * sin(60deg))
+ * and pulled back by the container's 1px border, so the flat edge rests on the
+ * table's outline instead of floating beside it.
+ */
 .table-add-col-btn {
-  width: 16px;
-  min-width: 16px;
-  height: 100%;
-  flex-shrink: 0;
-  margin-left: 2px;
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: 12.12px;
+  height: 14px;
+  transform: translate(-1px, -50%);
 }
 
 .table-add-row-btn {
-  width: fit-content;
+  position: absolute;
+  top: 100%;
+  bottom: auto;
+  left: 50%;
+  width: 14px;
+  height: 12.12px;
+  transform: translate(-50%, -1px);
+}
+
+.table-add-btn svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * Shares the add buttons' reveal timing so the whole table chrome behaves as
+ * one set of controls.
+ */
+.table-select-grip {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  transform: translate(-6px, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-tertiary, #a1a1aa);
+  /* It selects; it does not drag. */
+  cursor: pointer;
+  transition:
+    opacity 150ms ease 500ms,
+    color 120ms ease 500ms,
+    visibility 0s linear 650ms;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.editable-table-outer:hover .table-select-grip,
+.editable-table-outer.is-selected .table-select-grip,
+.table-select-grip:focus-visible {
+  opacity: 0.75;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.table-select-grip:hover,
+.table-select-grip:focus-visible {
+  color: var(--color-text-primary, #18181b);
+  opacity: 1;
+}
+
+.editable-table-outer.is-selected .table-select-grip {
+  color: var(--color-accent-green);
+  opacity: 1;
+}
+
+[data-theme="dark"] .table-select-grip:hover {
+  color: var(--color-text-primary, #fafafa);
+}
+
+.table-select-grip svg {
+  width: 4px;
   height: 16px;
-  margin: 2px auto 0;
-  padding: 0 8px;
 }
 
 .table-context-menu {
@@ -288,38 +527,4 @@
 
 [data-theme="dark"] .context-menu-divider {
   background: var(--color-border, #3f3f46);
-}
-
-.embedded-table-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 8px;
-  padding-top: 8px;
-}
-
-.embedded-table-info {
-  font-size: 12px;
-  color: var(--color-text-tertiary, #a1a1aa);
-}
-
-.embedded-table-config-btn {
-  font-size: 12px;
-  color: var(--color-text-tertiary, #a1a1aa);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: all 150ms ease;
-}
-
-.embedded-table-config-btn:hover {
-  color: var(--color-text-primary, #18181b);
-  background: var(--color-surface-secondary, #f4f4f5);
-}
-
-[data-theme="dark"] .embedded-table-config-btn:hover {
-  color: var(--color-text-primary, #fafafa);
-  background: var(--color-surface-secondary, #27272a);
 }

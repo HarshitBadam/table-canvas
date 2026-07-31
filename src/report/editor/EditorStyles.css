@@ -1,6 +1,9 @@
 @import "./styles/editor-base.css";
 @import "./styles/editor-interactions.css";
 @import "./styles/editor-blocks.css";
+@import "./styles/block-config-panel.css";
+@import "./styles/block-config-controls.css";
+@import "./styles/block-config-select.css";
 @import "./styles/callout-toggle-blocks.css";
 @import "./styles/chart-block.css";
 @import "./styles/table-block.css";

@@ -1,0 +1,196 @@
+/* Block configuration popovers reuse the Combine Tables (join modal) design language. */
+
+/*
+ * The panel opens inline underneath its block, so it competes with the report
+ * for vertical space. Half the viewport leaves the block it configures visible
+ * above it and stops the panel from stranding a large empty band below itself.
+ */
+.block-config-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  max-height: min(460px, 50vh);
+  /* 18px separates the panel clearly from its chart; 4px keeps the bottom
+     flow gap compact. Both values use only factors of 2 and 3. */
+  margin: 18px 0 4px;
+  scroll-margin-block-end: 48px;
+  border: 1px solid var(--color-border-elevation);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  z-index: 30;
+  animation: join-dropdown-in 0.15s ease-out;
+}
+
+.block-config-panel:focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block-config-panel {
+    animation: none;
+  }
+}
+
+.block-config-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.block-config-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.block-config-header-text h2 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.block-config-header-text p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.block-config-header-text p strong {
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+
+.block-config-close {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.block-config-close:hover {
+  background: var(--color-surface-tertiary);
+  color: var(--color-text-secondary);
+}
+
+.block-config-close svg {
+  width: 14px;
+  height: 14px;
+}
+
+.block-config-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb) / 0.3);
+}
+
+.block-config-body {
+  min-height: 0;
+  flex: 0 1 auto;
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.block-config-section h3 {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.block-config-section-help {
+  margin: -4px 0 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.block-config-subsection-label {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.block-config-note {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-text-tertiary);
+}
+
+.block-config-empty {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-text-tertiary);
+}
+
+.block-config-footer {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgb(var(--color-surface-secondary-rgb) / 0.5);
+  border-top: 1px solid var(--color-border-subtle);
+  border-radius: 0 0 11px 11px;
+}
+
+.block-config-footer-summary {
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.block-config-btn-done {
+  padding: 8px 16px;
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  background: var(--color-accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background-color 0.15s ease;
+}
+
+.block-config-btn-done:hover {
+  background: var(--color-accent-hover);
+}
+
+.block-config-btn-done:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb) / 0.3);
+}

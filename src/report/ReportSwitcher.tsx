@@ -1,19 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useReportStore } from './reportStore';
 import type { Report } from './types';
-import { toolbarIconButton } from './toolbarStyles';
-import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease';
 
 interface ReportSwitcherProps {
   activeReportId: string | null;
   onSelectReport?: () => void;
 }
 
-export function ReportSwitcher({ activeReportId, onSelectReport }: ReportSwitcherProps) {
+/** Rename is a report-level verb, so it is triggered from the toolbar's actions menu. */
+export interface ReportSwitcherHandle {
+  startRename: () => void;
+}
+
+export const ReportSwitcher = forwardRef<ReportSwitcherHandle, ReportSwitcherProps>(function ReportSwitcher(
+  { activeReportId, onSelectReport },
+  ref,
+) {
   const reports = useReportStore((state) => state.reports);
   const selectReport = useReportStore((state) => state.selectReport);
   const updateReport = useReportStore((state) => state.updateReport);
-  const { canEdit } = useWorkspaceLease();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -35,6 +40,15 @@ export function ReportSwitcher({ activeReportId, onSelectReport }: ReportSwitche
   const canSwitch = allReports.length > 1 || (allReports.length > 0 && !activeReport);
   const label = activeReport?.name
     || (allReports.length === 0 ? 'No reports yet' : 'Choose a report');
+
+  useImperativeHandle(ref, () => ({
+    startRename: () => {
+      if (!activeReport) return;
+      setRenameValue(activeReport.name);
+      setMenuOpen(false);
+      setIsRenaming(true);
+    },
+  }), [activeReport]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -145,7 +159,7 @@ export function ReportSwitcher({ activeReportId, onSelectReport }: ReportSwitche
   }
 
   return (
-    <div ref={containerRef} className="flex min-w-0 items-center gap-0.5">
+    <div ref={containerRef} className="flex min-w-0 items-center">
       <div className="relative min-w-0">
         {canSwitch ? (
           <button
@@ -226,25 +240,6 @@ export function ReportSwitcher({ activeReportId, onSelectReport }: ReportSwitche
           </div>
         )}
       </div>
-
-      {activeReport && (
-        <button
-          type="button"
-          aria-label="Rename report"
-          title={canEdit ? 'Rename report' : EDITING_ELSEWHERE_TOOLTIP}
-          disabled={!canEdit}
-          onClick={() => {
-            setRenameValue(activeReport.name);
-            setMenuOpen(false);
-            setIsRenaming(true);
-          }}
-          className={toolbarIconButton}
-        >
-          <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12.5 4.5l3 3M4 16l.75-3 8.5-8.5a1.4 1.4 0 012 2L6.75 15 4 16z" />
-          </svg>
-        </button>
-      )}
     </div>
   );
-}
+});

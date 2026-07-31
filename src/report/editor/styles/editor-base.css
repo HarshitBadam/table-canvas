@@ -100,6 +100,46 @@
   pointer-events: none;
 }
 
+/*
+ * Atomic blocks need a real paragraph between them so a user can type there.
+ * Until the caret is actually in one it should not cost any vertical space:
+ * a self-collapsing paragraph lets the two blocks' own margins collapse
+ * together, which is the spacing they would have had without it.
+ * The class is applied by AtomicBlockNavigation.
+ */
+.tiptap-editor-content p.is-gap-collapsed {
+  height: 0;
+  min-height: 0;
+  margin: 0;
+}
+
+.tiptap-editor-content p.is-gap-collapsed > br {
+  display: none;
+}
+
+/*
+ * The placeholder is a zero-height float, so on a collapsed paragraph it has no
+ * box to sit in and paints straight over the block underneath. A gap the user
+ * cannot see must not advertise itself either.
+ */
+.tiptap-editor-content p.is-gap-collapsed::before {
+  content: none !important;
+  display: none !important;
+}
+
+/*
+ * A collapsed gap deliberately has no clickable box of its own, not even a
+ * pseudo-element stretched over the margin it shares with its neighbours: two
+ * boxes that meet at a fractional coordinate cannot agree on which of them owns
+ * the pixel row between them, and a gap that won that row on a click aimed at a
+ * block's edge would open underneath it. The gap's clickable band is measured
+ * from the neighbouring blocks at click time instead, in AtomicBlockNavigation.
+ *
+ * The band stays unpainted. The editor's text cursor is the whole affordance: a
+ * rule drawn between every pair of blocks reads as a divider in the document
+ * rather than as a hover state, and it followed the pointer down the page.
+ */
+
 [data-node-view-wrapper] p.is-empty::before,
 [data-node-view-wrapper] .is-empty::before,
 [data-node-view-content] p.is-empty::before,

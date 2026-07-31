@@ -22,6 +22,19 @@
   box-shadow: inset 3px 0 0 var(--color-accent-green);
 }
 
+.tiptap-block-wrapper.is-configuring {
+  /* Gives the scroll container enough trailing content to reveal a panel's
+     footer with a deliberate viewport gap when this is the last report block. */
+  margin-bottom: 60px;
+}
+
+/* A configuration panel already identifies its source block; do not leave the
+   selected-block marker visible beside or underneath that panel. */
+.tiptap-block-wrapper.is-configuring.is-selected {
+  background: transparent;
+  box-shadow: none;
+}
+
 .tiptap-block-wrapper.is-dragging {
   opacity: 0.5;
 }
@@ -142,54 +155,4 @@
 .block-empty-state-description {
   font-size: 12px;
   color: var(--color-text-tertiary, #a1a1aa);
-}
-
-.block-config-panel {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  margin-top: 8px;
-  padding: 1rem;
-  background: var(--color-surface, #fff);
-  border: 1px solid var(--color-border, #e4e4e7);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  z-index: 20;
-  animation: slideDown 150ms ease;
-}
-
-[data-theme="dark"] .block-config-panel {
-  background: var(--color-surface, #18181b);
-  border-color: var(--color-border, #3f3f46);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.block-config-section {
-  margin-bottom: 1rem;
-}
-
-.block-config-section:last-child {
-  margin-bottom: 0;
-}
-
-.block-config-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-text-secondary, #71717a);
-  margin-bottom: 0.5rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }

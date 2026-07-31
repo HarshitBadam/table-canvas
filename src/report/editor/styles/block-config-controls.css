@@ -1,0 +1,216 @@
+/* Form controls used inside .block-config-panel. */
+
+.block-config-types {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.block-config-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 62px;
+  padding: 10px 8px;
+  background: var(--color-surface-secondary);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.block-config-type-card:hover {
+  background: var(--color-surface-tertiary);
+}
+
+.block-config-type-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb) / 0.3);
+}
+
+.block-config-type-card.active {
+  border-color: var(--color-accent);
+  background: rgb(var(--color-accent-rgb) / 0.08);
+}
+
+.block-config-type-icon {
+  color: var(--color-text-tertiary);
+}
+
+.block-config-type-card.active .block-config-type-icon {
+  color: var(--color-accent-text);
+}
+
+.block-config-type-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.block-config-type-card.active .block-config-type-name {
+  color: var(--color-accent-text);
+}
+
+.block-config-type-desc {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+.block-config-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.block-config-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.block-config-field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 560px) {
+  .block-config-fields {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .block-config-types {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.block-config-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.block-config-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--color-surface-secondary);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.block-config-option:hover {
+  background: var(--color-surface-tertiary);
+}
+
+.block-config-option:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb) / 0.3);
+}
+
+.block-config-option.active {
+  background: rgb(var(--color-accent-rgb) / 0.08);
+  border-color: var(--color-accent);
+}
+
+.block-config-option-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.block-config-option-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.block-config-option.active .block-config-option-name {
+  color: var(--color-accent-text);
+}
+
+.block-config-option-desc {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.block-config-option-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 5px;
+  color: transparent;
+  transition: all 0.15s ease;
+}
+
+.block-config-option.active .block-config-option-check {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.block-config-option-check svg {
+  width: 12px;
+  height: 12px;
+}
+
+.block-config-options-scroll {
+  max-height: 180px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  margin: -4px;
+}
+
+.block-config-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  background: var(--color-surface-secondary);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.block-config-input:hover {
+  background: var(--color-surface-tertiary);
+}
+
+.block-config-input:focus {
+  outline: none;
+  background: var(--color-surface);
+  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb) / 0.3);
+}
+
+.block-config-input::placeholder {
+  color: var(--color-text-tertiary);
+  font-weight: 400;
+}

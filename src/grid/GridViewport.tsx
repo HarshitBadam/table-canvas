@@ -5,9 +5,11 @@ import { GridCell } from './GridCell'
 import { HEADER_HEIGHT, ROW_HEIGHT, TOUCH_ROW_HEIGHT } from './constants'
 import { EDITING_ELSEWHERE_TOOLTIP } from '@/state/useWorkspaceLease'
 import { useGridContext } from './useGridContext'
+import { useDragAutoScroll } from './useDragAutoScroll'
 import type { WindowedRowsState } from './hooks/useWindowedRows'
 
 const TOUCH_ROW_QUERY = '(max-width: 767px), (pointer: coarse)'
+const ROW_HEADER_WIDTH = 50
 
 interface GridViewportProps {
   totalRows: number
@@ -27,8 +29,18 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
   const {
     columns, filteredRows, getColumnWidth, isEditable, canEdit, isCornerSelected, selection, selectedCell,
     isIndexColumnSelected, setSelection, handleCornerClick, handleContextMenu, handleRowClick,
-    openContextMenu,
+    openContextMenu, isDraggingSelectionRef, handleCellMouseEnter,
   } = useGridContext()
+  useDragAutoScroll({
+    containerRef,
+    isActiveRef: isDraggingSelectionRef,
+    headerHeight: HEADER_HEIGHT,
+    rowHeaderWidth: ROW_HEADER_WIDTH,
+    onReachCell: (rowIndex, colIndex) => {
+      const columnId = columns[colIndex]?.id
+      if (columnId) handleCellMouseEnter(rowIndex, columnId)
+    },
+  })
   const rowVirtualizer = useVirtualizer({
     count: totalRows,
     getScrollElement: () => containerRef.current,
@@ -86,7 +98,7 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
       <div style={{
         height: rowVirtualizer.getTotalSize() + HEADER_HEIGHT,
         position: 'relative',
-        minWidth: 50 + columns.reduce((sum, column) => sum + getColumnWidth(column.id), 0) + (isEditable ? 40 : 0),
+        minWidth: ROW_HEADER_WIDTH + columns.reduce((sum, column) => sum + getColumnWidth(column.id), 0) + (isEditable ? 40 : 0),
       }}>
         <div
           role="row"
@@ -114,7 +126,7 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
             className={`sticky left-0 z-fixed flex cursor-pointer items-center justify-center border-r border-border bg-surface-secondary px-3 text-xs font-medium transition-colors ${
               isCornerSelected ? '!bg-accent-green/10 text-accent-text ring-2 ring-inset ring-accent-green' : 'text-text-tertiary hover:bg-surface-tertiary'
             }`}
-            style={{ width: 50, minWidth: 50 }}
+            style={{ width: ROW_HEADER_WIDTH, minWidth: ROW_HEADER_WIDTH }}
             title="Click to insert row/column at beginning"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -127,7 +139,7 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
               aria-hidden="true"
               className="pointer-events-none absolute inset-y-0 z-0 bg-surface-tertiary"
               style={{
-                left: 50 + columns.reduce((sum, column) => sum + getColumnWidth(column.id), 0),
+                left: ROW_HEADER_WIDTH + columns.reduce((sum, column) => sum + getColumnWidth(column.id), 0),
                 right: 0,
               }}
             />
@@ -163,7 +175,7 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
             const rowStyle = { position: 'absolute' as const, top: virtualRow.start, height: rowHeight, width: '100%' }
             if (!row) {
               return <div key={`skeleton-${index}`} role="row" aria-rowindex={index + 2} className="flex border-b border-border-subtle bg-surface animate-pulse" style={rowStyle}>
-                <div role="rowheader" aria-colindex={1} className="sticky left-0 z-10 flex items-center justify-center px-3 text-xs border-r border-border-subtle text-text-tertiary bg-surface" style={{ width: 50, minWidth: 50 }}>{index + 1}</div>
+                <div role="rowheader" aria-colindex={1} className="sticky left-0 z-10 flex items-center justify-center px-3 text-xs border-r border-border-subtle text-text-tertiary bg-surface" style={{ width: ROW_HEADER_WIDTH, minWidth: ROW_HEADER_WIDTH }}>{index + 1}</div>
                 {columns.map(column => <div key={column.id} className="flex items-center px-3" style={{ width: getColumnWidth(column.id) }}><div className="h-4 bg-surface-secondary rounded w-3/4" /></div>)}
               </div>
             }
@@ -187,7 +199,7 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
                 }}
                 onContextMenu={(event) => handleContextMenu(event, 'row', index)}
                 className={`sticky left-0 z-10 flex cursor-pointer items-center justify-center border-r border-border-subtle px-3 text-xs ${isRowSelected ? 'text-accent-green font-medium !bg-accent-green/15 ring-2 ring-inset ring-accent-green' : isIndexColumnSelected ? 'text-accent-green !bg-accent-green/10' : 'text-text-tertiary hover:bg-surface-secondary'} ${index % 2 !== 0 ? 'bg-surface-secondary' : 'bg-surface'}`}
-                style={{ width: 50, minWidth: 50 }}
+                style={{ width: ROW_HEADER_WIDTH, minWidth: ROW_HEADER_WIDTH }}
                 title={`Row ${index + 1}`}
               >
                 {index + 1}

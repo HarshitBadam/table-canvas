@@ -2,6 +2,13 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 import { useState, useCallback, useMemo, memo, useRef, useEffect } from 'react';
 import { DimensionPicker } from './DimensionPicker';
+import { TableAddIcon } from './TableAddIcon';
+import { TableContextMenu, type ContextMenuState } from './TableContextMenu';
+import { TableSelectGrip } from './TableSelectGrip';
+import { TableEditableCell } from './TableEditableCell';
+import { HEADER_ROW } from './tableCellNavigation';
+import { useNodeSelect, useReleaseNodeSelection, useSelectNode } from './useNodeSelect';
+import { useReportTableCells } from './useReportTableCells';
 
 interface EditableTableNodeAttrs {
   headers: string[];
@@ -14,23 +21,19 @@ interface EditableTableNodeOptions {
   reportId?: string;
 }
 
-interface ContextMenuState {
-  show: boolean;
-  x: number;
-  y: number;
-  type: 'row' | 'column' | 'cell';
-  index: number;
-  colIndex?: number;
-}
-
 const EditableTableNodeView = memo(function EditableTableNodeView({
   node,
   updateAttributes,
   selected,
+  editor,
+  getPos,
 }: NodeViewProps) {
   const attrs = node.attrs as EditableTableNodeAttrs;
-  const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
-  const [editValue, setEditValue] = useState('');
+  // Cells own their clicks, so they can be selected and edited; the surrounding
+  // chrome selects the block instead, which is how it gets deleted or dragged.
+  const selectBlock = useNodeSelect(editor, getPos, 'td, th');
+  const selectNode = useSelectNode(editor, getPos);
+  const releaseBlockSelection = useReleaseNodeSelection(editor);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [showDimensionPicker, setShowDimensionPicker] = useState(!attrs.initialized);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -63,76 +66,21 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
     }
   }, [contextMenu]);
 
-  const handleCellClick = useCallback((rowIndex: number, colIndex: number) => {
-    const value = rows[rowIndex]?.[colIndex];
-    setEditValue(value !== null && value !== undefined ? String(value) : '');
-    setEditingCell({ row: rowIndex, col: colIndex });
-  }, [rows]);
+  const cells = useReportTableCells({
+    headers,
+    rows,
+    updateAttributes,
+    onEnterGrid: releaseBlockSelection,
+    onLeaveGrid: selectNode,
+  });
+  const { commitEdit } = cells;
 
-  const handleCellBlur = useCallback(() => {
-    if (editingCell && editingCell.row >= 0) {
-      const newRows = rows.map(r => [...r]);
-      newRows[editingCell.row][editingCell.col] = editValue;
-      updateAttributes({ rows: newRows });
-      setEditingCell(null);
-    }
-  }, [editingCell, editValue, rows, updateAttributes]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleCellBlur();
-      if (editingCell && editingCell.row >= 0 && editingCell.row < rows.length - 1) {
-        const nextValue = rows[editingCell.row + 1]?.[editingCell.col];
-        setEditValue(nextValue !== null && nextValue !== undefined ? String(nextValue) : '');
-        setEditingCell({ row: editingCell.row + 1, col: editingCell.col });
-      }
-    } else if (e.key === 'Tab') {
-      e.preventDefault();
-      if (editingCell) {
-        if (editingCell.row === -1) {
-          const newHeaders = [...headers];
-          newHeaders[editingCell.col] = editValue;
-          updateAttributes({ headers: newHeaders });
-          if (editingCell.col < headers.length - 1) {
-            setEditValue(headers[editingCell.col + 1] || '');
-            setEditingCell({ row: -1, col: editingCell.col + 1 });
-          } else {
-            const firstCellValue = rows[0]?.[0];
-            setEditValue(firstCellValue !== null && firstCellValue !== undefined ? String(firstCellValue) : '');
-            setEditingCell({ row: 0, col: 0 });
-          }
-        } else {
-          handleCellBlur();
-          const nextCol = (editingCell.col + 1) % headers.length;
-          const nextRow = nextCol === 0 ? editingCell.row + 1 : editingCell.row;
-          if (nextRow < rows.length) {
-            const nextValue = rows[nextRow]?.[nextCol];
-            setEditValue(nextValue !== null && nextValue !== undefined ? String(nextValue) : '');
-            setEditingCell({ row: nextRow, col: nextCol });
-          } else {
-            setEditingCell(null);
-          }
-        }
-      }
-    } else if (e.key === 'Escape') {
-      setEditingCell(null);
-    }
-  }, [handleCellBlur, editingCell, editValue, rows, headers, updateAttributes]);
-
-  const handleHeaderClick = useCallback((colIndex: number) => {
-    setEditValue(headers[colIndex] || '');
-    setEditingCell({ row: -1, col: colIndex });
-  }, [headers]);
-
-  const handleHeaderBlur = useCallback(() => {
-    if (editingCell && editingCell.row === -1) {
-      const newHeaders = [...headers];
-      newHeaders[editingCell.col] = editValue;
-      updateAttributes({ headers: newHeaders });
-      setEditingCell(null);
-    }
-  }, [editingCell, editValue, headers, updateAttributes]);
+  // Grabbing the handle takes focus off the cell editor without a blur, so the
+  // pending edit has to be written back before the input unmounts.
+  const selectTable = useCallback(() => {
+    commitEdit();
+    selectNode();
+  }, [commitEdit, selectNode]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent, type: 'row' | 'column' | 'cell', index: number, colIndex?: number) => {
     e.preventDefault();
@@ -188,37 +136,35 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
 
   return (
     <NodeViewWrapper className="editable-table-block">
-      <div className={`editable-table-outer ${selected ? 'is-selected' : ''}`}>
+      <div
+        onMouseDownCapture={selectBlock}
+        className={`editable-table-outer ${selected ? 'is-selected' : ''} ${
+          cells.selectedCell ? 'is-editing-cell' : ''
+        }`}
+      >
         {attrs.caption && (
           <div className="editable-table-caption">{attrs.caption}</div>
         )}
 
         <div className="editable-table-layout">
+          <TableSelectGrip onSelect={selectTable} />
           <div className="editable-table-container">
-            <table className="editable-table">
+            <table
+              ref={cells.gridRef}
+              className="editable-table"
+              style={{ minWidth: `${headers.length * 140}px` }}
+            >
               <thead>
                 <tr>
                   {headers.map((header, colIndex) => (
-                    <th
+                    <TableEditableCell
                       key={colIndex}
-                      onClick={() => handleHeaderClick(colIndex)}
+                      cells={cells}
+                      row={HEADER_ROW}
+                      col={colIndex}
+                      value={header}
                       onContextMenu={(e) => handleContextMenu(e, 'column', colIndex)}
-                      className={`editable-table-header ${editingCell?.row === -1 && editingCell?.col === colIndex ? 'is-editing' : ''}`}
-                    >
-                      {editingCell?.row === -1 && editingCell?.col === colIndex ? (
-                        <input
-                          type="text"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onBlur={handleHeaderBlur}
-                          onKeyDown={handleKeyDown}
-                          autoFocus
-                          className="editable-table-input"
-                        />
-                      ) : (
-                        <span className="editable-table-header-text">{header}</span>
-                      )}
-                    </th>
+                    />
                   ))}
                 </tr>
               </thead>
@@ -226,28 +172,14 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
                 {rows.map((row, rowIndex) => (
                   <tr key={rowIndex} className="editable-table-row">
                     {row.map((cell, colIndex) => (
-                      <td
+                      <TableEditableCell
                         key={colIndex}
-                        onClick={() => handleCellClick(rowIndex, colIndex)}
+                        cells={cells}
+                        row={rowIndex}
+                        col={colIndex}
+                        value={cell !== null && cell !== undefined ? String(cell) : ''}
                         onContextMenu={(e) => handleContextMenu(e, 'cell', rowIndex, colIndex)}
-                        className={`editable-table-cell ${editingCell?.row === rowIndex && editingCell?.col === colIndex ? 'is-editing' : ''}`}
-                      >
-                        {editingCell?.row === rowIndex && editingCell?.col === colIndex ? (
-                          <input
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onBlur={handleCellBlur}
-                            onKeyDown={handleKeyDown}
-                            autoFocus
-                            className="editable-table-input"
-                          />
-                        ) : (
-                          <span className="editable-table-cell-text">
-                            {cell !== null && cell !== undefined ? String(cell) : ''}
-                          </span>
-                        )}
-                      </td>
+                      />
                     ))}
                   </tr>
                 ))}
@@ -255,96 +187,35 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
             </table>
           </div>
 
-          {selected && (
-            <button
-              onClick={() => addColumn()}
-              className="table-add-btn table-add-col-btn"
-              title="Add column"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
-          )}
-        </div>
+          <button
+            onClick={() => addColumn()}
+            className="table-add-btn table-add-col-btn"
+            title="Add column"
+          >
+            <TableAddIcon direction="right" />
+          </button>
 
-        {selected && (
+          {/* Anchored to the table box, not to the block: anything the block
+              renders below the table must not push this off the border. */}
           <button
             onClick={() => addRow()}
             className="table-add-btn table-add-row-btn"
             title="Add row"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <TableAddIcon direction="down" />
           </button>
-        )}
+        </div>
 
-        {contextMenu && (
-          <div
-            ref={contextMenuRef}
-            className="table-context-menu"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
-          >
-            {contextMenu.type === 'column' && (
-              <>
-                <button onClick={() => addColumn(contextMenu.index)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  Insert column left
-                </button>
-                <button onClick={() => addColumn(contextMenu.index + 1)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  Insert column right
-                </button>
-                {headers.length > 1 && (
-                  <button onClick={() => deleteColumn(contextMenu.index)} className="danger">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Delete column
-                  </button>
-                )}
-              </>
-            )}
-            {contextMenu.type === 'cell' && (
-              <>
-                <button onClick={() => addRow(contextMenu.index)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  Insert row above
-                </button>
-                <button onClick={() => addRow(contextMenu.index + 1)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  Insert row below
-                </button>
-                {rows.length > 1 && (
-                  <button onClick={() => deleteRow(contextMenu.index)} className="danger">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Delete row
-                  </button>
-                )}
-                <div className="context-menu-divider" />
-                {contextMenu.colIndex !== undefined && headers.length > 1 && (
-                  <button onClick={() => deleteColumn(contextMenu.colIndex!)} className="danger">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Delete column
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        )}
+        <TableContextMenu
+          menu={contextMenu}
+          menuRef={contextMenuRef}
+          headers={headers}
+          rows={rows}
+          onAddRow={addRow}
+          onAddColumn={addColumn}
+          onDeleteRow={deleteRow}
+          onDeleteColumn={deleteColumn}
+        />
       </div>
     </NodeViewWrapper>
   );

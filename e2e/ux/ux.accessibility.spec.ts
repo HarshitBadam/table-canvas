@@ -108,7 +108,8 @@ test.describe('Accessibility', () => {
     await expect(page.locator('.tiptap-editor-content')).toBeVisible()
     await expectAccessible(page, 'Report editor')
 
-    await page.getByRole('button', { name: 'Insert manual table' }).click()
+    await page.getByRole('button', { name: 'Insert', exact: true }).click()
+    await page.getByRole('menuitem', { name: /Manual table/ }).click()
     const tableDialog = page.getByRole('dialog', { name: 'Insert Table' })
     await expect(tableDialog.getByRole('button', { name: 'Close table picker' })).toBeFocused()
     await expectAccessible(page, 'Report table dimensions', '[aria-labelledby="insert-table-title"]')

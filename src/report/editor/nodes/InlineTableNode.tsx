@@ -1,8 +1,13 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
+import { TableAddIcon } from './TableAddIcon';
 import { TableContextMenu } from './TableContextMenu';
+import { TableEditableCell } from './TableEditableCell';
+import { TableSelectGrip } from './TableSelectGrip';
+import { HEADER_ROW } from './tableCellNavigation';
 import { useInlineTableEditor } from './useInlineTableEditor';
+import { useNodeSelect, useReleaseNodeSelection, useSelectNode } from './useNodeSelect';
 
 interface InlineTableNodeOptions {
   reportId?: string;
@@ -12,27 +17,36 @@ const InlineTableNodeView = memo(function InlineTableNodeView({
   node,
   updateAttributes,
   selected,
+  editor,
+  getPos,
 }: NodeViewProps) {
+  const selectBlock = useNodeSelect(editor, getPos, 'td, th');
+  const selectNode = useSelectNode(editor, getPos);
+  const releaseBlockSelection = useReleaseNodeSelection(editor);
   const {
     attrs,
     headers,
     rows,
-    editingCell,
-    editValue,
-    setEditValue,
+    cells,
     contextMenu,
     contextMenuRef,
-    handleCellClick,
-    handleCellBlur,
-    handleKeyDown,
-    handleHeaderClick,
-    handleHeaderBlur,
     handleContextMenu,
     addRow,
     addColumn,
     deleteRow,
     deleteColumn,
-  } = useInlineTableEditor(node, updateAttributes);
+  } = useInlineTableEditor(node, updateAttributes, {
+    onEnterGrid: releaseBlockSelection,
+    onLeaveGrid: selectNode,
+  });
+
+  // Grabbing the handle takes focus off the cell editor without a blur, so the
+  // pending edit has to be written back before the input unmounts.
+  const { commitEdit } = cells;
+  const selectTable = useCallback(() => {
+    commitEdit();
+    selectNode();
+  }, [commitEdit, selectNode]);
 
   if (headers.length === 0) {
     return (
@@ -50,36 +64,32 @@ const InlineTableNodeView = memo(function InlineTableNodeView({
 
   return (
     <NodeViewWrapper className="editable-table-block">
-      <div className={`editable-table-outer ${selected ? 'is-selected' : ''}`}>
+      <div
+        onMouseDownCapture={selectBlock}
+        className={`editable-table-outer ${selected ? 'is-selected' : ''} ${
+          cells.selectedCell ? 'is-editing-cell' : ''
+        }`}
+      >
         {attrs.caption && <div className="editable-table-caption">{attrs.caption}</div>}
         <div className="editable-table-layout">
+          <TableSelectGrip onSelect={selectTable} />
           <div className="editable-table-container">
-            <table className="editable-table">
+            <table
+              ref={cells.gridRef}
+              className="editable-table"
+              style={{ minWidth: `${headers.length * 140}px` }}
+            >
               <thead>
                 <tr>
                   {headers.map((header, columnIndex) => (
-                    <th
+                    <TableEditableCell
                       key={columnIndex}
-                      onClick={() => handleHeaderClick(columnIndex)}
+                      cells={cells}
+                      row={HEADER_ROW}
+                      col={columnIndex}
+                      value={header || `Column ${columnIndex + 1}`}
                       onContextMenu={event => handleContextMenu(event, 'column', columnIndex)}
-                      className={`editable-table-header ${
-                        editingCell?.row === -1 && editingCell.col === columnIndex ? 'is-editing' : ''
-                      }`}
-                    >
-                      {editingCell?.row === -1 && editingCell.col === columnIndex ? (
-                        <input
-                          type="text"
-                          value={editValue}
-                          onChange={event => setEditValue(event.target.value)}
-                          onBlur={handleHeaderBlur}
-                          onKeyDown={handleKeyDown}
-                          autoFocus
-                          className="editable-table-input"
-                        />
-                      ) : (
-                        <span className="editable-table-header-text">{header || `Column ${columnIndex + 1}`}</span>
-                      )}
-                    </th>
+                    />
                   ))}
                 </tr>
               </thead>
@@ -87,47 +97,27 @@ const InlineTableNodeView = memo(function InlineTableNodeView({
                 {rows.map((row, rowIndex) => (
                   <tr key={rowIndex} className="editable-table-row">
                     {row.map((cell, columnIndex) => (
-                      <td
+                      <TableEditableCell
                         key={columnIndex}
-                        onClick={() => handleCellClick(rowIndex, columnIndex)}
+                        cells={cells}
+                        row={rowIndex}
+                        col={columnIndex}
+                        value={cell !== null && cell !== undefined ? String(cell) : ''}
                         onContextMenu={event => handleContextMenu(event, 'cell', rowIndex, columnIndex)}
-                        className={`editable-table-cell ${
-                          editingCell?.row === rowIndex && editingCell.col === columnIndex ? 'is-editing' : ''
-                        }`}
-                      >
-                        {editingCell?.row === rowIndex && editingCell.col === columnIndex ? (
-                          <input
-                            type="text"
-                            value={editValue}
-                            onChange={event => setEditValue(event.target.value)}
-                            onBlur={handleCellBlur}
-                            onKeyDown={handleKeyDown}
-                            autoFocus
-                            className="editable-table-input"
-                          />
-                        ) : (
-                          <span className="editable-table-cell-text">
-                            {cell !== null && cell !== undefined ? String(cell) : ''}
-                          </span>
-                        )}
-                      </td>
+                      />
                     ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {selected && (
-            <button onClick={() => addColumn()} className="table-add-btn table-add-col-btn" title="Add column">
-              <AddIcon />
-            </button>
-          )}
-        </div>
-        {selected && (
-          <button onClick={() => addRow()} className="table-add-btn table-add-row-btn" title="Add row">
-            <AddIcon />
+          <button onClick={() => addColumn()} className="table-add-btn table-add-col-btn" title="Add column">
+            <TableAddIcon direction="right" />
           </button>
-        )}
+          <button onClick={() => addRow()} className="table-add-btn table-add-row-btn" title="Add row">
+            <TableAddIcon direction="down" />
+          </button>
+        </div>
         {attrs.sourceInfo && (
           <div className="text-xs text-text-tertiary mt-2">From: {attrs.sourceInfo.tableName}</div>
         )}
@@ -145,14 +135,6 @@ const InlineTableNodeView = memo(function InlineTableNodeView({
     </NodeViewWrapper>
   );
 });
-
-function AddIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
 
 export const InlineTableNode = Node.create<InlineTableNodeOptions>({
   name: 'inlineTable',

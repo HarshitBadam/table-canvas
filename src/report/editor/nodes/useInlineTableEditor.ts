@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import type { KeyboardEvent, MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
 import type { NodeViewProps } from '@tiptap/react';
 import type { ContextMenuState } from './TableContextMenu';
+import { useReportTableCells, type TableCellValue } from './useReportTableCells';
 
 interface InlineTableNodeAttrs {
   headers: string[];
-  rows: (string | number | boolean | null | undefined)[][];
+  rows: TableCellValue[][];
   caption?: string;
   sourceInfo?: {
     tableId: string;
@@ -16,15 +17,22 @@ interface InlineTableNodeAttrs {
 export function useInlineTableEditor(
   node: NodeViewProps['node'],
   updateAttributes: NodeViewProps['updateAttributes'],
+  grip: { onEnterGrid?: () => void; onLeaveGrid?: () => void } = {},
 ) {
   const attrs = node.attrs as InlineTableNodeAttrs;
   const headers = useMemo(() => attrs.headers ?? [], [attrs.headers]);
   const rows = useMemo(() => attrs.rows ?? [], [attrs.rows]);
 
-  const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
-  const [editValue, setEditValue] = useState('');
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  const cells = useReportTableCells({
+    headers,
+    rows,
+    updateAttributes,
+    onEnterGrid: grip.onEnterGrid,
+    onLeaveGrid: grip.onLeaveGrid,
+  });
 
   useEffect(() => {
     const handleClickOutside = (e: globalThis.MouseEvent) => {
@@ -37,77 +45,6 @@ export function useInlineTableEditor(
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [contextMenu]);
-
-  const handleCellClick = useCallback((rowIndex: number, colIndex: number) => {
-    const value = rows[rowIndex]?.[colIndex];
-    setEditValue(value !== null && value !== undefined ? String(value) : '');
-    setEditingCell({ row: rowIndex, col: colIndex });
-  }, [rows]);
-
-  const handleCellBlur = useCallback(() => {
-    if (editingCell && editingCell.row >= 0) {
-      const newRows = rows.map(r => [...r]);
-      newRows[editingCell.row][editingCell.col] = editValue;
-      updateAttributes({ rows: newRows });
-      setEditingCell(null);
-    }
-  }, [editingCell, editValue, rows, updateAttributes]);
-
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleCellBlur();
-      if (editingCell && editingCell.row >= 0 && editingCell.row < rows.length - 1) {
-        const nextValue = rows[editingCell.row + 1]?.[editingCell.col];
-        setEditValue(nextValue !== null && nextValue !== undefined ? String(nextValue) : '');
-        setEditingCell({ row: editingCell.row + 1, col: editingCell.col });
-      }
-    } else if (e.key === 'Tab') {
-      e.preventDefault();
-      if (editingCell) {
-        if (editingCell.row === -1) {
-          const newHeaders = [...headers];
-          newHeaders[editingCell.col] = editValue;
-          updateAttributes({ headers: newHeaders });
-          if (editingCell.col < headers.length - 1) {
-            setEditValue(headers[editingCell.col + 1] || '');
-            setEditingCell({ row: -1, col: editingCell.col + 1 });
-          } else {
-            const firstCellValue = rows[0]?.[0];
-            setEditValue(firstCellValue !== null && firstCellValue !== undefined ? String(firstCellValue) : '');
-            setEditingCell({ row: 0, col: 0 });
-          }
-        } else {
-          handleCellBlur();
-          const nextCol = (editingCell.col + 1) % headers.length;
-          const nextRow = nextCol === 0 ? editingCell.row + 1 : editingCell.row;
-          if (nextRow < rows.length) {
-            const nextValue = rows[nextRow]?.[nextCol];
-            setEditValue(nextValue !== null && nextValue !== undefined ? String(nextValue) : '');
-            setEditingCell({ row: nextRow, col: nextCol });
-          } else {
-            setEditingCell(null);
-          }
-        }
-      }
-    } else if (e.key === 'Escape') {
-      setEditingCell(null);
-    }
-  }, [handleCellBlur, editingCell, editValue, rows, headers, updateAttributes]);
-
-  const handleHeaderClick = useCallback((colIndex: number) => {
-    setEditValue(headers[colIndex] || '');
-    setEditingCell({ row: -1, col: colIndex });
-  }, [headers]);
-
-  const handleHeaderBlur = useCallback(() => {
-    if (editingCell && editingCell.row === -1) {
-      const newHeaders = [...headers];
-      newHeaders[editingCell.col] = editValue;
-      updateAttributes({ headers: newHeaders });
-      setEditingCell(null);
-    }
-  }, [editingCell, editValue, headers, updateAttributes]);
 
   const handleContextMenu = useCallback((
     e: MouseEvent,
@@ -156,16 +93,9 @@ export function useInlineTableEditor(
     headers,
     rows,
     attrs,
-    editingCell,
-    editValue,
-    setEditValue,
+    cells,
     contextMenu,
     contextMenuRef,
-    handleCellClick,
-    handleCellBlur,
-    handleKeyDown,
-    handleHeaderClick,
-    handleHeaderBlur,
     handleContextMenu,
     addRow,
     addColumn,

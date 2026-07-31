@@ -1,5 +1,5 @@
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChartRenderer } from '@/charts/ChartRenderer';
 import type { ChartType } from '@/types';
 import type { EnhancedChartConfig } from '../../types';
@@ -13,18 +13,19 @@ import { TablePickerModal } from './TablePickerModal';
 import {
   ChartGlyph,
   ChartGrid,
-  ChartToolbar,
   SettingsIcon,
   TableGlyph,
 } from './ReportChartControls';
 import type { ChartNodeAttrs, ChartNodeOptions } from './chartNodeTypes';
+import { useNodeSelect } from './useNodeSelect';
 
 export const ChartNodeView = memo(function ChartNodeView({
   node,
   updateAttributes,
   selected,
   extension,
-  deleteNode,
+  editor,
+  getPos,
 }: NodeViewProps) {
   const attrs = node.attrs as ChartNodeAttrs;
   const options = extension.options as ChartNodeOptions;
@@ -44,6 +45,7 @@ export const ChartNodeView = memo(function ChartNodeView({
   });
   const [showConfig, setShowConfig] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const chartWrapperRef = useRef<HTMLDivElement>(null);
 
   const columnNames = useMemo(
     () => Object.fromEntries(columns.map(column => [column.id, column.name])),
@@ -157,11 +159,22 @@ export const ChartNodeView = memo(function ChartNodeView({
   }, [attrs.config, updateAttributes]);
 
   const changeTable = useCallback(() => {
-    setShowConfig(false);
     setShowPicker(true);
   }, []);
-  const closeConfig = useCallback(() => setShowConfig(false), []);
-  const openConfig = useCallback(() => setShowConfig(true), []);
+  const scrollToChart = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      chartWrapperRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+  }, []);
+  const closeConfig = useCallback(() => {
+    setShowConfig(false);
+    scrollToChart();
+  }, [scrollToChart]);
+  const openConfig = useCallback(() => {
+    if (showConfig) closeConfig();
+    else setShowConfig(true);
+  }, [closeConfig, showConfig]);
+  const selectChart = useNodeSelect(editor, getPos);
   const picker = showPicker ? (
     <TablePickerModal
       title="Select a table"
@@ -174,11 +187,14 @@ export const ChartNodeView = memo(function ChartNodeView({
   if (status === 'no-source') {
     return (
       <NodeViewWrapper className="chart-block">
-        <div className={`flex flex-col items-center justify-center text-center transition-all p-10 rounded-xl border border-dashed ${
-          selected
-            ? 'border-accent-green bg-accent-green/5'
-            : 'border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50 to-white dark:from-gray-800/50 dark:to-gray-900/50'
-        }`}>
+        <div
+          onMouseDownCapture={selectChart}
+          className={`flex flex-col items-center justify-center text-center transition-all p-10 rounded-xl border border-dashed ${
+            selected
+              ? 'border-accent-green bg-accent-green/5'
+              : 'border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50 to-white dark:from-gray-800/50 dark:to-gray-900/50'
+          }`}
+        >
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-green/15 to-accent-green/5 flex items-center justify-center mb-3 text-accent-green">
             <ChartGlyph />
           </div>
@@ -226,7 +242,10 @@ export const ChartNodeView = memo(function ChartNodeView({
         : 'Table not available';
     return (
       <NodeViewWrapper className="chart-block">
-        <div className={`block-empty-state ${selected ? 'is-selected' : ''}`}>
+        <div
+          onMouseDownCapture={selectChart}
+          className={`block-empty-state ${selected ? 'is-selected' : ''}`}
+        >
           <div className="block-empty-state-icon">📊</div>
           <div className="block-empty-state-title">{title}</div>
           <div className="block-empty-state-description">{description}</div>
@@ -271,6 +290,7 @@ export const ChartNodeView = memo(function ChartNodeView({
       config={attrs.config}
       chartType={attrs.chartType}
       columns={columns}
+      sourceName={tableNode?.name}
       onConfigChange={handleConfigChange}
       onChartTypeChange={handleChartTypeChange}
       onChangeTable={changeTable}
@@ -281,8 +301,11 @@ export const ChartNodeView = memo(function ChartNodeView({
   if (!tableData.length || !attrs.config.xAxis || !attrs.config.yAxis) {
     return (
       <NodeViewWrapper className="chart-block">
-        <div className={`tiptap-block-wrapper ${selected ? 'is-selected' : ''}`}>
-          <div className="chart-block-container">
+        <div
+          ref={chartWrapperRef}
+          className={`tiptap-block-wrapper ${selected ? 'is-selected' : ''} ${showConfig ? 'is-configuring' : ''}`}
+        >
+          <div className="chart-block-container" onMouseDownCapture={selectChart}>
             <div className="chart-block-body" style={{ padding: '2rem', textAlign: 'center' }}>
               <div className="text-3xl mb-2 opacity-60">📊</div>
               <p className="text-sm text-gray-500 mb-3">Configure chart axes to display data</p>
@@ -298,12 +321,17 @@ export const ChartNodeView = memo(function ChartNodeView({
 
   return (
     <NodeViewWrapper className="chart-block" data-drag-handle>
-      <div className={`tiptap-block-wrapper ${selected ? 'is-selected' : ''}`}>
-        <div className="chart-block-container relative group overflow-hidden">
+      <div
+        ref={chartWrapperRef}
+        className={`tiptap-block-wrapper ${selected ? 'is-selected' : ''} ${showConfig ? 'is-configuring' : ''}`}
+      >
+        <div
+          className="chart-block-container relative overflow-hidden"
+          onMouseDownCapture={selectChart}
+        >
           {attrs.config.showGrid !== false && <ChartGrid />}
-          <ChartToolbar selected={selected} onConfigure={openConfig} onDelete={deleteNode} />
           {(attrs.config.title || attrs.config.subtitle) && (
-            <div className="chart-block-header relative z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+            <div className="chart-block-header relative z-10">
               {attrs.config.title && <div className="chart-block-title">{attrs.config.title}</div>}
               {attrs.config.subtitle && <div className="chart-block-subtitle">{attrs.config.subtitle}</div>}
             </div>
@@ -325,17 +353,21 @@ export const ChartNodeView = memo(function ChartNodeView({
               columnNames={chartColumnNames}
             />
           </div>
-          <div className="chart-block-footer relative z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-            <span>
-              Source - {tableNode?.name || 'Unknown table'}
-              {isTruncated
-                ? ` - first ${tableData.length.toLocaleString()} of ${rowCount.toLocaleString()} rows`
-                : ` - ${rowCount.toLocaleString()} rows`}
-              {availableChartPoints < tableData.length || chartData.length < availableChartPoints
-                ? ` - ${chartData.length.toLocaleString()} of ${availableChartPoints.toLocaleString()} points plotted`
-                : ''}
+          <div className="chart-block-footer relative z-10">
+            <span className="chart-block-source">
+              <span className="chart-block-source-name">{tableNode?.name || 'Unknown table'}</span>
+              <span className="chart-block-source-meta">
+                {isTruncated
+                  ? `first ${tableData.length.toLocaleString()} of ${rowCount.toLocaleString()} rows`
+                  : `${rowCount.toLocaleString()} rows`}
+              </span>
+              {(availableChartPoints < tableData.length || chartData.length < availableChartPoints) && (
+                <span className="chart-block-source-meta">
+                  {`${chartData.length.toLocaleString()} of ${availableChartPoints.toLocaleString()} points plotted`}
+                </span>
+              )}
             </span>
-            <button onClick={openConfig} className="text-xs text-accent-green hover:text-accent-green-hover flex items-center gap-1 font-medium">
+            <button onClick={openConfig} className="chart-block-configure">
               <SettingsIcon />
               Configure
             </button>

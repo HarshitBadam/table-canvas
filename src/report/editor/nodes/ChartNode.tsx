@@ -41,18 +41,4 @@ export const ChartNode = Node.create<ChartNodeOptions>({
     return ReactNodeViewRenderer(ChartNodeView);
   },
 
-  addKeyboardShortcuts() {
-    const deleteSelectedNode = () => {
-      const { selection } = this.editor.state;
-      const parentNode = selection.$anchor.parent;
-      if (parentNode.type.name === this.name || selection.$anchor.nodeAfter?.type.name === this.name) {
-        return this.editor.commands.deleteSelection();
-      }
-      return false;
-    };
-    return {
-      Backspace: deleteSelectedNode,
-      Delete: deleteSelectedNode,
-    };
-  },
 });

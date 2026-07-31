@@ -32,15 +32,7 @@ function DeleteIcon() {
 }
 
 export function ChartGrid() {
-  return (
-    <div
-      className="absolute inset-0 pointer-events-none z-0"
-      style={{
-        backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px)',
-        backgroundSize: '24px 24px',
-      }}
-    />
-  )
+  return <div className="chart-block-grid" aria-hidden="true" />
 }
 
 export function ChartToolbar({
@@ -53,23 +45,20 @@ export function ChartToolbar({
   onDelete: () => void
 }) {
   return (
-    <div className={`absolute -top-10 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 transition-all duration-150 ${
-      selected
-        ? 'opacity-100 translate-y-0'
-        : 'opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto'
-    }`}>
+    <div className={`chart-block-toolbar ${selected ? 'is-visible' : ''}`}>
       <button
         onClick={onConfigure}
-        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-accent-green dark:hover:text-accent-green hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+        className="chart-block-toolbar-button"
       >
         <SettingsIcon />
         Configure
       </button>
-      <div className="w-px h-4 bg-gray-200 dark:bg-gray-600" />
+      <div className="chart-block-toolbar-divider" />
       <button
         onClick={onDelete}
-        className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+        className="chart-block-toolbar-button is-danger"
         title="Delete chart (Backspace)"
+        aria-label="Delete chart"
       >
         <DeleteIcon />
       </button>
