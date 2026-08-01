@@ -3,6 +3,7 @@ import {
   checkFileSize,
   checkRowCount,
   checkTableCount,
+  checkProjectTableLimits,
   checkProjectCount,
   checkStorageQuota,
 } from './enforce'
@@ -79,6 +80,71 @@ describe('enforce helpers', () => {
     it('rejects at google limit', () => {
       const result = checkTableCount(20, 'google')
       expect(result.ok).toBe(false)
+    })
+  })
+
+  describe('checkProjectTableLimits', () => {
+    const sourceTable = (id: string, rowCount: number) => ({
+      id,
+      kind: 'source_table' as const,
+      name: `Table ${id}`,
+      ui: { position: { x: 0, y: 0 } },
+      schema: { columns: [], rowCount },
+      plan: {
+        fileRef: '',
+        fileName: '',
+        fileType: 'csv' as const,
+        inferredSchemaVersion: 1,
+      },
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+
+    it('allows projects at the guest table and row boundaries', () => {
+      const nodes = Object.fromEntries(
+        Array.from({ length: 5 }, (_, index) => [
+          `table-${index}`,
+          sourceTable(`table-${index}`, 25_000),
+        ]),
+      )
+      expect(checkProjectTableLimits(nodes, 'guest')).toEqual({ ok: true })
+    })
+
+    it('rejects imported projects with too many tables', () => {
+      const nodes = Object.fromEntries(
+        Array.from({ length: 6 }, (_, index) => [
+          `table-${index}`,
+          sourceTable(`table-${index}`, 1),
+        ]),
+      )
+      expect(checkProjectTableLimits(nodes, 'guest')).toMatchObject({
+        ok: false,
+        limit: 5,
+      })
+    })
+
+    it('rejects imported projects with an oversized table', () => {
+      const nodes = { table: sourceTable('table', 25_001) }
+      expect(checkProjectTableLimits(nodes, 'guest')).toMatchObject({
+        ok: false,
+        limit: 25_000,
+      })
+    })
+
+    it('includes inserted rows when validating an imported project', () => {
+      const nodes = { table: sourceTable('table', 25_000) }
+      const patches = {
+        table: {
+          cellPatches: {},
+          deletedRows: new Set<string>(),
+          insertedRows: [{ rowId: 'new-row', values: {}, insertedAt: 25_000 }],
+          highlightedCells: new Set<string>(),
+        },
+      }
+      expect(checkProjectTableLimits(nodes, 'guest', patches)).toMatchObject({
+        ok: false,
+        limit: 25_000,
+      })
     })
   })
 

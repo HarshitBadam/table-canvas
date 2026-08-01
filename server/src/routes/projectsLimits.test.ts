@@ -197,16 +197,34 @@ describe('Projects API edge cases', () => {
     expect(response.body.data.project.name).toBe(name)
   })
 
-  it('should handle large nodes object', async () => {
+  it('rejects a project with more tables than the tier allows', async () => {
     const { app } = getProjectRoutesTestContext()
     const nodes: Record<string, unknown> = {}
-    for (let index = 0; index < 100; index++) {
+    for (let index = 0; index <= LIMITS.google.maxTablesPerProject; index++) {
       nodes[`node${index}`] = createSampleNode(`node${index}`)
     }
     const response = await request(app)
       .post('/api/projects')
       .send({ name: 'Large Project', nodes })
-      .expect(201)
-    expect(Object.keys(response.body.data.project.nodes)).toHaveLength(100)
+      .expect(400)
+    expect(response.body.errors.join(' ')).toContain('tables')
+  })
+
+  it('rejects a project with a table exceeding the tier row limit', async () => {
+    const { app } = getProjectRoutesTestContext()
+    const nodes = {
+      oversized: {
+        ...createSampleNode('oversized'),
+        schema: {
+          columns: [],
+          rowCount: LIMITS.google.maxRowsPerTable + 1,
+        },
+      },
+    }
+    const response = await request(app)
+      .post('/api/projects')
+      .send({ name: 'Oversized Project', nodes })
+      .expect(400)
+    expect(response.body.errors.join(' ')).toContain('rows')
   })
 })

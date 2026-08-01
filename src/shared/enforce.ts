@@ -1,3 +1,4 @@
+import type { Patches, ProjectNode } from '@/types'
 import { type Tier, getLimits } from './limits'
 
 interface LimitOk {
@@ -50,6 +51,53 @@ export function checkTableCount(currentTableCount: number, tier: Tier): LimitChe
     limit: maxTablesPerProject,
     tier,
   }
+}
+
+/**
+ * Validates persisted project contents, including imports, before the project
+ * is activated or synced. Creation flows use checkTableCount directly because
+ * they need to check capacity before adding a new table.
+ */
+export function checkProjectTableLimits(
+  nodes: Record<string, ProjectNode>,
+  tier: Tier,
+  patches: Record<string, Patches> = {},
+): LimitCheck {
+  const tables = Object.values(nodes).filter(
+    (node) => node.kind === 'source_table' || node.kind === 'derived_table',
+  )
+  const { maxTablesPerProject } = getLimits(tier)
+  if (tables.length > maxTablesPerProject) {
+    return {
+      ok: false,
+      reason: `This project has ${tables.length} tables (limit: ${maxTablesPerProject})`,
+      limit: maxTablesPerProject,
+      tier,
+    }
+  }
+
+  for (const table of tables) {
+    const sourceRowCount = table.kind === 'source_table'
+      ? table.plan.initialRows?.length ?? 0
+      : 0
+    const baseRowCount = Math.max(table.schema?.rowCount ?? 0, sourceRowCount)
+    const tablePatches = patches[table.id]
+    const insertedRowIds = new Set(tablePatches?.insertedRows.map(row => row.rowId))
+    const deletedBaseRows = [...(tablePatches?.deletedRows ?? [])]
+      .filter(rowId => !insertedRowIds.has(rowId)).length
+    const activeInsertedRows = tablePatches?.insertedRows
+      .filter(row => !tablePatches.deletedRows.has(row.rowId)).length ?? 0
+    const rowCount = Math.max(0, baseRowCount - deletedBaseRows) + activeInsertedRows
+    const rowCountCheck = checkRowCount(rowCount, tier)
+    if (!rowCountCheck.ok) {
+      return {
+        ...rowCountCheck,
+        reason: `Table "${table.name}" has ${rowCount.toLocaleString()} rows (limit: ${rowCountCheck.limit.toLocaleString()})`,
+      }
+    }
+  }
+
+  return { ok: true }
 }
 
 export function checkProjectCount(currentProjectCount: number, tier: Tier): LimitCheck {

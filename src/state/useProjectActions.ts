@@ -12,7 +12,11 @@ import {
   saveAllReports,
 } from '@/persistence/reportStorage'
 import { useReportStore } from '@/report/reportStore'
-import { checkProjectCount, type LimitExceeded } from '@/shared/enforce'
+import {
+  checkProjectCount,
+  checkProjectTableLimits,
+  type LimitExceeded,
+} from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import { useProjectStore } from './projectStore'
 import type { AppProviderState, ProjectImportData } from './appContextValue'
@@ -237,6 +241,11 @@ export function useProjectActions({
 
   const importProject = useCallback(async (input: ProjectImportData) => run(async () => {
     assertCapacity()
+    const limitsCheck = checkProjectTableLimits(input.nodes, tier, input.patches)
+    if (!limitsCheck.ok) {
+      setProjectLimitViolation(limitsCheck)
+      throw new ProjectActionError('limit', limitsCheck.reason)
+    }
     await flushProjectSave()
     await useReportStore.getState().flushSaves()
     let importedId: string | undefined
@@ -258,7 +267,15 @@ export function useProjectActions({
       }
       throw toProjectActionError(error, 'Could not import project')
     }
-  }), [activate, assertCapacity, flushProjectSave, prepareProject, run])
+  }), [
+    activate,
+    assertCapacity,
+    flushProjectSave,
+    prepareProject,
+    run,
+    setProjectLimitViolation,
+    tier,
+  ])
 
   return {
     createNewProject,
