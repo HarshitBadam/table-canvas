@@ -256,32 +256,27 @@ function parseMarkdownTable(lines: string[], startIndex: number): { rows: string
 }
 
 export function isTabularData(text: string): boolean {
-  const lines = text.trim().split('\n');
+  const lines = text.replace(/(?:\r?\n)+$/, '').split(/\r?\n/);
   if (lines.length < 1) return false;
 
   const tabCounts = lines.map(line => (line.match(/\t/g) || []).length);
-  const hasConsistentTabs = tabCounts.length > 1 && tabCounts[0] > 0 &&
+  const hasConsistentTabs = tabCounts[0] > 0 &&
     tabCounts.every(count => count === tabCounts[0]);
 
   return hasConsistentTabs;
 }
 
-export function parseTabularData(text: string): { headers: string[]; rows: string[][] } | null {
-  const lines = text.trim().split('\n').filter(line => line.trim());
+export function parseTabularData(text: string): { rows: string[][] } | null {
+  const lines = text.replace(/(?:\r?\n)+$/, '').split(/\r?\n/);
   if (lines.length < 1) return null;
 
   const rows = lines.map(line => line.split('\t').map(cell => cell.trim()));
+  const colCount = Math.max(...rows.map(row => row.length));
 
-  const headers = rows[0];
-  const dataRows = rows.slice(1);
-
-  const colCount = headers.length;
-  const normalizedRows = dataRows.map(row => {
-    if (row.length < colCount) {
-      return [...row, ...Array(colCount - row.length).fill('')];
-    }
-    return row.slice(0, colCount);
-  });
-
-  return { headers, rows: normalizedRows };
+  return {
+    rows: rows.map(row => [
+      ...row,
+      ...Array(Math.max(0, colCount - row.length)).fill(''),
+    ]),
+  };
 }

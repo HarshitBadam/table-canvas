@@ -1,17 +1,13 @@
 import * as Dialog from '@radix-ui/react-dialog'
-import type { Tier } from '@/shared/limits'
 
 interface CreateProjectDialogProps {
   open: boolean
   name: string
   error: string | null
   isCreating: boolean
-  showCapacityFeedback: boolean
-  tier: Tier
   onNameChange: (name: string) => void
   onOpenChange: (open: boolean) => void
   onSubmit: () => void
-  onSignIn: () => void
 }
 
 export function CreateProjectDialog({
@@ -19,23 +15,20 @@ export function CreateProjectDialog({
   name,
   error,
   isCreating,
-  showCapacityFeedback,
-  tier,
   onNameChange,
   onOpenChange,
   onSubmit,
-  onSignIn,
 }: CreateProjectDialogProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/40 motion-safe:animate-fade-in" />
+        <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/45 backdrop-blur-[2px] motion-safe:animate-fade-in" />
         <Dialog.Content className="fixed inset-0 z-modal m-auto h-fit w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-5 shadow-2xl motion-safe:animate-scale-in">
-          <Dialog.Title className="text-base font-semibold text-text-primary">
-            Create project
+          <Dialog.Title className="text-lg font-semibold tracking-tight text-text-primary">
+            Create a project
           </Dialog.Title>
           <Dialog.Description className="mt-1 text-sm text-text-secondary">
-            Start a separate workspace. Pending changes in this project will be saved first.
+            Start a separate workspace for another analysis. Your current work is saved first.
           </Dialog.Description>
           <form
             onSubmit={event => {
@@ -58,34 +51,10 @@ export function CreateProjectDialog({
             {error && (
               <div
                 id="create-project-error"
-                className={`mt-3 rounded-lg border p-3 ${
-                  showCapacityFeedback && tier === 'guest'
-                    ? 'border-accent-green/20 bg-accent-green/5'
-                    : 'border-error/20 bg-error/5'
-                }`}
+                className="mt-3 rounded-lg border border-error/20 bg-error/5 p-3"
                 role="alert"
               >
-                <p className={`text-sm font-medium ${
-                  showCapacityFeedback && tier === 'guest' ? 'text-accent-text' : 'text-error-text'
-                }`}>
-                  {showCapacityFeedback
-                    ? tier === 'guest'
-                      ? 'Sign in to create more projects'
-                      : 'Project limit reached'
-                    : error}
-                </p>
-                {showCapacityFeedback && (
-                  <p className="mt-1 text-xs leading-5 text-text-secondary">
-                    {tier === 'guest'
-                      ? 'Your current project stays on this device. Signing in also enables cloud sync.'
-                      : error}
-                  </p>
-                )}
-                {showCapacityFeedback && tier === 'guest' && (
-                  <button type="button" onClick={onSignIn} className="btn btn-primary mt-3">
-                    Sign in with Google
-                  </button>
-                )}
+                <p className="text-sm font-medium text-error-text">{error}</p>
               </div>
             )}
             <div className="mt-5 flex justify-end gap-2">

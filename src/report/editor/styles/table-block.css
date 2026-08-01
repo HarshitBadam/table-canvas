@@ -97,13 +97,13 @@
 
 .editable-table-header {
   position: relative;
-  padding: 8px 10px;
+  padding: 9px 12px;
   text-align: left;
   font-weight: 500;
   font-size: 12px;
   background-color: var(--color-surface-secondary, #fafafa);
   border-bottom: 1px solid var(--color-border, #e4e4e7);
-  border-right: 1px solid var(--color-border, #e4e4e7);
+  border-right: 1px solid var(--color-border-subtle, #f4f4f5);
   color: var(--color-text-secondary, #71717a);
   /* A click selects the cell; editing it is a second, deliberate step. */
   cursor: cell;
@@ -117,7 +117,7 @@
 [data-theme="dark"] .editable-table-header {
   background-color: var(--color-surface-secondary, #27272a);
   border-bottom-color: var(--color-border, #3f3f46);
-  border-right-color: var(--color-border, #3f3f46);
+  border-right-color: color-mix(in srgb, var(--color-border, #3f3f46) 65%, transparent);
   color: var(--color-text-secondary, #a1a1aa);
 }
 
@@ -150,9 +150,9 @@
 }
 
 .editable-table-cell {
-  padding: 8px 10px;
+  padding: 9px 12px;
   border-bottom: 1px solid var(--color-border-subtle, #f4f4f5);
-  border-right: 1px solid var(--color-border-subtle, #f4f4f5);
+  border-right: 1px solid color-mix(in srgb, var(--color-border-subtle, #f4f4f5) 65%, transparent);
   color: var(--color-text-primary, #18181b);
   cursor: cell;
   vertical-align: middle;
@@ -174,7 +174,7 @@
 
 [data-theme="dark"] .editable-table-cell {
   border-bottom-color: var(--color-border, #27272a);
-  border-right-color: var(--color-border, #27272a);
+  border-right-color: color-mix(in srgb, var(--color-border, #27272a) 65%, transparent);
   color: var(--color-text-primary, #fafafa);
 }
 
@@ -300,21 +300,20 @@
 }
 
 /*
- * The add buttons are flex/flow siblings of the table, so mounting them only
- * while the block is selected used to steal width and height from the grid at
- * the moment of selection. They stay in the layout permanently and only their
- * paint is toggled, which keeps the table exactly the same size in every state.
+ * The add buttons stay mounted so selecting a table never changes its size.
+ * They overlap the frame as small circular controls rather than pointing out
+ * from it, which keeps the editing chrome visually part of the report block.
  */
 .table-add-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  color: var(--color-text-tertiary, #a1a1aa);
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e4e4e7);
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  color: #b1b1b8;
   cursor: pointer;
   transition:
     opacity 150ms ease 500ms,
@@ -336,20 +335,23 @@
 }
 
 .editable-table-outer:hover .table-add-btn,
+.editable-table-outer.is-selected .table-add-btn,
 .table-add-btn:focus-visible {
-  opacity: 0.75;
+  opacity: 1;
   visibility: visible;
   transition-delay: 0s;
 }
 
 .table-add-btn:hover,
 .table-add-btn:focus-visible {
+  background: var(--color-surface-secondary, #fafafa);
   color: var(--color-text-primary, #18181b);
-  opacity: 1;
 }
 
 [data-theme="dark"] .table-add-btn {
-  color: var(--color-text-tertiary, #a1a1aa);
+  background: var(--color-surface, #18181b);
+  border-color: var(--color-border, #3f3f46);
+  color: var(--color-text-tertiary, #8f8f94);
 }
 
 [data-theme="dark"] .table-add-btn:hover {
@@ -357,17 +359,16 @@
 }
 
 /*
- * Each button is sized to its triangle exactly (base 14, height 14 * sin(60deg))
- * and pulled back by the container's 1px border, so the flat edge rests on the
- * table's outline instead of floating beside it.
+ * The controls are centred on the frame to make adding a row or column feel
+ * connected to the table without adding visual weight around its perimeter.
  */
 .table-add-col-btn {
   position: absolute;
   top: 50%;
   left: 100%;
-  width: 12.12px;
-  height: 14px;
-  transform: translate(-1px, -50%);
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
 }
 
 .table-add-row-btn {
@@ -375,15 +376,15 @@
   top: 100%;
   bottom: auto;
   left: 50%;
-  width: 14px;
-  height: 12.12px;
-  transform: translate(-50%, -1px);
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
 }
 
 .table-add-btn svg {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 14px;
+  height: 14px;
 }
 
 /*

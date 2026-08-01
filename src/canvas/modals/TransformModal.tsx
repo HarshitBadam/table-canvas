@@ -51,6 +51,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
   const [createError, setCreateError] = useState<string>()
   const creatingRef = useRef(false)
   const keysTouchedRef = useRef(false)
+  const operationFocusRef = useRef<HTMLButtonElement>(null)
 
   const leftCols = useMemo(() => 
     (leftNode?.kind === 'source_table' || leftNode?.kind === 'derived_table') 
@@ -226,16 +227,21 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
     : canUnion)
 
   return (
-    <Dialog.Root
-      open={isOpen}
-      onOpenChange={open => {
-        if (!open && !creatingRef.current) onClose()
-      }}
-    >
-      <Dialog.Portal>
+    <>
+      <Dialog.Root
+        open={isOpen}
+        onOpenChange={open => {
+          if (!open && !creatingRef.current) onClose()
+        }}
+      >
+        <Dialog.Portal>
         <Dialog.Overlay className="join-overlay z-50" />
         <Dialog.Content
           className="fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl motion-safe:animate-scale-in sm:max-w-lg"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+            operationFocusRef.current?.focus()
+          }}
           onCloseAutoFocus={event => {
             const connectSelect = document.getElementById(`connect-${sourceNodeId}`)
             const returnFocusElement = connectSelect instanceof HTMLElement && isVisibleElement(connectSelect)
@@ -255,15 +261,6 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
                 <p>Choose how to combine <strong>{leftNode?.name}</strong> and <strong>{rightNode?.name}</strong>.</p>
               </Dialog.Description>
             </div>
-            <Dialog.Close
-              className="canvas-touch-target join-close"
-              aria-label="Close combine tables"
-              disabled={isCreating}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="M18 6L6 18M6 6l12 12"/>
-              </svg>
-            </Dialog.Close>
           </div>
 
           <div className="join-body">
@@ -278,6 +275,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               canUnion={canUnion}
               joinType={joinType}
               onJoinTypeChange={setJoinType}
+              initialFocusRef={operationFocusRef}
             />
 
             {operation === 'union' && (
@@ -400,13 +398,15 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
             </div>
           </div>
         </Dialog.Content>
-      </Dialog.Portal>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       <UpgradePrompt
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}
         violation={upgradeViolation}
+        layer={isOpen ? 'nested' : 'base'}
       />
-    </Dialog.Root>
+    </>
   )
 }

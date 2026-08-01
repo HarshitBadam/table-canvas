@@ -18,8 +18,8 @@ export const toolbarTriggerChip = 'box-border flex h-9 shrink-0 items-center gap
  */
 export const toolbarMenuSurface = 'absolute top-[calc(100%+0.375rem)] z-popover overflow-hidden rounded-xl border border-border bg-surface shadow-lg motion-safe:animate-scale-in';
 
-/** Rows are square and full-width; the ring is inset so the radius never clips it. */
-export const toolbarMenuItem = 'group flex w-full gap-2.5 px-3 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-green disabled:cursor-not-allowed disabled:opacity-40';
+/** Rows use their focus background rather than a competing inset border. */
+export const toolbarMenuItem = 'group flex w-full gap-2.5 px-3 py-2 text-left outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-40';
 
 export const toolbarMenuItemNeutral = 'text-text-primary hover:bg-surface-secondary focus-visible:bg-surface-secondary disabled:hover:bg-transparent';
 

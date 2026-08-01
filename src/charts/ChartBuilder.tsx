@@ -105,7 +105,7 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
           className="fixed inset-0 z-modal m-auto flex h-fit max-h-[calc(100dvh-1rem)] w-[600px] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl motion-safe:animate-scale-in"
         >
           <div className="border-b border-border-subtle bg-accent-green/5 px-5 py-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-green text-white">
                   <ChartTypeIcon type={chartType} className="h-5 w-5" />
@@ -128,14 +128,6 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
                   </Dialog.Description>
                 </div>
               </div>
-              <Dialog.Close 
-                className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-text-primary sm:min-h-0 sm:min-w-0 sm:p-1.5"
-                aria-label="Close"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </Dialog.Close>
             </div>
           </div>
           

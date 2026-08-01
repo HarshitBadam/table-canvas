@@ -4,6 +4,7 @@ import { useApp, useAppAuth } from '@/state/AppContext'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { focusMenuItem } from '@/lib/focusMenuItem'
+import { AccountMenu } from './AccountMenu'
 import { useNavigation } from './NavigationContext'
 import { ProjectActionsMenu } from './ProjectActionsMenu'
 import { ProjectSwitcher } from './ProjectSwitcher'
@@ -24,7 +25,7 @@ export function AppHeader({
   exportState,
   onOpenNavigation,
 }: AppHeaderProps) {
-  const { user, logout, leaveGuest } = useAppAuth()
+  const { user, leaveGuest } = useAppAuth()
   const { isSaving } = useApp()
   const { canEdit } = useWorkspaceLease()
   const canUndo = useProjectStore(state => state.history.past.length > 0)
@@ -58,6 +59,17 @@ export function AppHeader({
     })
     return () => cancelAnimationFrame(frame)
   }, [dropdownRef, exportDropdownOpen])
+
+  useEffect(() => {
+    if (!exportDropdownOpen) return
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!dropdownRef.current?.contains(event.target as Node)) {
+        setExportDropdownOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [dropdownRef, exportDropdownOpen, setExportDropdownOpen])
 
   const handleExportMenuKeyDown = useCallback((event: React.KeyboardEvent) => {
     if (!exportDropdownOpen) return
@@ -160,7 +172,7 @@ export function AppHeader({
           )}
 
           <div
-            className="relative"
+            className="relative flex self-stretch items-center pl-0 md:border-l md:border-border-subtle md:pl-3"
             ref={dropdownRef}
             onKeyDown={handleExportMenuKeyDown}
             onBlur={(event) => {
@@ -172,6 +184,7 @@ export function AppHeader({
           >
             <button
               ref={exportButtonRef}
+              type="button"
               onPointerDown={() => {
                 exportMenuModalityRef.current = 'pointer'
               }}
@@ -185,23 +198,30 @@ export function AppHeader({
               aria-expanded={exportDropdownOpen}
               aria-controls="project-actions-menu"
               aria-label="Import or export project"
-              className="btn btn-secondary min-h-11 min-w-11 gap-2 p-0 sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5"
+              title="Import or export project"
+              className="flex h-12 min-w-11 shrink-0 items-center justify-center gap-2 rounded-md p-0 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary disabled:pointer-events-none disabled:opacity-50 md:w-auto md:px-2.5"
             >
               {(isExporting || isImporting) ? (
                 <>
                   <LoadingSpinner size="sm" />
-                  <span className="truncate max-w-32">
+                  <span className="hidden max-w-32 truncate md:inline">
                     {isExporting ? (exportProgress || 'Exporting...') : 'Importing...'}
                   </span>
                 </>
               ) : (
                 <>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  <svg className="h-7 w-7 shrink-0 rounded-full bg-surface-secondary p-1.5 text-text-tertiary md:h-4 md:w-4 md:rounded-none md:bg-transparent md:p-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0-4-4m4 4V4" />
                   </svg>
-                  <span className="hidden sm:inline">Import / Export</span>
-                  <svg className="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  <span className="hidden md:inline">Import / Export</span>
+                  <svg
+                    className={`hidden h-4 w-4 shrink-0 text-text-tertiary transition-transform duration-150 md:block ${exportDropdownOpen ? 'rotate-180' : ''}`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10l4 4 4-4" />
                   </svg>
                 </>
               )}
@@ -263,38 +283,44 @@ export function AppHeader({
 
       {user?.id !== 'local-user' && (
         <>
-          <div className="ml-2 hidden h-6 w-px bg-border md:block" />
-          <div className="flex items-center gap-2">
-            <span className="hidden max-w-40 truncate text-sm text-text-secondary md:inline">{user?.name || user?.email}</span>
-            <button
-              onClick={logout}
-              className="btn btn-ghost min-h-11 min-w-11 p-0 text-xs md:min-h-0 md:min-w-0 md:px-2 md:py-1"
-              title="Sign out"
-              aria-label="Sign out"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </button>
-          </div>
+          <div
+            className="mx-1 hidden self-stretch w-px bg-border-subtle md:block"
+            aria-hidden="true"
+          />
+          <AccountMenu />
         </>
       )}
       {user?.id === 'local-user' && (
-        <button
-          type="button"
-          onClick={() => {
-            void leaveGuest()
-              .then(() => window.location.assign('/login'))
-              .catch(() => undefined)
-          }}
-          className="btn btn-primary ml-2 gap-2 max-lg:min-h-11 max-lg:min-w-11 max-lg:p-0"
-          aria-label="Sign in to sync"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          <span className="hidden lg:inline">Sign in to sync</span>
-        </button>
+        <>
+          <div
+            className="mx-1 hidden self-stretch w-px bg-border-subtle md:block"
+            aria-hidden="true"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              void leaveGuest()
+                .then(() => window.location.assign('/login'))
+                .catch(() => undefined)
+            }}
+            className="flex h-12 min-w-11 shrink-0 items-center gap-2.5 rounded-md px-1.5 transition-colors hover:bg-surface-secondary md:px-2"
+            aria-label="Sign in to sync"
+            title="Sign in to sync"
+          >
+            <span
+              aria-hidden="true"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-green text-white"
+            >
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0H5Z" />
+              </svg>
+            </span>
+            <span className="hidden text-left lg:block">
+              <span className="block text-xs font-medium text-text-tertiary">Guest</span>
+              <span className="block text-sm font-semibold text-accent-text">Sign in to sync</span>
+            </span>
+          </button>
+        </>
       )}
     </header>
   )

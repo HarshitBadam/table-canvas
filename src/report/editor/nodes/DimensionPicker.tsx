@@ -30,17 +30,6 @@ export function DimensionPicker({ onSelect, onCancel }: DimensionPickerProps) {
       >
         <div className="dimension-modal-header">
           <h3 id="insert-table-title">Insert Table</h3>
-          <button
-            type="button"
-            className="dimension-modal-close"
-            onClick={onCancel}
-            aria-label="Close table picker"
-            data-dialog-initial-focus
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
         </div>
         <div className="dimension-modal-body">
           <DimensionStepper label="Rows" value={rows} onDecrease={() => decrement(setRows, 1)} onIncrease={() => increment(setRows, 20)} />

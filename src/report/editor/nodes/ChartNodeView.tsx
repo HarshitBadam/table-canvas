@@ -14,7 +14,6 @@ import {
   ChartGlyph,
   ChartGrid,
   SettingsIcon,
-  TableGlyph,
 } from './ReportChartControls';
 import type { ChartNodeAttrs, ChartNodeOptions } from './chartNodeTypes';
 import { useNodeSelect } from './useNodeSelect';
@@ -177,8 +176,7 @@ export const ChartNodeView = memo(function ChartNodeView({
   const selectChart = useNodeSelect(editor, getPos);
   const picker = showPicker ? (
     <TablePickerModal
-      title="Select a table"
-      subtitle="Choose the data source for this chart"
+      title="Select a table to embed"
       onSelect={handleSelectTable}
       onClose={() => setShowPicker(false)}
     />
@@ -189,24 +187,20 @@ export const ChartNodeView = memo(function ChartNodeView({
       <NodeViewWrapper className="chart-block">
         <div
           onMouseDownCapture={selectChart}
-          className={`flex flex-col items-center justify-center text-center transition-all p-10 rounded-xl border border-dashed ${
-            selected
-              ? 'border-accent-green bg-accent-green/5'
-              : 'border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50 to-white dark:from-gray-800/50 dark:to-gray-900/50'
-          }`}
+          onClick={() => setShowPicker(true)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              setShowPicker(true);
+            }
+          }}
+          className={`block-empty-state ${selected ? 'is-selected' : ''}`}
+          role="button"
+          tabIndex={0}
         >
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-green/15 to-accent-green/5 flex items-center justify-center mb-3 text-accent-green">
-            <ChartGlyph />
-          </div>
-          <div className="text-base font-semibold text-gray-900 dark:text-white mb-1">Add Chart</div>
-          <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">Visualize data from your tables</div>
-          <button
-            onClick={() => setShowPicker(true)}
-            className="px-4 py-2 text-sm font-medium text-white bg-accent-green hover:bg-accent-green-hover rounded-lg transition-colors flex items-center gap-2"
-          >
-            <TableGlyph />
-            Select Table
-          </button>
+          <ChartGlyph />
+          <div className="block-empty-state-title">Add Chart</div>
+          <div className="block-empty-state-description">Visualize data from your tables</div>
         </div>
         {picker}
       </NodeViewWrapper>

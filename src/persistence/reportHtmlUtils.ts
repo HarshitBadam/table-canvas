@@ -23,13 +23,17 @@ export function renderInlineTable(attrs: Record<string, unknown>): string {
   const rows = Array.isArray(attrs.rows)
     ? attrs.rows.filter(Array.isArray).slice(0, 1_000) as unknown[][]
     : []
+  const showHeaders = attrs.showHeaders !== false
   if (headers.length === 0) {
     return '<div class="block-placeholder">[Empty table]</div>\n'
   }
   const caption = typeof attrs.caption === 'string' ? attrs.caption : ''
   let html = '<table>\n'
   if (caption) html += `<caption>${escapeHtml(caption)}</caption>\n`
-  html += `<thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead>\n<tbody>`
+  if (showHeaders) {
+    html += `<thead><tr>${headers.map(header => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead>\n`
+  }
+  html += '<tbody>'
   for (const row of rows) {
     html += `<tr>${headers.map((_, index) => `<td>${escapeHtml(String(row[index] ?? ''))}</td>`).join('')}</tr>\n`
   }

@@ -10,6 +10,7 @@ import {
 } from '../tableData';
 import { TablePickerModal } from './TablePickerModal';
 import { EmbeddedTableConfigPanel } from './EmbeddedTableConfigPanel';
+import { SettingsIcon } from './ReportChartControls';
 import type { EmbeddedTableNodeAttrs, EmbeddedTableNodeOptions } from './embeddedTableTypes';
 import { useNodeSelect } from './useNodeSelect';
 
@@ -236,8 +237,24 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
     );
   }
 
+  const configPanel = showConfig ? (
+    <EmbeddedTableConfigPanel
+      attrs={attrs}
+      columns={columns}
+      sourceName={tableNode?.name}
+      onUpdate={updateAttributes}
+      onColumnToggle={handleColumnToggle}
+      onChangeTable={() => {
+        setShowPicker(true);
+      }}
+      onClose={closeConfig}
+    />
+  ) : null;
+
   return (
-    <NodeViewWrapper className="editable-table-block">
+    <NodeViewWrapper
+      className={`tiptap-block-wrapper editable-table-block ${selected ? 'is-selected' : ''} ${showConfig ? 'is-configuring' : ''}`}
+    >
       <div
         ref={tableWrapperRef}
         onMouseDownCapture={selectBlock}
@@ -294,28 +311,17 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
             {isTruncated && attrs.rowSelectionMode === 'all' ? ' (report safety limit)' : ''}
           </span>
           <button
+            type="button"
             onClick={toggleConfig}
             aria-expanded={showConfig}
-            className="embedded-table-config-btn"
+            className="chart-block-configure embedded-table-config-btn"
           >
+            <SettingsIcon />
             Configure
           </button>
         </div>
-
-        {showConfig && (
-          <EmbeddedTableConfigPanel
-            attrs={attrs}
-            columns={columns}
-            sourceName={tableNode?.name}
-            onUpdate={updateAttributes}
-            onColumnToggle={handleColumnToggle}
-            onChangeTable={() => {
-              setShowPicker(true);
-            }}
-            onClose={closeConfig}
-          />
-        )}
       </div>
+      {configPanel}
       {picker}
     </NodeViewWrapper>
   );

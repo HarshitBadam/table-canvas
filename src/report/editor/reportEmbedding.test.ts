@@ -109,6 +109,55 @@ describe('Column checkbox toggle semantics', () => {
 
 
 describe('Report HTML export for embedded tables', () => {
+  it('omits the inline table header markup when headers are hidden', () => {
+    const report: Report = {
+      id: 'r1',
+      name: 'Test Report',
+      tiptapContent: {
+        type: 'doc',
+        content: [{
+          type: 'inlineTable',
+          attrs: {
+            headers: ['Name', 'Score'],
+            rows: [['Ada', '10']],
+            showHeaders: false,
+          },
+        }],
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    const html = generateReportHtml(report, {})
+
+    expect(html).toContain('<tbody><tr><td>Ada</td><td>10</td></tr>')
+    expect(html).not.toContain('<thead>')
+    expect(html).not.toContain('<th>Name</th>')
+  })
+
+  it('keeps header markup for existing inline tables by default', () => {
+    const report: Report = {
+      id: 'r1',
+      name: 'Test Report',
+      tiptapContent: {
+        type: 'doc',
+        content: [{
+          type: 'inlineTable',
+          attrs: {
+            headers: ['Name', 'Score'],
+            rows: [['Ada', '10']],
+          },
+        }],
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    const html = generateReportHtml(report, {})
+
+    expect(html).toContain('<thead><tr><th>Name</th><th>Score</th></tr></thead>')
+  })
+
   it('renders embeddedTable nodes as HTML <table> elements', () => {
     const nodes = { t1: createSourceTable('t1', 'Sales') }
 

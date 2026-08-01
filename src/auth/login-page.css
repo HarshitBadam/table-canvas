@@ -118,23 +118,14 @@
 }
 
 .login-alert {
-  display: flex;
-  gap: 8px;
   margin-top: 20px;
   padding: 10px 12px;
-  border: 1px solid rgb(var(--color-error-rgb) / 0.25);
   border-radius: 8px;
   background-color: var(--color-error-soft);
   font-size: 13px;
+  font-weight: 500;
   line-height: 1.45;
   color: var(--color-error-text);
-}
-
-.login-alert svg {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  margin-top: 1px;
 }
 
 /* Shared metrics for both sign-in paths: one button family, no mismatch. */
@@ -210,31 +201,8 @@ button.auth-action:disabled {
   inset: 0;
 }
 
-.auth-google:focus-within .auth-action {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: -2px;
-  border-color: transparent;
-}
-
-.auth-skeleton {
-  height: 40px;
-  border-radius: 8px;
-  background-color: var(--color-surface-secondary);
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgb(var(--color-surface-secondary-rgb) / 0) 40%,
-    var(--color-surface-tertiary) 50%,
-    rgb(var(--color-surface-secondary-rgb) / 0) 60%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: auth-skeleton-sweep 1.4s ease-in-out infinite;
-}
-
-@keyframes auth-skeleton-sweep {
-  from { background-position: 150% 0; }
-  to { background-position: -50% 0; }
+.auth-google-loading {
+  cursor: wait;
 }
 
 .auth-choices {
@@ -250,13 +218,6 @@ button.auth-action:disabled {
   color: var(--color-text-tertiary);
   font-size: 13px;
   line-height: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .auth-skeleton {
-    animation: none;
-    background-image: none;
-  }
 }
 
 @media (max-width: 480px) {

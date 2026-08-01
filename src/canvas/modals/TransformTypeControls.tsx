@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import type { JoinType } from '@/types'
 
@@ -20,6 +20,7 @@ interface TransformTypeControlsProps {
   canUnion: boolean
   joinType: JoinType
   onJoinTypeChange: (joinType: JoinType) => void
+  initialFocusRef?: RefObject<HTMLButtonElement | null>
 }
 
 export function TransformTypeControls({
@@ -28,6 +29,7 @@ export function TransformTypeControls({
   canUnion,
   joinType,
   onJoinTypeChange,
+  initialFocusRef,
 }: TransformTypeControlsProps) {
   const [helpOpen, setHelpOpen] = useState(false)
   const helpTriggerRef = useRef<HTMLButtonElement>(null)
@@ -101,6 +103,7 @@ export function TransformTypeControls({
         )}
         <div className="join-types !grid-cols-2">
           <button
+            ref={initialFocusRef}
             type="button"
             onClick={() => onOperationChange('join')}
             aria-pressed={operation === 'join'}

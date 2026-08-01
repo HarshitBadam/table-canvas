@@ -191,8 +191,9 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
             onClick={() => addColumn()}
             className="table-add-btn table-add-col-btn"
             title="Add column"
+            aria-label="Add column"
           >
-            <TableAddIcon direction="right" />
+            <TableAddIcon />
           </button>
 
           {/* Anchored to the table box, not to the block: anything the block
@@ -201,8 +202,9 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
             onClick={() => addRow()}
             className="table-add-btn table-add-row-btn"
             title="Add row"
+            aria-label="Add row"
           >
-            <TableAddIcon direction="down" />
+            <TableAddIcon />
           </button>
         </div>
 

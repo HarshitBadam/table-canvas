@@ -58,16 +58,6 @@ export function EmbeddedTableConfigPanel({
               : 'Choose what this table shows.'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="block-config-close"
-          aria-label="Close table configuration"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
       </div>
 
       <div className="block-config-body">
@@ -77,32 +67,30 @@ export function EmbeddedTableConfigPanel({
             <p className="block-config-empty">This table has no columns.</p>
           ) : (
             <>
-              <div className="block-config-options-scroll">
-                <div className="block-config-options">
-                  {columns.map((column) => {
-                    const included = selectionEmpty || attrs.selectedColumns.includes(column.id);
-                    return (
-                      <button
-                        key={column.id}
-                        type="button"
-                        role="switch"
-                        aria-checked={included}
-                        onClick={() => onColumnToggle(column.id)}
-                        className={`block-config-option ${included ? 'active' : ''}`}
-                      >
-                        <span className="block-config-option-info">
-                          <span className="block-config-option-name">{column.name}</span>
-                          <span className="block-config-option-desc">{column.type}</span>
-                        </span>
-                        <span className="block-config-option-check" aria-hidden="true">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="block-config-options">
+                {columns.map((column) => {
+                  const included = selectionEmpty || attrs.selectedColumns.includes(column.id);
+                  return (
+                    <button
+                      key={column.id}
+                      type="button"
+                      role="switch"
+                      aria-checked={included}
+                      onClick={() => onColumnToggle(column.id)}
+                      className={`block-config-option ${included ? 'active' : ''}`}
+                    >
+                      <span className="block-config-option-info">
+                        <span className="block-config-option-name">{column.name}</span>
+                        <span className="block-config-option-desc">{column.type}</span>
+                      </span>
+                      <span className="block-config-option-check" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
               {selectionEmpty && (
                 <p className="block-config-note">
@@ -169,6 +157,7 @@ export function EmbeddedTableConfigPanel({
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </button>
+          <p className="block-config-note">Switching tables resets the selected columns.</p>
         </section>
       </div>
 

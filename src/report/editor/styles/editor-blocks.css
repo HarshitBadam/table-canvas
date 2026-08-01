@@ -23,15 +23,18 @@
 }
 
 .tiptap-block-wrapper.is-configuring {
-  /* Gives the scroll container enough trailing content to reveal a panel's
-     footer with a deliberate viewport gap when this is the last report block. */
-  margin-bottom: 60px;
+  /* Keep the panel's trailing space visually balanced with its 18px top gap. */
+  margin-bottom: 18px;
 }
 
 /* A configuration panel already identifies its source block; do not leave the
    selected-block marker visible beside or underneath that panel. */
-.tiptap-block-wrapper.is-configuring.is-selected {
+.tiptap-block-wrapper.is-configuring,
+.tiptap-block-wrapper.is-configuring:hover {
   background: transparent;
+}
+
+.tiptap-block-wrapper.is-configuring.is-selected {
   box-shadow: none;
 }
 

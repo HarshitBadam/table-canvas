@@ -44,41 +44,6 @@
   font-weight: 600;
 }
 
-.join-close {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--color-text-tertiary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.join-close:hover {
-  background: var(--color-surface-tertiary);
-  color: var(--color-text-secondary);
-}
-
-.join-close svg {
-  width: 14px;
-  height: 14px;
-}
-
-.join-close:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb) / 0.3);
-}
-
-.join-close:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
 @media (min-width: 640px) {
   .join-header {
     padding-inline: 24px;

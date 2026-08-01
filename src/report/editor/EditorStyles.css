@@ -8,5 +8,6 @@
 @import "./styles/chart-block.css";
 @import "./styles/table-block.css";
 @import "./styles/table-modals.css";
+@import "./styles/paste-table-headers-modal.css";
 @import "./styles/embedded-table.css";
 @import "./styles/slash-commands.css";

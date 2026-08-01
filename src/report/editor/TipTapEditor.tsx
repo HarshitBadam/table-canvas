@@ -6,13 +6,15 @@ import Typography from '@tiptap/extension-typography';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
 import { NodeSelection, Selection } from '@tiptap/pm/state';
-import { useCallback, forwardRef, useImperativeHandle, useEffect, useRef } from 'react';
+import { useCallback, forwardRef, useImperativeHandle, useEffect, useRef, useState } from 'react';
 import type { JSONContent } from '@tiptap/react';
+import type { GridClipboardData } from '@/grid/types';
 
 import { ChartNode } from './nodes/ChartNode';
 import { EmbeddedTableNode } from './nodes/EmbeddedTableNode';
 import { InlineTableNode } from './nodes/InlineTableNode';
 import { EditableTableNode } from './nodes/EditableTableNode';
+import { PasteTableHeadersModal } from './nodes/PasteTableHeadersModal';
 import { ToggleNode } from './nodes/ToggleNode';
 import { CalloutNode } from './nodes/CalloutNode';
 import { SlashCommands } from './extensions/SlashCommands';
@@ -34,6 +36,7 @@ import './EditorStyles.css';
  * "a block".
  */
 const KEEPS_BLOCK_SELECTION = '.table-context-menu, [role="dialog"]';
+const GRID_CLIPBOARD_MAX_AGE_MS = 2 * 60 * 1000;
 
 export interface TipTapEditorProps {
   content: JSONContent | null;
@@ -57,6 +60,51 @@ export interface TipTapEditorHandle {
   insertChart: () => void;
 }
 
+interface PendingTablePaste {
+  headers: string[];
+  rows: string[][];
+  sourceInfo: {
+    tableId: string;
+    tableName: string;
+    columnIds: string[];
+  } | null;
+  selection: { from: number; to: number };
+}
+
+function matchesGridClipboard(
+  clipboard: GridClipboardData | undefined,
+  pastedRows: string[][],
+  now = Date.now(),
+): clipboard is GridClipboardData {
+  if (!clipboard || !Number.isFinite(clipboard.timestamp)) return false;
+
+  const age = now - clipboard.timestamp;
+  if (age < 0 || age > GRID_CLIPBOARD_MAX_AGE_MS) return false;
+  if (
+    !Array.isArray(clipboard.headers)
+    || !Array.isArray(clipboard.columnIds)
+    || !Array.isArray(clipboard.rows)
+    || typeof clipboard.sourceTableId !== 'string'
+    || typeof clipboard.sourceTableName !== 'string'
+    || clipboard.headers.length === 0
+    || clipboard.headers.length !== clipboard.columnIds.length
+    || clipboard.rows.length !== pastedRows.length
+    || !clipboard.headers.every(header => typeof header === 'string')
+    || !clipboard.columnIds.every(columnId => typeof columnId === 'string')
+  ) {
+    return false;
+  }
+
+  return clipboard.rows.every((sourceRow, rowIndex) => (
+    Array.isArray(sourceRow)
+    && sourceRow.length === clipboard.headers.length
+    && pastedRows[rowIndex].length === clipboard.headers.length
+    && sourceRow.every(
+      (cell, columnIndex) => String(cell ?? '').trim() === pastedRows[rowIndex][columnIndex],
+    )
+  ));
+}
+
 export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
   function TipTapEditor(
     {
@@ -72,6 +120,7 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
     ref
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
+    const [pendingTablePaste, setPendingTablePaste] = useState<PendingTablePaste | null>(null);
     const editor = useEditor({
       extensions: [
         StarterKit.configure({
@@ -132,16 +181,33 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
 
       const handlePaste = (event: ClipboardEvent) => {
         const text = event.clipboardData?.getData('text/plain');
-        if (!text) return;
+        if (!text || !editor.isEditable) return;
 
         if (isTabularData(text)) {
           const tableData = parseTabularData(text);
-          if (!tableData?.headers.length) return;
+          if (!tableData?.rows.length) return;
           event.preventDefault();
           event.stopPropagation();
-          editor.commands.insertContent({
-            type: 'inlineTable',
-            attrs: { headers: tableData.headers, rows: tableData.rows },
+
+          const gridClipboard = matchesGridClipboard(window.__gridClipboard, tableData.rows)
+            ? window.__gridClipboard
+            : undefined;
+          const headers = gridClipboard?.headers
+            ?? tableData.rows[0].map((_, index) => `Column ${index + 1}`);
+          setPendingTablePaste({
+            headers,
+            rows: tableData.rows,
+            sourceInfo: gridClipboard
+              ? {
+                tableId: gridClipboard.sourceTableId,
+                tableName: gridClipboard.sourceTableName,
+                columnIds: gridClipboard.columnIds,
+              }
+              : null,
+            selection: {
+              from: editor.state.selection.from,
+              to: editor.state.selection.to,
+            },
           });
           return;
         }
@@ -157,6 +223,25 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
       container.addEventListener('paste', handlePaste, true);
       return () => container.removeEventListener('paste', handlePaste, true);
     }, [editor]);
+
+    const insertPendingTable = useCallback((showHeaders: boolean) => {
+      if (!editor || !pendingTablePaste) return;
+      const { headers, rows, sourceInfo, selection } = pendingTablePaste;
+      const documentSize = editor.state.doc.content.size;
+      const from = Math.min(selection.from, documentSize);
+      const to = Math.min(selection.to, documentSize);
+
+      editor
+        .chain()
+        .focus()
+        .setTextSelection({ from, to })
+        .insertContent({
+          type: 'inlineTable',
+          attrs: { headers, rows, showHeaders, sourceInfo },
+        })
+        .run();
+      setPendingTablePaste(null);
+    }, [editor, pendingTablePaste]);
 
     useImperativeHandle(ref, () => ({
       getEditor: () => editor,
@@ -250,7 +335,10 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
     }, [editor]);
 
     const handleContainerClick = useCallback((event: React.MouseEvent) => {
-      if (event.target === event.currentTarget) editor?.commands.focus('end');
+      // The area around a report is a dismissal surface, not an implicit "add
+      // text at the end" target. Keeping focus here left the trailing structural
+      // paragraph's slash hint visible after users clicked away from it.
+      if (event.target === event.currentTarget) editor?.commands.blur();
     }, [editor]);
 
     if (!editor) {
@@ -269,6 +357,14 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
         onClick={handleContainerClick}
       >
         <EditorContent editor={editor} />
+        {pendingTablePaste && (
+          <PasteTableHeadersModal
+            headers={pendingTablePaste.headers}
+            rows={pendingTablePaste.rows}
+            onChoose={insertPendingTable}
+            onClose={() => setPendingTablePaste(null)}
+          />
+        )}
       </div>
     );
   }
