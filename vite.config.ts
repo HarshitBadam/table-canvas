@@ -70,10 +70,12 @@ export default defineConfig({
   },
   build: {
     // Real chunk splitting below keeps most vendor code well isolated. The
-    // remaining large chunks (`charts`/recharts and `html2pdf`) are single
-    // third-party libraries that cannot be subdivided further, so we raise the
-    // warning threshold just enough to cover them rather than emit a warning.
-    chunkSizeWarningLimit: 800,
+    // largest remaining chunk is `pdfmake` — the PDF engine plus the embedded
+    // Roboto font data it needs for accented and Cyrillic text — a single
+    // third-party bundle that cannot be subdivided and is only fetched when a
+    // report is exported. The threshold is raised just enough to cover it rather
+    // than emit a warning on every build.
+    chunkSizeWarningLimit: 1900,
     rollupOptions: {
       output: {
         // Split large third-party dependencies into their own chunks so no
@@ -84,8 +86,7 @@ export default defineConfig({
           if (!id.includes('node_modules')) return
           if (id.includes('@duckdb')) return 'duckdb'
           if (id.includes('/xlsx/') || id.includes('/xlsx@')) return 'xlsx'
-          if (id.includes('html2canvas')) return 'html2canvas'
-          if (id.includes('html2pdf')) return 'html2pdf'
+          if (id.includes('/pdfmake/') || id.includes('/pdfmake@')) return 'pdfmake'
         },
       },
     },

@@ -244,6 +244,11 @@
   color: var(--color-warning-text);
 }
 
+.join-match-badge.neutral {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+}
+
 .join-match-badge.bad {
   background: rgb(var(--color-error-rgb) / 0.12);
   color: var(--color-error-text);

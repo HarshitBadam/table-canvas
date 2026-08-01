@@ -1,9 +1,17 @@
-import type { Report } from '@/report/types'
 import type { JSONContent } from '@tiptap/core'
 import type { TableRow } from '@/state/dataStore'
 import type { ProjectNode, TableNode } from '@/types'
-import { escapeHtml, renderInlineTable, safeLink } from './reportHtmlUtils'
+import { escapeHtml, renderInlineTable, safeLink, wrapTable } from './reportHtmlUtils'
 import { renderReportChart } from './reportHtmlChart'
+
+/** A block the author inserted but never pointed at a data source. */
+function isUnconfigured(node: JSONContent): boolean {
+  if (node.type !== 'embeddedTable' && node.type !== 'chartBlock') return false
+  if (!node.attrs?.sourceTableId) return true
+  if (node.type !== 'chartBlock') return false
+  const config = (node.attrs.config ?? {}) as Record<string, unknown>
+  return !config.xAxis || !config.yAxis
+}
 
 interface EmbeddedTableData {
   tableName: string
@@ -44,22 +52,40 @@ function renderEmbeddedTable(
   if (caption) {
     html += `<p><em>${escapeHtml(caption)}</em></p>\n`
   }
-  html += '<table border="1" style="border-collapse: collapse; width: 100%;">\n'
-  html += '<thead><tr>'
-  for (const colId of displayHeaders) {
-    const name = entry.columnNames?.[colId] || colId
-    html += `<th style="padding: 8px; text-align: left;">${escapeHtml(name)}</th>`
+  const headerNames = displayHeaders.map(colId => entry.columnNames?.[colId] || colId)
+  const cells = displayRows.map(row => displayHeaders.map((colId) => {
+    const value = row[colId]
+    return value != null ? String(value) : ''
+  }))
+
+  let inner = '<thead><tr>'
+  for (const name of headerNames) {
+    inner += `<th>${escapeHtml(name)}</th>`
   }
-  html += '</tr></thead>\n<tbody>'
-  for (const row of displayRows) {
-    html += '<tr>'
-    for (const colId of displayHeaders) {
-      const val = row[colId]
-      html += `<td style="padding: 8px;">${val != null ? escapeHtml(String(val)) : ''}</td>`
+  inner += '</tr></thead>\n<tbody>'
+  for (const row of cells) {
+    inner += '<tr>'
+    for (const value of row) {
+      inner += `<td>${escapeHtml(value)}</td>`
     }
-    html += '</tr>\n'
+    inner += '</tr>\n'
   }
-  html += '</tbody></table>\n'
+  inner += '</tbody>'
+  html += wrapTable({ headers: headerNames, rows: cells, showHeaders: true, inner })
+
+  // State the truncation, so a reader cannot mistake a windowed view for the
+  // whole table or for a subset of columns being all there is.
+  const notes: string[] = []
+  if (displayRows.length < entry.rows.length) {
+    const window = rowSelectionMode === 'last_n' ? 'last' : 'first'
+    notes.push(`Showing the ${window} ${displayRows.length.toLocaleString()} of ${entry.rows.length.toLocaleString()} rows`)
+  }
+  if (displayHeaders.length < entry.headers.length) {
+    notes.push(`${displayHeaders.length} of ${entry.headers.length} columns`)
+  }
+  if (notes.length > 0) {
+    html += `<p class="table-note">${escapeHtml(notes.join(' · '))}.</p>\n`
+  }
   return html
 }
 
@@ -145,22 +171,29 @@ function nodeToHtml(node: JSONContent, dataMap: EmbeddedDataMap): string {
     case 'hardBreak':
       return '<br>\n'
 
+    // An unconfigured block is an unfinished editing affordance, not content, so
+    // it is dropped from the export rather than shipped as a placeholder in a
+    // document someone else reads. A block that *is* configured but whose data
+    // is missing keeps its placeholder, because silently dropping real content
+    // would hide the problem instead of reporting it.
     case 'embeddedTable': {
+      if (isUnconfigured(node)) return ''
       const tableId = node.attrs?.sourceTableId as string
-      if (tableId && dataMap[tableId]) {
+      if (dataMap[tableId]) {
         return renderEmbeddedTable(tableId, node.attrs || {}, dataMap)
       }
       return `<div class="block-placeholder">[Embedded Table — no data available]</div>\n`
     }
 
     case 'chartBlock': {
+      if (isUnconfigured(node)) return ''
       const chartTableId = node.attrs?.sourceTableId as string
       const chartType = node.attrs?.chartType as string || 'chart'
-      const chartEntry = chartTableId ? dataMap[chartTableId] : undefined
+      const chartEntry = dataMap[chartTableId]
       if (chartEntry) {
         return renderReportChart(node.attrs || {}, chartEntry)
       }
-      return `<div class="block-placeholder">[Chart: ${escapeHtml(chartType)}]</div>\n`
+      return `<div class="block-placeholder">[Chart: ${escapeHtml(chartType)} — no data available]</div>\n`
     }
 
     case 'inlineTable':
@@ -189,7 +222,7 @@ function nodeToHtml(node: JSONContent, dataMap: EmbeddedDataMap): string {
   }
 }
 
-function tiptapToHtml(content: JSONContent, dataMap: EmbeddedDataMap): string {
+export function tiptapToHtml(content: JSONContent, dataMap: EmbeddedDataMap): string {
   if (!content || !content.content) return ''
 
   let html = ''
@@ -244,152 +277,4 @@ export function buildEmbeddedDataMap(
   }
 
   return map
-}
-
-export function generateReportHtml(report: Report, dataMap: EmbeddedDataMap = {}): string {
-  let content = ''
-
-  if (report.tiptapContent && report.tiptapContent.content && report.tiptapContent.content.length > 0) {
-    content = tiptapToHtml(report.tiptapContent, dataMap)
-  } else {
-    content = '<p><em>This report is empty.</em></p>'
-  }
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(report.name)} - Table Canvas Report</title>
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      line-height: 1.6;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 40px 20px;
-      color: #333;
-    }
-    h1, h2, h3, h4, h5, h6 {
-      margin-top: 1.5em;
-      margin-bottom: 0.5em;
-      color: #1a1a1a;
-    }
-    h1 { font-size: 2em; border-bottom: 2px solid #217346; padding-bottom: 0.3em; }
-    h2 { font-size: 1.5em; }
-    h3 { font-size: 1.25em; }
-    p { margin: 1em 0; }
-    ul, ol { margin: 1em 0; padding-left: 2em; }
-    li { margin: 0.5em 0; }
-    blockquote {
-      border-left: 4px solid #217346;
-      margin: 1em 0;
-      padding: 0.5em 1em;
-      background: #f9f9f9;
-    }
-    pre {
-      background: #f4f4f4;
-      padding: 1em;
-      border-radius: 4px;
-      overflow-x: auto;
-    }
-    code {
-      background: #f4f4f4;
-      padding: 0.2em 0.4em;
-      border-radius: 3px;
-      font-family: 'Monaco', 'Consolas', monospace;
-    }
-    pre code {
-      background: none;
-      padding: 0;
-    }
-    hr {
-      border: none;
-      border-top: 1px solid #ddd;
-      margin: 2em 0;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin: 1em 0;
-    }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 8px;
-      text-align: left;
-      overflow-wrap: anywhere;
-    }
-    th { background: #f7f7f7; }
-    caption {
-      caption-side: bottom;
-      color: #666;
-      font-size: 0.9em;
-      padding-top: 8px;
-    }
-    .table-note { color: #666; font-size: 0.85em; }
-    .callout {
-      border-left: 4px solid #217346;
-      background: #f5faf7;
-      padding: 0.5em 1em;
-      margin: 1em 0;
-    }
-    .callout-warning { border-left-color: #a16207; background: #fffbeb; }
-    .callout-error { border-left-color: #b91c1c; background: #fef2f2; }
-    details {
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 0.75em 1em;
-      margin: 1em 0;
-    }
-    summary { font-weight: 600; }
-    mark { background: #d1fae5; padding: 0 0.1em; }
-    a { color: #17653a; }
-    .block-placeholder { background: #f0f0f0; border: 1px dashed #ccc; padding: 1em; text-align: center; color: #666; margin: 1em 0; }
-    .report-chart { margin: 1.5em 0; padding: 1em; border: 1px solid #ddd; break-inside: avoid; }
-    .report-chart h3 { margin: 0; }
-    .report-chart svg { display: block; width: 100%; height: auto; }
-    .report-chart svg text { fill: #6b7280; font-size: 10px; }
-    .chart-subtitle, .report-chart figcaption { color: #666; font-size: 0.85em; }
-    .chart-legend { display: flex; flex-wrap: wrap; gap: 0.5em 1em; }
-    .chart-legend-item { display: inline-flex; align-items: center; gap: 0.35em; font-size: 0.8em; }
-    .chart-legend-item i { width: 0.75em; height: 0.75em; display: inline-block; }
-    .report-meta {
-      color: #666;
-      font-size: 0.9em;
-      margin-bottom: 2em;
-      padding-bottom: 1em;
-      border-bottom: 1px solid #eee;
-    }
-    .footer {
-      margin-top: 3em;
-      padding-top: 1em;
-      border-top: 1px solid #eee;
-      color: #666;
-      font-size: 0.8em;
-    }
-    @media print {
-      body { padding: 20px; }
-      .footer { display: none; }
-    }
-  </style>
-</head>
-<body>
-  <h1>${escapeHtml(report.name)}</h1>
-  <div class="report-meta">
-    Created: ${new Date(report.createdAt).toLocaleDateString()}<br>
-    Last updated: ${new Date(report.updatedAt).toLocaleDateString()}
-  </div>
-
-  <div class="content">
-    ${content}
-  </div>
-
-  <div class="footer">
-    Exported from Table Canvas on ${new Date().toLocaleDateString()}
-  </div>
-</body>
-</html>`
 }

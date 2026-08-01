@@ -29,7 +29,7 @@
   --color-success-soft: oklch(95% 0.025 152.5);
   --color-warning-soft: oklch(95% 0.035 62.6);
   --color-error-soft: oklch(95% 0.025 28.7);
-  --color-derived-soft: oklch(95% 0.025 303.9);
+  --color-derived-soft: oklch(95% 0.016 303.9);
   --color-data-blue-soft: oklch(95% 0.025 262.9);
   --color-data-blue-text: oklch(46% 0.18 262.9);
 
@@ -124,7 +124,7 @@
   --color-success-soft: oklch(25% 0.035 152.5);
   --color-warning-soft: oklch(27% 0.04 75);
   --color-error-soft: oklch(26% 0.04 25);
-  --color-derived-soft: oklch(26% 0.04 303.9);
+  --color-derived-soft: oklch(26% 0.028 303.9);
   --color-data-blue-soft: oklch(26% 0.04 262.9);
   --color-data-blue-text: oklch(76% 0.12 262.9);
 
@@ -173,6 +173,19 @@ body,
   height: 100%;
   margin: 0;
   padding: 0;
+  /*
+   * The viewport's overscroll behaviour is what decides whether a horizontal
+   * trackpad swipe that runs past the end of a scroller becomes a back or
+   * forward navigation. The workspace is a single document that never pushes
+   * history entries of its own, so that gesture does not step back through the
+   * app — it leaves for whatever the tab was showing beforehand, taking the
+   * session's view, selection and scroll position with it. Swiping across a wide
+   * table is an ordinary thing to do here, so the gesture is declined.
+   *
+   * All three elements are set because browsers disagree about which one the
+   * viewport takes this from.
+   */
+  overscroll-behavior: none;
 }
 
 body {
@@ -183,7 +196,6 @@ body {
   background-color: var(--color-canvas);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overscroll-behavior: none;
 }
 
 .safe-area-top {

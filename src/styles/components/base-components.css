@@ -50,6 +50,26 @@
     background-color: color-mix(in srgb, var(--color-sidebar-nav-active) 82%, var(--color-sidebar-nav-active-text));
   }
 
+  .sidebar-node-active-derived {
+    background-color: var(--color-node-derived);
+  }
+
+  .sidebar-node-active-derived:hover {
+    background-color: color-mix(in srgb, var(--color-node-derived) 92%, var(--color-node-derived-border));
+  }
+
+  .group:hover .sidebar-node-icon-source {
+    background-color: color-mix(in srgb, var(--color-node-source) 86%, var(--color-node-source-border));
+  }
+
+  .group:hover .sidebar-node-icon-derived {
+    background-color: color-mix(in srgb, var(--color-node-derived) 90%, var(--color-node-derived-border));
+  }
+
+  .group:hover .sidebar-node-icon-chart {
+    background-color: color-mix(in srgb, var(--color-node-chart) 86%, var(--color-node-chart-border));
+  }
+
   .btn-danger {
     @apply text-white;
     background-color: var(--color-error-solid);

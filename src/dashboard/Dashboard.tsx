@@ -77,7 +77,7 @@ export function Dashboard() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-3 sm:p-6">
+      <div className="flex-1 overflow-auto overscroll-x-contain p-3 sm:p-6">
         {!hasData ? (
           <DashboardEmptyState />
         ) : (

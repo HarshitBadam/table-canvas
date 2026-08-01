@@ -133,7 +133,9 @@ Notion-style rich-text documents (TipTap) that embed live tables and charts (`sr
   horizontal rules, plus a slash (`/`) command menu for inserting blocks.
 - **Embedded blocks**: embedded table (references a project table, stays in sync), inline/editable
   table (static, manually entered), and chart.
-- **Export**: reports are written as HTML into the project ZIP; there's also a PDF export path.
+- **Export**: reports are written as HTML into the project ZIP. "Export as PDF" serialises the same
+  stored content into a paged document and prints it through the browser, so text, tables and charts
+  stay vector and selectable.
 
 ## Persistence
 

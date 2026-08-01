@@ -23,7 +23,6 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import type { ProjectNode, Edge as ProjectEdge } from '@/types'
 import { useCanvasKeyboard } from './useCanvasKeyboard'
 import { useCanvasViewMode } from './useCanvasViewMode'
-import { wouldCreateCycle } from '@/engine/dependencyGraph'
 import { TableNodeComponent } from './nodes/TableNode'
 import type { ChartNodeData } from './nodes/ChartNode'
 import { computeSmartEdges, SmartEdge } from './edgeRouter'
@@ -83,6 +82,8 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const { handleSetViewMode } = useCanvasViewMode()
   const { canEdit } = useWorkspaceLease()
 
+  const dismissCycleWarning = useCallback(() => setCycleWarning(null), [])
+
   const requestConnection = useCallback((sourceId: string, targetId: string) => {
     if (sourceId === targetId) {
       return
@@ -97,17 +98,11 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
       setCycleWarning('Charts cannot start transformations. Connect two tables instead.')
       return
     }
-    if (wouldCreateCycle(projectEdges, sourceId, targetId)) {
-      setCycleWarning(
-        `Cannot connect "${sourceNode.name}" to "${targetNode.name}" because it would create a circular dependency. Choose a different table.`,
-      )
-      return
-    }
 
     setCycleWarning(null)
     setPendingConnection({ source: sourceId, target: targetId })
     setTransformModalOpen(true)
-  }, [projectEdges, projectNodes])
+  }, [projectNodes])
 
   const initialNodes: Node[] = useMemo(() => {
     return (Object.values(projectNodes) as ProjectNode[]).map((node) => ({
@@ -335,7 +330,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         />
       )}
       
-      <CycleWarningToast warning={cycleWarning} onClose={() => setCycleWarning(null)} />
+      <CycleWarningToast warning={cycleWarning} onClose={dismissCycleWarning} />
     </div>
   )
 }

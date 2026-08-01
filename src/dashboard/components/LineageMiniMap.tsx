@@ -143,7 +143,7 @@ function LineageVisualization({
 
   return (
     <div 
-      className="relative overflow-auto scrollbar-hide flex justify-center" 
+      className="relative overflow-auto overscroll-x-contain scrollbar-hide flex justify-center" 
       style={{ height: `${LINEAGE_VIEWPORT_HEIGHT}px` }}
     >
       <div className="relative" style={{ width: graphWidth, height: graphHeight }}>

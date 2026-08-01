@@ -1,8 +1,8 @@
 /**
  * Dashboard Print Styles
  * 
- * Minimal fallback for browser print (Cmd+P).
- * For best results, use the "Export PDF" button which uses html2pdf.js
+ * Minimal fallback for printing the dashboard with Cmd+P. Reports have a
+ * dedicated "Export as PDF" action that renders its own paged document.
  */
 
 @media print {

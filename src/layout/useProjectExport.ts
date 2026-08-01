@@ -7,7 +7,6 @@ import { useReportStore } from '@/report/reportStore'
 export interface ProjectExportState {
   isExporting: boolean
   isImporting: boolean
-  exportProgress: string
   exportError: string | null
   exportDropdownOpen: boolean
   dropdownRef: React.RefObject<HTMLDivElement>
@@ -26,10 +25,19 @@ export function useProjectExport(onImportComplete: () => void): ProjectExportSta
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
-  const [exportProgress, setExportProgress] = useState<string>('')
   const [exportError, setExportError] = useState<string | null>(null)
   const importInputRef = useRef<HTMLInputElement>(null!)
   const dropdownRef = useRef<HTMLDivElement>(null!)
+  /*
+   * Re-entry is blocked here rather than by disabling the trigger. The trigger
+   * only opens a menu holding two independent actions, so disabling it withheld
+   * import while an export ran and left a dimmed control with no way to discover
+   * why. A ref is also the only reliable guard: `setIsExporting` does not take
+   * effect until the next render, so two fast clicks can both get past a check
+   * on the state value.
+   */
+  const exportInFlight = useRef(false)
+  const importInFlight = useRef(false)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -52,12 +60,12 @@ export function useProjectExport(onImportComplete: () => void): ProjectExportSta
   }, [exportError])
 
   const handleExport = useCallback(async () => {
-    if (!projectId) return
+    if (!projectId || exportInFlight.current) return
 
+    exportInFlight.current = true
     setIsExporting(true)
     setExportDropdownOpen(false)
     setExportError(null)
-    setExportProgress('Starting export...')
 
     try {
       const project = useProjectStore.getState()
@@ -72,20 +80,19 @@ export function useProjectExport(onImportComplete: () => void): ProjectExportSta
       const { exportAndDownloadProject } = await import('@/persistence/exportService')
       await exportAndDownloadProject(projectId, projectName || 'project', {
         includeExcel: true,
-        onProgress: (message) => setExportProgress(message),
       })
-      setExportProgress('')
     } catch (err) {
       console.error('[Export] Failed:', err)
       setExportError(err instanceof Error ? err.message : 'Export failed')
-      setExportProgress('')
     } finally {
+      exportInFlight.current = false
       setIsExporting(false)
     }
   }, [projectId, projectName])
 
   const handleImportClick = useCallback(() => {
     setExportDropdownOpen(false)
+    if (importInFlight.current) return
     importInputRef.current?.click()
   }, [])
 
@@ -93,7 +100,11 @@ export function useProjectExport(onImportComplete: () => void): ProjectExportSta
     const file = event.target.files?.[0]
     if (!file) return
 
+    // Cleared unconditionally so re-picking the same file still fires a change.
     event.target.value = ''
+    if (importInFlight.current) return
+
+    importInFlight.current = true
     setIsImporting(true)
     setExportError(null)
 
@@ -112,6 +123,7 @@ export function useProjectExport(onImportComplete: () => void): ProjectExportSta
       console.error('[Import] Failed:', err)
       setExportError(err instanceof Error ? err.message : 'Import failed')
     } finally {
+      importInFlight.current = false
       setIsImporting(false)
     }
   }, [importProject, onImportComplete])
@@ -119,7 +131,6 @@ export function useProjectExport(onImportComplete: () => void): ProjectExportSta
   return {
     isExporting,
     isImporting,
-    exportProgress,
     exportError,
     exportDropdownOpen,
     dropdownRef,

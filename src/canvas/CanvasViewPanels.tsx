@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Panel } from 'reactflow'
 import { ImportButton } from '@/components/ImportButton'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
@@ -91,29 +92,38 @@ interface CycleWarningToastProps {
 }
 
 export function CycleWarningToast({ warning, onClose }: CycleWarningToastProps) {
+  const toastRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!warning) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!toastRef.current?.contains(event.target as globalThis.Node)) {
+        onClose()
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [warning, onClose])
+
   if (!warning) return null
+
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+    <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-fade-in">
       <div
-        className="flex items-start gap-3 px-4 py-3 bg-surface border border-warning/40 rounded-xl shadow-lg max-w-md"
+        ref={toastRef}
+        className="max-w-md rounded-2xl bg-surface px-5 py-4 shadow-xl"
         role="alert"
       >
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-warning/15 flex items-center justify-center">
-          <svg className="w-5 h-5 text-warning-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <p className="flex-1 text-sm text-text-primary">{warning}</p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="canvas-touch-target flex-shrink-0 rounded p-1 text-text-tertiary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
-          aria-label="Dismiss connection warning"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <p className="text-[13px] font-medium leading-snug text-text-secondary">{warning}</p>
       </div>
     </div>
   )

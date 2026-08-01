@@ -1,3 +1,17 @@
+/**
+ * Every view the workspace can show. `canvas`, `dashboard` and `report` own the
+ * whole screen; `grid` and `chart` are pointed at a single node, so they can
+ * only be shown while that node exists.
+ */
+const VIEW_MODES = ['canvas', 'grid', 'chart', 'dashboard', 'report'] as const
+
+export type ViewMode = typeof VIEW_MODES[number]
+
+/** Guards a view read back from storage, which may predate this build. */
+export function isViewMode(value: unknown): value is ViewMode {
+  return typeof value === 'string' && (VIEW_MODES as readonly string[]).includes(value)
+}
+
 export const WORKSPACE_NAV_ITEMS = [
   {
     id: 'canvas',

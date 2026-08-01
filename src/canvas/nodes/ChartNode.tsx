@@ -9,10 +9,9 @@ import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { ChartTypeIcon } from '@/charts/ChartTypeIcon'
 
 export interface ChartNodeData extends ChartNodeType {
-  selected: boolean
 }
 
-export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeData>) => {
+export const ChartNodeComponent = memo(({ data }: NodeProps<ChartNodeData>) => {
   const chartType = data.plan.chartType
   const sourceTableId = data.plan.sourceTableId
   const config = data.plan.config
@@ -54,10 +53,7 @@ export const ChartNodeComponent = memo(({ data, selected }: NodeProps<ChartNodeD
       className={`
         w-[220px] rounded-lg transition-all duration-200 ease-out overflow-hidden
         bg-surface
-        ${selected 
-          ? 'ring-2 ring-accent-green shadow-xl scale-[1.02]' 
-          : 'ring-1 ring-border shadow-md hover:shadow-lg'
-        }
+        ring-1 ring-border shadow-md hover:shadow-lg
       `}
     >
       <div className="px-3 py-2 border-b border-border-subtle bg-surface-secondary/50">

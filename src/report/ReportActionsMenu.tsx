@@ -1,6 +1,8 @@
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import {
   toolbarIconButton,
   toolbarMenuItem,
+  toolbarMenuItemBusy,
   toolbarMenuItemDanger,
   toolbarMenuItemNeutral,
   toolbarMenuSurface,
@@ -10,16 +12,32 @@ import { useToolbarMenu } from './useToolbarMenu';
 interface ReportActionsMenuProps {
   /** Applied to the actions that mutate the report; export stays available read-only. */
   blocked: { disabled?: boolean; title?: string };
-  isExporting: boolean;
+  /** The format currently exporting, or null when idle. */
+  exporting: 'pdf' | 'html' | null;
   onRename: () => void;
   onDuplicate: () => void;
-  onExport: () => void;
+  onExportPdf: () => void;
+  onExportHtml: () => void;
   onDelete: () => void;
 }
 
-const neutralItem = `${toolbarMenuItem} ${toolbarMenuItemNeutral} min-h-10 items-center text-sm`;
-const dangerItem = `${toolbarMenuItem} ${toolbarMenuItemDanger} min-h-10 items-center text-sm`;
+const itemLayout = 'min-h-10 items-center text-sm';
+const neutralItem = `${toolbarMenuItem} ${toolbarMenuItemNeutral} ${itemLayout}`;
+const busyNeutralItem = `${toolbarMenuItemBusy} ${toolbarMenuItemNeutral} ${itemLayout}`;
+const dangerItem = `${toolbarMenuItem} ${toolbarMenuItemDanger} ${itemLayout}`;
 const neutralIcon = 'h-4 w-4 shrink-0 text-text-tertiary';
+
+/**
+ * Takes the leading icon's slot so a running row keeps its height and label width; the
+ * label already carries the state, so the spinner stays out of the accessibility tree.
+ */
+function ItemSpinner() {
+  return (
+    <span className="flex h-4 w-4 shrink-0 items-center justify-center text-text-tertiary" aria-hidden="true">
+      <LoadingSpinner size="sm" className="shrink-0" />
+    </span>
+  );
+}
 
 /**
  * Document-scoped verbs live behind one affordance next to the report name, so the
@@ -27,10 +45,11 @@ const neutralIcon = 'h-4 w-4 shrink-0 text-text-tertiary';
  */
 export function ReportActionsMenu({
   blocked,
-  isExporting,
+  exporting,
   onRename,
   onDuplicate,
-  onExport,
+  onExportPdf,
+  onExportHtml,
   onDelete,
 }: ReportActionsMenuProps) {
   const {
@@ -75,7 +94,7 @@ export function ReportActionsMenu({
           role="menu"
           aria-label="Report actions"
           onKeyDown={handleMenuKeyDown}
-          className={`${toolbarMenuSurface} left-0 w-[13rem]`}
+          className={`${toolbarMenuSurface} left-0 w-[min(13rem,calc(100vw-1rem))]`}
         >
           <button
             type="button"
@@ -109,15 +128,41 @@ export function ReportActionsMenu({
             type="button"
             role="menuitem"
             tabIndex={-1}
-            disabled={isExporting}
-            onClick={() => run(onExport)}
-            className={neutralItem}
+            disabled={exporting !== null}
+            aria-busy={exporting === 'pdf'}
+            onClick={() => run(onExportPdf)}
+            className={exporting !== null ? busyNeutralItem : neutralItem}
           >
-            <svg className={neutralIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            {exporting === 'pdf' ? (
+              <ItemSpinner />
+            ) : (
+              <svg className={neutralIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
             <span className="min-w-0 flex-1 truncate">
-              {isExporting ? 'Exporting…' : 'Export as PDF'}
+              {exporting === 'pdf' ? 'Preparing…' : 'Export as PDF'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            tabIndex={-1}
+            disabled={exporting !== null}
+            aria-busy={exporting === 'html'}
+            onClick={() => run(onExportHtml)}
+            className={exporting !== null ? busyNeutralItem : neutralItem}
+          >
+            {exporting === 'html' ? (
+              <ItemSpinner />
+            ) : (
+              <svg className={neutralIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 9L6 12l3 3m6-6l3 3-3 3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            )}
+            <span className="min-w-0 flex-1 truncate">
+              {exporting === 'html' ? 'Exporting…' : 'Export as HTML'}
             </span>
           </button>
 

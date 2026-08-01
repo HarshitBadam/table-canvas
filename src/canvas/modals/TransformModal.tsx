@@ -323,7 +323,9 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
                   />
                 </div>
               </div>
-              <div className={`join-match-badge ${match.rate >= 70 ? 'good' : match.rate >= 30 ? 'warn' : 'bad'}`}>
+              <div className={`join-match-badge ${
+                match.rate === 0 ? 'neutral' : match.rate >= 70 ? 'good' : match.rate >= 30 ? 'warn' : 'bad'
+              }`}>
                 {previewLoading ? (
                   <>Checking sample rows…</>
                 ) : previewError ? (
@@ -340,7 +342,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
                 ) : match.rate > 0 ? (
                   <>{match.rate}% match across {match.rows} rows</>
                 ) : (
-                  <>No values match. Try different columns.</>
+                  <>No matching values in this sample.</>
                 )}
               </div>
             </section>

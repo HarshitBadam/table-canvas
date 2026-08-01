@@ -4,7 +4,9 @@ import { Sidebar } from './Sidebar'
 import { AppHeader } from './AppHeader'
 import { NavigationProvider } from './NavigationProvider'
 import { useProjectExport } from './useProjectExport'
-import { WORKSPACE_NAV_ITEMS, type WorkspaceNavId } from './viewNavigation'
+import { useWorkspaceViewPersistence } from './useWorkspaceViewPersistence'
+import { useHistoryShortcuts } from './useHistoryShortcuts'
+import { WORKSPACE_NAV_ITEMS, type ViewMode, type WorkspaceNavId } from './viewNavigation'
 import { CanvasView } from '@/canvas/CanvasView'
 import { useProjectStore } from '@/state/projectStore'
 import { useReportStore } from '@/report/reportStore'
@@ -23,8 +25,6 @@ const GridView = lazy(() => import('@/grid/GridView').then(m => ({ default: m.Gr
 const ChartView = lazy(() => import('@/charts/ChartView').then(m => ({ default: m.ChartView })))
 const Dashboard = lazy(() => import('@/dashboard/Dashboard').then(m => ({ default: m.Dashboard })))
 const ReportView = lazy(() => import('@/report/ReportView').then(m => ({ default: m.ReportView })))
-
-export type ViewMode = 'canvas' | 'grid' | 'chart' | 'dashboard' | 'report'
 
 export default function App() {
   const { isLoading, phase, phaseMessage, error, isAuthenticated } = useApp()
@@ -74,7 +74,7 @@ export default function App() {
 
 function MainApp() {
   const { projectLimitViolation, setProjectLimitViolation, syncError } = useApp()
-  const [viewMode, setViewMode] = useState<ViewMode>('canvas')
+  const { activeView, setActiveView } = useWorkspaceViewPersistence()
   const [navigationOpen, setNavigationOpen] = useState(false)
 
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
@@ -88,9 +88,8 @@ function MainApp() {
   const selectedReportId = useReportStore((state) => state.selectedReportId)
 
   const reportId = selectedReportId || Object.keys(reports)[0] || null
-  const visibleViewMode = !selectedNodeId && (viewMode === 'grid' || viewMode === 'chart')
-    ? 'canvas'
-    : viewMode
+
+  useHistoryShortcuts(activeView)
 
   useEffect(() => {
     setNavigationOpen(false)
@@ -98,9 +97,9 @@ function MainApp() {
 
   const handleBackToCanvas = useCallback(() => {
     selectNode(null)
-    setViewMode('canvas')
+    setActiveView('canvas')
     setNavigationOpen(false)
-  }, [selectNode])
+  }, [selectNode, setActiveView])
 
   const exportState = useProjectExport(handleBackToCanvas)
 
@@ -108,34 +107,34 @@ function MainApp() {
     const node = useProjectStore.getState().nodes[nodeId]
     if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
       selectNode(nodeId)
-      setViewMode('grid')
+      setActiveView('grid')
     } else if (node && node.kind === 'chart') {
       selectNode(nodeId)
-      setViewMode('chart')
+      setActiveView('chart')
     }
-  }, [selectNode])
+  }, [selectNode, setActiveView])
 
   const handleOpenDashboard = useCallback(() => {
-    setViewMode('dashboard')
+    setActiveView('dashboard')
     setNavigationOpen(false)
-  }, [])
+  }, [setActiveView])
 
   const handleOpenReport = useCallback(() => {
-    setViewMode('report')
+    setActiveView('report')
     setNavigationOpen(false)
-  }, [])
+  }, [setActiveView])
 
   const handleOpenTable = useCallback((tableId: string) => {
     selectNode(tableId)
-    setViewMode('grid')
+    setActiveView('grid')
     setNavigationOpen(false)
-  }, [selectNode])
+  }, [selectNode, setActiveView])
 
   const handleOpenChart = useCallback((chartId: string) => {
     selectNode(chartId)
-    setViewMode('chart')
+    setActiveView('chart')
     setNavigationOpen(false)
-  }, [selectNode])
+  }, [selectNode, setActiveView])
 
   const navigationValue = useMemo(() => ({
     openTable: handleOpenTable,
@@ -170,12 +169,12 @@ function MainApp() {
           <Sidebar
             isOpen={navigationOpen}
             onClose={() => setNavigationOpen(false)}
-            activeView={visibleViewMode}
+            activeView={activeView}
           />
 
           <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <AppHeader
-              viewMode={visibleViewMode}
+              viewMode={activeView}
               selectedNode={selectedNode}
               exportState={exportState}
               onOpenNavigation={() => setNavigationOpen(true)}
@@ -187,27 +186,27 @@ function MainApp() {
                 <LoadingSpinner />
               </div>
             }>
-              {visibleViewMode === 'canvas' && (
+              {activeView === 'canvas' && (
                 <ErrorBoundary name="CanvasView">
                   <CanvasView onNodeDoubleClick={handleNodeDoubleClick} />
                 </ErrorBoundary>
               )}
-              {visibleViewMode === 'grid' && selectedNodeId && (
+              {activeView === 'grid' && selectedNodeId && (
                 <ErrorBoundary name="GridView">
                   <GridView tableId={selectedNodeId} />
                 </ErrorBoundary>
               )}
-              {visibleViewMode === 'chart' && selectedNodeId && (
+              {activeView === 'chart' && selectedNodeId && (
                 <ErrorBoundary name="ChartView">
                   <ChartView chartId={selectedNodeId} />
                 </ErrorBoundary>
               )}
-              {visibleViewMode === 'dashboard' && (
+              {activeView === 'dashboard' && (
                 <ErrorBoundary name="Dashboard">
                   <Dashboard />
                 </ErrorBoundary>
               )}
-              {visibleViewMode === 'report' && (
+              {activeView === 'report' && (
                 <ErrorBoundary name="ReportView">
                   <ReportView reportId={reportId} onOpenTable={handleOpenTable} />
                 </ErrorBoundary>
@@ -215,7 +214,7 @@ function MainApp() {
             </Suspense>
           </div>
           <MobileBottomNav
-            viewMode={visibleViewMode}
+            viewMode={activeView}
             onOpenCanvas={handleBackToCanvas}
             onOpenDashboard={handleOpenDashboard}
             onOpenReport={handleOpenReport}

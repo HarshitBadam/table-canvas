@@ -19,7 +19,18 @@ export const toolbarTriggerChip = 'box-border flex h-9 shrink-0 items-center gap
 export const toolbarMenuSurface = 'absolute top-[calc(100%+0.375rem)] z-popover overflow-hidden rounded-xl border border-border bg-surface shadow-lg motion-safe:animate-scale-in';
 
 /** Rows use their focus background rather than a competing inset border. */
-export const toolbarMenuItem = 'group flex w-full gap-2.5 px-3 py-2 text-left outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+const toolbarMenuItemBase = 'group flex w-full gap-2.5 px-3 py-2 text-left outline-none transition-colors disabled:opacity-40';
+
+/** A disabled row is normally a refused one, so it carries the not-allowed cursor. */
+export const toolbarMenuItem = `${toolbarMenuItemBase} disabled:cursor-not-allowed`;
+
+/**
+ * For a row that is disabled only because its own action is still running: the verb is
+ * allowed, so refusing the pointer would misread. The not-allowed class is omitted rather
+ * than overridden — Tailwind emits `cursor-not-allowed` after `cursor-default`, so a
+ * later class in the attribute would lose.
+ */
+export const toolbarMenuItemBusy = toolbarMenuItemBase;
 
 export const toolbarMenuItemNeutral = 'text-text-primary hover:bg-surface-secondary focus-visible:bg-surface-secondary disabled:hover:bg-transparent';
 

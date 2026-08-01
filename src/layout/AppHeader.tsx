@@ -9,7 +9,7 @@ import { useNavigation } from './NavigationContext'
 import { ProjectActionsMenu } from './ProjectActionsMenu'
 import { ProjectSwitcher } from './ProjectSwitcher'
 import type { ChartNode, ProjectNode } from '@/types'
-import type { ViewMode } from './App'
+import type { ViewMode } from './viewNavigation'
 import type { ProjectExportState } from './useProjectExport'
 
 interface AppHeaderProps {
@@ -38,7 +38,6 @@ export function AppHeader({
   const {
     isExporting,
     isImporting,
-    exportProgress,
     exportError,
     exportDropdownOpen,
     dropdownRef,
@@ -106,6 +105,8 @@ export function AppHeader({
     restoreExportTriggerFocus()
     handleImportClick()
   }, [handleImportClick, restoreExportTriggerFocus])
+
+  const isBusy = isExporting || isImporting
 
   return (
     <header className="safe-area-top flex min-h-16 shrink-0 items-center gap-2 border-b border-border bg-surface px-2 sm:gap-3 sm:px-3">
@@ -193,38 +194,27 @@ export function AppHeader({
                 if (event.detail > 0) exportMenuModalityRef.current = 'pointer'
                 setExportDropdownOpen(!exportDropdownOpen)
               }}
-              disabled={isExporting || isImporting}
               aria-haspopup="menu"
               aria-expanded={exportDropdownOpen}
               aria-controls="project-actions-menu"
+              aria-busy={isBusy}
               aria-label="Import or export project"
               title="Import or export project"
-              className="flex h-12 min-w-11 shrink-0 items-center justify-center gap-2 rounded-md p-0 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary disabled:pointer-events-none disabled:opacity-50 md:w-auto md:px-2.5"
+              className="flex h-12 min-w-11 shrink-0 items-center justify-center gap-2 rounded-md p-0 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary md:w-auto md:px-2.5"
             >
-              {(isExporting || isImporting) ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  <span className="hidden max-w-32 truncate md:inline">
-                    {isExporting ? (exportProgress || 'Exporting...') : 'Importing...'}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <svg className="h-7 w-7 shrink-0 rounded-full bg-surface-secondary p-1.5 text-text-tertiary md:h-4 md:w-4 md:rounded-none md:bg-transparent md:p-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0-4-4m4 4V4" />
-                  </svg>
-                  <span className="hidden md:inline">Import / Export</span>
-                  <svg
-                    className={`hidden h-4 w-4 shrink-0 text-text-tertiary transition-transform duration-150 md:block ${exportDropdownOpen ? 'rotate-180' : ''}`}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10l4 4 4-4" />
-                  </svg>
-                </>
-              )}
+              <svg className="h-7 w-7 shrink-0 rounded-full bg-surface-secondary p-1.5 text-text-tertiary md:h-4 md:w-4 md:rounded-none md:bg-transparent md:p-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0-4-4m4 4V4" />
+              </svg>
+              <span className="hidden md:inline">Import / Export</span>
+              <svg
+                className={`hidden h-4 w-4 shrink-0 text-text-tertiary transition-transform duration-150 md:block ${exportDropdownOpen ? 'rotate-180' : ''}`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10l4 4 4-4" />
+              </svg>
             </button>
 
             {exportDropdownOpen && (

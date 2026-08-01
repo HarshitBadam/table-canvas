@@ -89,7 +89,7 @@ The latest work was checked with:
 | ReportView | 496 KB | 153 KB | Lazy |
 | ChartRenderer | 401 KB | 102 KB | Lazy |
 | XLSX | 424 KB | 140 KB | On demand |
-| HTML-to-PDF | 777 KB | 233 KB | On demand |
+| Report PDF export | 8 KB | 3 KB | On demand |
 | DuckDB WASM | 34–39 MB per selected variant | 7.7–8.8 MB | Runtime selects one variant |
 
 The build emits all three DuckDB WASM variants for compatibility, but clients fetch only the selected variant. This is a hosting/deployment-size concern, not a triple-download runtime defect.

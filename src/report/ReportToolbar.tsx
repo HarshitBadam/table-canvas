@@ -6,7 +6,7 @@ import { ReportActionsMenu } from './ReportActionsMenu';
 import { ReportInsertMenu } from './ReportInsertMenu';
 import { ReportFormatBar } from './ReportFormatBar';
 import { DeleteReportDialog } from './ReportDialogs';
-import { useReportPdfExport } from './useReportPdfExport';
+import { useReportExport } from './useReportExport';
 import { toolbarIconButton } from './toolbarStyles';
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease';
 
@@ -52,7 +52,7 @@ export function ReportToolbar({
   const persistenceError = useReportStore((state) => state.persistenceError);
   const { canEdit } = useWorkspaceLease();
   const blocked = canEdit ? {} : { disabled: true, title: EDITING_ELSEWHERE_TOOLTIP };
-  const { isExporting, error: exportError, exportPdf } = useReportPdfExport();
+  const { exporting, error: exportError, exportReport } = useReportExport();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [compactFormatOpen, setCompactFormatOpen] = useState(false);
   const switcherRef = useRef<ReportSwitcherHandle>(null);
@@ -96,10 +96,11 @@ export function ReportToolbar({
         {activeReport && (
           <ReportActionsMenu
             blocked={blocked}
-            isExporting={isExporting}
+            exporting={exporting}
             onRename={() => switcherRef.current?.startRename()}
             onDuplicate={() => duplicateReport(activeReport.id)}
-            onExport={() => void exportPdf()}
+            onExportPdf={() => void exportReport('pdf')}
+            onExportHtml={() => void exportReport('html')}
             onDelete={() => setConfirmingDelete(true)}
           />
         )}
@@ -143,7 +144,7 @@ export function ReportToolbar({
           role="group"
           aria-label="Text formatting"
         >
-          <div className="flex h-full w-full max-w-full translate-y-[2.5px] items-center overflow-x-auto scrollbar-none xl:translate-y-0">
+          <div className="flex h-full w-full max-w-full translate-y-[2.5px] items-center overflow-x-auto overscroll-x-contain scrollbar-none xl:translate-y-0">
             <ReportFormatBar editor={editor} blocked={blocked} showDividers={!compactFormatOpen} />
           </div>
         </div>

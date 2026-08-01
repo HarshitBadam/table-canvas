@@ -1,65 +1,89 @@
 import type JSZipInstance from 'jszip'
 import { exportProjectFile, loadReportsForProject, loadProject } from './db'
-import { getTableData } from '@/engine/tableDataService'
 import type { ProjectNode } from '@/types'
-import type { Report } from '@/report/types'
-import {
-  buildEmbeddedDataMap,
-  collectEmbeddedTableIds,
-  generateReportHtml,
-  type EmbeddedDataMap,
-} from './reportHtmlGenerator'
+import { generateReportHtml } from './reportHtmlDocument'
+import { buildReportEmbeddedData } from './reportExportData'
 import { createWorkbook } from './exportWorkbook'
 
 export interface ZipExportOptions {
   includeExcel?: boolean
+  /** Master switch for the `reports/` folder, as well as the HTML rendition itself. */
   includeReportHtml?: boolean
+  /** Adds a PDF alongside each exported report's HTML. */
+  includeReportPdf?: boolean
   onProgress?: (message: string, percent: number) => void
 }
 
-async function buildReportData(
-  report: Report,
-  nodes: Record<string, ProjectNode>,
-): Promise<EmbeddedDataMap> {
-  if (!report.tiptapContent) return {}
-  const limits = new Map<string, number>()
-  for (const { tableId, rowLimit } of collectEmbeddedTableIds(report.tiptapContent)) {
-    limits.set(tableId, Math.max(limits.get(tableId) ?? 0, rowLimit))
+type ProgressCallback = (message: string, percent: number) => void
+type ReportPdfRenderer = typeof import('@/report/pdfExport').renderReportPdfBlob
+
+const EXCEL_START = 15
+const EXCEL_END = 45
+const REPORTS_END = 92
+
+/**
+ * createWorkbook reports on its own fixed 30-80 scale, which is squeezed into the
+ * range above so that PDF rendering — by far the slowest step — gets most of the bar.
+ */
+function scaleWorkbookProgress(onProgress?: ProgressCallback): ProgressCallback | undefined {
+  if (!onProgress) return undefined
+  return (message, percent) => {
+    const scaled = EXCEL_START + (percent - 30) / 50 * (EXCEL_END - EXCEL_START)
+    onProgress(message, Math.round(Math.min(EXCEL_END, Math.max(EXCEL_START, scaled))))
   }
-  const entries = await Promise.all([...limits].map(async ([tableId, rowLimit]) => {
-    try {
-      const result = await getTableData(tableId, 0, rowLimit)
-      if (result.error) {
-        console.error(`[Export] Failed to read embedded table ${tableId}:`, result.error)
-        return { tableId, rows: [] }
-      }
-      return { tableId, rows: result.rows }
-    } catch (error) {
-      console.error(`[Export] Failed to read embedded table ${tableId}:`, error)
-      return { tableId, rows: [] }
-    }
-  }))
-  return buildEmbeddedDataMap(entries, nodes)
+}
+
+interface ReportExportOptions {
+  includePdf: boolean
+  onProgress?: ProgressCallback
+}
+
+/** Unique base name shared by every format written for a single report. */
+function uniqueReportBaseName(name: string, used: Set<string>): string {
+  const sanitized = name.replace(/[^a-zA-Z0-9-_ ]/g, '_').trim().substring(0, 50)
+    || 'Untitled Report'
+  let candidate = sanitized
+  let suffix = 2
+  while (used.has(candidate.toLowerCase())) {
+    candidate = `${sanitized} (${suffix})`
+    suffix += 1
+  }
+  used.add(candidate.toLowerCase())
+  return candidate
 }
 
 async function addReports(
   zip: JSZipInstance,
   reports: Awaited<ReturnType<typeof loadReportsForProject>>,
   nodes: Record<string, ProjectNode>,
+  { includePdf, onProgress }: ReportExportOptions,
 ): Promise<void> {
+  const entries = Object.values(reports)
+  if (entries.length === 0) return
+
   const folder = zip.folder('reports')
-  const usedFilenames = new Set<string>()
-  for (const report of Object.values(reports)) {
-    const baseName = report.name.replace(/[^a-zA-Z0-9-_ ]/g, '_').trim().substring(0, 50)
-      || 'Untitled Report'
-    let filename = `${baseName}.html`
-    let suffix = 2
-    while (usedFilenames.has(filename.toLowerCase())) {
-      filename = `${baseName} (${suffix}).html`
-      suffix += 1
+  const usedBaseNames = new Set<string>()
+  let renderReportPdfBlob: ReportPdfRenderer | null = null
+  if (includePdf) {
+    renderReportPdfBlob = (await import('@/report/pdfExport')).renderReportPdfBlob
+  }
+
+  for (const [index, report] of entries.entries()) {
+    onProgress?.(
+      `Rendering report ${index + 1} of ${entries.length}...`,
+      Math.round(EXCEL_END + index / entries.length * (REPORTS_END - EXCEL_END)),
+    )
+    const baseName = uniqueReportBaseName(report.name, usedBaseNames)
+    const dataMap = await buildReportEmbeddedData(report, nodes)
+
+    folder?.file(`${baseName}.html`, generateReportHtml(report, dataMap))
+    if (renderReportPdfBlob) {
+      try {
+        folder?.file(`${baseName}.pdf`, await renderReportPdfBlob({ report, nodes, dataMap }))
+      } catch (error) {
+        console.error(`[Export] Failed to render PDF for report "${report.name}":`, error)
+      }
     }
-    usedFilenames.add(filename.toLowerCase())
-    folder?.file(filename, generateReportHtml(report, await buildReportData(report, nodes)))
   }
 }
 
@@ -69,26 +93,34 @@ export async function exportProjectAsZip(
 ): Promise<Blob> {
   const { default: JSZip } = await import('jszip')
   const zip = new JSZip()
-  const { includeExcel = true, includeReportHtml = true, onProgress } = options
+  const {
+    includeExcel = true,
+    includeReportHtml = true,
+    includeReportPdf = true,
+    onProgress,
+  } = options
 
-  onProgress?.('Preparing project data...', 10)
+  onProgress?.('Preparing project data...', 5)
   zip.file('project.tablecanvas.json', await (await exportProjectFile(projectId)).text())
 
   const project = includeExcel || includeReportHtml ? await loadProject(projectId) : null
   if ((includeExcel || includeReportHtml) && !project) throw new Error('Project not found')
 
   if (includeExcel) {
-    onProgress?.('Creating Excel workbook...', 30)
-    const workbook = await createWorkbook(project!.nodes, onProgress)
+    onProgress?.('Creating Excel workbook...', EXCEL_START)
+    const workbook = await createWorkbook(project!.nodes, scaleWorkbookProgress(onProgress))
     if (workbook) zip.file('data.xlsx', workbook)
   }
 
   if (includeReportHtml) {
-    onProgress?.('Exporting reports...', 90)
-    await addReports(zip, await loadReportsForProject(projectId), project!.nodes)
+    onProgress?.('Exporting reports...', EXCEL_END)
+    await addReports(zip, await loadReportsForProject(projectId), project!.nodes, {
+      includePdf: includeReportPdf,
+      onProgress,
+    })
   }
 
-  onProgress?.('Compressing...', 98)
+  onProgress?.('Compressing...', 95)
   const blob = await zip.generateAsync({
     type: 'blob',
     compression: 'DEFLATE',
