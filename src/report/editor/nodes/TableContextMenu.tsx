@@ -84,7 +84,6 @@ export const TableContextMenu = memo(function TableContextMenu({
               Delete row
             </button>
           )}
-          <div className="context-menu-divider" />
           {menu.colIndex !== undefined && headers.length > 1 && (
             <button onClick={() => onDeleteColumn(menu.colIndex!)} className="danger">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

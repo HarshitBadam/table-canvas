@@ -164,27 +164,15 @@ export function FilterPanel({
             flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl motion-safe:animate-fade-in sm:max-w-xl"
         >
         <div className="border-b border-border-subtle px-4 py-4 sm:px-6">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <Dialog.Title className="text-base font-semibold text-text-primary">
-                Filter Data
-              </Dialog.Title>
-              <Dialog.Description className="mt-0.5 text-sm text-text-secondary">
-                {initialColumnId
-                  ? `Editing conditions for ${columns.find(column => column.id === initialColumnId)?.name ?? 'this column'}. Results update instantly.`
-                  : 'Results update as you configure each condition.'}
-              </Dialog.Description>
-            </div>
-            <Dialog.Close
-              type="button"
-              aria-label="Close filter panel"
-              data-dialog-initial-focus
-              className="canvas-touch-target join-close"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </Dialog.Close>
+          <div className="min-w-0">
+            <Dialog.Title className="text-base font-semibold text-text-primary">
+              Filter Data
+            </Dialog.Title>
+            <Dialog.Description className="mt-0.5 text-sm text-text-secondary">
+              {initialColumnId
+                ? `Editing conditions for ${columns.find(column => column.id === initialColumnId)?.name ?? 'this column'}. Results update instantly.`
+                : 'Results update as you configure each condition.'}
+            </Dialog.Description>
           </div>
           
           {filters.conditions.length > 0 && (

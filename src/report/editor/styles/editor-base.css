@@ -75,7 +75,7 @@
   margin-top: 0;
 }
 
-.tiptap-editor-content p.is-empty::before {
+.tiptap-editor-content.ProseMirror-focused p.is-empty::before {
   color: var(--color-text-tertiary, #a1a1aa);
   content: attr(data-placeholder);
   float: left;
@@ -83,7 +83,7 @@
   pointer-events: none;
 }
 
-.tiptap-editor-content .is-editor-empty:first-child::before {
+.tiptap-editor-content.ProseMirror-focused .is-editor-empty:first-child::before {
   color: var(--color-text-tertiary, #a1a1aa);
   content: attr(data-placeholder);
   float: left;
@@ -91,8 +91,8 @@
   pointer-events: none;
 }
 
-.tiptap-editor-content > p.is-empty:first-child::before,
-.tiptap-editor-content > p.is-empty:not(:first-child)::before {
+.tiptap-editor-content.ProseMirror-focused > p.is-empty:first-child::before,
+.tiptap-editor-content.ProseMirror-focused > p.is-empty:not(:first-child)::before {
   color: var(--color-text-tertiary, #a1a1aa);
   content: attr(data-placeholder);
   float: left;

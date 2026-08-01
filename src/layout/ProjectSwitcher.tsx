@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useApp } from '@/state/AppContext'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
+import { checkProjectCount } from '@/shared/enforce'
 import { CreateProjectDialog, DeleteProjectDialog } from './ProjectDialogs'
 import { ProjectSwitcherActions } from './ProjectSwitcherActions'
 interface MenuPosition {
@@ -33,7 +34,6 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
     loadProject,
     renameProject,
     setProjectLimitViolation,
-    leaveGuest,
   } = useApp()
   const switcherRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -52,7 +52,6 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
   const [isCreating, setIsCreating] = useState(false)
   const [isDuplicating, setIsDuplicating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [showCapacityFeedback, setShowCapacityFeedback] = useState(false)
   const createLockRef = useRef(false)
   const duplicateLockRef = useRef(false)
   const deleteLockRef = useRef(false)
@@ -143,17 +142,31 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
     createLockRef.current = true
     setIsCreating(true)
     setError(null)
-    setShowCapacityFeedback(false)
     try {
       await createNewProject(nextName)
       setName('')
       setCreateOpen(false)
     } catch (cause) {
-      setProjectLimitViolation(null)
-      setShowCapacityFeedback(
+      const limitError =
         typeof cause === 'object' && cause !== null && 'code' in cause
-          && cause.code === 'limit',
-      )
+          && cause.code === 'limit'
+      if (limitError) {
+        const capacity = checkProjectCount(projects.length, user?.tier ?? 'guest')
+        setProjectLimitViolation(
+          capacity.ok
+            ? {
+                ok: false,
+                reason: cause instanceof Error ? cause.message : 'Project limit reached',
+                limit: projects.length,
+                tier: user?.tier ?? 'guest',
+              }
+            : capacity,
+        )
+        setName('')
+        setCreateOpen(false)
+        return
+      }
+      setProjectLimitViolation(null)
       setError(cause instanceof Error ? cause.message : 'Could not create project')
     } finally {
       createLockRef.current = false
@@ -163,6 +176,13 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
 
   const handleDuplicate = async () => {
     if (duplicateLockRef.current) return
+    const capacity = checkProjectCount(projects.length, user?.tier ?? 'guest')
+    if (!capacity.ok) {
+      setMenuOpen(false)
+      setProjectActionsOpen(false)
+      setProjectLimitViolation(capacity)
+      return
+    }
     duplicateLockRef.current = true
     setIsDuplicating(true)
     setMenuActionError(null)
@@ -170,6 +190,25 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
       await duplicateActiveProject()
       setMenuOpen(false)
     } catch (cause) {
+      const limitError =
+        typeof cause === 'object' && cause !== null && 'code' in cause
+          && cause.code === 'limit'
+      if (limitError) {
+        const updatedCapacity = checkProjectCount(projects.length, user?.tier ?? 'guest')
+        setMenuOpen(false)
+        setProjectActionsOpen(false)
+        setProjectLimitViolation(
+          updatedCapacity.ok
+            ? {
+                ok: false,
+                reason: cause instanceof Error ? cause.message : 'Project limit reached',
+                limit: projects.length,
+                tier: user?.tier ?? 'guest',
+              }
+            : updatedCapacity,
+        )
+        return
+      }
       setProjectLimitViolation(null)
       setMenuActionError(cause instanceof Error ? cause.message : 'Could not duplicate project')
     } finally {
@@ -193,17 +232,6 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
     } finally {
       deleteLockRef.current = false
       setIsDeleting(false)
-    }
-  }
-
-  const handleSignIn = async () => {
-    setError(null)
-    try {
-      await leaveGuest()
-      setCreateOpen(false)
-      window.location.assign('/login')
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not prepare sign-in')
     }
   }
 
@@ -332,6 +360,12 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
                   role="menuitem"
                   onClick={() => {
                     setMenuOpen(false)
+                    const capacity = checkProjectCount(projects.length, user?.tier ?? 'guest')
+                    if (!capacity.ok) {
+                      setProjectLimitViolation(capacity)
+                      return
+                    }
+                    setError(null)
                     setCreateOpen(true)
                   }}
                   className="-mr-1 rounded-md px-1.5 py-1 text-xs font-semibold text-accent-text outline-none transition-colors hover:bg-accent-green/10 focus-visible:ring-2 focus-visible:ring-accent-green"
@@ -495,17 +529,13 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
             name={name}
             error={error}
             isCreating={isCreating}
-            showCapacityFeedback={showCapacityFeedback}
-            tier={user?.tier ?? 'guest'}
             onNameChange={setName}
             onSubmit={() => void handleCreate()}
-            onSignIn={() => void handleSignIn()}
             onOpenChange={(open) => {
               if (isCreating) return
               setCreateOpen(open)
               if (!open) {
                 setError(null)
-                setShowCapacityFeedback(false)
                 requestAnimationFrame(() => triggerRef.current?.focus())
               }
             }}

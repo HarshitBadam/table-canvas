@@ -11,9 +11,8 @@
   flex-direction: column;
   overflow: visible;
   max-height: min(460px, 50vh);
-  /* 18px separates the panel clearly from its chart; 4px keeps the bottom
-     flow gap compact. Both values use only factors of 2 and 3. */
-  margin: 18px 0 4px;
+  /* The wrapper supplies the matching 18px gap below the panel. */
+  margin: 18px 0 0;
   scroll-margin-block-end: 48px;
   border: 1px solid var(--color-border-elevation);
   border-radius: 12px;
@@ -67,36 +66,6 @@
 .block-config-header-text p strong {
   color: var(--color-accent-text);
   font-weight: 600;
-}
-
-.block-config-close {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-text-tertiary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.block-config-close:hover {
-  background: var(--color-surface-tertiary);
-  color: var(--color-text-secondary);
-}
-
-.block-config-close svg {
-  width: 14px;
-  height: 14px;
-}
-
-.block-config-close:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb) / 0.3);
 }
 
 .block-config-body {

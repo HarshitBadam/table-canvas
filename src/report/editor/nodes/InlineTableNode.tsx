@@ -27,6 +27,7 @@ const InlineTableNodeView = memo(function InlineTableNodeView({
     attrs,
     headers,
     rows,
+    showHeaders,
     cells,
     contextMenu,
     contextMenuRef,
@@ -79,20 +80,22 @@ const InlineTableNodeView = memo(function InlineTableNodeView({
               className="editable-table"
               style={{ minWidth: `${headers.length * 140}px` }}
             >
-              <thead>
-                <tr>
-                  {headers.map((header, columnIndex) => (
-                    <TableEditableCell
-                      key={columnIndex}
-                      cells={cells}
-                      row={HEADER_ROW}
-                      col={columnIndex}
-                      value={header || `Column ${columnIndex + 1}`}
-                      onContextMenu={event => handleContextMenu(event, 'column', columnIndex)}
-                    />
-                  ))}
-                </tr>
-              </thead>
+              {showHeaders && (
+                <thead>
+                  <tr>
+                    {headers.map((header, columnIndex) => (
+                      <TableEditableCell
+                        key={columnIndex}
+                        cells={cells}
+                        row={HEADER_ROW}
+                        col={columnIndex}
+                        value={header || `Column ${columnIndex + 1}`}
+                        onContextMenu={event => handleContextMenu(event, 'column', columnIndex)}
+                      />
+                    ))}
+                  </tr>
+                </thead>
+              )}
               <tbody>
                 {rows.map((row, rowIndex) => (
                   <tr key={rowIndex} className="editable-table-row">
@@ -111,16 +114,23 @@ const InlineTableNodeView = memo(function InlineTableNodeView({
               </tbody>
             </table>
           </div>
-          <button onClick={() => addColumn()} className="table-add-btn table-add-col-btn" title="Add column">
-            <TableAddIcon direction="right" />
+          <button
+            onClick={() => addColumn()}
+            className="table-add-btn table-add-col-btn"
+            title="Add column"
+            aria-label="Add column"
+          >
+            <TableAddIcon />
           </button>
-          <button onClick={() => addRow()} className="table-add-btn table-add-row-btn" title="Add row">
-            <TableAddIcon direction="down" />
+          <button
+            onClick={() => addRow()}
+            className="table-add-btn table-add-row-btn"
+            title="Add row"
+            aria-label="Add row"
+          >
+            <TableAddIcon />
           </button>
         </div>
-        {attrs.sourceInfo && (
-          <div className="text-xs text-text-tertiary mt-2">From: {attrs.sourceInfo.tableName}</div>
-        )}
         <TableContextMenu
           menu={contextMenu}
           menuRef={contextMenuRef}
@@ -149,6 +159,7 @@ export const InlineTableNode = Node.create<InlineTableNodeOptions>({
     return {
       headers: { default: [] },
       rows: { default: [] },
+      showHeaders: { default: true },
       caption: { default: '' },
       sourceInfo: { default: null },
     };

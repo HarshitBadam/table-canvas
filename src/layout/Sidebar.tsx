@@ -86,16 +86,6 @@ export function Sidebar({
             </div>
             <span className="truncate font-bold text-base text-text-primary">Table Canvas</span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn btn-ghost min-h-11 min-w-11 p-0 lg:hidden"
-            aria-label="Close navigation"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
         </div>
 
         <div className="space-y-2 border-b border-border p-4">
@@ -200,7 +190,7 @@ export function Sidebar({
           })}
         </nav>
 
-        <div className="p-4 border-t border-border bg-surface-secondary/50">
+        <div className="border-t border-border bg-surface-secondary/50 p-4">
           <ThemeToggle />
         </div>
 

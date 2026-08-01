@@ -42,11 +42,6 @@ export const TablePickerModal = memo(function TablePickerModal({
             <h3 id="table-picker-title">{title}</h3>
             {subtitle && <p className="table-picker-item-meta">{subtitle}</p>}
           </div>
-          <button type="button" onClick={onClose} className="table-picker-close" aria-label="Close" data-dialog-initial-focus={tables.length <= 5 ? true : undefined}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
         </div>
 
         <div className="table-picker-content">
@@ -97,6 +92,11 @@ export const TablePickerModal = memo(function TablePickerModal({
               )}
             </div>
           )}
+        </div>
+        <div className="table-picker-footer">
+          <button type="button" className="table-picker-cancel" onClick={onClose}>
+            Cancel
+          </button>
         </div>
       </div>
     </div>

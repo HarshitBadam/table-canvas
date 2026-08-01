@@ -108,19 +108,10 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
         <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fade-in z-[60]" />
         <Dialog.Content className="fixed inset-0 z-[60] m-auto h-fit w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl motion-safe:animate-scale-in">
           <div className="px-6 pt-5 pb-4">
-            <div className="flex items-center justify-between">
+            <div>
               <Dialog.Title className="text-lg font-semibold text-text-primary">
                 {recipeConfig.title}
               </Dialog.Title>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-surface-secondary transition-colors"
-                aria-label="Close recipe"
-              >
-                <svg className="w-5 h-5 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
             <Dialog.Description className="text-sm text-text-secondary mt-1">
               {recipeConfig.description}

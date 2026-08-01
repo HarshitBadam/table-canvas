@@ -109,7 +109,15 @@ export function GoogleSignInButton({ onCredential, busy = false }: GoogleSignInB
 
   if (status === 'loading') {
     return (
-      <div className="auth-skeleton" role="status" aria-label="Loading Google sign-in" />
+      <div
+        className="auth-action auth-google-loading"
+        role="status"
+        aria-label="Loading Google sign-in"
+        aria-busy="true"
+      >
+        <GoogleGlyph />
+        Continue with Google
+      </div>
     )
   }
 

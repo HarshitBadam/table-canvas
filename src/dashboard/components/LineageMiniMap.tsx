@@ -22,9 +22,16 @@ export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProp
       <div className="px-5 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h3 className="text-sm font-semibold text-text-primary">Data Flow</h3>
-          <span className="text-xs text-text-tertiary">
-            {sourceNodes.length} source{sourceNodes.length !== 1 ? 's' : ''} - {derivedNodes.length} derived{chartNodes.length > 0 ? ` - ${chartNodes.length} chart${chartNodes.length !== 1 ? 's' : ''}` : ''}
-          </span>
+          <div
+            className="flex items-center gap-2 text-xs text-text-tertiary"
+            aria-label={`${sourceNodes.length} source${sourceNodes.length !== 1 ? 's' : ''}, ${derivedNodes.length} derived${derivedNodes.length !== 1 ? 's' : ''}${chartNodes.length > 0 ? `, ${chartNodes.length} chart${chartNodes.length !== 1 ? 's' : ''}` : ''}`}
+          >
+            <span>{sourceNodes.length} source{sourceNodes.length !== 1 ? 's' : ''}</span>
+            <span>{derivedNodes.length} derived{derivedNodes.length !== 1 ? 's' : ''}</span>
+            {chartNodes.length > 0 && (
+              <span>{chartNodes.length} chart{chartNodes.length !== 1 ? 's' : ''}</span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-4 text-xs text-text-tertiary">
           <div className="flex items-center gap-1.5">
@@ -57,7 +64,7 @@ export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProp
           }}
         />
         
-        <div className="relative p-8">
+        <div className="relative px-8">
           <LineageVisualization 
             nodes={nodes}
             edges={edges}
@@ -71,6 +78,9 @@ export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProp
 
 const MINIMAP_NODE_WIDTH = 140
 const MINIMAP_NODE_HEIGHT = 60
+const LINEAGE_VIEWPORT_HEIGHT = 384
+const DERIVED_EDGE_COLOR = '#6D28D9'
+const CHART_EDGE_COLOR = '#2563EB'
 
 function LineageVisualization({ 
   nodes, 
@@ -131,12 +141,10 @@ function LineageVisualization({
     }
   }, [nodes, edges])
 
-  const containerHeight = Math.min(graphHeight, 400)
-
   return (
     <div 
       className="relative overflow-auto scrollbar-hide flex justify-center" 
-      style={{ height: `${containerHeight}px`, minHeight: '200px' }}
+      style={{ height: `${LINEAGE_VIEWPORT_HEIGHT}px` }}
     >
       <div className="relative" style={{ width: graphWidth, height: graphHeight }}>
         <svg 
@@ -146,11 +154,6 @@ function LineageVisualization({
           style={{ overflow: 'visible' }}
         >
         <defs>
-          <linearGradient id="flowEdgeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#217346" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0.8" />
-          </linearGradient>
-          
           {/* Solid color for print */}
           <linearGradient id="flowEdgePrint" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#6B7280" />
@@ -161,27 +164,26 @@ function LineageVisualization({
             id="flowArrowhead"
             markerWidth="10"
             markerHeight="10"
-            refX="8"
+            refX="10"
             refY="5"
             orient="auto"
           >
             <path
               d="M 0 0 L 10 5 L 0 10 Z"
-              fill="#8B5CF6"
-              opacity="0.9"
+              fill={DERIVED_EDGE_COLOR}
             />
           </marker>
           <marker
             id="flowArrowheadChart"
             markerWidth="10"
             markerHeight="10"
-            refX="8"
+            refX="10"
             refY="5"
             orient="auto"
           >
             <path
               d="M 0 0 L 10 5 L 0 10 Z"
-              fill="#3B82F6"
+              fill={CHART_EDGE_COLOR}
             />
           </marker>
         </defs>
@@ -209,17 +211,17 @@ function LineageVisualization({
               <path
                 d={path}
                 fill="none"
-                stroke="#8B5CF6"
-                strokeWidth={6}
-                strokeOpacity={0.08}
+                stroke={DERIVED_EDGE_COLOR}
+                strokeWidth={3}
+                strokeOpacity={0.06}
                 strokeLinecap="round"
                 className="lineage-glow print:hidden"
               />
               <path
                 d={path}
                 fill="none"
-                stroke={targetNode?.kind === 'chart' ? '#3B82F6' : 'url(#flowEdgeGradient)'}
-                strokeWidth={2.25}
+                stroke={targetNode?.kind === 'chart' ? CHART_EDGE_COLOR : DERIVED_EDGE_COLOR}
+                strokeWidth={2}
                 strokeLinecap="round"
                 markerEnd={targetNode?.kind === 'chart'
                   ? 'url(#flowArrowheadChart)'
@@ -278,7 +280,6 @@ function LineageVisualization({
               minWidth: '120px',
               maxWidth: '160px',
             }}
-            title={isChart ? node.name : `${node.name} (${node.rowCount.toLocaleString()} rows)`}
           >
             <div className="flex items-center gap-2">
               <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBgClass}`}>

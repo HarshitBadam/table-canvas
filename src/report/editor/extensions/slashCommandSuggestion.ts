@@ -1,5 +1,5 @@
 import { ReactRenderer } from '@tiptap/react';
-import type { SuggestionOptions, SuggestionProps } from '@tiptap/suggestion';
+import { exitSuggestion, type SuggestionOptions, type SuggestionProps } from '@tiptap/suggestion';
 import tippy, { type Instance as TippyInstance } from 'tippy.js';
 import { SlashCommandList } from './SlashCommandList';
 import { getSlashCommandItems } from './SlashCommandItems';
@@ -22,6 +22,8 @@ export function getSlashCommandSuggestion(): Partial<SuggestionOptions<SlashComm
     render: () => {
       let component: ReactRenderer<CommandListRef> | null = null;
       let popup: TippyInstance[] | null = null;
+      let dismiss: (() => void) | null = null;
+      let handleOutsideMouseDown: ((event: MouseEvent) => void) | null = null;
 
       return {
         onStart: (props: SuggestionProps<SlashCommandItem>) => {
@@ -54,6 +56,13 @@ export function getSlashCommandSuggestion(): Partial<SuggestionOptions<SlashComm
               ],
             },
           });
+
+          dismiss = () => exitSuggestion(props.editor.view);
+          handleOutsideMouseDown = event => {
+            if (event.target instanceof Node && component?.element.contains(event.target)) return;
+            dismiss?.();
+          };
+          document.addEventListener('mousedown', handleOutsideMouseDown, true);
         },
         onUpdate: (props: SuggestionProps<SlashCommandItem>) => {
           component?.updateProps({ items: props.items, command: props.command });
@@ -65,14 +74,19 @@ export function getSlashCommandSuggestion(): Partial<SuggestionOptions<SlashComm
         },
         onKeyDown: (props: { event: KeyboardEvent }) => {
           if (props.event.key === 'Escape') {
-            popup?.[0]?.hide();
+            dismiss?.();
             return true;
           }
           return component?.ref?.onKeyDown(props) || false;
         },
         onExit: () => {
+          if (handleOutsideMouseDown) {
+            document.removeEventListener('mousedown', handleOutsideMouseDown, true);
+          }
           popup?.[0]?.destroy();
           component?.destroy();
+          dismiss = null;
+          handleOutsideMouseDown = null;
         },
       };
     },

@@ -7,10 +7,12 @@ import { useReportTableCells, type TableCellValue } from './useReportTableCells'
 interface InlineTableNodeAttrs {
   headers: string[];
   rows: TableCellValue[][];
+  showHeaders?: boolean;
   caption?: string;
   sourceInfo?: {
     tableId: string;
     tableName: string;
+    columnIds?: string[];
   };
 }
 
@@ -22,6 +24,7 @@ export function useInlineTableEditor(
   const attrs = node.attrs as InlineTableNodeAttrs;
   const headers = useMemo(() => attrs.headers ?? [], [attrs.headers]);
   const rows = useMemo(() => attrs.rows ?? [], [attrs.rows]);
+  const showHeaders = attrs.showHeaders !== false;
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -92,6 +95,7 @@ export function useInlineTableEditor(
   return {
     headers,
     rows,
+    showHeaders,
     attrs,
     cells,
     contextMenu,

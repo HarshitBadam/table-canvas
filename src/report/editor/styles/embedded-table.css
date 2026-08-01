@@ -26,10 +26,10 @@
   outline-color: var(--color-accent-green);
 }
 
-/* Configuring is still "selected"; a muted ring keeps the link visible. */
+/* Match chart blocks: the configuration panel itself identifies its source. */
 .embedded-table-window.is-configuring,
 .embedded-table-window.is-configuring:hover {
-  outline-color: rgba(33, 115, 70, 0.35);
+  outline-color: transparent;
 }
 
 .embedded-table-header {
@@ -128,42 +128,4 @@
 [data-theme="dark"] .embedded-table-footer {
   background: var(--color-surface-secondary, #27272a);
   border-top-color: var(--color-border, #3f3f46);
-}
-
-/*
- * Kept mounted so the footer height and text position never change when the
- * block is selected.
- */
-.embedded-table-config-btn {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--color-accent-green);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: opacity 100ms ease, background-color 100ms ease;
-  opacity: 0;
-  visibility: hidden;
-}
-
-.embedded-table-window:hover .embedded-table-config-btn,
-.embedded-table-window.is-selected .embedded-table-config-btn,
-.embedded-table-window.is-configuring .embedded-table-config-btn,
-.embedded-table-config-btn:focus-visible {
-  opacity: 1;
-  visibility: visible;
-}
-
-.embedded-table-config-btn:hover {
-  background: rgba(33, 115, 70, 0.1);
-}
-
-[data-theme="dark"] .embedded-table-config-btn {
-  color: var(--color-accent-green);
-}
-
-[data-theme="dark"] .embedded-table-config-btn:hover {
-  background: rgba(33, 115, 70, 0.2);
 }

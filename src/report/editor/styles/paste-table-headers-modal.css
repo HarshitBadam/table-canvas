@@ -1,0 +1,176 @@
+.paste-table-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(24 24 27 / 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.paste-table-modal {
+  width: min(420px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--color-border-elevation, var(--color-border, #e4e4e7));
+  border-radius: 12px;
+  background: var(--color-surface, #fff);
+  box-shadow: var(--shadow-lg, 0 20px 40px rgb(0 0 0 / 0.2));
+  animation: paste-table-modal-in 150ms ease-out;
+}
+
+.paste-table-modal:focus-visible {
+  outline: none;
+}
+
+.paste-table-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid var(--color-border-subtle, var(--color-border, #e4e4e7));
+}
+
+.paste-table-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--color-accent, var(--color-accent-green, #217346));
+  background: rgb(var(--color-accent-rgb, 33 115 70) / 0.1);
+  border-radius: 7px;
+}
+
+.paste-table-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.paste-table-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.paste-table-modal-header > div:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+
+.paste-table-modal h3 {
+  margin: 0;
+  color: var(--color-text-primary, #18181b);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.paste-table-modal-header p {
+  margin: 2px 0 0;
+  color: var(--color-text-secondary, #71717a);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.paste-table-modal-body {
+  padding: 14px 16px 16px;
+}
+
+.paste-table-summary {
+  display: inline-flex;
+  margin: 0 0 10px;
+  color: var(--color-accent-text, var(--color-accent, #217346));
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.paste-table-options {
+  display: grid;
+  gap: 8px;
+}
+
+.paste-table-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--color-surface-secondary, #fafafa);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.paste-table-option:hover {
+  background: rgb(var(--color-accent-rgb, 33 115 70) / 0.05);
+}
+
+.paste-table-option:focus-visible,
+.paste-table-cancel:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb, 33 115 70) / 0.3);
+}
+
+.paste-table-option-content {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.paste-table-option-title {
+  color: var(--color-text-primary, #18181b);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.paste-table-option-description {
+  color: var(--color-text-secondary, #71717a);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.paste-table-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 16px;
+  border-top: 1px solid var(--color-border-subtle, var(--color-border, #e4e4e7));
+  background: rgb(var(--color-surface-secondary-rgb, 250 250 250) / 0.5);
+}
+
+.paste-table-cancel {
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--color-accent, var(--color-accent-green, #217346));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.paste-table-cancel:hover {
+  background: var(--color-accent-hover, #185c37);
+}
+
+[data-theme="dark"] .paste-table-overlay {
+  background: rgb(0 0 0 / 0.58);
+}
+
+@keyframes paste-table-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paste-table-modal {
+    animation: none;
+  }
+}

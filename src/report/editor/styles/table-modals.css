@@ -27,7 +27,6 @@
 .table-picker-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 16px 20px;
   border-bottom: 1px solid var(--color-border, #e4e4e7);
 }
@@ -47,34 +46,43 @@
   color: var(--color-text-primary, #fafafa);
 }
 
-.table-picker-close {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--color-text-tertiary, #a1a1aa);
-  cursor: pointer;
-  transition: all 100ms ease;
-}
-
-.table-picker-close:hover {
-  background: var(--color-surface-secondary, #f4f4f5);
-  color: var(--color-text-primary, #18181b);
-}
-
-[data-theme="dark"] .table-picker-close:hover {
-  background: var(--color-surface-secondary, #27272a);
-  color: var(--color-text-primary, #fafafa);
-}
-
 .table-picker-content {
   padding: 12px;
   max-height: 400px;
   overflow-y: auto;
+}
+
+.table-picker-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-border, #e4e4e7);
+  background: var(--color-surface-secondary, #fafafa);
+}
+
+.table-picker-cancel {
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--color-accent, var(--color-accent-green, #217346));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.table-picker-cancel:hover {
+  background: var(--color-accent-hover, #185c37);
+}
+
+.table-picker-cancel:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--color-accent-rgb, 33 115 70) / 0.3);
+}
+
+[data-theme="dark"] .table-picker-footer {
+  border-top-color: var(--color-border, #3f3f46);
+  background: var(--color-surface-secondary, #27272a);
 }
 
 .table-picker-empty {
@@ -228,30 +236,6 @@
 }
 
 [data-theme="dark"] .dimension-modal-header h3 {
-  color: var(--color-text-primary, #fafafa);
-}
-
-.dimension-modal-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  color: var(--color-text-tertiary, #a1a1aa);
-  transition: all 100ms ease;
-}
-
-.dimension-modal-close:hover {
-  background: var(--color-surface-secondary, #f4f4f5);
-  color: var(--color-text-primary, #18181b);
-}
-
-[data-theme="dark"] .dimension-modal-close:hover {
-  background: var(--color-surface-secondary, #27272a);
   color: var(--color-text-primary, #fafafa);
 }
 

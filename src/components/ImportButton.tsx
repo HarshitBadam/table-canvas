@@ -68,6 +68,10 @@ export function ImportButton() {
         })
       } catch (error: unknown) {
         console.error('Project import error:', error)
+        const limitError =
+          typeof error === 'object' && error !== null && 'code' in error
+            && error.code === 'limit'
+        if (limitError) return
         const message = error instanceof Error ? error.message : 'Unknown error'
         setImportError(`Failed to import project: ${message}`)
       } finally {
@@ -181,7 +185,11 @@ export function ImportButton() {
 
       const tableCheck = checkTableCount(currentTableCount + selectedSheets.length - 1, tier)
       if (!tableCheck.ok) {
-        showViolation(tableCheck)
+        setSheetModalOpen(false)
+        showViolation({
+          ...tableCheck,
+          reason: `Importing ${selectedSheets.length} ${selectedSheets.length === 1 ? 'sheet' : 'sheets'} would bring this project from ${currentTableCount} to ${currentTableCount + selectedSheets.length} tables (limit: ${tableCheck.limit}).`,
+        })
         return
       }
 
@@ -271,8 +279,8 @@ export function ImportButton() {
 
       <Dialog.Root open={sheetModalOpen} onOpenChange={setSheetModalOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 motion-safe:animate-fade-in" />
-          <Dialog.Content className="fixed inset-0 z-50 m-auto h-fit w-full max-w-sm overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl motion-safe:animate-scale-in">
+          <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/45 backdrop-blur-[2px] motion-safe:animate-fade-in" />
+          <Dialog.Content className="fixed inset-0 z-modal m-auto h-fit w-[min(25.5rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl motion-safe:animate-scale-in">
             <div className="flex flex-col items-start border-b border-border-subtle px-5 pb-4 pt-5 text-left">
               <Dialog.Title className="text-base font-semibold text-text-primary">
                 Select Sheets to Import
@@ -346,6 +354,7 @@ export function ImportButton() {
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}
         violation={upgradeViolation}
+        layer={sheetModalOpen ? 'nested' : 'base'}
       />
     </>
   )
