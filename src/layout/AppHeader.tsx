@@ -320,8 +320,18 @@ function GridHeaderContent({ selectedNode }: { selectedNode: ProjectNode }) {
   return (
     <>
       <span className="min-w-0 max-w-36 truncate text-sm font-medium sm:max-w-56">{selectedNode.name}</span>
-      <span className={`badge hidden md:inline-flex ${selectedNode.kind === 'source_table' ? 'badge-accent' : 'badge-purple'}`}>
-        {selectedNode.kind === 'source_table' ? 'Source - Editable' : 'Derived - View Only'}
+      <span className="hidden items-center gap-1 md:inline-flex">
+        {selectedNode.kind === 'source_table' ? (
+          <>
+            <span className="badge badge-accent">Source</span>
+            <span className="badge badge-green">Editable</span>
+          </>
+        ) : (
+          <>
+            <span className="badge badge-purple">Derived</span>
+            <span className="badge badge-purple">View Only</span>
+          </>
+        )}
       </span>
       <div className="flex-1" />
     </>
