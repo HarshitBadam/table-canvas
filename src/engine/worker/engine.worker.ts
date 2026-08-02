@@ -7,7 +7,7 @@ import type {
 } from '../types'
 import type { TransformDef } from '@/types'
 import { loadTable, getSlice, getFilteredSlice, updateCell, insertRow, deleteRow, getDistinctValues, getAggregation, getProfile, dropTable } from './tableOperations'
-import { executeTransform } from './transforms'
+import { countCombinedTransformRows, executeTransform } from './transforms'
 import { WorkerRequestScheduler } from './requestScheduler'
 
 let db: duckdb.AsyncDuckDB | null = null
@@ -87,6 +87,13 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
 
       case 'executeTransform':
         result = await executeTransform(requireConn(), payload as TransformDef & { outputTableId: string })
+        break
+
+      case 'countCombinedTransformRows':
+        result = await countCombinedTransformRows(
+          requireConn(),
+          payload as Extract<TransformDef, { type: 'join' | 'union' }>,
+        )
         break
 
       case 'getSlice': {

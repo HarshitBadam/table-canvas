@@ -22,11 +22,14 @@ export function UpgradePrompt({
   if (!violation) return null
 
   const isGuest = violation.tier === 'guest'
-  const limitContext = violation.reason.toLowerCase().includes('table')
-    ? 'You’ve reached this project’s table limit.'
-    : violation.reason.toLowerCase().includes('project')
+  const reason = violation.reason.toLowerCase()
+  const limitContext = reason.includes('row')
+    ? 'You’ve reached this project’s row limit.'
+    : reason.includes('project')
       ? 'You’ve reached your project limit.'
-      : 'You’ve reached this workspace limit.'
+      : reason.includes('table')
+        ? 'You’ve reached this project’s table limit.'
+        : 'You’ve reached this workspace limit.'
   const overlayLayer = layer === 'nested' ? 'z-[90]' : 'z-modal-backdrop'
   const contentLayer = layer === 'nested' ? 'z-[100]' : 'z-modal'
   const overlayStyle = layer === 'nested'

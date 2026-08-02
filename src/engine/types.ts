@@ -11,6 +11,7 @@ export type WorkerRequestType =
   | 'init'
   | 'loadTable'
   | 'executeTransform'
+  | 'countCombinedTransformRows'
   | 'getSlice'
   | 'getFilteredSlice'
   | 'getDistinctValues'

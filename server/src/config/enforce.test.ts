@@ -7,42 +7,24 @@ import {
 
 describe('server enforce helpers', () => {
   describe('checkFileSize', () => {
-    it('allows files at the google limit', () => {
-      expect(checkFileSize(25 * 1024 * 1024, 'google')).toEqual({ ok: true });
-    });
-
-    it('rejects files over the google limit', () => {
-      const result = checkFileSize(25 * 1024 * 1024 + 1, 'google');
-      expect(result.ok).toBe(false);
+    it('allows arbitrarily large files for google tier', () => {
+      expect(checkFileSize(Number.MAX_SAFE_INTEGER, 'google')).toEqual({ ok: true });
     });
   });
 
   describe('checkProjectCount', () => {
-    it('allows below the limit', () => {
-      expect(checkProjectCount(9, 'google')).toEqual({ ok: true });
-    });
-
-    it('rejects at the limit', () => {
-      const result = checkProjectCount(10, 'google');
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.limit).toBe(10);
-      }
+    it('allows arbitrarily many projects for google tier', () => {
+      expect(checkProjectCount(Number.MAX_SAFE_INTEGER, 'google')).toEqual({ ok: true });
     });
   });
 
   describe('checkStorageQuota', () => {
-    it('allows within quota', () => {
-      expect(checkStorageQuota(0, 1024, 'google')).toEqual({ ok: true });
-    });
-
-    it('rejects exceeding quota', () => {
-      const result = checkStorageQuota(
-        39 * 1024 * 1024,
-        2 * 1024 * 1024,
+    it('allows arbitrary storage for google tier', () => {
+      expect(checkStorageQuota(
+        Number.MAX_SAFE_INTEGER,
+        Number.MAX_SAFE_INTEGER,
         'google',
-      );
-      expect(result.ok).toBe(false);
+      )).toEqual({ ok: true });
     });
   });
 });

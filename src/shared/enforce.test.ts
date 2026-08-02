@@ -27,13 +27,8 @@ describe('enforce helpers', () => {
       }
     })
 
-    it('allows larger files for google tier', () => {
-      expect(checkFileSize(10 * 1024 * 1024, 'google')).toEqual({ ok: true })
-    })
-
-    it('rejects files over the google limit', () => {
-      const result = checkFileSize(25 * 1024 * 1024 + 1, 'google')
-      expect(result.ok).toBe(false)
+    it('allows arbitrarily large files for google tier', () => {
+      expect(checkFileSize(Number.MAX_SAFE_INTEGER, 'google')).toEqual({ ok: true })
     })
   })
 
@@ -50,13 +45,8 @@ describe('enforce helpers', () => {
       }
     })
 
-    it('allows higher row count for google tier', () => {
-      expect(checkRowCount(100_000, 'google')).toEqual({ ok: true })
-    })
-
-    it('rejects rows over the google limit', () => {
-      const result = checkRowCount(500_001, 'google')
-      expect(result.ok).toBe(false)
+    it('allows arbitrarily many rows for google tier', () => {
+      expect(checkRowCount(Number.MAX_SAFE_INTEGER, 'google')).toEqual({ ok: true })
     })
   })
 
@@ -73,13 +63,8 @@ describe('enforce helpers', () => {
       }
     })
 
-    it('allows up to google limit', () => {
-      expect(checkTableCount(19, 'google')).toEqual({ ok: true })
-    })
-
-    it('rejects at google limit', () => {
-      const result = checkTableCount(20, 'google')
-      expect(result.ok).toBe(false)
+    it('allows arbitrarily many tables for google tier', () => {
+      expect(checkTableCount(Number.MAX_SAFE_INTEGER, 'google')).toEqual({ ok: true })
     })
   })
 
@@ -162,47 +147,20 @@ describe('enforce helpers', () => {
       }
     })
 
-    it('allows up to google limit', () => {
-      expect(checkProjectCount(9, 'google')).toEqual({ ok: true })
-    })
-
-    it('rejects at google limit', () => {
-      const result = checkProjectCount(10, 'google')
-      expect(result.ok).toBe(false)
+    it('allows arbitrarily many projects for google tier', () => {
+      expect(checkProjectCount(Number.MAX_SAFE_INTEGER, 'google')).toEqual({ ok: true })
     })
   })
 
   describe('checkStorageQuota', () => {
-    it('allows when within quota for google tier', () => {
-      const result = checkStorageQuota(10 * 1024 * 1024, 5 * 1024 * 1024, 'google')
-      expect(result).toEqual({ ok: true })
-    })
-
-    it('rejects when exceeding quota for google tier', () => {
-      const used = 38 * 1024 * 1024
-      const newFile = 5 * 1024 * 1024
-      const result = checkStorageQuota(used, newFile, 'google')
-      expect(result.ok).toBe(false)
-      if (!result.ok) {
-        expect(result.limit).toBe(40 * 1024 * 1024)
-      }
-    })
-
     it('always allows for guest tier (no cloud storage)', () => {
       const result = checkStorageQuota(999_999_999, 999_999_999, 'guest')
       expect(result).toEqual({ ok: true })
     })
 
-    it('allows exactly at the boundary', () => {
-      const max = 40 * 1024 * 1024
-      const result = checkStorageQuota(max - 100, 100, 'google')
+    it('allows arbitrary storage for google tier', () => {
+      const result = checkStorageQuota(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, 'google')
       expect(result).toEqual({ ok: true })
-    })
-
-    it('rejects one byte over', () => {
-      const max = 40 * 1024 * 1024
-      const result = checkStorageQuota(max - 100, 101, 'google')
-      expect(result.ok).toBe(false)
     })
   })
 })

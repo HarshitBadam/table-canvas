@@ -282,6 +282,10 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
 
   const handleTransformModalClose = () => {
     setTransformModalOpen(false)
+  }
+
+  const handleTransformModalDismiss = () => {
+    setTransformModalOpen(false)
     setPendingConnection(null)
   }
 
@@ -345,11 +349,12 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         )}
       </ReactFlow>
 
-      {transformModalOpen && pendingConnection && (
+      {pendingConnection && (
         <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center"><div className="bg-surface rounded-lg p-8 animate-pulse">Loading table options…</div></div>}>
           <TransformModal
             isOpen={transformModalOpen}
             onClose={handleTransformModalClose}
+            onDismiss={handleTransformModalDismiss}
             sourceNodeId={pendingConnection.source}
             targetNodeId={pendingConnection.target}
           />

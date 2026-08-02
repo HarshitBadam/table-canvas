@@ -4,10 +4,11 @@ import { useProjectStore } from '@/state/projectStore'
 import type { TableRow } from '@/state/dataStore'
 import { useAppAuth } from '@/state/AppContext'
 import { useWorkspaceLease } from '@/state/useWorkspaceLease'
-import { JoinType } from '@/types'
+import { JoinType, type TransformDef } from '@/types'
+import { getEngine } from '@/engine/EngineAdapter'
 import { getTableData } from '@/engine/tableDataService'
 import { analyzeMatch, findBestKeys } from '@/canvas/joinUtils'
-import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
+import { checkRowCount, checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import { beginTableOperation } from '@/state/tableOperationCoordinator'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
@@ -16,10 +17,24 @@ import { JoinColumnSelect } from './JoinColumnSelect'
 import { TransformOutputOptions } from './TransformOutputOptions'
 import { TransformTypeControls } from './TransformTypeControls'
 import { finalizeCombinedTable } from './finalizeCombinedTable'
-type TransformModalProps = { isOpen: boolean; onClose: () => void; sourceNodeId: string; targetNodeId: string }
+type TransformModalProps = {
+  isOpen: boolean
+  /** Hides the combine dialog without unmounting (keeps upgrade prompt alive). */
+  onClose: () => void
+  /** Fully tears down the modal host after combine + upgrade are both done. */
+  onDismiss: () => void
+  sourceNodeId: string
+  targetNodeId: string
+}
 const MAX_TABLE_NAME_LENGTH = 100
 
-export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: TransformModalProps) {
+export function TransformModal({
+  isOpen,
+  onClose,
+  onDismiss,
+  sourceNodeId,
+  targetNodeId,
+}: TransformModalProps) {
   const nodes = useProjectStore(s => s.nodes)
   const addDerivedTable = useProjectStore(s => s.addDerivedTable)
   const { user } = useAppAuth()
@@ -128,7 +143,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       return next
     })
   }, [])
-  const handleCreate = useCallback(() => {
+  const handleCreate = useCallback(async () => {
     if (creatingRef.current) return
     if (operation === 'join' && (!leftKey || !rightKey)) return
     if (operation === 'union' && !canUnion) return
@@ -139,38 +154,74 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
     const tableCheck = checkTableCount(currentTableCount, tier)
     if (!tableCheck.ok) {
       setUpgradeViolation(tableCheck)
+      onClose()
       setUpgradeOpen(true)
       return
     }
     const lCols = allCols.filter(c => c.side === 'L' && selected.has(c.id)).map(c => c.colId)
     const rCols = allCols.filter(c => c.side === 'R' && selected.has(c.id) && c.colId !== rightKey).map(c => c.colId)
+    const transformDef: Extract<TransformDef, { type: 'join' | 'union' }> = operation === 'union'
+      ? {
+          type: 'union',
+          sourceTableIds: [sourceNodeId, targetNodeId],
+        }
+      : {
+          type: 'join',
+          leftTableId: sourceNodeId,
+          rightTableId: targetNodeId,
+          joinType,
+          leftKey,
+          rightKey,
+          leftColumns: lCols.length < leftCols.length ? lCols : undefined,
+          rightColumns: rCols.length < rightCols.length - 1 ? rCols : undefined,
+          leftTableName: leftNode?.name,
+          rightTableName: rightNode?.name,
+        }
     creatingRef.current = true
     setIsCreating(true)
     setCreateError(undefined)
     try {
+      if (tier === 'guest') {
+        // Materialize the inputs and count the SQL result before adding a target
+        // node. This is exact for both joins and appends, so an over-limit guest
+        // result never appears as a prolonged 0-row computing table.
+        const [left, right] = await Promise.all([
+          getTableData(sourceNodeId, 0, 1),
+          getTableData(targetNodeId, 0, 1),
+        ])
+        if (left.error || right.error) {
+          const failedTableName = left.error ? leftNode?.name : rightNode?.name
+          throw new Error(
+            `Unable to prepare ${failedTableName ?? 'an input table'}: ${left.error || right.error}`,
+          )
+        }
+        const columnIdToName = Object.fromEntries(
+          [...leftCols, ...rightCols].map(column => [column.id, column.name]),
+        )
+        const rowCount = await getEngine().countCombinedTransformRows(
+          transformDef,
+          columnIdToName,
+        )
+        const rowCheck = checkRowCount(rowCount, tier)
+        if (!rowCheck.ok) {
+          const action = operation === 'union' ? 'Appending these tables' : 'Joining these tables'
+          setUpgradeViolation({
+            ...rowCheck,
+            reason: `${action} would create ${rowCount.toLocaleString()} rows. Guest projects allow up to ${rowCheck.limit.toLocaleString()} rows per table; filter or reduce the input rows, then try again.`,
+          })
+          // Close combine first so the upgrade prompt is not stacked over it.
+          onClose()
+          setUpgradeOpen(true)
+          return
+        }
+      }
       const id = addDerivedTable({
         name: outputName.trim() || `${leftNode?.name} + ${rightNode?.name}`,
-        transformDef: operation === 'union'
-          ? {
-              type: 'union',
-              sourceTableIds: [sourceNodeId, targetNodeId],
-            }
-          : {
-              type: 'join',
-              leftTableId: sourceNodeId,
-              rightTableId: targetNodeId,
-              joinType,
-              leftKey,
-              rightKey,
-              leftColumns: lCols.length < leftCols.length ? lCols : undefined,
-              rightColumns: rCols.length < rightCols.length - 1 ? rCols : undefined,
-              leftTableName: leftNode?.name,
-              rightTableName: rightNode?.name,
-            },
+        transformDef,
         upstreamNodeIds: [sourceNodeId, targetNodeId],
       })
       const generation = beginTableOperation(id, 'waiting')
-      onClose()
+      onDismiss()
       void finalizeCombinedTable(id, generation, tier, [sourceNodeId, targetNodeId])
     } catch (error) {
       console.error('[TransformModal] Failed to create table:', error)
@@ -183,7 +234,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       creatingRef.current = false
       setIsCreating(false)
     }
-  }, [leftKey, rightKey, operation, canUnion, selected, outputName, leftNode, rightNode, sourceNodeId, targetNodeId, joinType, leftCols, rightCols, allCols, addDerivedTable, onClose, nodes, user])
+  }, [leftKey, rightKey, operation, canUnion, selected, outputName, leftNode, rightNode, sourceNodeId, targetNodeId, joinType, leftCols, rightCols, allCols, addDerivedTable, onClose, onDismiss, nodes, user])
   const leftOpts = useMemo(
     () => leftCols.map(c => ({ value: c.id, label: c.name, type: c.type })),
     [leftCols],
@@ -203,7 +254,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       <Dialog.Root
         open={isOpen}
         onOpenChange={open => {
-          if (!open && !creatingRef.current) onClose()
+          if (!open && !creatingRef.current) onDismiss()
         }}
       >
         <Dialog.Portal>
@@ -377,7 +428,10 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
 
       <UpgradePrompt
         open={upgradeOpen}
-        onOpenChange={setUpgradeOpen}
+        onOpenChange={(open) => {
+          setUpgradeOpen(open)
+          if (!open) onDismiss()
+        }}
         violation={upgradeViolation}
         layer={isOpen ? 'nested' : 'base'}
       />

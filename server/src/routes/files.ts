@@ -28,9 +28,8 @@ import { Types } from 'mongoose';
 
 const router = Router();
 
-// Uploads are the most expensive request the API serves: they buffer up to
-// 50MB, reserve quota, and write GridFS chunks. Tier quotas cap total stored
-// bytes but nothing else caps the rate of attempts, including failed ones.
+// Uploads are the most expensive request the API serves: they buffer in memory
+// and write GridFS chunks, so rate-limit upload attempts, including failures.
 const uploadLimiter = createApiRateLimit({
   prefix: 'files-upload',
   windowMs: 15 * 60 * 1000,
@@ -49,9 +48,6 @@ const downloadLimiter = createApiRateLimit({
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB hard ceiling; tier limits are tighter
-  },
   fileFilter: (_req, file, cb) => {
     const allowedMimes = [
       'text/csv',
@@ -161,7 +157,7 @@ router.post(
     const reserved = await reserveStorage(
       userId,
       file.size,
-      getLimits(tier).maxServerStorageBytes,
+      tier === 'google' ? undefined : getLimits(tier).maxServerStorageBytes,
     );
     if (!reserved) {
       throw new AppError('This upload would exceed your storage quota', 413);
