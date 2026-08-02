@@ -109,6 +109,7 @@ describe('documentLease', () => {
       role: 'owner',
       requesting: false,
       refused: false,
+      unreachable: false,
     })
     expect(owner.getLeaseState().role).toBe('mirror')
     expect(owner.holdsWriteLease()).toBe(false)
@@ -141,6 +142,7 @@ describe('documentLease', () => {
       role: 'mirror',
       requesting: false,
       refused: true,
+      unreachable: false,
     })
     expect(locks.isHeld(leaseName(KEY))).toBe(true)
 
@@ -177,8 +179,77 @@ describe('documentLease', () => {
       role: 'owner',
       requesting: false,
       refused: false,
+      unreachable: false,
     })
 
+    owner.stopDocumentLease()
+    follower.stopDocumentLease()
+  })
+
+  it('marks the owner unreachable when handover is never answered', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const owner = await openTab()
+    owner.startDocumentLease({
+      key: KEY,
+      // Never resolves: simulates a frozen owner that still holds the lock.
+      flush: () => new Promise(() => {}),
+    })
+    await settleTabs()
+
+    const follower = await openTab()
+    follower.startDocumentLease({ key: KEY, flush: async () => undefined })
+    await settleTabs()
+
+    vi.useFakeTimers()
+    follower.requestWriteLease()
+    expect(follower.getLeaseState().requesting).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(follower.HANDOVER_REQUEST_TIMEOUT_MS)
+    expect(follower.getLeaseState()).toEqual({
+      role: 'mirror',
+      requesting: false,
+      refused: false,
+      unreachable: true,
+    })
+
+    // Try again must be able to send another request after the timeout clears.
+    follower.requestWriteLease()
+    expect(follower.getLeaseState().requesting).toBe(true)
+    expect(follower.getLeaseState().unreachable).toBe(false)
+
+    vi.useRealTimers()
+    owner.stopDocumentLease()
+    follower.stopDocumentLease()
+  })
+
+  it('refuses handover when the owner flush hangs past the flush timeout', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const owner = await openTab()
+    owner.startDocumentLease({
+      key: KEY,
+      flush: () => new Promise(() => {}),
+    })
+    await settleTabs()
+
+    const follower = await openTab()
+    follower.startDocumentLease({ key: KEY, flush: async () => undefined })
+    await settleTabs()
+
+    vi.useFakeTimers()
+    follower.requestWriteLease()
+    await vi.advanceTimersByTimeAsync(owner.HANDOVER_FLUSH_TIMEOUT_MS)
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(owner.getLeaseState().role).toBe('owner')
+    expect(follower.getLeaseState()).toEqual({
+      role: 'mirror',
+      requesting: false,
+      refused: true,
+      unreachable: false,
+    })
+
+    vi.useRealTimers()
     owner.stopDocumentLease()
     follower.stopDocumentLease()
   })

@@ -5,7 +5,12 @@ import type { LeaseState } from './documentLease'
 const lease = vi.hoisted(() => {
   const listeners = new Set<() => void>()
   return {
-    state: { role: 'owner', requesting: false, refused: false } as LeaseState,
+    state: {
+      role: 'owner',
+      requesting: false,
+      refused: false,
+      unreachable: false,
+    } as LeaseState,
     listeners,
     set(next: Partial<LeaseState>) {
       lease.state = { ...lease.state, ...next }
@@ -65,7 +70,12 @@ async function waitForHandoverWindow() {
 describe('editing follows the tab in front', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    lease.state = { role: 'owner', requesting: false, refused: false }
+    lease.state = {
+      role: 'owner',
+      requesting: false,
+      refused: false,
+      unreachable: false,
+    }
     lease.listeners.clear()
     lease.requestWriteLease.mockClear()
     focusTab(true)
@@ -104,8 +114,20 @@ describe('editing follows the tab in front', () => {
     expect(lease.requestWriteLease).not.toHaveBeenCalled()
   })
 
+  it('waits for the reader once the other tab is unreachable', async () => {
+    mount()
+    act(() => lease.set({ role: 'mirror', unreachable: true }))
+    await waitForHandoverWindow()
+    expect(lease.requestWriteLease).not.toHaveBeenCalled()
+  })
+
   it('asks once when focus returns to a tab that is only mirroring', async () => {
-    lease.state = { role: 'mirror', requesting: false, refused: false }
+    lease.state = {
+      role: 'mirror',
+      requesting: false,
+      refused: false,
+      unreachable: false,
+    }
     mount()
     act(() => window.dispatchEvent(new Event('focus')))
     await waitForHandoverWindow()
