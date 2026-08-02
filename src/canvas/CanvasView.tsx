@@ -8,6 +8,7 @@ import ReactFlow, {
   useEdgesState,
   NodeTypes,
   NodeMouseHandler,
+  type NodeChange,
   ConnectionLineType,
   ConnectionMode,
   type NodeProps,
@@ -170,6 +171,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null)
   const fittedNodeKeyRef = useRef('')
+  const dragStartRef = useRef<{ id: string; position: { x: number; y: number } } | null>(null)
 
   useLayoutEffect(() => {
     setNodes(initialNodes)
@@ -199,17 +201,34 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         setEdges(computeSmartEdges(updatedNodes, baseEdges))
         return updatedNodes
       })
+      const start = dragStartRef.current
+      dragStartRef.current = null
+      if (
+        !start
+        || start.id !== node.id
+        || start.position.x !== node.position.x
+        || start.position.y !== node.position.y
+      ) {
+        saveSnapshot(`Move node ${projectNodes[node.id]?.name ?? node.id}`)
+      }
       updateNodePosition(node.id, node.position)
     },
-    [baseEdges, setEdges, setNodes, updateNodePosition]
+    [baseEdges, projectNodes, saveSnapshot, setEdges, setNodes, updateNodePosition]
   )
 
   const onNodeDragStart: NodeMouseHandler = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      saveSnapshot(`Move node ${projectNodes[node.id]?.name ?? node.id}`)
+      dragStartRef.current = {
+        id: node.id,
+        position: { ...node.position },
+      }
     },
-    [projectNodes, saveSnapshot],
+    [],
   )
+
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    onNodesChange(changes.filter(change => change.type !== 'remove'))
+  }, [onNodesChange])
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -273,7 +292,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStart={onNodeDragStart}
@@ -297,6 +316,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         connectionMode={ConnectionMode.Loose}
         nodesDraggable={canEdit}
         nodesConnectable={canEdit}
+        deleteKeyCode={null}
         connectionRadius={36}
         nodeDragThreshold={4}
         connectOnClick={false}

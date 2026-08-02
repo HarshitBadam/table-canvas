@@ -71,6 +71,7 @@ export function createColumnOps(set: SetFn, get: GetFn) {
       const name = nameResult.name
       const colIndex = node.schema?.columns.length ?? 0
       const columnId = `col_${colIndex}_${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
+      get().saveSnapshot(`Add column ${name}`)
 
       set((state) => {
         const currentNode = state.nodes[tableId]
@@ -117,6 +118,7 @@ export function createColumnOps(set: SetFn, get: GetFn) {
       if (formulaResult && !formulaResult.ok) return formulaResult
       const totalCols = columns.length
       const columnId = `col_${totalCols}_${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`
+      get().saveSnapshot(`Insert column ${name}`)
 
       set((state) => {
         const currentNode = state.nodes[tableId]
@@ -171,6 +173,7 @@ export function createColumnOps(set: SetFn, get: GetFn) {
       const name = nameResult.name
       const totalCols = columns.length
       const columnId = `formula_${totalCols}_${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`
+      get().saveSnapshot(`Add formula column ${name}`)
 
       set((state) => {
         const currentNode = state.nodes[tableId]
@@ -331,6 +334,11 @@ export function createColumnOps(set: SetFn, get: GetFn) {
       }
       const nameResult = validateColumnName(node.schema.columns, newName, columnId)
       if (!nameResult.ok) return nameResult
+      const currentColumn = node.schema.columns.find(column => column.id === columnId)
+      if (currentColumn?.name === nameResult.name) {
+        return { ok: true, columnId } satisfies ColumnOperationResult
+      }
+      get().saveSnapshot(`Rename column ${currentColumn?.name ?? columnId}`)
 
       set((state) => {
         const currentNode = state.nodes[tableId]

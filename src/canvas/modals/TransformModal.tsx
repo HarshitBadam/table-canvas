@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
+import { beginHistoryTransaction, commitHistoryTransaction, rollbackHistoryTransaction } from '@/state/historyTransaction'
 import type { TableRow } from '@/state/dataStore'
 import { useAppAuth } from '@/state/AppContext'
 import { useWorkspaceLease } from '@/state/useWorkspaceLease'
@@ -15,12 +16,7 @@ import { getVisibleFocusableElement, isVisibleElement } from '@/components/useDi
 import { JoinColumnSelect } from './JoinColumnSelect'
 import { TransformOutputOptions } from './TransformOutputOptions'
 import { TransformTypeControls } from './TransformTypeControls'
-interface TransformModalProps {
-  isOpen: boolean
-  onClose: () => void
-  sourceNodeId: string
-  targetNodeId: string
-}
+type TransformModalProps = { isOpen: boolean; onClose: () => void; sourceNodeId: string; targetNodeId: string }
 const MAX_TABLE_NAME_LENGTH = 100
 export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: TransformModalProps) {
   const nodes = useProjectStore(s => s.nodes)
@@ -147,12 +143,15 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
     }
     const lCols = allCols.filter(c => c.side === 'L' && selected.has(c.id)).map(c => c.colId)
     const rCols = allCols.filter(c => c.side === 'R' && selected.has(c.id) && c.colId !== rightKey).map(c => c.colId)
-
     creatingRef.current = true
     setIsCreating(true)
     setCreateError(undefined)
     let id: string | null = null
+    let transactionId: string | null = null
     try {
+      transactionId = beginHistoryTransaction(
+        `Create ${operation} table ${outputName.trim() || `${leftNode?.name} + ${rightNode?.name}`}`,
+      )
       id = addDerivedTable({
         name: outputName.trim() || `${leftNode?.name} + ${rightNode?.name}`,
         transformDef: operation === 'union'
@@ -173,6 +172,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               rightTableName: rightNode?.name,
             },
         upstreamNodeIds: [sourceNodeId, targetNodeId],
+        recordHistory: false,
       })
       const result = await ensureTableMaterialized(id)
       if (result.status === 'error') {
@@ -180,15 +180,16 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       }
       const rowCheck = checkRowCount(result.rowCount ?? 0, tier)
       if (!rowCheck.ok) {
-        useProjectStore.getState().deleteNode(id)
+        rollbackHistoryTransaction(transactionId)
         id = null
         setUpgradeViolation(rowCheck)
         setUpgradeOpen(true)
         return
       }
+      commitHistoryTransaction(transactionId)
       onClose()
     } catch (error) {
-      if (id) useProjectStore.getState().deleteNode(id)
+      rollbackHistoryTransaction(transactionId)
       console.error('[TransformModal] Failed to create table:', error)
       setCreateError('We could not create the combined table. Check the selected columns and try again.')
     } finally {
@@ -196,7 +197,6 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       setIsCreating(false)
     }
   }, [leftKey, rightKey, operation, canUnion, selected, outputName, leftNode, rightNode, sourceNodeId, targetNodeId, joinType, leftCols, rightCols, allCols, addDerivedTable, onClose, nodes, user])
-
   const leftOpts = useMemo(
     () => leftCols.map(c => ({ value: c.id, label: c.name, type: c.type })),
     [leftCols],
@@ -211,7 +211,6 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
   const canCreate = canEdit && (operation === 'join'
     ? Boolean(leftKey && rightKey && includedColumnCount > 0)
     : canUnion)
-
   return (
     <>
       <Dialog.Root

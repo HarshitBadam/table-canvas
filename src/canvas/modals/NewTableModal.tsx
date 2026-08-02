@@ -11,6 +11,11 @@ import type { Tier } from '@/shared/limits'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { loadTableIntoEngine } from '@/engine/loadTableIntoEngine'
 import { getVisibleFocusableElement, isVisibleElement } from '@/components/useDialogFocus'
+import {
+  beginHistoryTransaction,
+  commitHistoryTransaction,
+  rollbackHistoryTransaction,
+} from '@/state/historyTransaction'
 import { ColumnTypeDropdown } from './ColumnTypeDropdown'
 
 interface NewTableModalProps {
@@ -127,8 +132,10 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
     setIsCreating(true)
     setCreateError(null)
     let tableId: string | null = null
+    let transactionId: string | null = null
 
     try {
+      transactionId = beginHistoryTransaction(`Create table ${tableName.trim()}`)
       tableId = addSourceTable({
         name: tableName.trim(),
         fileRef: '',
@@ -136,19 +143,19 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
         fileType: 'csv',
         schema,
         initialRows: rows,
+        recordHistory: false,
       })
       setTableData(tableId, rows)
       const loaded = await loadTableIntoEngine(tableId, schema, rows)
       if (!loaded) {
         throw new Error('The data engine did not initialize the table.')
       }
+      commitHistoryTransaction(transactionId)
       resetForm()
       onClose()
     } catch (error) {
-      if (tableId) {
-        useProjectStore.getState().deleteNode(tableId)
-        useDataStore.getState().clearTableData(tableId)
-      }
+      rollbackHistoryTransaction(transactionId)
+      if (tableId) useDataStore.getState().clearTableData(tableId)
       console.error('[NewTableModal] Failed to create table:', error)
       setCreateError('We could not create the table. Try again.')
     } finally {

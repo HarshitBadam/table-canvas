@@ -10,6 +10,8 @@ import {
   materializeProjectTables,
 } from './projectLifecycle'
 import { ProjectActionError } from './projectOperations'
+import { retainHistoryFileRefs } from '@/persistence/historyFileCleanup'
+import { getStorageScope } from '@/persistence/storageScope'
 
 export async function prepareProjectState(project: ProjectWithSync): Promise<void> {
   const nodes = withoutRuntimeNodeState(project.nodes)
@@ -44,6 +46,7 @@ export async function prepareProjectState(project: ProjectWithSync): Promise<voi
       selectedNodeId: null,
       history: { past: [], future: [] },
     })
+    retainHistoryFileRefs(getStorageScope(), [])
     const selectedReportId = Object.values(reports)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.id ?? null
     useReportStore.setState({

@@ -17,6 +17,7 @@ import { createColumnOps } from './nodesColumnOps'
 import { createChartOps } from './nodesChartOps'
 import { applyNodeDuplicate, prepareNodeDuplicate } from './duplicateNode'
 import { invalidateMaterializations } from '@/engine/materializationCoordinator'
+import { applyNodeUpdate, isTableRename, markRenameDependentsDirty } from './nodesRename'
 
 export const createNodesSlice: StateCreator<
   ProjectStoreState,
@@ -33,14 +34,13 @@ export const createNodesSlice: StateCreator<
   },
 
   updateNode: (id, updates) => {
+    const current = get().nodes[id]
+    const renamingTable = isTableRename(current, updates)
     set((state) => {
-      const node = state.nodes[id]
-      if (node) {
-        Object.assign(node, updates, { updatedAt: new Date().toISOString() })
-      }
+      applyNodeUpdate(state, id, updates)
     })
+    if (renamingTable) markRenameDependentsDirty(get(), id)
   },
-
   duplicateNode: (id, options) => {
     const state = get()
     const sourceNode = state.nodes[id]
@@ -59,9 +59,12 @@ export const createNodesSlice: StateCreator<
     return duplicate.id
   },
 
-  deleteNode: (id) => {
+  deleteNode: (id, options) => {
     const state = get()
-    state.saveSnapshot(`Delete node ${state.nodes[id]?.name || id}`)
+    if (!state.nodes[id]) return
+    if (options?.recordHistory !== false) {
+      state.saveSnapshot(`Delete node ${state.nodes[id].name}`)
+    }
     const nodeIds = new Set([id, ...getDependentNodeIds(state.nodes, state.edges, id)])
     invalidateMaterializations()
     useTableRuntimeStore.getState().forgetNodes(nodeIds)
@@ -95,6 +98,11 @@ export const createNodesSlice: StateCreator<
   },
 
   updateNodeUI: (id, updates) => {
+    const current = get().nodes[id]
+    if (!current || Object.entries(updates).every(([key, value]) =>
+      current.ui[key as keyof typeof updates] === value
+    )) return
+    get().saveSnapshot(`Change view for ${current.name}`)
     set((state) => {
       const node = state.nodes[id]
       if (node) {
@@ -153,10 +161,10 @@ export const createNodesSlice: StateCreator<
     position,
     initialRows,
     select = true,
+    recordHistory = true,
   }) => {
     const state = get()
-    state.saveSnapshot(`Import table ${name}`)
-
+    if (recordHistory) state.saveSnapshot(`Import table ${name}`)
     const id = generateId()
     const now = new Date().toISOString()
 
@@ -197,10 +205,16 @@ export const createNodesSlice: StateCreator<
     return id
   },
 
-  addDerivedTable: ({ name, transformDef, upstreamNodeIds, schema, position }) => {
+  addDerivedTable: ({
+    name,
+    transformDef,
+    upstreamNodeIds,
+    schema,
+    position,
+    recordHistory = true,
+  }) => {
     const state = get()
-    state.saveSnapshot(`Create derived table ${name}`)
-
+    if (recordHistory) state.saveSnapshot(`Create derived table ${name}`)
     const id = generateId()
     const now = new Date().toISOString()
 
@@ -279,6 +293,11 @@ export const createNodesSlice: StateCreator<
   },
   ...createColumnOps(set, get),
   setTableFilters: (tableId, filters) => {
+    const current = get().getTableNode(tableId)
+    if (!current) return
+    const next = filters && filters.conditions.length > 0 ? filters : undefined
+    if (JSON.stringify(current.viewFilters) === JSON.stringify(next)) return
+    get().saveSnapshot(`Change filters for ${current.name}`)
     set((state) => {
       const node = state.nodes[tableId]
       if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
@@ -302,20 +321,25 @@ export const createNodesSlice: StateCreator<
   },
 
   updateChartConfig: (chartId, updates) => {
+    const current = get().nodes[chartId]
+    if (!current || current.kind !== 'chart') return
+    const nextConfig = { ...current.plan.config, ...updates }
+    if (JSON.stringify(current.plan.config) === JSON.stringify(nextConfig)) return
+    get().saveSnapshot(`Update chart ${current.name}`)
     set((state) => {
       const node = state.nodes[chartId]
       if (node && node.kind === 'chart') {
         const chartNode = node as ChartNode
-        chartNode.plan.config = {
-          ...chartNode.plan.config,
-          ...updates,
-        }
+        chartNode.plan.config = nextConfig
         chartNode.updatedAt = new Date().toISOString()
       }
     })
   },
 
   updateChartName: (chartId, name) => {
+    const current = get().nodes[chartId]
+    if (!current || current.kind !== 'chart' || current.name === name) return
+    get().saveSnapshot(`Rename chart ${current.name}`)
     set((state) => {
       const node = state.nodes[chartId]
       if (node && node.kind === 'chart') {

@@ -60,6 +60,9 @@ export function useProjectAutosave({
   const edges = useProjectStore(store => store.edges)
   const patches = useProjectStore(store => store.patches)
   const projectName = useProjectStore(store => store.projectName)
+  const historyTransactionId = useProjectStore(
+    store => store.history.transaction?.id ?? null,
+  )
 
   const cancelPendingSave = useCallback(() => {
     if (!debounceTimer.current) return
@@ -76,6 +79,9 @@ export function useProjectAutosave({
 
   const saveLatestProject = useCallback(async () => {
     cancelPendingSave()
+    if (useProjectStore.getState().history.transaction) {
+      throw new Error('A table operation is still in progress.')
+    }
     // Mirror tabs hold the same stores but must never write the document.
     if (!holdsWriteLease()) {
       markSaving(false)
@@ -136,7 +142,12 @@ export function useProjectAutosave({
   const scheduleSave = useCallback(() => {
     if (!holdsWriteLease()) return
     markSaving(true)
-    const { nodes: current, edges: currentEdges } = useProjectStore.getState()
+    const project = useProjectStore.getState()
+    if (project.history.transaction) {
+      markSaving(false)
+      return
+    }
+    const { nodes: current, edges: currentEdges } = project
     const structural = documentTopology(current, currentEdges) !== savedTopology.current
     if (structural) {
       cancelPendingSave()
@@ -162,6 +173,7 @@ export function useProjectAutosave({
     nodes,
     patches,
     projectName,
+    historyTransactionId,
     isAuthenticated,
     phase,
     projectId,

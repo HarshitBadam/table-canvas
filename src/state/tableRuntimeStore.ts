@@ -14,6 +14,7 @@ interface TableRuntimeState {
   markNodesDirty: (nodeIds: Iterable<string>) => void
   invalidateNodes: (nodeIds: Iterable<string>) => void
   clearNodeError: (nodeId: string) => void
+  clearSchemas: (nodeIds: Iterable<string>) => void
   setMaterializedSchema: (nodeId: string, schema: TableSchema) => void
   forgetNodes: (nodeIds: Iterable<string>) => void
   resetRuntime: () => void
@@ -51,6 +52,14 @@ export const useTableRuntimeStore = create<TableRuntimeState>()((set) => ({
             },
           }
     ))
+  },
+
+  clearSchemas: (nodeIds) => {
+    set((state) => {
+      const schemas = { ...state.schemas }
+      for (const nodeId of nodeIds) delete schemas[nodeId]
+      return { schemas }
+    })
   },
 
   setMaterializedSchema: (nodeId, schema) => {

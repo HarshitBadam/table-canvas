@@ -117,11 +117,10 @@ export function useGridEditing(
       setEditColumnName('')
       return
     }
-    saveSnapshot('Rename column')
     renameColumn(tableId, editingColumnId, editColumnName.trim())
     setEditingColumnId(null)
     setEditColumnName('')
-  }, [editingColumnId, editColumnName, saveSnapshot, renameColumn, tableId])
+  }, [editingColumnId, editColumnName, renameColumn, tableId])
 
   const cancelColumnNameEdit = useCallback(() => {
     setEditingColumnId(null)

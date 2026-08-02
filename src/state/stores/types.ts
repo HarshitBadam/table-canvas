@@ -16,7 +16,14 @@ export interface HistoryEntry {
   nodes: Record<string, ProjectNode>
   edges: Record<string, Edge>
   patches: Record<string, Patches>
+  selectedNodeId: string | null
   description: string
+}
+
+interface HistoryTransaction {
+  id: string
+  projectId: string
+  snapshot: HistoryEntry
 }
 
 export type ColumnOperationResult =
@@ -38,6 +45,7 @@ export type ColumnOperationResult =
 interface HistoryState {
   past: HistoryEntry[]
   future: HistoryEntry[]
+  transaction?: HistoryTransaction | null
 }
 
 export interface NodesSliceState {
@@ -49,7 +57,7 @@ export interface NodesSliceState {
     id: string,
     options?: { selectDuplicate?: boolean },
   ) => string | undefined
-  deleteNode: (id: string) => void
+  deleteNode: (id: string, options?: { recordHistory?: boolean }) => void
   updateNodePosition: (id: string, position: Position) => void
   updateNodeUI: (id: string, updates: { viewMode?: NodeViewMode }) => void
   addNewTable: () => void
@@ -63,6 +71,7 @@ export interface NodesSliceState {
     position?: Position
     initialRows?: Array<Record<string, CellValue>>
     select?: boolean
+    recordHistory?: boolean
   }) => string
   addDerivedTable: (params: {
     name: string
@@ -70,6 +79,7 @@ export interface NodesSliceState {
     upstreamNodeIds: string[]
     schema?: TableSchema
     position?: Position
+    recordHistory?: boolean
   }) => string
   addChart: (params: {
     name: string
@@ -131,7 +141,10 @@ export interface HistorySliceState {
   redo: () => void
   canUndo: () => boolean
   canRedo: () => boolean
-  saveSnapshot: (description: string) => void
+  saveSnapshot: (description: string) => string
+  beginHistoryTransaction: (description: string) => string | null
+  commitHistoryTransaction: (id: string) => boolean
+  rollbackHistoryTransaction: (id: string) => boolean
 }
 
 export interface ProjectStoreState extends 
