@@ -10,7 +10,11 @@ import {
 } from './sqlHelpers'
 import { INTERNAL_ROW_ID_COLUMN } from '../internalColumns'
 
-export async function loadTable(conn: duckdb.AsyncDuckDBConnection, request: LoadTableRequest): Promise<void> {
+export async function loadTable(
+  conn: duckdb.AsyncDuckDBConnection,
+  request: LoadTableRequest,
+  onBatchComplete?: () => Promise<void>,
+): Promise<void> {
   const { tableId, data } = request
   const tableName = quoteIdentifier(sanitizeTableName(tableId))
   const columnDefinitions = data.columns
@@ -29,6 +33,8 @@ export async function loadTable(conn: duckdb.AsyncDuckDBConnection, request: Loa
       ).join(', ')
       const columns = data.columns.map(quoteIdentifier).join(', ')
       await conn.query(`INSERT INTO ${tableName} (${columns}) VALUES ${values}`)
+      // Let short reads for other tables slip in between INSERT batches.
+      if (onBatchComplete) await onBatchComplete()
     }
     await conn.query('COMMIT')
   } catch (error) {

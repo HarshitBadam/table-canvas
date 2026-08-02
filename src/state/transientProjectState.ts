@@ -9,11 +9,19 @@ import type { ProjectNode } from '@/types'
 export function withoutRuntimeNodeState(
   nodes: Record<string, ProjectNode>,
 ): Record<string, ProjectNode> {
-  return Object.fromEntries(Object.entries(nodes).map(([id, node]) => {
-    if (!('cacheInfo' in node)) return [id, node]
+  return Object.fromEntries(Object.entries(nodes).flatMap(([id, node]) => {
+    // Incomplete imports use a synthetic fileRef; never persist them.
+    if (
+      node.kind === 'source_table'
+      && typeof node.plan?.fileRef === 'string'
+      && node.plan.fileRef.startsWith('pending:')
+    ) {
+      return []
+    }
+    if (!('cacheInfo' in node)) return [[id, node]]
     const stripped = { ...node } as ProjectNode & { cacheInfo?: unknown }
     delete stripped.cacheInfo
-    return [id, stripped as ProjectNode]
+    return [[id, stripped as ProjectNode]]
   }))
 }
 

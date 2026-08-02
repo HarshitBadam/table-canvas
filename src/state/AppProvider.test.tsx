@@ -301,12 +301,7 @@ describe('AppProvider project lifecycle', () => {
     await waitFor(() => expect(screen.getByTestId('project')).toHaveTextContent('next-project'))
   })
 
-  it('keeps the app mounted while tables materialize during a switch', async () => {
-    let resolveMaterialization!: () => void
-    hasProjectTables.mockReturnValueOnce(false).mockReturnValue(true)
-    materializeProjectTables.mockReturnValueOnce(new Promise((resolve) => {
-      resolveMaterialization = () => resolve({ completedTableIds: [], failures: [] })
-    }))
+  it('keeps the app mounted while a project switch installs metadata without eager materialization', async () => {
     renderApp()
     await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
 
@@ -316,7 +311,6 @@ describe('AppProvider project lifecycle', () => {
     })
 
     expect(screen.getByTestId('phase')).toHaveTextContent('ready')
-    resolveMaterialization()
     await waitFor(() => {
       expect(screen.getByTestId('project')).toHaveTextContent('next-project')
     })

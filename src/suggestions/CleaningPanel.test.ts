@@ -4,10 +4,27 @@ const getTableData = vi.hoisted(() => vi.fn())
 
 vi.mock('@/engine/tableDataService', () => ({ getTableData }))
 
-import { loadCleaningRows } from './cleaningRows'
+import { loadCleaningPreview, loadCleaningRows } from './cleaningRows'
 
 beforeEach(() => {
   getTableData.mockReset()
+})
+
+describe('loadCleaningPreview', () => {
+  it('returns a bounded preview and policy flag for oversized tables', async () => {
+    getTableData.mockResolvedValue({
+      rows: [{ __rowId: '1', value: 'sample' }],
+      totalRows: 100_001,
+    })
+
+    await expect(loadCleaningPreview('table')).resolves.toEqual({
+      rows: [{ __rowId: '1', value: 'sample' }],
+      totalRows: 100_001,
+      isTruncated: true,
+      isPolicyLimited: true,
+    })
+    expect(getTableData).toHaveBeenCalledWith('table', 0, 1_000)
+  })
 })
 
 describe('loadCleaningRows', () => {
@@ -24,7 +41,7 @@ describe('loadCleaningRows', () => {
   it('surfaces an error from the full-table fetch', async () => {
     getTableData
       .mockResolvedValueOnce({
-        rows: [{ __rowId: '1', value: 'first' }],
+        rows: [],
         totalRows: 2,
       })
       .mockResolvedValueOnce({
@@ -38,16 +55,17 @@ describe('loadCleaningRows', () => {
     )
   })
 
-  it('loads the complete table when the first page is partial', async () => {
+  it('loads the complete table after a zero-limit preflight', async () => {
     const completeRows = [
       { __rowId: '1', value: 'first' },
       { __rowId: '2', value: 'second' },
     ]
     getTableData
-      .mockResolvedValueOnce({ rows: completeRows.slice(0, 1), totalRows: 2 })
+      .mockResolvedValueOnce({ rows: [], totalRows: 2 })
       .mockResolvedValueOnce({ rows: completeRows, totalRows: 2 })
 
     await expect(loadCleaningRows('table')).resolves.toEqual(completeRows)
+    expect(getTableData).toHaveBeenNthCalledWith(1, 'table', 0, 0)
     expect(getTableData).toHaveBeenNthCalledWith(2, 'table', 0, 2)
   })
 
@@ -61,5 +79,6 @@ describe('loadCleaningRows', () => {
       'limited to 100,000 rows',
     )
     expect(getTableData).toHaveBeenCalledTimes(1)
+    expect(getTableData).toHaveBeenCalledWith('table', 0, 0)
   })
 })

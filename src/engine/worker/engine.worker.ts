@@ -8,10 +8,12 @@ import type {
 import type { TransformDef } from '@/types'
 import { loadTable, getSlice, getFilteredSlice, updateCell, insertRow, deleteRow, getDistinctValues, getAggregation, getProfile, dropTable } from './tableOperations'
 import { executeTransform } from './transforms'
+import { WorkerRequestScheduler } from './requestScheduler'
 
 let db: duckdb.AsyncDuckDB | null = null
 let conn: duckdb.AsyncDuckDBConnection | null = null
 let initPromise: Promise<void> | null = null
+let scheduler: WorkerRequestScheduler | null = null
 
 async function initDuckDB(): Promise<void> {
   if (db && conn) return
@@ -29,7 +31,7 @@ async function initDuckDB(): Promise<void> {
       },
       coi: {
         mainModule: '/duckdb/duckdb-coi.wasm',
-        mainWorker: '/duckdb/duckdb-browser-coi.worker.js',
+        mainWorker: '/duckdb/duckdb-browser-coi.pthread.worker.js',
         pthreadWorker: '/duckdb/duckdb-browser-coi.pthread.worker.js',
       },
     }
@@ -75,7 +77,11 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
         break
 
       case 'loadTable':
-        await loadTable(requireConn(), payload as LoadTableRequest)
+        await loadTable(
+          requireConn(),
+          payload as LoadTableRequest,
+          () => scheduler?.flushPendingReads() ?? Promise.resolve(),
+        )
         result = { success: true }
         break
 
@@ -163,11 +169,10 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
   }
 }
 
-let requestQueue = Promise.resolve()
+scheduler = new WorkerRequestScheduler(handleRequest)
 
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {
-  const request = event.data
-  requestQueue = requestQueue.then(() => handleRequest(request))
+  scheduler?.enqueue(event.data)
 }
 
 self.postMessage({ type: 'ready' })

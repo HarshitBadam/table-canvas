@@ -3,6 +3,7 @@ import type { ProjectStoreState, HistorySliceState, HistoryEntry } from './types
 import type { Edge, Patches, ProjectNode, TableNode } from '@/types'
 import { useDataStore } from '@/state/dataStore'
 import { invalidateMaterializations } from '@/engine/materializationCoordinator'
+import { cancelTableOperation } from '@/state/tableOperationCoordinator'
 import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import { computePatchesVersion } from '@/engine/cacheUtils'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
@@ -290,6 +291,10 @@ function restore(
     invalidateMaterializations()
   }
   const runtime = useTableRuntimeStore.getState()
+  // deleteNode cancels gates; history restore bypasses deleteNode.
+  for (const id of reconciliation.removed) {
+    cancelTableOperation(id)
+  }
   runtime.forgetNodes(reconciliation.removed)
   runtime.clearSchemas(reconciliation.affected)
   runtime.invalidateNodes(reconciliation.affected)

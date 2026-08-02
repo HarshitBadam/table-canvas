@@ -47,12 +47,35 @@ export function FilterPanel({
   totalRowCount,
   initialColumnId,
 }: FilterPanelProps) {
-  const [engineUniqueValues, setEngineUniqueValues] = useState<Record<string, CellValue[]>>({})
+  const distinctScope = useMemo(
+    () => `${tableId}|${columns.map(column => `${column.id}:${column.name}`).join('|')}`,
+    [columns, tableId],
+  )
+  const [distinctState, setDistinctState] = useState<{
+    scope: string
+    values: Record<string, CellValue[]>
+  }>({ scope: distinctScope, values: {} })
+  const engineUniqueValues = distinctState.scope === distinctScope ? distinctState.values : {}
+  const activeColumnIds = useMemo(() => {
+    if (!isOpen) return []
+    return [...new Set([
+      ...filters.conditions.map(condition => condition.columnId),
+      ...(initialColumnId ? [initialColumnId] : []),
+    ])]
+  }, [filters.conditions, initialColumnId, isOpen])
+  const activeColumnKey = activeColumnIds.join('|')
 
   useEffect(() => {
-    if (!isOpen || columns.length === 0) return
+    if (!isOpen || activeColumnIds.length === 0) return
     let cancelled = false
-    void Promise.all(columns.map(async column => {
+    const columnsToLoad = activeColumnIds
+      .map(columnId => columns.find(column => column.id === columnId))
+      .filter((column): column is ColumnSchema =>
+        Boolean(column && engineUniqueValues[column.id] === undefined),
+      )
+    if (columnsToLoad.length === 0) return
+
+    void Promise.all(columnsToLoad.map(async column => {
       try {
         const values = await getEngine().getDistinctValues(tableId, column.name, 101)
         return [column.id, values] as const
@@ -60,25 +83,41 @@ export function FilterPanel({
         return null
       }
     })).then(entries => {
-      if (!cancelled) {
-        setEngineUniqueValues(Object.fromEntries(entries.filter(entry => entry !== null)))
-      }
+      if (cancelled) return
+      const loadedEntries = entries.filter(entry => entry !== null)
+      setDistinctState(previous => ({
+        scope: distinctScope,
+        values: {
+          ...(previous.scope === distinctScope ? previous.values : {}),
+          ...Object.fromEntries(loadedEntries),
+        },
+      }))
     })
     return () => {
       cancelled = true
     }
-  }, [columns, isOpen, tableId])
+  }, [
+    activeColumnIds,
+    activeColumnKey,
+    columns,
+    distinctScope,
+    engineUniqueValues,
+    isOpen,
+    tableId,
+  ])
 
   const columnUniqueValueCounts = useMemo(() => {
     if (!isOpen) return {}
 
     const counts: Record<string, number> = {}
-    columns.forEach(col => {
+    activeColumnIds.forEach(columnId => {
+      const col = columns.find(column => column.id === columnId)
+      if (!col) return
       counts[col.id] = engineUniqueValues[col.id]?.length
         ?? countUniqueValues(rows, col.id, getDisplayValue)
     })
     return counts
-  }, [columns, engineUniqueValues, getDisplayValue, isOpen, rows])
+  }, [activeColumnIds, columns, engineUniqueValues, getDisplayValue, isOpen, rows])
 
   const getColumnFilterType = useCallback((columnId: string): FilterColumnType => {
     const column = columns.find(c => c.id === columnId)

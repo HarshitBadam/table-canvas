@@ -3,7 +3,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { Handle, Position, NodeProps } from 'reactflow'
 import { TableSchema, NodeUI, NodeViewMode, CellValue, ViewFilterConfig } from '@/types'
 import { formatNumber } from '@/lib/utils'
-import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
+import { isTableUpdating, tablePhaseLabel, useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { MiniTableView } from './MiniTableView'
 import { NODE_WIDTH } from '../canvasConstants'
 import { ColumnTypeBadge } from '@/components/ColumnTypeBadge'
@@ -126,7 +126,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
       </div>
 
       <div>
-        {schema && schema.columns.length === 0 && (
+        {schema && schema.columns.length === 0 && !isTableUpdating(cacheInfo) && !cacheInfo?.error && (
           <div className="flex flex-col items-center justify-center px-6 py-6 text-center">
             <svg
               className="mb-2 h-5 w-5 text-text-tertiary"
@@ -141,6 +141,12 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             </svg>
             <p className="text-xs font-medium text-text-secondary">No columns to preview</p>
             <p className="mt-1 text-xs text-text-tertiary">Add a column to see table data here.</p>
+          </div>
+        )}
+        {schema && schema.columns.length === 0 && isTableUpdating(cacheInfo) && !cacheInfo?.error && (
+          <div className="flex flex-col items-center justify-center gap-2 px-6 py-6 text-center">
+            <LoadingSpinner size="sm" />
+            <p className="text-xs font-medium text-text-secondary">{tablePhaseLabel(cacheInfo?.phase)}</p>
           </div>
         )}
 
@@ -188,10 +194,10 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
           </div>
         )}
         
-        {cacheInfo?.isComputing && !cacheInfo?.error && (
+        {isTableUpdating(cacheInfo) && !cacheInfo?.error && (schema?.columns.length ?? 0) > 0 && (
           <div className="px-4 py-2.5 text-xs font-medium text-text-secondary bg-surface-secondary flex items-center gap-2">
             <LoadingSpinner size="sm" />
-            Updating table…
+            {tablePhaseLabel(cacheInfo?.phase)}
           </div>
         )}
 

@@ -177,34 +177,15 @@ describe('AppProvider transition failures', () => {
     expect(reportStore.state.activeProjectId).toBe('current-project')
   })
 
-  it('restores previous stores when candidate materialization fails', async () => {
-    const table = {
-      id: 'table',
-      kind: 'source_table' as const,
-      name: 'Table',
-      ui: { position: { x: 0, y: 0 } },
-      createdAt: '2026-01-01',
-      updatedAt: '2026-01-01',
-      plan: {
-        fileRef: 'file',
-        fileName: 'data.csv',
-        fileType: 'csv' as const,
-        inferredSchemaVersion: 1,
-      },
-    }
-    mocks.loadProject.mockResolvedValueOnce(project('next-project', 'Next', { table }))
-    mocks.hasTables.mockImplementation(nodes => Object.keys(nodes).length > 0)
-    mocks.materialize.mockResolvedValueOnce({
-      completedTableIds: [],
-      failures: [{ tableId: 'table', error: 'materialization failed' }],
-    })
+  it('restores previous stores when clearing the previous project runtime fails', async () => {
     await renderReady()
+    mocks.clearRuntime.mockRejectedValueOnce(new Error('engine drop failed'))
 
     act(() => {
       fireEvent.click(screen.getByRole('button', { name: 'Load next' }))
     })
 
-    await waitFor(() => expect(mocks.materialize).toHaveBeenCalled())
+    await waitFor(() => expect(mocks.clearRuntime).toHaveBeenCalled())
     expect(screen.getByTestId('project')).toHaveTextContent('current-project')
     expect(screen.getByTestId('store-project')).toHaveTextContent('current-project')
     expect(reportStore.state.activeProjectId).toBe('current-project')

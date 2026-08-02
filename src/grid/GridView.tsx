@@ -34,13 +34,17 @@ export function GridView({ tableId }: GridViewProps) {
   const updateCacheInfo = useTableRuntimeStore((state) => state.updateCacheInfo)
 
   const {
-    node, columns, rows, filteredRows, unfilteredTotalRows,
-    isEditable, canEdit, canMutate, isDirty, isComputing, isMaterializing,
+    node, columns, loadedRows, totalRows, getRowAtIndex, unfilteredTotalRows,
+    isEditable, canEdit, canMutate, isDirty, isComputing,
     materializationError, setMaterializationError, computationError,
     highlightedCells, tableData, getDisplayValue,
     filters, handleFiltersChange,
     windowed,
   } = useGridData(tableId)
+  const rowAccess = useMemo(
+    () => ({ totalRows, getRowAtIndex }),
+    [getRowAtIndex, totalRows],
+  )
 
   const [gridFeedback, setGridFeedback] = useState<GridFeedbackMessage | null>(null)
   const [derivedEditDialogOpen, setDerivedEditDialogOpen] = useState(false)
@@ -66,7 +70,7 @@ export function GridView({ tableId }: GridViewProps) {
     editingColumnId, editColumnName, setEditColumnName,
     handleColumnDoubleClick, commitColumnNameEdit, cancelColumnNameEdit,
     saveSnapshot, setCellValue,
-  } = useGridEditing(tableId, columns, filteredRows, canMutate, requestDerivedTableDuplicate)
+  } = useGridEditing(tableId, columns, getRowAtIndex, canMutate, requestDerivedTableDuplicate)
 
   const {
     selection, setSelection,
@@ -77,14 +81,14 @@ export function GridView({ tableId }: GridViewProps) {
     getRowInsertionIndex, getColumnInsertionIndex,
     getRowInsertionDescription, getColumnInsertionDescription,
     toggleHighlightForSelection,
-  } = useGridSelection(tableId, columns, rows, filteredRows, canMutate)
+  } = useGridSelection(tableId, columns, rowAccess, canMutate)
 
   const {
     contextMenu, setContextMenu, newColumnModal, setNewColumnModal,
     doInsertRow, openNewColumnModal, doInsertColumn, handleContextMenu, openContextMenu,
     handleInsertRowAbove, handleInsertRowBelow, handleDeleteRow,
     handleInsertColumnLeft, handleInsertColumnRight,
-  } = useGridOperations(tableId, columns, filteredRows, canMutate, saveSnapshot, showGridFeedback)
+  } = useGridOperations(tableId, columns, rowAccess, canMutate, saveSnapshot, showGridFeedback)
   const closeContextMenu = useCallback(() => setContextMenu(null), [setContextMenu])
   const formulaLifecycle = useFormulaColumnLifecycle(
     tableId,
@@ -97,16 +101,16 @@ export function GridView({ tableId }: GridViewProps) {
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
     handleAutofillStart, handleAutofillMove, handleAutofillOneRow,
   } = useGridAutofill({
-    isEditable: canMutate, columns, rows: filteredRows, cellRangeSelection,
+    isEditable: canMutate, columns, rowAccess, cellRangeSelection,
     getDisplayValue, saveSnapshot, setCellValue, tableId,
   })
 
   const { getSelectedCellData, formatClipboardText } = useGridClipboard(
-    tableId, node, columns, filteredRows, getDisplayValue, selection, cellRangeSelection,
+    tableId, node, columns, rowAccess, getDisplayValue, selection, cellRangeSelection,
   )
 
   useGridKeyboard({
-    editingCell, selectedCell, selection, columns, rows: filteredRows, isEditable: canMutate,
+    editingCell, selectedCell, selection, columns, rowAccess, isEditable: canMutate,
     cellRangeSelection, setSelection, selectCell, commitEdit, cancelEdit, startEditing,
     getDisplayValue, saveSnapshot, setCellValue, tableId,
     getSelectedCellData, formatClipboardText,
@@ -133,14 +137,8 @@ export function GridView({ tableId }: GridViewProps) {
     windowed.invalidate()
   }, [setMaterializationError, tableId, updateCacheInfo, windowed])
 
-  const totalRows = filteredRows.length
-  // A zero-result filter refresh must not replace the existing grid with the full-page
-  // loading state. `version` advances after the first successful window fetch, so only
-  // show that state while the table is genuinely loading for the first time.
-  const isInitialLoad = (isMaterializing || isComputing)
-    && windowed.version === 0
-    && totalRows === 0
-    && !tableData?.rows?.length
+  const isInitialLoad = windowed.isInitialLoading
+    || (isComputing && totalRows === 0 && !tableData?.rows?.length)
   const [loadingElapsedSeconds, setLoadingElapsedSeconds] = useState(0)
 
   useEffect(() => {
@@ -187,7 +185,7 @@ export function GridView({ tableId }: GridViewProps) {
     resizeColumnBy, setColumnWidth,
     highlightedCells, handleAddRow, handleCellDoubleClick,
     contextMenu,
-    filteredRows,
+    getRowAtIndex,
     closeContextMenu,
     onInsertRowAbove: handleInsertRowAbove,
     onInsertRowBelow: handleInsertRowBelow,
@@ -216,7 +214,7 @@ export function GridView({ tableId }: GridViewProps) {
     filters, handleToggleFilters, resizingColumn, handleResizeStart,
     resizeColumnBy, setColumnWidth,
     highlightedCells, handleAddRow, handleCellDoubleClick,
-    contextMenu, filteredRows, setContextMenu,
+    contextMenu, getRowAtIndex, setContextMenu,
     handleInsertRowAbove, handleInsertRowBelow, handleDeleteRow,
     handleInsertColumnLeft, handleInsertColumnRight,
     doInsertRow, openNewColumnModal,
@@ -367,7 +365,7 @@ export function GridView({ tableId }: GridViewProps) {
           setShowFilterPanel(false)
           setFilterTargetColumnId(undefined)
         }} columns={columns} filters={filters}
-          onFiltersChange={handleFiltersChange} rows={rows} getDisplayValue={getDisplayValue}
+          onFiltersChange={handleFiltersChange} rows={loadedRows} getDisplayValue={getDisplayValue}
           matchingRowCount={totalRows} totalRowCount={unfilteredTotalRows}
           initialColumnId={filterTargetColumnId}
         />

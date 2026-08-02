@@ -5,10 +5,21 @@ import * as Dialog from '@radix-ui/react-dialog'
 import type { WorkBook } from 'xlsx'
 import { useProjectStore } from '@/state/projectStore'
 import { useApp, useAppAuth } from '@/state/AppContext'
-import { beginHistoryTransaction, commitHistoryTransaction, rollbackHistoryTransaction } from '@/state/historyTransaction'
+import {
+  failTableOperation,
+  isTableOperationCurrent,
+  updateTableOperation,
+} from '@/state/tableOperationCoordinator'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { checkFileSize, checkRowCount, checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
+import {
+  discardPendingImport,
+  fileBaseName,
+  fileExtension,
+  isDataFile,
+  reservePendingImport,
+} from '@/persistence/importLifecycle'
 import { discardFiles, getTableCount } from '@/persistence/importUtils'
 import { stageImportedTable } from '@/persistence/stageImportedTable'
 import type { ParsedTableData } from '@/engine/fileParsers'
@@ -39,19 +50,6 @@ type PendingImportItem =
     }
 
 type SelectionMode = 'sheets' | 'tables'
-
-function fileExtension(fileName: string): string | undefined {
-  return fileName.split('.').pop()?.toLowerCase()
-}
-
-function fileBaseName(fileName: string): string {
-  return fileName.replace(/\.[^/.]+$/, '')
-}
-
-function isDataFile(file: File): boolean {
-  const extension = fileExtension(file.name)
-  return extension === 'csv' || extension === 'xlsx' || extension === 'xls'
-}
 
 export function ImportButton() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -87,8 +85,13 @@ export function ImportButton() {
 
   const handleClick = () => fileInputRef.current?.click()
 
-  const importSingleCsv = async (file: File, projectId: string, uploadedFileIds: string[]) => {
-    const { parseCSVFile } = await import('@/persistence/importParsers')
+  const importSingleCsv = async (
+    file: File,
+    projectId: string,
+    uploadedFileIds: string[],
+    onReserved?: () => void,
+  ) => {
+    const { inspectCSVFile } = await import('@/persistence/importParsers')
     const nodes = useProjectStore.getState().nodes
     const tableCheck = checkTableCount(getTableCount(nodes), tier)
     if (!tableCheck.ok) {
@@ -96,33 +99,50 @@ export function ImportButton() {
       return
     }
 
-    const { schema, rows, fileRef } = await parseCSVFile(file, projectId)
-    uploadedFileIds.push(fileRef)
-
-    const rowCheck = checkRowCount(schema.rowCount ?? rows.length, tier)
-    if (!rowCheck.ok) {
-      await discardFiles(uploadedFileIds)
-      showViolation(rowCheck)
-      return
-    }
-    if (useProjectStore.getState().projectId !== projectId) {
-      throw new Error('The active project changed during import.')
-    }
-    const transactionId = beginHistoryTransaction(`Import table ${file.name}`)
+    const { tableId, generation } = reservePendingImport(file)
+    // Node shows import progress; re-enable the button for concurrent imports.
+    onReserved?.()
     try {
+      const { schema, rows } = await inspectCSVFile(file)
+      if (!isTableOperationCurrent(tableId, generation)) return
+      const rowCheck = checkRowCount(schema.rowCount ?? rows.length, tier)
+      if (!rowCheck.ok) {
+        discardPendingImport(tableId)
+        showViolation(rowCheck)
+        return
+      }
+
+      // Keep phase on reading through upload so the node doesn't flash a
+      // separate "saving" state before engine load.
+      updateTableOperation(tableId, generation, {
+        progress: { completed: rows.length, total: rows.length, label: 'Rows parsed' },
+      })
+      const uploaded = await uploadFileWithSync(file, projectId)
+      uploadedFileIds.push(uploaded.id)
+      if (
+        useProjectStore.getState().projectId !== projectId
+        || !isTableOperationCurrent(tableId, generation)
+      ) {
+        discardPendingImport(tableId)
+        await discardFiles(uploadedFileIds)
+        uploadedFileIds.length = 0
+        return
+      }
       await stageImportedTable({
         name: fileBaseName(file.name),
-        fileRef,
+        fileRef: uploaded.id,
         fileName: file.name,
         fileType: 'csv',
         schema,
         rows,
         engineError: 'The data engine did not initialize the imported table.',
+        tableId,
+        operationGeneration: generation,
       })
-      commitHistoryTransaction(transactionId)
       uploadedFileIds.length = 0
     } catch (error) {
-      rollbackHistoryTransaction(transactionId)
+      const message = error instanceof Error ? error.message : 'The file could not be imported.'
+      failTableOperation(tableId, generation, message)
       throw error
     }
   }
@@ -256,42 +276,47 @@ export function ImportButton() {
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
+    const tableCheck = checkTableCount(getTableCount(useProjectStore.getState().nodes), tier)
+    if (!tableCheck.ok) {
+      showViolation(tableCheck)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
 
     setIsImporting(true)
     setImportError(null)
     const projectId = useProjectStore.getState().projectId
     const uploadedFileIds: string[] = []
-    let transactionId: string | null = null
+    let pendingImport: { tableId: string; generation: number } | null = null
 
     try {
       if (extension === 'csv') {
-        await importSingleCsv(file, projectId, uploadedFileIds)
+        await importSingleCsv(file, projectId, uploadedFileIds, () => setIsImporting(false))
       } else if (extension === 'xlsx' || extension === 'xls') {
         const { parseExcelFile } = await import('@/persistence/importParsers')
+        pendingImport = reservePendingImport(file)
+        setIsImporting(false)
         const result = await parseExcelFile(file, projectId)
         if (result.kind === 'single') {
           uploadedFileIds.push(result.fileRef)
-          if (useProjectStore.getState().projectId !== projectId) {
+          if (
+            useProjectStore.getState().projectId !== projectId
+            || !isTableOperationCurrent(pendingImport.tableId, pendingImport.generation)
+          ) {
             throw new Error('The active project changed during import.')
           }
-          const nodes = useProjectStore.getState().nodes
-          const tableCheck = checkTableCount(getTableCount(nodes), tier)
-          if (!tableCheck.ok) {
-            await discardFiles(uploadedFileIds)
-            showViolation(tableCheck)
-            return
-          }
-
           const { schema, rows } = result.tableData
 
           const rowCheck = checkRowCount(schema.rowCount ?? rows.length, tier)
           if (!rowCheck.ok) {
             await discardFiles(uploadedFileIds)
+            uploadedFileIds.length = 0
+            discardPendingImport(pendingImport.tableId)
+            pendingImport = null
             showViolation(rowCheck)
             return
           }
-          transactionId = beginHistoryTransaction(`Import table ${file.name}`)
-
+          updateTableOperation(pendingImport.tableId, pendingImport.generation, { phase: 'materializing' })
           await stageImportedTable({
             name: fileBaseName(file.name),
             fileRef: result.fileRef,
@@ -300,11 +325,14 @@ export function ImportButton() {
             schema,
             rows,
             engineError: 'The data engine did not initialize the imported table.',
+            tableId: pendingImport.tableId,
+            operationGeneration: pendingImport.generation,
           })
-          commitHistoryTransaction(transactionId)
-          transactionId = null
           uploadedFileIds.length = 0
+          pendingImport = null
         } else {
+          discardPendingImport(pendingImport.tableId)
+          pendingImport = null
           openSelectionModal(
             result.sheets.map((sheet) => ({
               id: `sheet:0:${file.name}:${sheet.name}`,
@@ -325,7 +353,13 @@ export function ImportButton() {
         setImportError('Unsupported file type. Please use a CSV, Excel, or TableCanvas project file.')
       }
     } catch (error: unknown) {
-      rollbackHistoryTransaction(transactionId)
+      if (pendingImport) {
+        failTableOperation(
+          pendingImport.tableId,
+          pendingImport.generation,
+          error instanceof Error ? error.message : 'The file could not be imported.',
+        )
+      }
       await discardFiles(uploadedFileIds)
       console.error('Import error:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -344,7 +378,7 @@ export function ImportButton() {
     setImportError(null)
     const projectId = useProjectStore.getState().projectId
     const uploadedFileIds: string[] = []
-    let transactionId: string | null = null
+    const createdTableIds: string[] = []
 
     try {
       const [
@@ -389,7 +423,7 @@ export function ImportButton() {
         }
       }
 
-      transactionId = beginHistoryTransaction(
+      useProjectStore.getState().saveSnapshot(
         selectionMode === 'sheets'
           ? `Import ${selectedItems.length} workbook sheets`
           : `Import ${selectedItems.length} tables`,
@@ -403,7 +437,7 @@ export function ImportButton() {
             throw new Error('The active project changed during import.')
           }
 
-          await stageImportedTable({
+          const tableId = await stageImportedTable({
             name: item.tableName,
             fileRef: uploaded.id,
             fileName: item.file.name,
@@ -412,6 +446,7 @@ export function ImportButton() {
             rows: item.tableData.rows,
             engineError: `The data engine did not initialize table "${item.tableName}".`,
           })
+          createdTableIds.push(tableId)
           continue
         }
 
@@ -427,7 +462,7 @@ export function ImportButton() {
           throw new Error('The active project changed during import.')
         }
 
-        await stageImportedTable({
+        const tableId = await stageImportedTable({
           name: item.tableName,
           fileRef,
           fileName: item.sourceFileName,
@@ -437,16 +472,17 @@ export function ImportButton() {
           rows: tableData.rows,
           engineError: `The data engine did not initialize sheet "${item.sheetName}".`,
         })
+        createdTableIds.push(tableId)
       }
 
-      commitHistoryTransaction(transactionId)
-      transactionId = null
       uploadedFileIds.length = 0
 
       setSelectionModalOpen(false)
       clearSelectionState()
     } catch (error) {
-      rollbackHistoryTransaction(transactionId)
+      createdTableIds.forEach((tableId) => {
+        useProjectStore.getState().deleteNode(tableId, { recordHistory: false })
+      })
       await discardFiles(uploadedFileIds)
       console.error('Import selection error:', error)
       setImportError(

@@ -7,11 +7,13 @@ import {
 } from '@/persistence/storageScope'
 import { useProjectStore } from './projectStore'
 import {
+  getNodeCacheInfo,
   updateNodeCacheInfo,
   useTableRuntimeStore,
 } from './tableRuntimeStore'
 import { duplicateDerivedTable } from './duplicateDerivedTable'
 import { setDocumentWriteGuard } from './transientProjectState'
+import { waitForTableOperation } from './tableOperationCoordinator'
 
 const mocks = vi.hoisted(() => ({
   ensureTableMaterialized: vi.fn(),
@@ -47,17 +49,25 @@ const derivedSchema = {
   rowCount: 1,
 }
 
+async function settleDuplicate(tableId: string): Promise<void> {
+  await waitForTableOperation(tableId)
+  await vi.waitFor(() => {
+    const phase = getNodeCacheInfo(tableId)?.phase
+    expect(phase === 'ready' || phase === 'error').toBe(true)
+  })
+}
+
 beforeEach(() => {
   resetStore()
   vi.clearAllMocks()
   setStorageScope(GUEST_STORAGE_SCOPE)
   mocks.isNetworkOnline.mockReturnValue(true)
-  mocks.ensureTableMaterialized.mockResolvedValue({
+  mocks.ensureTableMaterialized.mockImplementation(async (tableId: string) => ({
     status: 'computed',
-    tableId: 'derived',
+    tableId,
     rowCount: 1,
     schema: derivedSchema,
-  })
+  }))
   mocks.readAllTableRows.mockResolvedValue([
     { __rowId: 'derived_row', calculated: 42 },
   ])
@@ -75,7 +85,7 @@ afterEach(() => {
 })
 
 describe('duplicateDerivedTable', () => {
-  it('creates an independent editable source with no graph connections', async () => {
+  it('creates an independent editable source immediately, then finishes in the background', async () => {
     const sourceId = addSource('Source')
     const derivedId = addFilter(sourceId, 'Filtered')
     useTableRuntimeStore.getState().setMaterializedSchema(derivedId, derivedSchema)
@@ -90,6 +100,14 @@ describe('duplicateDerivedTable', () => {
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
+    expect(useProjectStore.getState().nodes[result.tableId]).toMatchObject({
+      kind: 'source_table',
+      name: 'Filtered copy',
+      plan: { fileType: 'snapshot' },
+    })
+
+    await settleDuplicate(result.tableId)
+
     const state = useProjectStore.getState()
     const duplicate = state.nodes[result.tableId]
     expect(duplicate).toMatchObject({
@@ -125,6 +143,7 @@ describe('duplicateDerivedTable', () => {
     expect(Object.values(state.edges).some(edge =>
       edge.fromNodeId === result.tableId || edge.toNodeId === result.tableId,
     )).toBe(false)
+    expect(getNodeCacheInfo(result.tableId)?.phase).toBe('ready')
   })
 
   it('is restored by undo and redo without changing the original graph', async () => {
@@ -139,6 +158,7 @@ describe('duplicateDerivedTable', () => {
     const result = await duplicateDerivedTable(derivedId, 'guest')
     expect(result.ok).toBe(true)
     if (!result.ok) return
+    await settleDuplicate(result.tableId)
 
     useProjectStore.getState().undo()
     expect(useProjectStore.getState().nodes[result.tableId]).toBeUndefined()
@@ -172,26 +192,28 @@ describe('duplicateDerivedTable', () => {
 
     expect(result.ok).toBe(true)
     expect(useProjectStore.getState().selectedNodeId).toBe(sourceId)
+    if (result.ok) await settleDuplicate(result.tableId)
   })
 
-  it('does not create a table when materialization fails', async () => {
+  it('keeps the pending copy and records an error when materialization fails', async () => {
     const sourceId = addSource('Source')
     const derivedId = addFilter(sourceId, 'Filtered')
+    useTableRuntimeStore.getState().setMaterializedSchema(derivedId, derivedSchema)
     mocks.ensureTableMaterialized.mockResolvedValue({
       status: 'error',
       tableId: derivedId,
       error: 'Upstream source failed',
     })
-    const nodeCount = Object.keys(useProjectStore.getState().nodes).length
 
     const result = await duplicateDerivedTable(derivedId, 'guest')
 
-    expect(result).toEqual({
-      ok: false,
-      code: 'MATERIALIZATION_FAILED',
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    await settleDuplicate(result.tableId)
+    expect(getNodeCacheInfo(result.tableId)).toMatchObject({
+      phase: 'error',
       error: 'Upstream source failed',
     })
-    expect(Object.keys(useProjectStore.getState().nodes)).toHaveLength(nodeCount)
     expect(mocks.uploadFileWithSync).not.toHaveBeenCalled()
   })
 
@@ -226,7 +248,7 @@ describe('duplicateDerivedTable', () => {
     expect(mocks.uploadFileWithSync).not.toHaveBeenCalled()
   })
 
-  it('aborts before upload if the derived data changes while rows are read', async () => {
+  it('records TABLE_CHANGED on the pending copy if source data changes while rows are read', async () => {
     const sourceId = addSource('Source')
     const derivedId = addFilter(sourceId, 'Filtered')
     useTableRuntimeStore.getState().setMaterializedSchema(derivedId, derivedSchema)
@@ -241,8 +263,14 @@ describe('duplicateDerivedTable', () => {
     })
 
     const result = await duplicateDerivedTable(derivedId, 'guest')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    await settleDuplicate(result.tableId)
 
-    expect(result).toMatchObject({ ok: false, code: 'TABLE_CHANGED' })
+    expect(getNodeCacheInfo(result.tableId)).toMatchObject({
+      phase: 'error',
+      error: expect.stringContaining('changed while it was being copied'),
+    })
     expect(mocks.uploadFileWithSync).not.toHaveBeenCalled()
   })
 
@@ -264,13 +292,19 @@ describe('duplicateDerivedTable', () => {
     })
 
     const result = await duplicateDerivedTable(derivedId, 'guest')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    await settleDuplicate(result.tableId)
 
-    expect(result).toMatchObject({ ok: false, code: 'WRITE_LEASE_LOST' })
+    expect(getNodeCacheInfo(result.tableId)).toMatchObject({
+      phase: 'error',
+      error: expect.stringContaining('another tab'),
+    })
     expect(mocks.deleteFileWithSync).toHaveBeenCalledWith(
       'unused-snapshot',
       { strictRemote: true },
     )
-    expect(Object.values(useProjectStore.getState().nodes)).toHaveLength(2)
+    expect(Object.values(useProjectStore.getState().nodes)).toHaveLength(3)
   })
 
   it('discards an uploaded snapshot if the derived table changes during upload', async () => {
@@ -292,8 +326,14 @@ describe('duplicateDerivedTable', () => {
     })
 
     const result = await duplicateDerivedTable(derivedId, 'guest')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    await settleDuplicate(result.tableId)
 
-    expect(result).toMatchObject({ ok: false, code: 'TABLE_CHANGED' })
+    expect(getNodeCacheInfo(result.tableId)).toMatchObject({
+      phase: 'error',
+      error: expect.stringContaining('changed while it was being copied'),
+    })
     expect(mocks.deleteFileWithSync).toHaveBeenCalledWith(
       'stale-snapshot',
       { strictRemote: true },

@@ -4,8 +4,10 @@ import { ColumnSchema, CellValue, ViewFilterConfig } from '@/types'
 import { formatNumber } from '@/lib/utils'
 import { MINI_ROW_HEIGHT as CELL_HEIGHT, MINI_HEADER_HEIGHT as HEADER_HEIGHT, MINI_BUFFER_ROWS as BUFFER_ROWS, MINI_FOOTER_HEIGHT as FOOTER_HEIGHT } from '@/grid/constants'
 import { computeDisplayValue } from '@/grid/displayUtils'
-import { applyFilters, hasActiveFilters } from '@/grid/filterUtils'
+import { hasActiveFilters } from '@/grid/filterUtils'
 import { getTableData } from '@/engine/tableDataService'
+import { getEngine } from '@/engine/EngineAdapter'
+import type { FilterConditionDef } from '@/engine/types'
 import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 
 interface MiniTableViewProps {
@@ -28,6 +30,23 @@ const MIN_CELL_WIDTH = 65
 // Canvas previews show a bounded sample; the grid view is the full virtualized table.
 const PREVIEW_LIMIT = 1000
 
+function buildFilterDefs(
+  filters: ViewFilterConfig | undefined,
+  columns: ColumnSchema[],
+): FilterConditionDef[] | undefined {
+  if (!filters || filters.conditions.length === 0) return undefined
+  const columnsById = new Map(columns.map(column => [column.id, column]))
+  return filters.conditions.map(condition => {
+    const column = columnsById.get(condition.columnId)
+    return {
+      column: column?.name ?? condition.columnId,
+      operator: condition.operator,
+      value: condition.value,
+      value2: condition.value2,
+      columnType: column?.type,
+    }
+  })
+}
 
 export const MiniTableView = memo(({ 
   tableId, 
@@ -44,6 +63,7 @@ export const MiniTableView = memo(({
   // preview slice (already remapped to column ids by getTableData) for display.
   const [rows, setRows] = useState<TableRow[]>([])
   const [engineTotalRows, setEngineTotalRows] = useState(0)
+  const [matchingTotalRows, setMatchingTotalRows] = useState(0)
   const [isLoaded, setIsLoaded] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
@@ -52,27 +72,69 @@ export const MiniTableView = memo(({
     () => columns.map(column => `${column.id}:${column.name}:${column.type}`).join('|'),
     [columns],
   )
+  const filterKey = useMemo(() => JSON.stringify(viewFilters ?? null), [viewFilters])
+  const filtersActive = Boolean(viewFilters && hasActiveFilters(viewFilters))
 
   useEffect(() => {
     let cancelled = false
     setIsLoaded(false)
     setLoadError(null)
-    getTableData(tableId, 0, PREVIEW_LIMIT)
-      .then(({ rows: fetched, totalRows, error }) => {
+    setScrollTop(0)
+
+    const loadPreview = async () => {
+      if (!filtersActive) {
+        const result = await getTableData(tableId, 0, PREVIEW_LIMIT)
+        return {
+          rows: result.rows,
+          totalRows: result.totalRows,
+          matchingRows: result.totalRows,
+          error: result.error,
+        }
+      }
+
+      // Materialize and read the unfiltered count first. The filtered slice then
+      // uses the same engine-side predicate path as the main grid.
+      const base = await getTableData(tableId, 0, 0)
+      if (base.error) {
+        return { rows: [], totalRows: 0, matchingRows: 0, error: base.error }
+      }
+      const slice = await getEngine().getFilteredSlice({
+        tableId,
+        filters: buildFilterDefs(viewFilters, columns),
+        offset: 0,
+        limit: PREVIEW_LIMIT,
+        columns,
+      })
+      const fetched = slice.rows.map((row, index) => ({
+        ...row,
+        __rowId: row.__rowId as string || `row_${index}`,
+      })) as TableRow[]
+      return {
+        rows: fetched,
+        totalRows: base.totalRows,
+        matchingRows: slice.totalRows,
+      }
+    }
+
+    loadPreview()
+      .then(({ rows: fetched, totalRows, matchingRows, error }) => {
         if (cancelled) return
         if (error) {
           setRows([])
           setEngineTotalRows(0)
+          setMatchingTotalRows(0)
           setLoadError(error)
           return
         }
-        setRows(fetched as TableRow[])
+        setRows(fetched)
         setEngineTotalRows(totalRows)
+        setMatchingTotalRows(matchingRows)
       })
       .catch((error) => {
         if (cancelled) return
         setRows([])
         setEngineTotalRows(0)
+        setMatchingTotalRows(0)
         setLoadError(error instanceof Error ? error.message : String(error))
       })
       .finally(() => {
@@ -81,7 +143,17 @@ export const MiniTableView = memo(({
     return () => {
       cancelled = true
     }
-  }, [tableId, versionHash, dataRevision, schemaKey, reloadKey])
+  }, [
+    columns,
+    dataRevision,
+    filterKey,
+    filtersActive,
+    reloadKey,
+    schemaKey,
+    tableId,
+    versionHash,
+    viewFilters,
+  ])
 
   const handleRetry = useCallback(() => {
     updateCacheInfo(tableId, { error: undefined, isDirty: true, isComputing: false })
@@ -98,19 +170,11 @@ export const MiniTableView = memo(({
     if (patches?.deletedRows?.size) {
       result = result.filter(row => !patches.deletedRows?.has(row.__rowId))
     }
-    if (viewFilters && hasActiveFilters(viewFilters)) {
-      result = applyFilters(result, viewFilters, columns, getDisplayValue)
-    }
     return result
-  }, [rows, patches?.deletedRows, viewFilters, columns, getDisplayValue])
-  
-  const filtersActive = viewFilters && hasActiveFilters(viewFilters)
-  const unfilteredRowCount = useMemo(() => {
-    if (!patches?.deletedRows?.size) return rows.length
-    return rows.filter(row => !patches.deletedRows?.has(row.__rowId)).length
   }, [rows, patches?.deletedRows])
-
+  
   const totalRows = visibleRows.length
+  const previewIsTruncated = matchingTotalRows > rows.length
   const previewHeight = Math.min(
     maxHeight,
     HEADER_HEIGHT + totalRows * CELL_HEIGHT + FOOTER_HEIGHT,
@@ -179,7 +243,7 @@ export const MiniTableView = memo(({
       style={{ height: previewHeight }}
       role="table"
       aria-colcount={columns.length}
-      aria-rowcount={engineTotalRows}
+      aria-rowcount={filtersActive ? matchingTotalRows : engineTotalRows}
     >
       {/* Scrollable table area - hide scrollbars but keep functionality */}
       <div 
@@ -257,11 +321,23 @@ export const MiniTableView = memo(({
         style={{ height: FOOTER_HEIGHT }}
       >
         {filtersActive ? (
-          <span>
-            Showing <span className="font-medium text-text-primary">{formatNumber(totalRows)}</span>
-            {' of '}
-            {formatNumber(Math.max(unfilteredRowCount, engineTotalRows))} rows
-          </span>
+          previewIsTruncated ? (
+            <span>
+              Previewing <span className="font-medium text-text-primary">{formatNumber(totalRows)}</span>
+              {' of '}{formatNumber(matchingTotalRows)} matching rows
+              {' '}({formatNumber(engineTotalRows)} total)
+            </span>
+          ) : (
+            <span>
+              Showing <span className="font-medium text-text-primary">{formatNumber(totalRows)}</span>
+              {' matching rows '}({formatNumber(engineTotalRows)} total)
+            </span>
+          )
+        ) : previewIsTruncated ? (
+          <>
+            <span>{columns.length} columns</span>
+            <span>Previewing {formatNumber(totalRows)} of {formatNumber(engineTotalRows)} rows</span>
+          </>
         ) : (
           <>
             <span>{columns.length} columns</span>

@@ -9,6 +9,14 @@ type NodeKind = 'source_table' | 'derived_table' | 'chart'
 
 export type NodeViewMode = 'collapsed' | 'data'
 
+export type TableRuntimePhase =
+  | 'reading'
+  | 'uploading'
+  | 'waiting'
+  | 'materializing'
+  | 'ready'
+  | 'error'
+
 export interface NodeUI {
   position: Position
   viewMode?: NodeViewMode
@@ -37,6 +45,12 @@ export interface CacheInfo {
   error?: string
   isComputing?: boolean
   dataRevision?: number
+  /** Canonical per-tab lifecycle for long-running table work. */
+  phase?: TableRuntimePhase
+  /** Monotonic token used to ignore completion from cancelled/stale work. */
+  operationGeneration?: number
+  /** Optional bounded progress reported by imports and snapshot operations. */
+  progress?: { completed: number; total?: number; label?: string }
 }
 
 

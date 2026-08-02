@@ -1,23 +1,24 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
-import { beginHistoryTransaction, commitHistoryTransaction, rollbackHistoryTransaction } from '@/state/historyTransaction'
 import type { TableRow } from '@/state/dataStore'
 import { useAppAuth } from '@/state/AppContext'
 import { useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { JoinType } from '@/types'
-import { ensureTableMaterialized } from '@/engine/materializationService'
 import { getTableData } from '@/engine/tableDataService'
 import { analyzeMatch, findBestKeys } from '@/canvas/joinUtils'
-import { checkRowCount, checkTableCount, type LimitExceeded } from '@/shared/enforce'
+import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
+import { beginTableOperation } from '@/state/tableOperationCoordinator'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { getVisibleFocusableElement, isVisibleElement } from '@/components/useDialogFocus'
 import { JoinColumnSelect } from './JoinColumnSelect'
 import { TransformOutputOptions } from './TransformOutputOptions'
 import { TransformTypeControls } from './TransformTypeControls'
+import { finalizeCombinedTable } from './finalizeCombinedTable'
 type TransformModalProps = { isOpen: boolean; onClose: () => void; sourceNodeId: string; targetNodeId: string }
 const MAX_TABLE_NAME_LENGTH = 100
+
 export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: TransformModalProps) {
   const nodes = useProjectStore(s => s.nodes)
   const addDerivedTable = useProjectStore(s => s.addDerivedTable)
@@ -127,7 +128,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       return next
     })
   }, [])
-  const handleCreate = useCallback(async () => {
+  const handleCreate = useCallback(() => {
     if (creatingRef.current) return
     if (operation === 'join' && (!leftKey || !rightKey)) return
     if (operation === 'union' && !canUnion) return
@@ -146,13 +147,8 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
     creatingRef.current = true
     setIsCreating(true)
     setCreateError(undefined)
-    let id: string | null = null
-    let transactionId: string | null = null
     try {
-      transactionId = beginHistoryTransaction(
-        `Create ${operation} table ${outputName.trim() || `${leftNode?.name} + ${rightNode?.name}`}`,
-      )
-      id = addDerivedTable({
+      const id = addDerivedTable({
         name: outputName.trim() || `${leftNode?.name} + ${rightNode?.name}`,
         transformDef: operation === 'union'
           ? {
@@ -172,26 +168,17 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
               rightTableName: rightNode?.name,
             },
         upstreamNodeIds: [sourceNodeId, targetNodeId],
-        recordHistory: false,
       })
-      const result = await ensureTableMaterialized(id)
-      if (result.status === 'error') {
-        throw new Error(result.error || 'The table could not be computed.')
-      }
-      const rowCheck = checkRowCount(result.rowCount ?? 0, tier)
-      if (!rowCheck.ok) {
-        rollbackHistoryTransaction(transactionId)
-        id = null
-        setUpgradeViolation(rowCheck)
-        setUpgradeOpen(true)
-        return
-      }
-      commitHistoryTransaction(transactionId)
+      const generation = beginTableOperation(id, 'waiting')
       onClose()
+      void finalizeCombinedTable(id, generation, tier, [sourceNodeId, targetNodeId])
     } catch (error) {
-      rollbackHistoryTransaction(transactionId)
       console.error('[TransformModal] Failed to create table:', error)
-      setCreateError('We could not create the combined table. Check the selected columns and try again.')
+      setCreateError(
+        error instanceof Error
+          ? error.message
+          : 'We could not create the combined table. Check the selected columns and try again.',
+      )
     } finally {
       creatingRef.current = false
       setIsCreating(false)

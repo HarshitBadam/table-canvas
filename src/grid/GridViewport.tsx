@@ -27,7 +27,7 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
   )
   const { ensureRange, isLoading, totalRows: windowedTotalRows } = windowed
   const {
-    columns, filteredRows, getColumnWidth, isEditable, canEdit, isCornerSelected, selection, selectedCell,
+    columns, getRowAtIndex, getColumnWidth, isEditable, canEdit, isCornerSelected, selection, selectedCell,
     isIndexColumnSelected, setSelection, handleCornerClick, handleContextMenu, handleRowClick,
     openContextMenu, isDraggingSelectionRef, handleCellMouseEnter,
   } = useGridContext()
@@ -173,7 +173,7 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
         <div style={{ position: 'relative', height: rowVirtualizer.getTotalSize() }}>
           {virtualRows.map(virtualRow => {
             const index = virtualRow.index
-            const row = filteredRows[index]
+            const row = getRowAtIndex(index)
             const rowStyle = { position: 'absolute' as const, top: virtualRow.start, height: rowHeight, width: '100%' }
             if (!row) {
               return <div key={`skeleton-${index}`} role="row" aria-rowindex={index + 2} className="flex border-b border-border-subtle bg-surface animate-pulse" style={rowStyle}>

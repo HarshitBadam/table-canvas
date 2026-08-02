@@ -14,10 +14,21 @@ export interface WindowedRowsState {
   getLoadedRows: () => Map<number, GridRow>
   ensureRange: (startIndex: number, endIndex: number) => void
   version: number
+  loadPhase: WindowLoadPhase
   isLoading: boolean
+  isInitialLoading: boolean
+  isFetching: boolean
+  isPrefetching: boolean
   error: string | null
   invalidate: () => void
 }
+
+export type WindowLoadPhase =
+  | 'idle'
+  | 'initial-materialization'
+  | 'initial-fetch'
+  | 'fetch'
+  | 'prefetch'
 
 interface WindowState {
   start: number
@@ -26,6 +37,7 @@ interface WindowState {
 }
 
 interface WindowRequest {
+  projectId: string | null
   tableId: string
   columns: ColumnSchema[]
   filterDefs: FilterConditionDef[] | undefined
@@ -34,6 +46,8 @@ interface WindowRequest {
   offset: number
   limit: number
   generation: number
+  fingerprint: string
+  kind: 'initial' | 'fetch' | 'prefetch'
 }
 
 function buildFilterDefs(
@@ -55,6 +69,7 @@ function buildFilterDefs(
 }
 
 export function useWindowedRows(
+  projectId: string | null,
   tableId: string,
   columns: ColumnSchema[],
   filters: ViewFilterConfig | null,
@@ -62,7 +77,7 @@ export function useWindowedRows(
   search: string | undefined,
 ): WindowedRowsState {
   const [totalRows, setTotalRows] = useState(0)
-  const [isLoading, setIsLoading] = useState(false)
+  const [loadPhase, setLoadPhase] = useState<WindowLoadPhase>('idle')
   const [error, setError] = useState<string | null>(null)
 
   const windowRef = useRef<WindowState>({ start: 0, end: 0, rows: new Map() })
@@ -76,22 +91,36 @@ export function useWindowedRows(
   const filterStr = filters ? JSON.stringify([filters.conditions, filters.logic]) : ''
   const sortStr = sorts ? JSON.stringify(sorts) : ''
   const columnStr = JSON.stringify(columns.map(({ id, name, type }) => ({ id, name, type })))
-  const fingerprint = `${tableId}|${filterStr}|${sortStr}|${search || ''}|${columnStr}`
+  const fingerprint = `${projectId ?? ''}|${tableId}|${filterStr}|${sortStr}|${search || ''}|${columnStr}`
+  const currentFingerprintRef = useRef(fingerprint)
+  currentFingerprintRef.current = fingerprint
   const latestConfigRef = useRef<Omit<WindowRequest, 'offset' | 'limit' | 'generation'>>({
+    projectId,
     tableId,
     columns,
     filterDefs: buildFilterDefs(filters, columns),
     sorts,
     search,
+    fingerprint,
+    kind: 'fetch',
   })
   latestConfigRef.current = {
+    projectId,
     tableId,
     columns,
     filterDefs: buildFilterDefs(filters, columns),
     sorts,
     search,
+    fingerprint,
+    kind: 'fetch',
   }
   const requestPumpRef = useRef<(request: WindowRequest) => void>(() => undefined)
+  const isCurrentRequest = useCallback((request: WindowRequest) => (
+    request.generation === generationRef.current
+    && request.fingerprint === currentFingerprintRef.current
+    && request.projectId === latestConfigRef.current.projectId
+    && request.tableId === latestConfigRef.current.tableId
+  ), [])
 
   const pumpRequest = useCallback((request: WindowRequest) => {
     if (fetchInFlightRef.current) {
@@ -99,17 +128,19 @@ export function useWindowedRows(
       return
     }
     fetchInFlightRef.current = true
-    setIsLoading(true)
+    setLoadPhase(request.kind === 'initial' ? 'initial-materialization' : request.kind)
 
     void (async () => {
       try {
         const materialization = await ensureTableMaterialized(request.tableId)
+        if (!isCurrentRequest(request)) return
         if (materialization.status === 'error') {
           throw new Error(materialization.error || 'Failed to materialize table')
         }
         if (materialization.status === 'loading') {
           throw new Error('Table data changed while loading. Please try again.')
         }
+        setLoadPhase(request.kind === 'initial' ? 'initial-fetch' : request.kind)
         const engine = getEngine()
         let slice: TableSlice
 
@@ -132,7 +163,7 @@ export function useWindowedRows(
           )
         }
 
-        if (request.generation !== generationRef.current) return
+        if (!isCurrentRequest(request)) return
 
         const newRows = new Map<number, GridRow>()
         slice.rows.forEach((row, idx) => {
@@ -174,28 +205,37 @@ export function useWindowedRows(
         setError(null)
         setVersion(v => v + 1)
       } catch (e) {
-        if (request.generation !== generationRef.current) return
+        if (!isCurrentRequest(request)) return
+        windowRef.current = { start: 0, end: 0, rows: new Map() }
+        replaceOnNextFetchRef.current = true
+        setTotalRows(0)
         setError(e instanceof Error ? e.message : String(e))
+        setVersion(v => v + 1)
       } finally {
         fetchInFlightRef.current = false
         const pending = pendingFetchRef.current
         pendingFetchRef.current = null
         if (pending) {
           requestPumpRef.current(pending)
-        } else {
-          setIsLoading(false)
+        } else if (isCurrentRequest(request)) {
+          setLoadPhase('idle')
         }
       }
     })()
-  }, [])
+  }, [isCurrentRequest])
   requestPumpRef.current = pumpRequest
 
-  const fetchWindow = useCallback((offset: number, limit: number) => {
+  const fetchWindow = useCallback((
+    offset: number,
+    limit: number,
+    kind: WindowRequest['kind'] = 'fetch',
+  ) => {
     requestPumpRef.current({
       ...latestConfigRef.current,
       offset,
       limit,
       generation: generationRef.current,
+      kind,
     })
   }, [])
 
@@ -204,14 +244,14 @@ export function useWindowedRows(
     const previousFingerprint = fingerprintRef.current
     fingerprintRef.current = fingerprint
     generationRef.current++
+    pendingFetchRef.current = null
     replaceOnNextFetchRef.current = true
-    if (!previousFingerprint || !previousFingerprint.startsWith(`${tableId}|`)) {
-      windowRef.current = { start: 0, end: 0, rows: new Map() }
-      setTotalRows(0)
-      setVersion(v => v + 1)
-    }
-    void fetchWindow(0, WINDOW_SIZE)
-  }, [fetchWindow, fingerprint, tableId])
+    windowRef.current = { start: 0, end: 0, rows: new Map() }
+    setTotalRows(0)
+    setError(null)
+    if (previousFingerprint) setVersion(v => v + 1)
+    void fetchWindow(0, WINDOW_SIZE, 'initial')
+  }, [fetchWindow, fingerprint])
 
   const getRowAtIndex = useCallback((index: number): GridRow | null => {
     const win = windowRef.current
@@ -220,12 +260,12 @@ export function useWindowedRows(
 
     if (index < win.start - PREFETCH_THRESHOLD || index >= win.end + PREFETCH_THRESHOLD) {
       const newStart = Math.max(0, index - Math.floor(WINDOW_SIZE / 4))
-      fetchWindow(newStart, WINDOW_SIZE)
+      fetchWindow(newStart, WINDOW_SIZE, 'fetch')
     } else if (index >= win.end - PREFETCH_THRESHOLD && index < win.end + WINDOW_SIZE) {
-      fetchWindow(win.end, WINDOW_SIZE)
+      fetchWindow(win.end, WINDOW_SIZE, 'prefetch')
     } else if (index < win.start + PREFETCH_THRESHOLD && win.start > 0) {
       const newStart = Math.max(0, win.start - WINDOW_SIZE)
-      fetchWindow(newStart, WINDOW_SIZE)
+      fetchWindow(newStart, WINDOW_SIZE, 'prefetch')
     }
 
     return null
@@ -247,8 +287,26 @@ export function useWindowedRows(
     pendingFetchRef.current = null
     replaceOnNextFetchRef.current = true
     setError(null)
-    void fetchWindow(0, WINDOW_SIZE)
+    void fetchWindow(0, WINDOW_SIZE, 'fetch')
   }, [fetchWindow])
 
-  return { totalRows, getRowAtIndex, getLoadedRows, ensureRange, version, isLoading, error, invalidate }
+  const isInitialLoading = loadPhase === 'initial-materialization' || loadPhase === 'initial-fetch'
+  const isPrefetching = loadPhase === 'prefetch'
+  const isFetching = loadPhase === 'initial-fetch' || loadPhase === 'fetch' || isPrefetching
+  const isLoading = isInitialLoading || loadPhase === 'fetch'
+
+  return {
+    totalRows,
+    getRowAtIndex,
+    getLoadedRows,
+    ensureRange,
+    version,
+    loadPhase,
+    isLoading,
+    isInitialLoading,
+    isFetching,
+    isPrefetching,
+    error,
+    invalidate,
+  }
 }

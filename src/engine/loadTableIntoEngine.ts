@@ -7,6 +7,7 @@ import {
   simpleHash,
 } from './cacheUtils'
 import type { LoadTableResult } from './EngineAdapter'
+import { enqueueEngineMutation } from './materializationCoordinator'
 import { useProjectStore } from '@/state/projectStore'
 import { getNodeCacheInfo, updateNodeCacheInfo } from '@/state/tableRuntimeStore'
 import type { TableRow } from '@/state/dataStore'
@@ -41,12 +42,35 @@ export async function loadTableIntoEngine(
   schema: TableSchema,
   rows: TableRow[],
 ): Promise<boolean> {
+  // Import path bypasses ensureTableMaterialized; still join the shared mutation lane.
+  return enqueueEngineMutation(() => loadTableIntoEngineUnlocked(tableId, schema, rows))
+}
+
+async function loadTableIntoEngineUnlocked(
+  tableId: string,
+  schema: TableSchema,
+  rows: TableRow[],
+): Promise<boolean> {
   const startGeneration = captureLoadGeneration(tableId)
+  const operationGeneration = getNodeCacheInfo(tableId)?.operationGeneration
+  updateNodeCacheInfo(tableId, {
+    isComputing: true,
+    phase: 'materializing',
+    error: undefined,
+  })
   try {
     const node = useProjectStore.getState().getTableNode(tableId)
     const patches = copyPatches(useProjectStore.getState().patches[tableId])
     const loadResult = await loadEngineTable(tableId, schema, rows, patches)
-    if (startGeneration !== captureLoadGeneration(tableId)) return false
+    // Prefer the import operation token over the fragile content hash: updateNode
+    // during staging changes updatedAt/fileRef and would otherwise false-fail large imports.
+    if (
+      operationGeneration !== undefined
+        ? getNodeCacheInfo(tableId)?.operationGeneration !== operationGeneration
+        : startGeneration !== captureLoadGeneration(tableId)
+    ) {
+      return false
+    }
 
     const fileRef = node?.kind === 'source_table' ? node.plan.fileRef : undefined
     const currentVersionHash = computeSourceVersionHash(
@@ -64,16 +88,22 @@ export async function loadTableIntoEngine(
       currentVersionHash,
       error: undefined,
       warnings: loadResult?.warnings,
+      phase: 'ready',
     })
     return true
   } catch (error) {
-    if (startGeneration === captureLoadGeneration(tableId)) {
+    const message = error instanceof Error ? error.message : 'Failed to load into engine'
+    if (
+      operationGeneration === undefined
+      || getNodeCacheInfo(tableId)?.operationGeneration === operationGeneration
+    ) {
       updateNodeCacheInfo(tableId, {
         isDirty: true,
         isComputing: false,
-        error: error instanceof Error ? error.message : 'Failed to load into engine',
+        error: message,
+        phase: 'error',
       })
     }
-    return false
+    throw error instanceof Error ? error : new Error(message)
   }
 }

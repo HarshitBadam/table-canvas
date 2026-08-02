@@ -1,5 +1,5 @@
 import type { CellValue, ColumnSchema } from '@/types'
-import type { GridRow } from './types'
+import type { GridRowAccess } from './types'
 import { validateCellInput } from './cellValueValidation'
 
 interface GridPasteChange {
@@ -74,7 +74,7 @@ interface CreateGridPastePlanOptions {
   text: string
   startRow: number
   startColIndex: number
-  rows: GridRow[]
+  rowAccess: GridRowAccess
   columns: ColumnSchema[]
 }
 
@@ -82,7 +82,7 @@ export function createGridPastePlan({
   text,
   startRow,
   startColIndex,
-  rows,
+  rowAccess,
   columns,
 }: CreateGridPastePlanOptions): GridPastePlan {
   const matrix = parseTabularClipboard(text)
@@ -95,7 +95,7 @@ export function createGridPastePlan({
 
   matrix.forEach((clipboardRow, rowOffset) => {
     clipboardRow.forEach((input, columnOffset) => {
-      const row = rows[startRow + rowOffset]
+      const row = rowAccess.getRowAtIndex(startRow + rowOffset)
       const column = columns[startColIndex + columnOffset]
 
       if (!row || !column) {

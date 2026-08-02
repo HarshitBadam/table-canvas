@@ -7,7 +7,7 @@ import {
 } from '@/types'
 
 
-type WorkerRequestType =
+export type WorkerRequestType =
   | 'init'
   | 'loadTable'
   | 'executeTransform'

@@ -4,7 +4,10 @@ import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspa
 import { TableRow } from '@/state/dataStore'
 import { computeSuggestionEffect } from './computeEffects'
 import { useCleaningApply } from './useCleaningApply'
-import { loadCleaningRows } from './cleaningRows'
+import {
+  loadCleaningPreview,
+  MAX_IN_MEMORY_CLEANING_ROWS,
+} from './cleaningRows'
 import type { Suggestion } from '@/types'
 
 interface CleaningPanelProps {
@@ -24,6 +27,9 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
   const [rows, setRows] = useState<TableRow[]>([])
   const [rowsLoaded, setRowsLoaded] = useState(false)
   const [rowsError, setRowsError] = useState<string | null>(null)
+  const [totalRows, setTotalRows] = useState(0)
+  const [previewIsTruncated, setPreviewIsTruncated] = useState(false)
+  const [isPolicyLimited, setIsPolicyLimited] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
   const refreshKey = node?.updatedAt
 
@@ -31,14 +37,20 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
     let cancelled = false
     setRowsLoaded(false)
     setRowsError(null)
-    loadCleaningRows(tableId)
-      .then((loadedRows) => {
+    loadCleaningPreview(tableId)
+      .then((preview) => {
         if (cancelled) return
-        setRows(loadedRows)
+        setRows(preview.rows)
+        setTotalRows(preview.totalRows)
+        setPreviewIsTruncated(preview.isTruncated)
+        setIsPolicyLimited(preview.isPolicyLimited)
       })
       .catch((cause) => {
         if (!cancelled) {
           setRows([])
+          setTotalRows(0)
+          setPreviewIsTruncated(false)
+          setIsPolicyLimited(false)
           setRowsError(cause instanceof Error ? cause.message : 'Could not load table rows for cleaning.')
         }
       })
@@ -98,9 +110,9 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       .filter(s => {
         if (s.operationType === 'review' && s.highlights.length > 0) {
           const allAlreadyHighlighted = s.highlights.every(h => existingHighlights.has(h))
-          if (allAlreadyHighlighted) return false
+          if (allAlreadyHighlighted && !previewIsTruncated) return false
         }
-        return s.changes.length > 0 || s.highlights.length > 0
+        return previewIsTruncated || s.changes.length > 0 || s.highlights.length > 0
       })
 
     // Keep review-only outlier suggestions after actionable cleaning fixes.
@@ -111,7 +123,7 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         || b.suggestion.context.cleaningOperation?.type === 'remove_outliers'
       return Number(aIsOutlier) - Number(bIsOutlier)
     })
-  }, [suggestions, rows, existingHighlights])
+  }, [suggestions, rows, existingHighlights, previewIsTruncated])
 
   useEffect(() => {
     if (!rowsLoaded || rowsError) return
@@ -150,6 +162,7 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
     tableId,
     setSelectedIds,
     rows,
+    totalRows,
   })
 
   if (node?.kind !== 'source_table') {
@@ -207,9 +220,21 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
 
   return (
     <div className="flex flex-col h-full">
+      {isPolicyLimited && (
+        <div className="border-b border-yellow-300 bg-yellow-50 px-4 py-3 dark:border-yellow-900 dark:bg-yellow-950/30" role="note">
+          <p className="text-xs font-medium text-text-primary">
+            Preview only for this large table
+          </p>
+          <p className="mt-1 text-xs text-text-secondary">
+            This table has {totalRows.toLocaleString()} rows. Applying in-place cleaning is limited
+            to {MAX_IN_MEMORY_CLEANING_ROWS.toLocaleString()} rows to protect browser memory.
+          </p>
+        </div>
+      )}
       <div className="flex items-center justify-between border-b border-border-subtle bg-surface-secondary/40 px-4 py-3">
         <span className="text-xs font-medium text-text-tertiary">
           {suggestionsWithEffects.length} issue{suggestionsWithEffects.length !== 1 ? 's' : ''}
+          {previewIsTruncated ? ' in preview' : ''}
         </span>
         <div className="flex items-center gap-1">
           <button
@@ -259,7 +284,7 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
                       {suggestion.title}
                     </span>
                     <span className="shrink-0 text-xs font-medium tabular-nums text-text-tertiary">
-                      {count}
+                      {previewIsTruncated ? `${count}+` : count}
                     </span>
                   </div>
                   {changes.length > 0 && (
@@ -279,8 +304,14 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       <div className="p-3 border-t border-border">
         <button
           onClick={handleApply}
-          disabled={selectedCount === 0 || isApplying || !canEdit}
-          title={canEdit ? undefined : EDITING_ELSEWHERE_TOOLTIP}
+          disabled={selectedCount === 0 || isApplying || !canEdit || isPolicyLimited}
+          title={
+            !canEdit
+              ? EDITING_ELSEWHERE_TOOLTIP
+              : isPolicyLimited
+                ? `In-place cleaning is limited to ${MAX_IN_MEMORY_CLEANING_ROWS.toLocaleString()} rows.`
+                : undefined
+          }
           className="w-full btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isApplying ? 'Applying...' : `Apply ${selectedCount} fix${selectedCount !== 1 ? 'es' : ''}`}
