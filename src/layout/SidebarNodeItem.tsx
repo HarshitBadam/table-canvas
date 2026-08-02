@@ -5,7 +5,7 @@ import type { ProjectNode, TableNode } from '@/types'
 import { useProjectStore } from '@/state/projectStore'
 import { duplicateDerivedTable } from '@/state/duplicateDerivedTable'
 import { useAppAuth } from '@/state/AppContext'
-import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
+import { isTableUpdating, useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { focusMenuItem } from '@/lib/focusMenuItem'
 import { ChartTypeIcon } from '@/charts/ChartTypeIcon'
@@ -38,6 +38,7 @@ export function SidebarNodeItem({
   const nodes = useProjectStore(state => state.nodes)
   const { user } = useAppAuth()
   const { canEdit } = useWorkspaceLease()
+  const cacheInfo = useNodeCacheInfo(node.id)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null)
@@ -153,6 +154,7 @@ export function SidebarNodeItem({
 
   const isTable = node.kind === 'source_table' || node.kind === 'derived_table'
   const isDerivedTable = node.kind === 'derived_table'
+  const tableIsUpdating = isTable && isTableUpdating(cacheInfo)
 
   return (
     <li
@@ -194,8 +196,10 @@ export function SidebarNodeItem({
           <button
             type="button"
             onClick={() => onOpen(node.id)}
+            disabled={tableIsUpdating}
             aria-current={selected ? 'page' : undefined}
-            className={`min-w-0 flex-1 rounded-lg px-2 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset ${
+            title={tableIsUpdating ? 'This table is updating. It will open once the refresh finishes.' : undefined}
+            className={`min-w-0 flex-1 rounded-lg px-2 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset disabled:cursor-wait disabled:opacity-60 ${
               isDerivedTable ? 'focus-visible:ring-node-derived-border' : 'focus-visible:ring-accent-green'
             } ${
               selected

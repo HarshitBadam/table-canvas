@@ -46,6 +46,7 @@ describe('useBackgroundTableRefresh', () => {
       childId,
       grandchildId,
     ])
+    expect(ensureTableMaterialized).toHaveBeenCalledWith(sourceId, { announce: false })
   })
 
   it('does not refresh unrelated clean tables', async () => {
@@ -62,6 +63,6 @@ describe('useBackgroundTableRefresh', () => {
     })
 
     expect(ensureTableMaterialized).toHaveBeenCalledOnce()
-    expect(ensureTableMaterialized).toHaveBeenCalledWith(editedId)
+    expect(ensureTableMaterialized).toHaveBeenCalledWith(editedId, { announce: false })
   })
 })

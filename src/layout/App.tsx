@@ -20,6 +20,7 @@ import { StorageWarningBanner } from '@/persistence/StorageWarningBanner'
 import { EditingElsewhereBanner } from '@/components/EditingElsewhereBanner'
 import { MergeNoticeBanner } from '@/components/MergeNoticeBanner'
 import { NodeDeletionProvider } from '@/components/NodeDeletionAlertDialog'
+import { getNodeCacheInfo, isTableUpdating } from '@/state/tableRuntimeStore'
 
 const GridView = lazy(() => import('@/grid/GridView').then(m => ({ default: m.GridView })))
 const ChartView = lazy(() => import('@/charts/ChartView').then(m => ({ default: m.ChartView })))
@@ -106,6 +107,7 @@ function MainApp() {
   const handleNodeDoubleClick = useCallback((nodeId: string) => {
     const node = useProjectStore.getState().nodes[nodeId]
     if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
+      if (isTableUpdating(getNodeCacheInfo(nodeId))) return
       selectNode(nodeId)
       setActiveView('grid')
     } else if (node && node.kind === 'chart') {
@@ -125,6 +127,7 @@ function MainApp() {
   }, [setActiveView])
 
   const handleOpenTable = useCallback((tableId: string) => {
+    if (isTableUpdating(getNodeCacheInfo(tableId))) return
     selectNode(tableId)
     setActiveView('grid')
     setNavigationOpen(false)

@@ -37,6 +37,15 @@ export class ApiError extends Error {
   }
 }
 
+/** Prefer server field errors when present (e.g. "Invalid project ID format"). */
+export function formatApiErrorMessage(error: unknown, fallback = 'Request failed'): string {
+  if (error instanceof ApiError) {
+    return error.errors?.join(', ') || error.message || fallback;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
 /** Supports both `Retry-After` forms: delta-seconds and an HTTP-date. */
 function parseRetryAfter(response: Response): number | undefined {
   const header = response.headers?.get('Retry-After');

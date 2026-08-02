@@ -159,6 +159,21 @@ describe('source table materialization', () => {
     await ensureTableMaterialized('table_1')
     expect(cacheOf('table_1')).toMatchObject({ isDirty: false, isComputing: false })
   })
+  it('can rematerialize without announcing Updating progress', async () => {
+    projectStore.nodes.table_1 = sourceNode('table_1', { isDirty: true })
+    loadFile.mockResolvedValue(csv())
+    engine.getSlice.mockRejectedValue(new Error('Not in engine'))
+    const computingStates: Array<boolean | undefined> = []
+    const unsubscribe = useTableRuntimeStore.subscribe((state) => {
+      computingStates.push(state.cacheInfo.table_1?.isComputing)
+    })
+
+    await ensureTableMaterialized('table_1', { announce: false })
+    unsubscribe()
+
+    expect(computingStates).not.toContain(true)
+    expect(cacheOf('table_1')).toMatchObject({ isDirty: false, isComputing: false })
+  })
   it('reloads a source table when the engine row count is incomplete', async () => {
     const node = sourceNode('table_1', {
       currentVersionHash: computeSourceVersionHash(

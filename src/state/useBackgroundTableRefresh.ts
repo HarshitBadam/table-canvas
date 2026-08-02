@@ -25,7 +25,8 @@ export function getDirtyTableRefreshOrder(
 /**
  * Recomputes stale tables after an edit burst. Grid and chart readers materialize
  * their own table on demand; this fills the gap for downstream tables that are not
- * currently open, so their canvas state does not remain pending until a reload.
+ * currently open. Progress is silent so undo/redo does not flash Updating badges
+ * across the canvas.
  */
 export function useBackgroundTableRefresh(enabled: boolean): void {
   const projectId = useProjectStore(state => state.projectId)
@@ -47,7 +48,7 @@ export function useBackgroundTableRefresh(enabled: boolean): void {
         for (const tableId of scheduledOrder) {
           if (useProjectStore.getState().projectId !== projectId) return
           if (!getNodeCacheInfo(tableId)?.isDirty) continue
-          await ensureTableMaterialized(tableId)
+          await ensureTableMaterialized(tableId, { announce: false })
         }
       })().catch(error => {
         console.error('[TableRefresh] Background refresh failed:', error)

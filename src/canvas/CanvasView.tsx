@@ -316,7 +316,10 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         connectionMode={ConnectionMode.Loose}
         nodesDraggable={canEdit}
         nodesConnectable={canEdit}
-        deleteKeyCode={null}
+        // Deletion is mediated by useCanvasKeyboard so it can ask for confirmation.
+        // An empty shortcut list prevents React Flow from removing the rendered node
+        // before that confirmation is resolved.
+        deleteKeyCode={[]}
         connectionRadius={36}
         nodeDragThreshold={4}
         connectOnClick={false}

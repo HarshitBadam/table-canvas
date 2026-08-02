@@ -13,6 +13,7 @@ import {
 import type { Report } from '@/report/types'
 import {
   acknowledgeProjectSave,
+  clearProjectSyncOperation,
   finalizeProjectDelete,
   getProjectSyncOperation,
   listProjectSyncOperations,
@@ -216,11 +217,23 @@ export async function flushAllQueuedProjectSavesWithSync(
     try {
       await flushProjectSaveWithSync(operation.projectId, scope)
     } catch (error) {
-      if (!(error instanceof ApiError) || error.statusCode !== 409) throw error
-      conflicts.push({
-        projectId: operation.projectId,
-        operation: operation.operation,
-      })
+      if (error instanceof ApiError && error.statusCode === 409) {
+        conflicts.push({
+          projectId: operation.projectId,
+          operation: operation.operation,
+        })
+        continue
+      }
+      // Drop doomed queue entries (e.g. invalid project ids) so one bad sync
+      // cannot brick app startup for an otherwise healthy account.
+      if (error instanceof ApiError && error.statusCode === 400) {
+        await clearProjectSyncOperation(operation.projectId, scope)
+        reportProjectSyncError(
+          error.errors?.join(', ') || error.message || 'Project sync failed',
+        )
+        continue
+      }
+      throw error
     }
   }
   return conflicts

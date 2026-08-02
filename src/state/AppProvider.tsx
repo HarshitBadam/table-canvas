@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LoginCredentials } from '@/api/auth.api'
+import { formatApiErrorMessage } from '@/api/client'
 import {
   fetchProjects,
   flushAllProjectSavesWithSync,
@@ -155,8 +156,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           isAuthenticated: true,
         }))
         if (authResult.user.tier !== 'guest') {
-          await syncLocalProjectsToBackend()
-          await flushAllProjectSavesWithSync()
+          try {
+            await syncLocalProjectsToBackend()
+            await flushAllProjectSavesWithSync()
+          } catch (error) {
+            console.error('[AppContext] Startup project sync failed:', error)
+            setState(previous => ({
+              ...previous,
+              syncError: formatApiErrorMessage(error, 'Project sync failed'),
+            }))
+          }
         }
 
         setPhase('loading_project')
@@ -179,7 +188,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }))
         setPhase('ready')
       } catch (error) {
-        setPhase('error', error instanceof Error ? error.message : 'Initialization failed')
+        setPhase('error', formatApiErrorMessage(error, 'Initialization failed'))
       }
     }
 
@@ -190,8 +199,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPhase('loading_project')
     clearWorkspaceViews(getStorageScope())
     if (tier !== 'guest') {
-      await syncLocalProjectsToBackend()
-      await flushAllProjectSavesWithSync()
+      try {
+        await syncLocalProjectsToBackend()
+        await flushAllProjectSavesWithSync()
+      } catch (error) {
+        console.error('[AppContext] Post-login project sync failed:', error)
+        setState(previous => ({
+          ...previous,
+          syncError: formatApiErrorMessage(error, 'Project sync failed'),
+        }))
+      }
     }
     const { project, projectList } = await loadOrCreateProject()
     await prepareProject(project)

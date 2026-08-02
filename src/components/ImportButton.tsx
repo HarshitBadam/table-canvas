@@ -9,9 +9,49 @@ import { beginHistoryTransaction, commitHistoryTransaction, rollbackHistoryTrans
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { checkFileSize, checkRowCount, checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
-import type { SheetInfo } from '@/persistence/importParsers'
 import { discardFiles, getTableCount } from '@/persistence/importUtils'
 import { stageImportedTable } from '@/persistence/stageImportedTable'
+import type { ParsedTableData } from '@/engine/fileParsers'
+import { uploadFileWithSync } from '@/persistence/syncService'
+
+type PendingImportItem =
+  | {
+      id: string
+      kind: 'csv'
+      label: string
+      tableName: string
+      rowCount: number
+      selected: boolean
+      file: File
+      tableData: ParsedTableData
+    }
+  | {
+      id: string
+      kind: 'sheet'
+      label: string
+      tableName: string
+      rowCount: number
+      selected: boolean
+      sourceFileName: string
+      sheetName: string
+      workbook: WorkBook
+      buffer: ArrayBuffer
+    }
+
+type SelectionMode = 'sheets' | 'tables'
+
+function fileExtension(fileName: string): string | undefined {
+  return fileName.split('.').pop()?.toLowerCase()
+}
+
+function fileBaseName(fileName: string): string {
+  return fileName.replace(/\.[^/.]+$/, '')
+}
+
+function isDataFile(file: File): boolean {
+  const extension = fileExtension(file.name)
+  return extension === 'csv' || extension === 'xlsx' || extension === 'xls'
+}
 
 export function ImportButton() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -20,11 +60,9 @@ export function ImportButton() {
   const { canEdit } = useWorkspaceLease()
 
   const [isImporting, setIsImporting] = useState(false)
-  const [sheetModalOpen, setSheetModalOpen] = useState(false)
-  const [sheets, setSheets] = useState<SheetInfo[]>([])
-  const [workbook, setWorkbook] = useState<WorkBook | null>(null)
-  const [excelBuffer, setExcelBuffer] = useState<ArrayBuffer | null>(null)
-  const [fileName, setFileName] = useState('')
+  const [selectionModalOpen, setSelectionModalOpen] = useState(false)
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('sheets')
+  const [pendingItems, setPendingItems] = useState<PendingImportItem[]>([])
   const [importError, setImportError] = useState<string | null>(null)
 
   const [upgradeViolation, setUpgradeViolation] = useState<LimitExceeded | null>(null)
@@ -37,18 +75,156 @@ export function ImportButton() {
     setUpgradeOpen(true)
   }
 
+  const clearSelectionState = () => {
+    setPendingItems([])
+    setSelectionMode('sheets')
+  }
+
+  const handleSelectionModalOpenChange = (open: boolean) => {
+    setSelectionModalOpen(open)
+    if (!open) clearSelectionState()
+  }
+
   const handleClick = () => fileInputRef.current?.click()
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const importSingleCsv = async (file: File, projectId: string, uploadedFileIds: string[]) => {
+    const { parseCSVFile } = await import('@/persistence/importParsers')
+    const nodes = useProjectStore.getState().nodes
+    const tableCheck = checkTableCount(getTableCount(nodes), tier)
+    if (!tableCheck.ok) {
+      showViolation(tableCheck)
+      return
+    }
 
-    const extension = file.name.split('.').pop()?.toLowerCase()
+    const { schema, rows, fileRef } = await parseCSVFile(file, projectId)
+    uploadedFileIds.push(fileRef)
+
+    const rowCheck = checkRowCount(schema.rowCount ?? rows.length, tier)
+    if (!rowCheck.ok) {
+      await discardFiles(uploadedFileIds)
+      showViolation(rowCheck)
+      return
+    }
+    if (useProjectStore.getState().projectId !== projectId) {
+      throw new Error('The active project changed during import.')
+    }
+    const transactionId = beginHistoryTransaction(`Import table ${file.name}`)
+    try {
+      await stageImportedTable({
+        name: fileBaseName(file.name),
+        fileRef,
+        fileName: file.name,
+        fileType: 'csv',
+        schema,
+        rows,
+        engineError: 'The data engine did not initialize the imported table.',
+      })
+      commitHistoryTransaction(transactionId)
+      uploadedFileIds.length = 0
+    } catch (error) {
+      rollbackHistoryTransaction(transactionId)
+      throw error
+    }
+  }
+
+  const buildPendingItemsFromFiles = async (files: File[]): Promise<PendingImportItem[]> => {
+    const { inspectCSVFile, inspectExcelFile } = await import('@/persistence/importParsers')
+
+    const items: PendingImportItem[] = []
+    for (const [fileIndex, file] of files.entries()) {
+      const extension = fileExtension(file.name)
+      if (extension === 'csv') {
+        const tableData = await inspectCSVFile(file)
+        const tableName = fileBaseName(file.name)
+        items.push({
+          id: `csv:${fileIndex}:${file.name}`,
+          kind: 'csv',
+          label: tableName,
+          tableName,
+          rowCount: tableData.schema.rowCount ?? tableData.rows.length,
+          selected: true,
+          file,
+          tableData,
+        })
+        continue
+      }
+
+      if (extension === 'xlsx' || extension === 'xls') {
+        const { workbook, buffer, sheets } = await inspectExcelFile(file)
+        const baseName = fileBaseName(file.name)
+        for (const sheet of sheets) {
+          items.push({
+            id: `sheet:${fileIndex}:${file.name}:${sheet.name}`,
+            kind: 'sheet',
+            label: `${baseName} › ${sheet.name}`,
+            tableName: sheet.name,
+            rowCount: sheet.rowCount,
+            selected: true,
+            sourceFileName: file.name,
+            sheetName: sheet.name,
+            workbook,
+            buffer,
+          })
+        }
+      }
+    }
+    return items
+  }
+
+  const openSelectionModal = (items: PendingImportItem[], mode: SelectionMode) => {
+    setPendingItems(items)
+    setSelectionMode(mode)
+    setSelectionModalOpen(true)
+  }
+
+  const prepareMultiFileSelection = async (files: File[]) => {
+    for (const file of files) {
+      const sizeCheck = checkFileSize(file.size, tier)
+      if (!sizeCheck.ok) {
+        showViolation(sizeCheck)
+        return
+      }
+    }
+
+    setIsImporting(true)
+    setImportError(null)
+    try {
+      const items = await buildPendingItemsFromFiles(files)
+      if (items.length === 0) {
+        setImportError('No importable tables found in the selected files.')
+        return
+      }
+      openSelectionModal(items, 'tables')
+    } catch (error: unknown) {
+      console.error('Multi-file inspect error:', error)
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      setImportError(`Failed to read selected files: ${message}`)
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+
+    if (files.length > 1) {
+      if (!files.every(isDataFile)) {
+        setImportError('To import multiple files at once, select only CSV or Excel files.')
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        return
+      }
+      await prepareMultiFileSelection(files)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    const file = files[0]
+    const extension = fileExtension(file.name)
 
     if (extension === 'json' || extension === 'zip') {
       setIsImporting(true)
       setImportError(null)
-      setFileName(file.name)
       try {
         const { parseImportFile } = await import('@/persistence/exportImport')
         const parsed = await parseImportFile(file)
@@ -83,47 +259,13 @@ export function ImportButton() {
 
     setIsImporting(true)
     setImportError(null)
-    setFileName(file.name)
     const projectId = useProjectStore.getState().projectId
     const uploadedFileIds: string[] = []
     let transactionId: string | null = null
 
     try {
       if (extension === 'csv') {
-        const { parseCSVFile } = await import('@/persistence/importParsers')
-        const nodes = useProjectStore.getState().nodes
-        const tableCheck = checkTableCount(getTableCount(nodes), tier)
-        if (!tableCheck.ok) {
-          showViolation(tableCheck)
-          return
-        }
-
-        const { schema, rows, fileRef } = await parseCSVFile(file, projectId)
-        uploadedFileIds.push(fileRef)
-
-        const rowCheck = checkRowCount(schema.rowCount ?? rows.length, tier)
-        if (!rowCheck.ok) {
-          await discardFiles(uploadedFileIds)
-          showViolation(rowCheck)
-          return
-        }
-        if (useProjectStore.getState().projectId !== projectId) {
-          throw new Error('The active project changed during import.')
-        }
-        transactionId = beginHistoryTransaction(`Import table ${file.name}`)
-
-        await stageImportedTable({
-          name: file.name.replace(/\.[^/.]+$/, ''),
-          fileRef,
-          fileName: file.name,
-          fileType: 'csv',
-          schema,
-          rows,
-          engineError: 'The data engine did not initialize the imported table.',
-        })
-        commitHistoryTransaction(transactionId)
-        transactionId = null
-        uploadedFileIds.length = 0
+        await importSingleCsv(file, projectId, uploadedFileIds)
       } else if (extension === 'xlsx' || extension === 'xls') {
         const { parseExcelFile } = await import('@/persistence/importParsers')
         const result = await parseExcelFile(file, projectId)
@@ -151,7 +293,7 @@ export function ImportButton() {
           transactionId = beginHistoryTransaction(`Import table ${file.name}`)
 
           await stageImportedTable({
-            name: file.name.replace(/\.[^/.]+$/, ''),
+            name: fileBaseName(file.name),
             fileRef: result.fileRef,
             fileName: file.name,
             fileType: 'xlsx',
@@ -163,10 +305,21 @@ export function ImportButton() {
           transactionId = null
           uploadedFileIds.length = 0
         } else {
-          setSheets(result.sheets)
-          setWorkbook(result.workbook)
-          setExcelBuffer(result.buffer)
-          setSheetModalOpen(true)
+          openSelectionModal(
+            result.sheets.map((sheet) => ({
+              id: `sheet:0:${file.name}:${sheet.name}`,
+              kind: 'sheet' as const,
+              label: sheet.name,
+              tableName: sheet.name,
+              rowCount: sheet.rowCount,
+              selected: sheet.selected,
+              sourceFileName: file.name,
+              sheetName: sheet.name,
+              workbook: result.workbook,
+              buffer: result.buffer,
+            })),
+            'sheets',
+          )
         }
       } else {
         setImportError('Unsupported file type. Please use a CSV, Excel, or TableCanvas project file.')
@@ -183,14 +336,16 @@ export function ImportButton() {
     }
   }
 
-  const handleImportSelectedSheets = async () => {
-    if (!workbook) return
+  const handleImportSelectedItems = async () => {
+    const selectedItems = pendingItems.filter((item) => item.selected)
+    if (selectedItems.length === 0) return
 
     setIsImporting(true)
     setImportError(null)
     const projectId = useProjectStore.getState().projectId
     const uploadedFileIds: string[] = []
     let transactionId: string | null = null
+
     try {
       const [
         { importSheetAndPersist },
@@ -199,22 +354,34 @@ export function ImportButton() {
         import('@/persistence/importParsers'),
         import('@/engine/fileParsers'),
       ])
-      const selectedSheets = sheets.filter((s) => s.selected)
+
       const nodes = useProjectStore.getState().nodes
       const currentTableCount = getTableCount(nodes)
+      const unitLabel = selectionMode === 'sheets' ? 'sheet' : 'table'
+      const unitLabelPlural = selectionMode === 'sheets' ? 'sheets' : 'tables'
 
-      const tableCheck = checkTableCount(currentTableCount + selectedSheets.length - 1, tier)
+      const tableCheck = checkTableCount(currentTableCount + selectedItems.length - 1, tier)
       if (!tableCheck.ok) {
-        setSheetModalOpen(false)
+        setSelectionModalOpen(false)
+        clearSelectionState()
         showViolation({
           ...tableCheck,
-          reason: `Importing ${selectedSheets.length} ${selectedSheets.length === 1 ? 'sheet' : 'sheets'} would bring this project from ${currentTableCount} to ${currentTableCount + selectedSheets.length} tables (limit: ${tableCheck.limit}).`,
+          reason: `Importing ${selectedItems.length} ${selectedItems.length === 1 ? unitLabel : unitLabelPlural} would bring this project from ${currentTableCount} to ${currentTableCount + selectedItems.length} tables (limit: ${tableCheck.limit}).`,
         })
         return
       }
 
-      for (const sheet of selectedSheets) {
-        const tableData = parseWorkbookSheet(workbook, sheet.name)
+      for (const item of selectedItems) {
+        if (item.kind === 'csv') {
+          const rowCheck = checkRowCount(item.rowCount, tier)
+          if (!rowCheck.ok) {
+            showViolation(rowCheck)
+            return
+          }
+          continue
+        }
+
+        const tableData = parseWorkbookSheet(item.workbook, item.sheetName)
         const rowCheck = checkRowCount(tableData.schema.rowCount ?? tableData.rows.length, tier)
         if (!rowCheck.ok) {
           showViolation(rowCheck)
@@ -223,16 +390,37 @@ export function ImportButton() {
       }
 
       transactionId = beginHistoryTransaction(
-        `Import ${selectedSheets.length} workbook sheets`,
+        selectionMode === 'sheets'
+          ? `Import ${selectedItems.length} workbook sheets`
+          : `Import ${selectedItems.length} tables`,
       )
 
-      for (const sheet of selectedSheets) {
+      for (const item of selectedItems) {
+        if (item.kind === 'csv') {
+          const uploaded = await uploadFileWithSync(item.file, projectId)
+          uploadedFileIds.push(uploaded.id)
+          if (useProjectStore.getState().projectId !== projectId) {
+            throw new Error('The active project changed during import.')
+          }
+
+          await stageImportedTable({
+            name: item.tableName,
+            fileRef: uploaded.id,
+            fileName: item.file.name,
+            fileType: 'csv',
+            schema: item.tableData.schema,
+            rows: item.tableData.rows,
+            engineError: `The data engine did not initialize table "${item.tableName}".`,
+          })
+          continue
+        }
+
         const { tableData, fileRef } = await importSheetAndPersist(
-          workbook,
-          sheet.name,
-          fileName,
+          item.workbook,
+          item.sheetName,
+          item.sourceFileName,
           projectId,
-          excelBuffer || undefined,
+          item.buffer,
         )
         uploadedFileIds.push(fileRef)
         if (useProjectStore.getState().projectId !== projectId) {
@@ -240,49 +428,53 @@ export function ImportButton() {
         }
 
         await stageImportedTable({
-          name: sheet.name,
+          name: item.tableName,
           fileRef,
-          fileName,
+          fileName: item.sourceFileName,
           fileType: 'xlsx',
-          sheetName: sheet.name,
+          sheetName: item.sheetName,
           schema: tableData.schema,
           rows: tableData.rows,
-          engineError: `The data engine did not initialize sheet "${sheet.name}".`,
+          engineError: `The data engine did not initialize sheet "${item.sheetName}".`,
         })
       }
+
       commitHistoryTransaction(transactionId)
       transactionId = null
       uploadedFileIds.length = 0
 
-      setSheetModalOpen(false)
-      setWorkbook(null)
-      setExcelBuffer(null)
-      setSheets([])
+      setSelectionModalOpen(false)
+      clearSelectionState()
     } catch (error) {
       rollbackHistoryTransaction(transactionId)
       await discardFiles(uploadedFileIds)
-      console.error('Workbook import error:', error)
+      console.error('Import selection error:', error)
       setImportError(
-        error instanceof Error ? error.message : 'Failed to import workbook',
+        error instanceof Error ? error.message : 'Failed to import selected tables',
       )
     } finally {
       setIsImporting(false)
     }
   }
 
-  const toggleSheet = (index: number) => {
-    setSheets((prev) =>
-      prev.map((s, i) => (i === index ? { ...s, selected: !s.selected } : s))
+  const toggleItem = (index: number) => {
+    setPendingItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, selected: !item.selected } : item))
     )
   }
 
-  const selectedCount = sheets.filter((s) => s.selected).length
+  const selectedCount = pendingItems.filter((item) => item.selected).length
+  const selectionTitle = selectionMode === 'sheets' ? 'Select Sheets to Import' : 'Select Tables to Import'
+  const selectionDescription = selectionMode === 'sheets'
+    ? `This file contains ${pendingItems.length} sheets`
+    : `${pendingItems.length} tables from selected files`
 
   return (
     <>
       <input
         ref={fileInputRef}
         type="file"
+        multiple
         accept=".csv,.xlsx,.xls,.json,.tablecanvas.json,.zip,.tablecanvas.zip"
         onChange={handleFileSelect}
         className="hidden"
@@ -314,32 +506,32 @@ export function ImportButton() {
         </p>
       )}
 
-      <Dialog.Root open={sheetModalOpen} onOpenChange={setSheetModalOpen}>
+      <Dialog.Root open={selectionModalOpen} onOpenChange={handleSelectionModalOpenChange}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/45 backdrop-blur-[2px] motion-safe:animate-fade-in" />
           <Dialog.Content className="fixed inset-0 z-modal m-auto h-fit w-[min(25.5rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl motion-safe:animate-scale-in">
             <div className="flex flex-col items-start border-b border-border-subtle px-5 pb-4 pt-5 text-left">
               <Dialog.Title className="text-base font-semibold text-text-primary">
-                Select Sheets to Import
+                {selectionTitle}
               </Dialog.Title>
               <Dialog.Description className="mt-0.5 text-sm text-text-secondary">
-                This file contains {sheets.length} sheets
+                {selectionDescription}
               </Dialog.Description>
             </div>
 
             <div className="max-h-[min(60vh,30rem)] overflow-y-auto">
               <div className="divide-y divide-border-subtle">
-                {sheets.map((sheet, index) => (
+                {pendingItems.map((item, index) => (
                   <label
-                    key={sheet.name}
+                    key={item.id}
                     className="flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-secondary"
                   >
                     <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
-                      sheet.selected
+                      item.selected
                         ? 'border-accent-green bg-accent-green'
                         : 'border-border bg-surface'
                     }`}>
-                      {sheet.selected && (
+                      {item.selected && (
                         <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
@@ -347,16 +539,16 @@ export function ImportButton() {
                     </span>
                     <input
                       type="checkbox"
-                      checked={sheet.selected}
-                      onChange={() => toggleSheet(index)}
+                      checked={item.selected}
+                      onChange={() => toggleItem(index)}
                       className="sr-only focus-visible:!outline-none"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-text-primary truncate">
-                        {sheet.name}
+                        {item.label}
                       </div>
                       <div className="text-xs text-text-secondary">
-                        {sheet.rowCount} rows
+                        {item.rowCount} rows
                       </div>
                     </div>
                   </label>
@@ -375,8 +567,8 @@ export function ImportButton() {
                   </button>
                 </Dialog.Close>
                 <button
-                  onClick={handleImportSelectedSheets}
-                  disabled={selectedCount === 0}
+                  onClick={handleImportSelectedItems}
+                  disabled={selectedCount === 0 || isImporting}
                   className="btn btn-primary px-4"
                 >
                   Import
@@ -391,7 +583,7 @@ export function ImportButton() {
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}
         violation={upgradeViolation}
-        layer={sheetModalOpen ? 'nested' : 'base'}
+        layer={selectionModalOpen ? 'nested' : 'base'}
       />
     </>
   )

@@ -35,24 +35,19 @@ interface ExcelSingleSheet {
 
 type ExcelParseResult = ExcelMultiSheet | ExcelSingleSheet
 
-export async function parseCSVFile(file: File, projectId: string): Promise<CSVParseResult> {
+export async function inspectCSVFile(file: File): Promise<ParsedTableData> {
   const buffer = await readFileAsArrayBuffer(file)
-  const tableData = await parseCsvBuffer(buffer)
+  return parseCsvBuffer(buffer)
+}
+
+export async function parseCSVFile(file: File, projectId: string): Promise<CSVParseResult> {
+  const tableData = await inspectCSVFile(file)
   const uploaded = await uploadFileWithSync(file, projectId)
   return { ...tableData, fileRef: uploaded.id }
 }
 
-export async function parseExcelFile(file: File, projectId: string): Promise<ExcelParseResult> {
-  const buffer = await readFileAsArrayBuffer(file)
-  const workbook = readWorkbook(buffer)
-
-  if (workbook.SheetNames.length === 1) {
-    const tableData = parseWorkbookSheet(workbook, workbook.SheetNames[0])
-    const uploaded = await uploadFileWithSync(file, projectId)
-    return { kind: 'single', tableData, fileRef: uploaded.id }
-  }
-
-  const sheets = workbook.SheetNames.map((name) => {
+function sheetInfosFromWorkbook(workbook: WorkBook): SheetInfo[] {
+  return workbook.SheetNames.map((name) => {
     const sheet = workbook.Sheets[name]
     const range = sheet['!ref']?.split(':') ?? []
     const rowCount = range.length === 2
@@ -60,6 +55,26 @@ export async function parseExcelFile(file: File, projectId: string): Promise<Exc
       : 0
     return { name, rowCount, selected: true }
   })
+}
+
+export async function inspectExcelFile(file: File): Promise<{
+  workbook: WorkBook
+  buffer: ArrayBuffer
+  sheets: SheetInfo[]
+}> {
+  const buffer = await readFileAsArrayBuffer(file)
+  const workbook = readWorkbook(buffer)
+  return { workbook, buffer, sheets: sheetInfosFromWorkbook(workbook) }
+}
+
+export async function parseExcelFile(file: File, projectId: string): Promise<ExcelParseResult> {
+  const { workbook, buffer, sheets } = await inspectExcelFile(file)
+
+  if (sheets.length === 1) {
+    const tableData = parseWorkbookSheet(workbook, sheets[0].name)
+    const uploaded = await uploadFileWithSync(file, projectId)
+    return { kind: 'single', tableData, fileRef: uploaded.id }
+  }
 
   return { kind: 'multi', workbook, buffer, sheets }
 }
