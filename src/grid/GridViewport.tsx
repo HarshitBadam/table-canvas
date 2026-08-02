@@ -83,7 +83,9 @@ export function GridViewport({ totalRows, windowed, onAddColumn }: GridViewportP
       aria-multiselectable="true"
       aria-rowcount={totalRows + 1}
       aria-colcount={columns.length + 1}
-      className="flex-1 overflow-auto overscroll-x-contain select-none"
+      className={`flex-1 overflow-auto overscroll-x-contain select-none ${
+        totalRows > 50 ? 'grid-viewport-scrollbar' : ''
+      }`}
       onMouseDown={(event) => {
         const target = event.target
         if (

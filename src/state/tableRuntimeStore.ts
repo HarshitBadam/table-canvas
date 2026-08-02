@@ -106,6 +106,10 @@ export function getNodeCacheInfo(nodeId: string): CacheInfo | undefined {
   return useTableRuntimeStore.getState().cacheInfo[nodeId]
 }
 
+export function isTableUpdating(cacheInfo: CacheInfo | undefined): boolean {
+  return !cacheInfo?.error && Boolean(cacheInfo?.isDirty || cacheInfo?.isComputing)
+}
+
 export function updateNodeCacheInfo(
   nodeId: string,
   updates: Partial<CacheInfo>,

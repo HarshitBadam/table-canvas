@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api, ApiError } from './client'
+import { api, ApiError, formatApiErrorMessage } from './client'
 
 function rateLimited(headers: Record<string, string> = {}): Response {
   return {
@@ -43,5 +43,15 @@ describe('rate limited responses', () => {
     const error = await api.get('/projects').catch((thrown: unknown) => thrown)
 
     expect(error).toMatchObject({ statusCode: 429, retryAfterSeconds: undefined })
+  })
+})
+
+describe('formatApiErrorMessage', () => {
+  it('prefers detailed validation errors from the API', () => {
+    expect(
+      formatApiErrorMessage(
+        new ApiError('Validation failed', 400, ['Invalid project ID format']),
+      ),
+    ).toBe('Invalid project ID format')
   })
 })

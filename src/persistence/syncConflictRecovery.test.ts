@@ -96,4 +96,43 @@ describe('queued project conflict recovery', () => {
       revision: 3,
     })
   })
+
+  it('drops doomed queue entries with invalid project ids instead of failing boot', async () => {
+    const db = await getDB()
+    const scope = db.accountStorageScope('invalid-id-user')
+    db.setStorageScope(scope)
+    await db.saveProject(
+      'not-a-mongo-id',
+      'Legacy local project',
+      {},
+      {},
+      {},
+      { revision: 0 },
+      scope,
+    )
+    await db.enqueueProjectSave('not-a-mongo-id', {
+      name: 'Legacy local project',
+      nodes: {},
+      edges: {},
+      patches: {},
+      reports: {},
+    }, 0, scope)
+    const { ApiError } = await import('@/api/client')
+    api.updateProject.mockRejectedValueOnce(
+      new ApiError('Validation failed', 400, ['Invalid project ID format']),
+    )
+    const { flushAllProjectSavesWithSync, setProjectSyncErrorHandler } = await import(
+      './syncService'
+    )
+    const syncErrors: Array<string | null> = []
+    setProjectSyncErrorHandler(message => {
+      syncErrors.push(message)
+    })
+
+    await expect(flushAllProjectSavesWithSync()).resolves.toEqual([])
+
+    expect(await db.getProjectSyncOperation('not-a-mongo-id', scope)).toBeNull()
+    expect(syncErrors).toContain('Invalid project ID format')
+    setProjectSyncErrorHandler(null)
+  })
 })

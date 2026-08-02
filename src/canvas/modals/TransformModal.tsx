@@ -264,7 +264,7 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
             />
 
             {operation === 'union' && (
-              <div className="rounded-lg border border-accent-green/20 bg-accent-green/5 px-3 py-2.5">
+              <div className="rounded-lg bg-accent-green/5 px-3 py-2.5">
                 <p className="text-sm font-medium text-text-primary">Rows will be stacked in table order</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
                   Columns stay aligned by position and type. The original tables remain unchanged.

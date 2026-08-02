@@ -166,4 +166,40 @@ describe('history slice', () => {
     expect(useProjectStore.getState().nodes[rejectedId]).toBeUndefined()
     expect(useProjectStore.getState().history.past).toHaveLength(1)
   })
+
+  it('does not dirty unrelated tables when undoing a node move', () => {
+    const firstId = addSource('First')
+    const secondId = addSource('Second')
+    clean(firstId, secondId)
+    useTableRuntimeStore.getState().updateCacheInfo(firstId, {
+      isDirty: false,
+      isComputing: false,
+      currentVersionHash: 'hash_first',
+      dataRevision: 1,
+    })
+    useTableRuntimeStore.getState().updateCacheInfo(secondId, {
+      isDirty: false,
+      isComputing: false,
+      currentVersionHash: 'hash_second',
+      dataRevision: 1,
+    })
+    useProjectStore.setState({ history: { past: [], future: [] } })
+    useProjectStore.getState().saveSnapshot('Move first')
+    useProjectStore.getState().updateNodePosition(firstId, { x: 999, y: 999 })
+
+    useProjectStore.getState().undo()
+
+    expect(cacheOf(firstId)).toMatchObject({
+      isDirty: false,
+      isComputing: false,
+      currentVersionHash: 'hash_first',
+      dataRevision: 1,
+    })
+    expect(cacheOf(secondId)).toMatchObject({
+      isDirty: false,
+      isComputing: false,
+      currentVersionHash: 'hash_second',
+      dataRevision: 1,
+    })
+  })
 })

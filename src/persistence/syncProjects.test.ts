@@ -281,6 +281,26 @@ describe('loadProjectWithSync', () => {
     expect(result?.isLocalOnly).toBe(true)
     expect(result?.needsSync).toBe(true)
   })
+
+  it('falls back to local cache when the remote id is invalid', async () => {
+    mockGetProject.mockRejectedValue(
+      new ApiError('Validation failed', 400, ['Invalid project ID format']),
+    )
+    mockLoadProjectLocal.mockResolvedValue({
+      id: 'not-a-mongo-id',
+      name: 'Cached project',
+      nodes: {},
+      edges: {},
+      patches: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    })
+
+    const result = await loadProjectWithSync('not-a-mongo-id')
+
+    expect(result?.name).toBe('Cached project')
+    expect(result?.needsSync).toBe(false)
+  })
 })
 describe('saveProjectWithSync', () => {
   it('durably queues the local snapshot and debounces backend save', async () => {

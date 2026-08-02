@@ -249,7 +249,16 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
       return loaded
     } catch (error) {
       console.error('[syncService] Failed to load project from backend:', error)
-      if (!isRetryableRemoteDeferral(error)) throw error
+      // Invalid/missing remote ids should fall back to the local cache instead of
+      // hard-failing boot when IndexedDB still has a usable copy.
+      if (
+        error instanceof ApiError
+        && (error.statusCode === 400 || error.statusCode === 404)
+      ) {
+        // fall through to local
+      } else if (!isRetryableRemoteDeferral(error)) {
+        throw error
+      }
     }
   }
   if (!localProject) return null

@@ -13,7 +13,10 @@ import {
   getNodeCacheInfo,
   updateNodeCacheInfo,
 } from '@/state/tableRuntimeStore'
-import type { MaterializationResult } from './materializationService'
+import type {
+  MaterializationOptions,
+  MaterializationResult,
+} from './materializationService'
 import {
   captureMaterializationScope,
   isMaterializationScopeCurrent,
@@ -87,7 +90,9 @@ export async function computeDerivedTable(
   scope: MaterializationScope = captureMaterializationScope(
     useProjectStore.getState().projectId,
   ),
+  options: MaterializationOptions = {},
 ): Promise<MaterializationResult> {
+  const announce = options.announce !== false
   const snapshot = captureDerivedSnapshot(tableId)
 
   if (!snapshot) {
@@ -133,7 +138,7 @@ export async function computeDerivedTable(
       }
     }
 
-    updateNodeCacheInfo(tableId, { isComputing: true })
+    if (announce) updateNodeCacheInfo(tableId, { isComputing: true })
 
     const nameToId = new Map<string, string>()
     const idToName = new Map<string, string>()

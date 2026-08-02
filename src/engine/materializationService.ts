@@ -45,6 +45,15 @@ export interface MaterializationResult {
   error?: string
 }
 
+export interface MaterializationOptions {
+  /**
+   * When false, skip the shared "Updating…" cache flag so background refresh
+   * does not flash status badges on every canvas node. Callers that are
+   * actively waiting on data (grid, previews) leave this at the default.
+   */
+  announce?: boolean
+}
+
 const inProgressMaterializations = new Map<string, Promise<MaterializationResult>>()
 
 interface SourceSnapshot {
@@ -129,7 +138,9 @@ function captureTableRequestGeneration(tableId: string): string | undefined {
 async function loadSourceTable(
   tableId: string,
   scope: MaterializationScope,
+  options: MaterializationOptions = {},
 ): Promise<MaterializationResult> {
+  const announce = options.announce !== false
   let snapshot = captureSourceSnapshot(tableId)
   if (!snapshot) {
     return {
@@ -165,7 +176,7 @@ async function loadSourceTable(
       }
     }
 
-    updateNodeCacheInfo(tableId, { isComputing: true })
+    if (announce) updateNodeCacheInfo(tableId, { isComputing: true })
     let rows: TableRow[] = []
     if (snapshot.node.plan.fileRef) {
       const fileData = await loadFileWithSync(snapshot.node.plan.fileRef)
@@ -273,19 +284,23 @@ async function loadSourceTable(
 }
 
 
-export async function ensureTableMaterialized(tableId: string): Promise<MaterializationResult> {
+export async function ensureTableMaterialized(
+  tableId: string,
+  options: MaterializationOptions = {},
+): Promise<MaterializationResult> {
   const projectId = useProjectStore.getState().projectId
   const scope = captureMaterializationScope(projectId)
-  const requestKey = `${scope.projectId}:${scope.generation}:${tableId}`
+  const announce = options.announce !== false
+  const requestKey = `${scope.projectId}:${scope.generation}:${tableId}:${announce ? 'a' : 's'}`
   const existingPromise = inProgressMaterializations.get(requestKey)
   if (existingPromise) {
     return existingPromise
   }
 
   const materializationPromise = enqueueEngineMutation(async () => {
-    let result = await materializeTableInternal(tableId, scope)
+    let result = await materializeTableInternal(tableId, scope, options)
     while (result.status === 'loading' && scopeIsCurrent(scope)) {
-      result = await materializeTableInternal(tableId, scope)
+      result = await materializeTableInternal(tableId, scope, options)
     }
     return result
   })
@@ -305,6 +320,7 @@ export async function ensureTableMaterialized(tableId: string): Promise<Material
 async function materializeTableInternal(
   tableId: string,
   scope: MaterializationScope,
+  options: MaterializationOptions = {},
 ): Promise<MaterializationResult> {
   if (!scopeIsCurrent(scope)) return staleMaterialization(tableId)
   const projectStore = useProjectStore.getState()
@@ -320,7 +336,7 @@ async function materializeTableInternal(
   }
 
   if (node.kind === 'source_table') {
-    return loadSourceTable(tableId, scope)
+    return loadSourceTable(tableId, scope, options)
   }
 
   const computationOrder = getComputationOrder(
@@ -334,7 +350,7 @@ async function materializeTableInternal(
     if (!tableNode) continue
 
     if (tableNode.kind === 'source_table') {
-      const result = await loadSourceTable(nodeToCompute, scope)
+      const result = await loadSourceTable(nodeToCompute, scope, options)
       if (result.status === 'error') {
         if (nodeToCompute !== tableId) {
           if (scopeIsCurrent(scope) && captureTableRequestGeneration(tableId) === requestGeneration) {
@@ -353,7 +369,7 @@ async function materializeTableInternal(
         return result
       }
     } else if (tableNode.kind === 'derived_table') {
-      const result = await computeDerivedTable(nodeToCompute, scope)
+      const result = await computeDerivedTable(nodeToCompute, scope, options)
       if (result.status === 'error') {
         if (nodeToCompute !== tableId) {
           if (scopeIsCurrent(scope) && captureTableRequestGeneration(tableId) === requestGeneration) {
