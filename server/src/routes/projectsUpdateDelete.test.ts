@@ -100,6 +100,27 @@ describe('Projects API update and delete', () => {
       expect(response.body.error).toContain('another session')
       expect((await Project.findById(project._id))?.name).toBe('First writer')
     })
+
+    it('rejects an update that exceeds the row limit', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+      })
+      const nodes = {
+        oversized: {
+          ...createSampleNode('oversized'),
+          schema: {
+            columns: [],
+            rowCount: 500_001,
+          },
+        },
+      }
+      const response = await request(app)
+        .put(`/api/projects/${project._id}`)
+        .send({ nodes, expectedRevision: project.revision })
+        .expect(400)
+      expect(response.body.errors.join(' ')).toContain('rows')
+    })
   })
 
   describe('PATCH /api/projects/:id', () => {

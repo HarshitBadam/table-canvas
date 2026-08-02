@@ -3,11 +3,14 @@ import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { ProjectNode, TableNode } from '@/types'
 import { useProjectStore } from '@/state/projectStore'
+import { useAppAuth } from '@/state/AppContext'
 import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { focusMenuItem } from '@/lib/focusMenuItem'
 import { ChartTypeIcon } from '@/charts/ChartTypeIcon'
 import { TableTypeIcon } from '@/components/TableTypeIcon'
+import { UpgradePrompt } from '@/components/UpgradePrompt'
+import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
 
 interface SidebarNodeItemProps {
   node: ProjectNode
@@ -29,12 +32,17 @@ export function SidebarNodeItem({
 }: SidebarNodeItemProps) {
   const updateNode = useProjectStore(state => state.updateNode)
   const duplicateNode = useProjectStore(state => state.duplicateNode)
+  const saveSnapshot = useProjectStore(state => state.saveSnapshot)
+  const nodes = useProjectStore(state => state.nodes)
+  const { user } = useAppAuth()
   const { canEdit } = useWorkspaceLease()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState(node.name)
+  const [upgradeViolation, setUpgradeViolation] = useState<LimitExceeded | null>(null)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
   const menuOpen = menuPosition !== null
 
   useEffect(() => {
@@ -95,6 +103,7 @@ export function SidebarNodeItem({
   const commitRename = () => {
     const nextName = name.trim()
     if (nextName && nextName !== node.name) {
+      saveSnapshot(`Rename node ${node.name}`)
       updateNode(node.id, { name: nextName })
     }
     setRenaming(false)
@@ -102,6 +111,17 @@ export function SidebarNodeItem({
 
   const duplicate = () => {
     setMenuPosition(null)
+    if (node.kind === 'source_table' || node.kind === 'derived_table') {
+      const currentTableCount = Object.values(nodes).filter(
+        candidate => candidate.kind === 'source_table' || candidate.kind === 'derived_table',
+      ).length
+      const capacity = checkTableCount(currentTableCount, user?.tier ?? 'guest')
+      if (!capacity.ok) {
+        setUpgradeViolation(capacity)
+        setUpgradeOpen(true)
+        return
+      }
+    }
     const duplicateId = duplicateNode(node.id)
     if (duplicateId) onOpen(duplicateId)
   }
@@ -214,6 +234,11 @@ export function SidebarNodeItem({
         </div>,
         document.body,
       )}
+      <UpgradePrompt
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        violation={upgradeViolation}
+      />
     </li>
   )
 }

@@ -62,6 +62,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const projectEdges = useProjectStore((state) => state.edges)
   const patches = useProjectStore((state) => state.patches)
   const updateNodePosition = useProjectStore((state) => state.updateNodePosition)
+  const saveSnapshot = useProjectStore((state) => state.saveSnapshot)
   const selectNode = useProjectStore((state) => state.selectNode)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
   
@@ -203,6 +204,13 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     [baseEdges, setEdges, setNodes, updateNodePosition]
   )
 
+  const onNodeDragStart: NodeMouseHandler = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      saveSnapshot(`Move node ${projectNodes[node.id]?.name ?? node.id}`)
+    },
+    [projectNodes, saveSnapshot],
+  )
+
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       selectNode(node.id)
@@ -239,7 +247,8 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
 
   const handleAutoArrange = useCallback((direction: LayoutDirection = 'LR') => {
     if (nodes.length === 0) return
-    
+    saveSnapshot('Auto-arrange canvas')
+
     const layoutedNodes = getLayoutedNodes(nodes, edges, { direction })
     
     layoutedNodes.forEach((node) => {
@@ -250,7 +259,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     
     const smartEdges = computeSmartEdges(layoutedNodes, baseEdges)
     setEdges(smartEdges)
-  }, [nodes, edges, baseEdges, updateNodePosition, setNodes, setEdges])
+  }, [nodes, edges, baseEdges, updateNodePosition, saveSnapshot, setNodes, setEdges])
 
   const handleTransformModalClose = () => {
     setTransformModalOpen(false)
@@ -267,6 +276,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={handleNodeDoubleClick}

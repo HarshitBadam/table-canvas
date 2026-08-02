@@ -15,6 +15,7 @@ import {
   createProjectWithinCapacity,
   restoreProjectWithinCapacity,
 } from '../services/projectCapacity.js';
+import { validateProjectTierLimits } from '../services/projectPayloadLimits.js';
 import { createApiRateLimit } from '../middleware/apiRateLimit.js';
 
 const router = Router();
@@ -68,6 +69,7 @@ async function updateOwnedProject(
   projectId: string,
   userId: string,
   body: Record<string, unknown>,
+  tier: Tier,
 ) {
   validateProjectPayload(body);
   const revision = expectedRevision(body.expectedRevision);
@@ -80,11 +82,30 @@ async function updateOwnedProject(
   const revisionFilter = revision === 0
     ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] }
     : { revision };
+  const ownershipFilter = {
+    _id: new Types.ObjectId(projectId),
+    userId: new Types.ObjectId(userId),
+    deletedAt: null,
+  };
+  const currentProject = await Project.findOne({
+    ...ownershipFilter,
+    ...revisionFilter,
+  });
+  if (!currentProject) {
+    const exists = await Project.exists(ownershipFilter);
+    if (!exists) throw new NotFoundError('Project');
+    throw new ConflictError(
+      'Project changed in another session. Reload before saving to avoid overwriting newer work.',
+    );
+  }
+  validateProjectTierLimits(
+    (updates.nodes as Record<string, unknown> | undefined) ?? currentProject.nodes,
+    tier,
+    (updates.patches as Record<string, unknown> | undefined) ?? currentProject.patches,
+  );
   const project = await Project.findOneAndUpdate(
     {
-      _id: new Types.ObjectId(projectId),
-      userId: new Types.ObjectId(userId),
-      deletedAt: null,
+      ...ownershipFilter,
       ...revisionFilter,
     },
     {
@@ -94,13 +115,6 @@ async function updateOwnedProject(
     { new: true, runValidators: true },
   );
   if (project) return project;
-
-  const exists = await Project.exists({
-    _id: new Types.ObjectId(projectId),
-    userId: new Types.ObjectId(userId),
-    deletedAt: null,
-  });
-  if (!exists) throw new NotFoundError('Project');
   throw new ConflictError(
     'Project changed in another session. Reload before saving to avoid overwriting newer work.',
   );
@@ -154,6 +168,7 @@ router.post(
 
     const userDoc = await User.findById(userId);
     const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
+    validateProjectTierLimits(nodes ?? {}, tier, patches ?? {});
     const project = await createProjectWithinCapacity({
       userId,
       tier,
@@ -223,7 +238,9 @@ router.put(
       throw new ValidationError(['Invalid project ID format']);
     }
 
-    const project = await updateOwnedProject(projectId, userId, req.body);
+    const userDoc = await User.findById(userId);
+    const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
+    const project = await updateOwnedProject(projectId, userId, req.body, tier);
 
     const response: ApiResponse<{ project: IProjectPublic }> = {
       success: true,
@@ -252,7 +269,9 @@ router.patch(
       throw new ValidationError(['Invalid project ID format']);
     }
 
-    const project = await updateOwnedProject(projectId, userId, req.body);
+    const userDoc = await User.findById(userId);
+    const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
+    const project = await updateOwnedProject(projectId, userId, req.body, tier);
 
     const response: ApiResponse<{ project: IProjectPublic }> = {
       success: true,

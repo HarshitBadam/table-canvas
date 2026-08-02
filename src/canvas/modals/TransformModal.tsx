@@ -8,32 +8,27 @@ import { JoinType } from '@/types'
 import { ensureTableMaterialized } from '@/engine/materializationService'
 import { getTableData } from '@/engine/tableDataService'
 import { analyzeMatch, findBestKeys } from '@/canvas/joinUtils'
-import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
+import { checkRowCount, checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { getVisibleFocusableElement, isVisibleElement } from '@/components/useDialogFocus'
 import { JoinColumnSelect } from './JoinColumnSelect'
 import { TransformOutputOptions } from './TransformOutputOptions'
 import { TransformTypeControls } from './TransformTypeControls'
-
 interface TransformModalProps {
   isOpen: boolean
   onClose: () => void
   sourceNodeId: string
   targetNodeId: string
 }
-
 const MAX_TABLE_NAME_LENGTH = 100
-
 export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: TransformModalProps) {
   const nodes = useProjectStore(s => s.nodes)
   const addDerivedTable = useProjectStore(s => s.addDerivedTable)
   const { user } = useAppAuth()
   const { canEdit } = useWorkspaceLease()
-
   const leftNode = nodes[sourceNodeId]
   const rightNode = nodes[targetNodeId]
-
   const [joinType, setJoinType] = useState<JoinType>('left')
   const [operation, setOperation] = useState<'join' | 'union'>('join')
   const [leftKey, setLeftKey] = useState('')
@@ -52,17 +47,14 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
   const creatingRef = useRef(false)
   const keysTouchedRef = useRef(false)
   const operationFocusRef = useRef<HTMLButtonElement>(null)
-
   const leftCols = useMemo(() => 
     (leftNode?.kind === 'source_table' || leftNode?.kind === 'derived_table') 
       ? leftNode.schema?.columns ?? [] : []
   , [leftNode])
-
   const rightCols = useMemo(() => 
     (rightNode?.kind === 'source_table' || rightNode?.kind === 'derived_table') 
       ? rightNode.schema?.columns ?? [] : []
   , [rightNode])
-
   const allCols = useMemo(() => [
     ...leftCols.map(c => ({
       id: `L:${c.id}`, colId: c.id, name: c.name, type: c.type, side: 'L' as const,
@@ -73,26 +65,21 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       table: rightNode?.name, sourceTone: rightNode?.kind === 'derived_table' ? 'derived' as const : 'source' as const,
     }))
   ], [leftCols, rightCols, leftNode?.kind, leftNode?.name, rightNode?.kind, rightNode?.name])
-
   useEffect(() => {
     if (leftNode && rightNode) setOutputName(`${leftNode.name} + ${rightNode.name}`)
   }, [leftNode, rightNode])
-
   useEffect(() => {
     setSelected(new Set(allCols.map(c => c.id)))
   }, [allCols])
-
   useEffect(() => {
     if (!isOpen) return
     keysTouchedRef.current = false
   }, [isOpen, sourceNodeId, targetNodeId])
-
   useEffect(() => {
     if (!isOpen) return
     let cancelled = false
     setPreviewLoading(true)
     setPreviewError(undefined)
-
     void Promise.all([
       getTableData(sourceNodeId, 0, 1_000),
       getTableData(targetNodeId, 0, 1_000),
@@ -108,12 +95,10 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
     }).finally(() => {
       if (!cancelled) setPreviewLoading(false)
     })
-
     return () => {
       cancelled = true
     }
   }, [isOpen, sourceNodeId, targetNodeId, previewRequestKey])
-
   useEffect(() => {
     if (keysTouchedRef.current) return
     if (leftCols.length && rightCols.length) {
@@ -122,12 +107,10 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       else { setLeftKey(leftCols[0].id); setRightKey(rightCols[0].id) }
     }
   }, [leftCols, rightCols, leftData, rightData])
-
   const match = useMemo(() => analyzeMatch(leftData, rightData, leftKey, rightKey), [leftData, rightData, leftKey, rightKey])
   const canUnion = leftCols.length > 0 && leftCols.length === rightCols.length && leftCols.every(
     (column, index) => column.type === rightCols[index]?.type,
   )
-
   useEffect(() => {
     if (!leftKey || !rightKey) return
     setSelected((previous) => {
@@ -137,7 +120,6 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       return next
     })
   }, [leftKey, rightKey])
-
   const toggle = useCallback((id: string) => {
     setSelected(prev => {
       const next = new Set(prev)
@@ -149,12 +131,10 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       return next
     })
   }, [])
-
   const handleCreate = useCallback(async () => {
     if (creatingRef.current) return
     if (operation === 'join' && (!leftKey || !rightKey)) return
     if (operation === 'union' && !canUnion) return
-
     const tier: Tier = user?.tier ?? 'guest'
     const currentTableCount = Object.values(nodes).filter(
       (n) => n.kind === 'source_table' || n.kind === 'derived_table',
@@ -165,7 +145,6 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       setUpgradeOpen(true)
       return
     }
-
     const lCols = allCols.filter(c => c.side === 'L' && selected.has(c.id)).map(c => c.colId)
     const rCols = allCols.filter(c => c.side === 'R' && selected.has(c.id) && c.colId !== rightKey).map(c => c.colId)
 
@@ -173,7 +152,6 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
     setIsCreating(true)
     setCreateError(undefined)
     let id: string | null = null
-
     try {
       id = addDerivedTable({
         name: outputName.trim() || `${leftNode?.name} + ${rightNode?.name}`,
@@ -199,6 +177,14 @@ export function TransformModal({ isOpen, onClose, sourceNodeId, targetNodeId }: 
       const result = await ensureTableMaterialized(id)
       if (result.status === 'error') {
         throw new Error(result.error || 'The table could not be computed.')
+      }
+      const rowCheck = checkRowCount(result.rowCount ?? 0, tier)
+      if (!rowCheck.ok) {
+        useProjectStore.getState().deleteNode(id)
+        id = null
+        setUpgradeViolation(rowCheck)
+        setUpgradeOpen(true)
+        return
       }
       onClose()
     } catch (error) {

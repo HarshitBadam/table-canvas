@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react'
 import { useProjectStore } from '@/state/projectStore'
+import { useAppAuth } from '@/state/AppContext'
 import type { CellValue, ColumnSchema, UserColumnType } from '@/types'
+import { checkRowCount } from '@/shared/enforce'
 import { generateId } from '@/lib/utils'
 import type { ContextMenuState } from './GridContextMenu'
 import type { GridRow } from './types'
@@ -16,6 +18,7 @@ export function useGridOperations(
   saveSnapshot: (label: string) => void,
   onFeedback: (feedback: GridFeedbackMessage) => void,
 ) {
+  const { user } = useAppAuth()
   const insertRow = useProjectStore((state) => state.insertRow)
   const deleteRow = useProjectStore((state) => state.deleteRow)
   const addColumn = useProjectStore((state) => state.addColumn)
@@ -28,12 +31,17 @@ export function useGridOperations(
 
   const doInsertRow = useCallback((index: number) => {
     if (!isEditable) return
+    const rowCountCheck = checkRowCount(rows.length + 1, user?.tier ?? 'guest')
+    if (!rowCountCheck.ok) {
+      onFeedback({ message: rowCountCheck.reason, tone: 'warning' })
+      return
+    }
     saveSnapshot('Insert row')
     const newRowId = generateId()
     const values: Record<string, CellValue> = {}
     columns.forEach(col => { values[col.id] = '' })
     insertRow(tableId, newRowId, values, index)
-  }, [isEditable, saveSnapshot, columns, insertRow, tableId])
+  }, [isEditable, rows.length, user?.tier, onFeedback, saveSnapshot, columns, insertRow, tableId])
 
   const openNewColumnModal = useCallback((index: number) => {
     if (!isEditable) return
