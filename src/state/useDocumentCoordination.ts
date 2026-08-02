@@ -3,6 +3,7 @@ import { loadProject } from '@/persistence/db'
 import { deserializePatches } from '@/persistence/patchSerialization'
 import { loadReportsForProject } from '@/persistence/reportStorage'
 import { useReportStore } from '@/report/reportStore'
+import type { ProjectNode } from '@/types'
 import type { DocumentIdentity } from './documentIdentity'
 import {
   holdsWriteLease,
@@ -15,6 +16,7 @@ import {
   applyDocumentSnapshot,
   startDocumentMirror,
 } from './documentMirror'
+import { useProjectStore } from './projectStore'
 import { setDocumentWriteGuard } from './transientProjectState'
 
 /** A tab has to hold focus this long before editing follows it. */
@@ -26,9 +28,19 @@ interface CoordinationOptions {
   flush: () => Promise<void>
 }
 
+function tableNodeCount(nodes: Record<string, ProjectNode>): number {
+  return Object.values(nodes).filter(
+    node => node.kind === 'source_table' || node.kind === 'derived_table',
+  ).length
+}
+
 async function adoptLatestLocalSnapshot(identity: DocumentIdentity): Promise<void> {
   const stored = await loadProject(identity.projectId, identity.scope)
   if (!stored) return
+  const live = useProjectStore.getState()
+  // IndexedDB can lag an unsaved import that was already mirrored into this tab.
+  // Prefer the richer in-memory graph; the new owner will persist it next.
+  if (tableNodeCount(live.nodes) > tableNodeCount(stored.nodes)) return
   const reports = await loadReportsForProject(identity.projectId, identity.scope)
   applyDocumentSnapshot({
     name: stored.name,
@@ -83,9 +95,9 @@ export function useDocumentCoordination({
       cancel()
       if (document.visibilityState === 'hidden' || !document.hasFocus()) return
       const lease = getLeaseState()
-      // A refusal is the owner saying it cannot let go, so wait for "Try again"
-      // instead of asking again every time the state moves.
-      if (lease.role === 'owner' || lease.refused) return
+      // A refusal or unreachable owner needs an explicit "Try again" rather than
+      // asking again every time focus or lease state moves.
+      if (lease.role === 'owner' || lease.refused || lease.unreachable) return
       timer = setTimeout(() => {
         timer = null
         requestWriteLease()

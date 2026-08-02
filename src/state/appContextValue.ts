@@ -47,6 +47,8 @@ export interface AppContextValue {
   renameProject: (name: string) => void
   refreshProjects: () => Promise<void>
   deleteNodeWithSync: (nodeId: string) => Promise<void>
+  /** Await IndexedDB durability (and report flush) without waiting on remote sync. */
+  persistProjectNow: () => Promise<void>
   projectLimitViolation: LimitExceeded | null
   setProjectLimitViolation: (violation: LimitExceeded | null) => void
   isReady: boolean

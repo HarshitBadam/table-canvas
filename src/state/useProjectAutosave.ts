@@ -10,7 +10,9 @@ import { useReportStore } from '@/report/reportStore'
 import { holdsWriteLease } from './documentLease'
 import { publishDocumentSnapshot } from './documentMirror'
 import { useProjectStore } from './projectStore'
+import { withoutRuntimeNodeState } from './transientProjectState'
 import type { AppPhase, AppProviderState } from './appContextValue'
+import type { Edge, ProjectNode } from '@/types'
 
 /**
  * Coalescing window for the high-frequency edits — cell values, positions, report text —
@@ -22,15 +24,17 @@ import type { AppPhase, AppProviderState } from './appContextValue'
 const AUTOSAVE_INTERVAL_MS = 800
 
 /**
- * Adding or removing a table or a connection is a discrete, deliberate act rather than a
- * burst frame. Coalescing those buys nothing and risks losing a whole table to a reload,
- * so they are written straight away and only the edits within them are batched.
+ * Topology of what IndexedDB actually keeps. Incomplete imports use a synthetic
+ * `pending:` fileRef and are stripped on write, so counting live node ids would treat a
+ * later real fileRef promotion as a no-op and leave a finished import on the 800ms
+ * debounce — enough time for a reload or tab discard to drop it.
  */
-function documentTopology(
-  nodes: Record<string, unknown>,
-  edges: Record<string, unknown>,
+function durableDocumentTopology(
+  nodes: Record<string, ProjectNode>,
+  edges: Record<string, Edge>,
 ): string {
-  return `${Object.keys(nodes).sort().join()}|${Object.keys(edges).sort().join()}`
+  const durable = withoutRuntimeNodeState(nodes)
+  return `${Object.keys(durable).sort().join()}|${Object.keys(edges).sort().join()}`
 }
 
 interface AutosaveOptions {
@@ -41,7 +45,11 @@ interface AutosaveOptions {
 }
 
 export interface ProjectAutosave {
+  /** Writes the document to IndexedDB (and enqueues remote sync) then mirrors it. */
   saveLatestProject: () => Promise<void>
+  /** Local durability only — used for import completion and tab handover. */
+  flushLocalProjectSave: () => Promise<void>
+  /** Local save plus a best-effort remote flush. */
   flushProjectSave: () => Promise<void>
 }
 
@@ -101,7 +109,7 @@ export function useProjectAutosave({
           savePending.current = false
           const project = useProjectStore.getState()
           if (!project.projectId) break
-          const topology = documentTopology(project.nodes, project.edges)
+          const topology = durableDocumentTopology(project.nodes, project.edges)
           await saveProjectWithSync(
             project.projectId,
             project.projectName,
@@ -127,8 +135,13 @@ export function useProjectAutosave({
     }
   }, [cancelPendingSave, markSaving])
 
-  const flushProjectSave = useCallback(async () => {
+  /** IndexedDB (+ sync enqueue) only — callers that also need reports flush those next. */
+  const flushLocalProjectSave = useCallback(async () => {
     await saveLatestProject()
+  }, [saveLatestProject])
+
+  const flushProjectSave = useCallback(async () => {
+    await flushLocalProjectSave()
     const activeProjectId = useProjectStore.getState().projectId
     if (!activeProjectId || !holdsWriteLease()) return
     try {
@@ -137,7 +150,7 @@ export function useProjectAutosave({
       if (!isRetryableRemoteDeferral(error)) throw error
       console.warn('[AppContext] Retryable remote save deferred:', error)
     }
-  }, [saveLatestProject])
+  }, [flushLocalProjectSave])
 
   const scheduleSave = useCallback(() => {
     if (!holdsWriteLease()) return
@@ -148,7 +161,7 @@ export function useProjectAutosave({
       return
     }
     const { nodes: current, edges: currentEdges } = project
-    const structural = documentTopology(current, currentEdges) !== savedTopology.current
+    const structural = durableDocumentTopology(current, currentEdges) !== savedTopology.current
     if (structural) {
       cancelPendingSave()
     } else if (debounceTimer.current) {
@@ -197,5 +210,5 @@ export function useProjectAutosave({
 
   useEffect(() => cancelPendingSave, [cancelPendingSave])
 
-  return { saveLatestProject, flushProjectSave }
+  return { saveLatestProject, flushLocalProjectSave, flushProjectSave }
 }

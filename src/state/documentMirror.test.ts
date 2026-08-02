@@ -100,6 +100,43 @@ describe('documentMirror', () => {
     stopOwner()
   })
 
+  it('does not publish incomplete pending imports to mirrors', async () => {
+    const owner = await openTab()
+    const stopOwner = owner.mirror.startDocumentMirror(KEY)
+    owner.projectStore.useProjectStore.setState({
+      projectId: 'project-1',
+      projectName: 'Importing',
+      nodes: {
+        'table-ready': tableNode('table-ready', '2026-01-02T00:00:00.000Z'),
+        'table-pending': {
+          ...tableNode('table-pending', '2026-01-02T00:00:00.000Z'),
+          plan: {
+            fileRef: 'pending:abc',
+            fileName: 'pending.csv',
+            fileType: 'csv',
+            inferredSchemaVersion: 1,
+          },
+        } as SourceTableNode,
+      },
+      edges: {},
+      patches: {},
+    })
+
+    const follower = await openTab()
+    const stopFollower = follower.mirror.startDocumentMirror(KEY)
+    seedDocument(follower, '2026-01-01T00:00:00.000Z')
+
+    owner.mirror.publishDocumentSnapshot()
+    await settleTabs()
+
+    const mirrored = follower.projectStore.useProjectStore.getState()
+    expect(mirrored.nodes['table-ready']).toBeDefined()
+    expect(mirrored.nodes['table-pending']).toBeUndefined()
+
+    stopOwner()
+    stopFollower()
+  })
+
   it('does not reach tabs on a different document', async () => {
     const owner = await openTab()
     const stopOwner = owner.mirror.startDocumentMirror(KEY)

@@ -6,7 +6,6 @@ import type { WorkBook } from 'xlsx'
 import { useProjectStore } from '@/state/projectStore'
 import { useApp, useAppAuth } from '@/state/AppContext'
 import {
-  failTableOperation,
   isTableOperationCurrent,
   updateTableOperation,
 } from '@/state/tableOperationCoordinator'
@@ -54,7 +53,7 @@ type SelectionMode = 'sheets' | 'tables'
 export function ImportButton() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { user } = useAppAuth()
-  const { importProject } = useApp()
+  const { importProject, persistProjectNow } = useApp()
   const { canEdit } = useWorkspaceLease()
 
   const [isImporting, setIsImporting] = useState(false)
@@ -67,6 +66,7 @@ export function ImportButton() {
   const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   const tier: Tier = user?.tier ?? 'guest'
+  const requireRemoteWhenOnline = tier !== 'guest'
 
   const showViolation = (v: LimitExceeded) => {
     setUpgradeViolation(v)
@@ -117,7 +117,9 @@ export function ImportButton() {
       updateTableOperation(tableId, generation, {
         progress: { completed: rows.length, total: rows.length, label: 'Rows parsed' },
       })
-      const uploaded = await uploadFileWithSync(file, projectId)
+      const uploaded = await uploadFileWithSync(file, projectId, undefined, {
+        requireRemoteWhenOnline,
+      })
       uploadedFileIds.push(uploaded.id)
       if (
         useProjectStore.getState().projectId !== projectId
@@ -139,10 +141,10 @@ export function ImportButton() {
         tableId,
         operationGeneration: generation,
       })
+      await persistProjectNow()
       uploadedFileIds.length = 0
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'The file could not be imported.'
-      failTableOperation(tableId, generation, message)
+      discardPendingImport(tableId)
       throw error
     }
   }
@@ -296,7 +298,7 @@ export function ImportButton() {
         const { parseExcelFile } = await import('@/persistence/importParsers')
         pendingImport = reservePendingImport(file)
         setIsImporting(false)
-        const result = await parseExcelFile(file, projectId)
+        const result = await parseExcelFile(file, projectId, { requireRemoteWhenOnline })
         if (result.kind === 'single') {
           uploadedFileIds.push(result.fileRef)
           if (
@@ -328,6 +330,7 @@ export function ImportButton() {
             tableId: pendingImport.tableId,
             operationGeneration: pendingImport.generation,
           })
+          await persistProjectNow()
           uploadedFileIds.length = 0
           pendingImport = null
         } else {
@@ -353,13 +356,7 @@ export function ImportButton() {
         setImportError('Unsupported file type. Please use a CSV, Excel, or TableCanvas project file.')
       }
     } catch (error: unknown) {
-      if (pendingImport) {
-        failTableOperation(
-          pendingImport.tableId,
-          pendingImport.generation,
-          error instanceof Error ? error.message : 'The file could not be imported.',
-        )
-      }
+      if (pendingImport) discardPendingImport(pendingImport.tableId)
       await discardFiles(uploadedFileIds)
       console.error('Import error:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -431,7 +428,9 @@ export function ImportButton() {
 
       for (const item of selectedItems) {
         if (item.kind === 'csv') {
-          const uploaded = await uploadFileWithSync(item.file, projectId)
+          const uploaded = await uploadFileWithSync(item.file, projectId, undefined, {
+            requireRemoteWhenOnline,
+          })
           uploadedFileIds.push(uploaded.id)
           if (useProjectStore.getState().projectId !== projectId) {
             throw new Error('The active project changed during import.')
@@ -456,6 +455,7 @@ export function ImportButton() {
           item.sourceFileName,
           projectId,
           item.buffer,
+          { requireRemoteWhenOnline },
         )
         uploadedFileIds.push(fileRef)
         if (useProjectStore.getState().projectId !== projectId) {
@@ -475,6 +475,7 @@ export function ImportButton() {
         createdTableIds.push(tableId)
       }
 
+      await persistProjectNow()
       uploadedFileIds.length = 0
 
       setSelectionModalOpen(false)

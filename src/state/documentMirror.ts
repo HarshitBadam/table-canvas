@@ -9,6 +9,7 @@ import { useProjectStore } from './projectStore'
 import { useTableRuntimeStore } from './tableRuntimeStore'
 import { retainHistoryFileRefs } from '@/persistence/historyFileCleanup'
 import { getStorageScope } from '@/persistence/storageScope'
+import { withoutRuntimeNodeState } from './transientProjectState'
 
 /**
  * Mirrors the owner's document into every other tab on the same document. Followers
@@ -149,10 +150,13 @@ function stopDocumentMirror(): void {
 export function publishDocumentSnapshot(): void {
   if (!session?.channel) return
   const project = useProjectStore.getState()
+  // Publish the durable graph only — incomplete `pending:` imports are stripped the
+  // same way IndexedDB writes are, so mirrors never show tables that cannot survive a
+  // reload.
   session.channel.postMessage({
     tabId: documentTabId(),
     name: project.projectName,
-    nodes: project.nodes,
+    nodes: withoutRuntimeNodeState(project.nodes),
     edges: project.edges,
     patches: serializablePatches(project.patches),
     reports: useReportStore.getState().reports,

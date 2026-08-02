@@ -68,7 +68,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     syncError: null,
   })
   const initialized = useRef(false)
-  const { saveLatestProject, flushProjectSave } = useProjectAutosave({
+  const { saveLatestProject, flushLocalProjectSave, flushProjectSave } = useProjectAutosave({
     phase: state.phase,
     isAuthenticated: state.isAuthenticated,
     projectId: state.projectId,
@@ -107,9 +107,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     projectId: state.projectId,
     authToken: `${user?.id ?? 'none'}:${user?.tier ?? 'none'}`,
   })
+  // Handover only needs local durability. Waiting on remote sync used to refuse
+  // editing whenever the network hiccuped, even though IndexedDB was fine.
   useDocumentCoordination({
     identity: state.phase === 'ready' ? documentIdentity : null,
-    flush: flushProjectSave,
+    flush: flushLocalProjectSave,
   })
   usePersistenceLifecycle({
     user,
@@ -334,6 +336,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await dropEngineTables(nodeIds, { onlyIfDeleted: true })
   }, [])
 
+  const persistProjectNow = useCallback(async () => {
+    await flushLocalProjectSave()
+    await useReportStore.getState().flushSaves()
+  }, [flushLocalProjectSave])
+
   const value: AppContextValue = {
     ...state,
     isReady: state.phase === 'ready',
@@ -351,6 +358,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     renameProject,
     refreshProjects,
     deleteNodeWithSync,
+    persistProjectNow,
     projectLimitViolation,
     setProjectLimitViolation,
   }

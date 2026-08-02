@@ -4,7 +4,12 @@ import type { LeaseState } from '@/state/documentLease'
 import { EditingElsewhereBanner } from './EditingElsewhereBanner'
 
 const requestWriteLease = vi.fn()
-let leaseState: LeaseState = { role: 'owner', requesting: false, refused: false }
+let leaseState: LeaseState = {
+  role: 'owner',
+  requesting: false,
+  refused: false,
+  unreachable: false,
+}
 const listeners = new Set<() => void>()
 
 function setLeaseState(next: Partial<LeaseState>): void {
@@ -24,7 +29,12 @@ vi.mock('@/state/documentLease', () => ({
 }))
 
 beforeEach(() => {
-  leaseState = { role: 'owner', requesting: false, refused: false }
+  leaseState = {
+    role: 'owner',
+    requesting: false,
+    refused: false,
+    unreachable: false,
+  }
   listeners.clear()
   requestWriteLease.mockClear()
 })
@@ -40,7 +50,12 @@ describe('EditingElsewhereBanner', () => {
   })
 
   it('offers to move editing here while mirroring', () => {
-    leaseState = { role: 'mirror', requesting: false, refused: false }
+    leaseState = {
+      role: 'mirror',
+      requesting: false,
+      refused: false,
+      unreachable: false,
+    }
     render(<EditingElsewhereBanner />)
 
     const banner = screen.getByRole('status')
@@ -53,7 +68,12 @@ describe('EditingElsewhereBanner', () => {
 
   it('stays quiet for a handover that finishes quickly', () => {
     vi.useFakeTimers()
-    leaseState = { role: 'mirror', requesting: false, refused: false }
+    leaseState = {
+      role: 'mirror',
+      requesting: false,
+      refused: false,
+      unreachable: false,
+    }
     render(<EditingElsewhereBanner />)
 
     setLeaseState({ requesting: true })
@@ -69,7 +89,12 @@ describe('EditingElsewhereBanner', () => {
   })
 
   it('explains a refused handover and offers to retry', () => {
-    leaseState = { role: 'mirror', requesting: false, refused: true }
+    leaseState = {
+      role: 'mirror',
+      requesting: false,
+      refused: true,
+      unreachable: false,
+    }
     render(<EditingElsewhereBanner />)
 
     expect(screen.getByRole('status')).toHaveTextContent(
@@ -80,8 +105,29 @@ describe('EditingElsewhereBanner', () => {
     expect(requestWriteLease).toHaveBeenCalledTimes(1)
   })
 
+  it('explains when the other tab never answers and offers to retry', () => {
+    leaseState = {
+      role: 'mirror',
+      requesting: false,
+      refused: false,
+      unreachable: true,
+    }
+    render(<EditingElsewhereBanner />)
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      "Couldn't reach the other tab. Switch to it or close it, then try again.",
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(requestWriteLease).toHaveBeenCalledTimes(1)
+  })
+
   it('never names the mechanism in user-facing copy', () => {
-    leaseState = { role: 'mirror', requesting: false, refused: false }
+    leaseState = {
+      role: 'mirror',
+      requesting: false,
+      refused: false,
+      unreachable: false,
+    }
     const { container } = render(<EditingElsewhereBanner />)
 
     const copy = container.textContent?.toLowerCase() ?? ''

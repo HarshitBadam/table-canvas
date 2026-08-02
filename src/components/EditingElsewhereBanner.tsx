@@ -5,7 +5,7 @@ import { useWorkspaceLease } from '@/state/useWorkspaceLease'
 const CLAIM_NOTICE_DELAY_MS = 300
 
 export function EditingElsewhereBanner() {
-  const { role, requesting, refused, requestEditing } = useWorkspaceLease()
+  const { role, requesting, refused, unreachable, requestEditing } = useWorkspaceLease()
   const [showClaiming, setShowClaiming] = useState(false)
 
   useEffect(() => {
@@ -16,6 +16,27 @@ export function EditingElsewhereBanner() {
     const timer = setTimeout(() => setShowClaiming(true), CLAIM_NOTICE_DELAY_MS)
     return () => clearTimeout(timer)
   }, [requesting])
+
+  if (unreachable) {
+    return (
+      <div
+        className="animate-fade-in flex items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700"
+        role="status"
+        aria-live="polite"
+      >
+        <span>
+          Couldn&apos;t reach the other tab. Switch to it or close it, then try again.
+        </span>
+        <button
+          type="button"
+          onClick={requestEditing}
+          className="btn btn-primary ml-auto shrink-0 px-2.5 py-1 text-xs"
+        >
+          Try again
+        </button>
+      </div>
+    )
+  }
 
   if (refused) {
     return (

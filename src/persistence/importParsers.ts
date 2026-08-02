@@ -40,9 +40,13 @@ export async function inspectCSVFile(file: File): Promise<ParsedTableData> {
   return parseCsvBuffer(buffer)
 }
 
-export async function parseCSVFile(file: File, projectId: string): Promise<CSVParseResult> {
+export async function parseCSVFile(
+  file: File,
+  projectId: string,
+  options?: { requireRemoteWhenOnline?: boolean },
+): Promise<CSVParseResult> {
   const tableData = await inspectCSVFile(file)
-  const uploaded = await uploadFileWithSync(file, projectId)
+  const uploaded = await uploadFileWithSync(file, projectId, undefined, options)
   return { ...tableData, fileRef: uploaded.id }
 }
 
@@ -67,12 +71,16 @@ export async function inspectExcelFile(file: File): Promise<{
   return { workbook, buffer, sheets: sheetInfosFromWorkbook(workbook) }
 }
 
-export async function parseExcelFile(file: File, projectId: string): Promise<ExcelParseResult> {
+export async function parseExcelFile(
+  file: File,
+  projectId: string,
+  options?: { requireRemoteWhenOnline?: boolean },
+): Promise<ExcelParseResult> {
   const { workbook, buffer, sheets } = await inspectExcelFile(file)
 
   if (sheets.length === 1) {
     const tableData = parseWorkbookSheet(workbook, sheets[0].name)
-    const uploaded = await uploadFileWithSync(file, projectId)
+    const uploaded = await uploadFileWithSync(file, projectId, undefined, options)
     return { kind: 'single', tableData, fileRef: uploaded.id }
   }
 
@@ -85,10 +93,11 @@ export async function importSheetAndPersist(
   fileName: string,
   projectId: string,
   fileBuffer?: ArrayBuffer,
+  options?: { requireRemoteWhenOnline?: boolean },
 ): Promise<{ tableData: ParsedTableData; fileRef: string }> {
   const tableData = parseWorkbookSheet(workbook, sheetName)
   if (!fileBuffer) throw new Error('The workbook data is unavailable')
   const file = new File([fileBuffer], fileName, { type: EXCEL_MIME_TYPE })
-  const uploaded = await uploadFileWithSync(file, projectId)
+  const uploaded = await uploadFileWithSync(file, projectId, undefined, options)
   return { tableData, fileRef: uploaded.id }
 }
