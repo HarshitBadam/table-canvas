@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { ProjectNode, TableNode } from '@/types'
 import { useProjectStore } from '@/state/projectStore'
+import { duplicateDerivedTable } from '@/state/duplicateDerivedTable'
 import { useAppAuth } from '@/state/AppContext'
 import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
@@ -10,6 +11,7 @@ import { focusMenuItem } from '@/lib/focusMenuItem'
 import { ChartTypeIcon } from '@/charts/ChartTypeIcon'
 import { TableTypeIcon } from '@/components/TableTypeIcon'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
+import { DuplicateTableErrorDialog } from '@/components/DuplicateTableErrorDialog'
 import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
 
 interface SidebarNodeItemProps {
@@ -43,6 +45,8 @@ export function SidebarNodeItem({
   const [name, setName] = useState(node.name)
   const [upgradeViolation, setUpgradeViolation] = useState<LimitExceeded | null>(null)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [duplicateError, setDuplicateError] = useState<string | null>(null)
+  const [duplicating, setDuplicating] = useState(false)
   const menuOpen = menuPosition !== null
 
   useEffect(() => {
@@ -109,7 +113,7 @@ export function SidebarNodeItem({
     setRenaming(false)
   }
 
-  const duplicate = () => {
+  const duplicate = async () => {
     setMenuPosition(null)
     if (node.kind === 'source_table' || node.kind === 'derived_table') {
       const currentTableCount = Object.values(nodes).filter(
@@ -122,8 +126,29 @@ export function SidebarNodeItem({
         return
       }
     }
-    const duplicateId = duplicateNode(node.id)
-    if (duplicateId) onOpen(duplicateId)
+
+    if (node.kind === 'derived_table') {
+      if (duplicating) return
+      setDuplicating(true)
+      const result = await duplicateDerivedTable(
+        node.id,
+        user?.tier ?? 'guest',
+        { selectDuplicate: false },
+      )
+      setDuplicating(false)
+      if (!result.ok) {
+        if (result.code === 'LIMIT_EXCEEDED') {
+          setUpgradeViolation(result.violation)
+          setUpgradeOpen(true)
+        } else {
+          setDuplicateError(result.error)
+        }
+        return
+      }
+      return
+    }
+
+    duplicateNode(node.id, { selectDuplicate: false })
   }
 
   const isTable = node.kind === 'source_table' || node.kind === 'derived_table'
@@ -220,7 +245,12 @@ export function SidebarNodeItem({
           className="fixed z-popover overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-lg motion-safe:animate-scale-in"
         >
           <MenuItem icon={<RenameIcon />} label="Rename" onClick={startRename} disabled={!canEdit} />
-          <MenuItem icon={<DuplicateIcon />} label="Duplicate" onClick={duplicate} disabled={!canEdit} />
+          <MenuItem
+            icon={<DuplicateIcon />}
+            label={duplicating ? 'Duplicating…' : 'Duplicate'}
+            onClick={() => void duplicate()}
+            disabled={!canEdit || duplicating}
+          />
           <MenuItem
             icon={<DeleteIcon />}
             label="Delete"
@@ -238,6 +268,10 @@ export function SidebarNodeItem({
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}
         violation={upgradeViolation}
+      />
+      <DuplicateTableErrorDialog
+        error={duplicateError}
+        onClose={() => setDuplicateError(null)}
       />
     </li>
   )

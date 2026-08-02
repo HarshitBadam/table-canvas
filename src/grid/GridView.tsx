@@ -19,6 +19,7 @@ import { useFormulaColumnLifecycle } from './useFormulaColumnLifecycle'
 import { GridProvider, type GridContextValue } from './GridContext'
 import { GridViewport } from './GridViewport'
 import { GridFeedback, type GridFeedbackMessage } from './GridFeedback'
+import { DerivedTableEditDialog } from './DerivedTableEditDialog'
 
 const SuggestionsPanel = lazy(() => import('@/suggestions/SuggestionsPanel').then(m => ({ default: m.SuggestionsPanel })))
 const ChartBuilder = lazy(() => import('@/charts/ChartBuilder').then(m => ({ default: m.ChartBuilder })))
@@ -42,9 +43,13 @@ export function GridView({ tableId }: GridViewProps) {
   } = useGridData(tableId)
 
   const [gridFeedback, setGridFeedback] = useState<GridFeedbackMessage | null>(null)
+  const [derivedEditDialogOpen, setDerivedEditDialogOpen] = useState(false)
   const showGridFeedback = useCallback((feedback: GridFeedbackMessage) => {
     setGridFeedback({ ...feedback, id: Date.now() })
   }, [])
+  const requestDerivedTableDuplicate = useCallback(() => {
+    if (node?.kind === 'derived_table') setDerivedEditDialogOpen(true)
+  }, [node?.kind])
 
   useEffect(() => {
     if (!gridFeedback) return
@@ -61,7 +66,7 @@ export function GridView({ tableId }: GridViewProps) {
     editingColumnId, editColumnName, setEditColumnName,
     handleColumnDoubleClick, commitColumnNameEdit, cancelColumnNameEdit,
     saveSnapshot, setCellValue,
-  } = useGridEditing(tableId, columns, filteredRows, canMutate)
+  } = useGridEditing(tableId, columns, filteredRows, canMutate, requestDerivedTableDuplicate)
 
   const {
     selection, setSelection,
@@ -106,6 +111,7 @@ export function GridView({ tableId }: GridViewProps) {
     getDisplayValue, saveSnapshot, setCellValue, tableId,
     getSelectedCellData, formatClipboardText,
     onFeedback: showGridFeedback,
+    onReadOnlyEditAttempt: requestDerivedTableDuplicate,
   })
 
   const {
@@ -349,12 +355,7 @@ export function GridView({ tableId }: GridViewProps) {
         <GridViewport totalRows={totalRows} windowed={windowed} onAddColumn={handleAddColumn} />
 
         <GridContextMenu />
-        {gridFeedback && (
-          <GridFeedback
-            feedback={gridFeedback}
-            onDismiss={() => setGridFeedback(null)}
-          />
-        )}
+        {gridFeedback && <GridFeedback feedback={gridFeedback} onDismiss={() => setGridFeedback(null)} />}
 
         {showSuggestions && (
           <Suspense fallback={<div className="fixed right-0 top-0 h-full w-full max-w-96 animate-pulse border-l border-border bg-surface" />}>
@@ -371,17 +372,8 @@ export function GridView({ tableId }: GridViewProps) {
           initialColumnId={filterTargetColumnId}
         />
 
-        <FormulaColumnModal isOpen={newColumnModal.isOpen} columns={columns}
-          onConfirm={(name, type, formula) => { doInsertColumn(newColumnModal.insertIndex, name, type, formula); setNewColumnModal({ isOpen: false, insertIndex: 0 }) }}
-          onCancel={() => setNewColumnModal({ isOpen: false, insertIndex: 0 })}
-        />
-        <FormulaColumnModal
-          isOpen={Boolean(formulaLifecycle.editingColumn)}
-          columns={columns}
-          initialColumn={formulaLifecycle.editingColumn}
-          onConfirm={formulaLifecycle.saveFormula}
-          onCancel={formulaLifecycle.closeEditor}
-        />
+        <FormulaColumnModal isOpen={newColumnModal.isOpen} columns={columns} onConfirm={(name, type, formula) => { doInsertColumn(newColumnModal.insertIndex, name, type, formula); setNewColumnModal({ isOpen: false, insertIndex: 0 }) }} onCancel={() => setNewColumnModal({ isOpen: false, insertIndex: 0 })} />
+        <FormulaColumnModal isOpen={Boolean(formulaLifecycle.editingColumn)} columns={columns} initialColumn={formulaLifecycle.editingColumn} onConfirm={formulaLifecycle.saveFormula} onCancel={formulaLifecycle.closeEditor} />
 
         {chartBuilderOpen && (
           <Suspense fallback={
@@ -397,6 +389,7 @@ export function GridView({ tableId }: GridViewProps) {
             />
           </Suspense>
         )}
+        <DerivedTableEditDialog isOpen={derivedEditDialogOpen} tableId={tableId} onClose={() => setDerivedEditDialogOpen(false)} />
       </div>
     </GridProvider>
   )

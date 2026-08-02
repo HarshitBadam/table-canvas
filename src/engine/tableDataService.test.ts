@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MaterializationResult } from './materializationService'
 import type { TableSlice } from './types'
 import { invalidateMaterializations } from './materializationCoordinator'
-import { getTableData } from './tableDataService'
+import { getRawTableData, getTableData } from './tableDataService'
 
 const mocks = vi.hoisted(() => ({
   projectId: 'project_a',
@@ -100,5 +100,24 @@ describe('getTableData materialization scope', () => {
     expect(result.rows).toEqual([])
     expect(result.totalRows).toBe(0)
     expect(result.error).toMatch(/data changed while loading/i)
+  })
+
+  it('can return raw DuckDB column names for lossless snapshots', async () => {
+    mocks.ensureTableMaterialized.mockResolvedValue({
+      status: 'cached',
+      tableId: 'table_1',
+    } satisfies MaterializationResult)
+    mocks.getSlice.mockResolvedValue({
+      tableId: 'table_1',
+      offset: 0,
+      limit: 1000,
+      rows: [{ __rowId: 'row_1', 'Right Value': 42 }],
+      totalRows: 1,
+    })
+
+    const result = await getRawTableData('table_1')
+
+    expect(mocks.getSlice).toHaveBeenCalledWith('table_1', 0, 1000, undefined)
+    expect(result.rows[0]['Right Value']).toBe(42)
   })
 })

@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import type { TableRow } from '@/state/dataStore'
 import type { CellValue, ColumnSchema, ColumnType, TableSchema } from '@/types'
 import { inferValueType } from '@/lib/utils'
+import { parseTableSnapshot } from './tableSnapshot'
 
 export interface ParsedTableData {
   schema: TableSchema
@@ -11,12 +12,15 @@ export interface ParsedTableData {
 
 export async function parseFileData(
   fileData: ArrayBuffer,
-  fileType: 'csv' | 'xlsx',
+  fileType: 'csv' | 'xlsx' | 'snapshot',
   sheetName?: string,
   schema?: TableSchema
 ): Promise<TableRow[]> {
   if (fileType === 'csv') {
     return (await parseCsvBuffer(fileData, schema)).rows
+  }
+  if (fileType === 'snapshot') {
+    return parseTableSnapshot(fileData, schema)
   }
 
   const workbook = readWorkbook(fileData)

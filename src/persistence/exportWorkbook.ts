@@ -1,11 +1,9 @@
 import * as XLSX from 'xlsx'
-import { getTableData } from '@/engine/tableDataService'
+import { readAllTableRows } from '@/engine/readAllTableRows'
 import type { ProjectNode, TableNode } from '@/types'
 import { getTableNodes } from '@/lib/utils'
 import { computeDisplayValue } from '@/grid/displayUtils'
 import type { TableRow } from '@/state/dataStore'
-
-const EXPORT_PAGE_SIZE = 50_000
 
 function sanitizeSheetName(name: string): string {
   return Array.from(name, character => character.charCodeAt(0) < 32 ? '_' : character)
@@ -70,32 +68,6 @@ function createWorksheet(table: TableNode, rows: Record<string, unknown>[]): XLS
     wch: Math.max(header.length, ...data.slice(1, 101).map(row => String(row[index] ?? '').length).map(length => Math.min(length, 50))) + 2,
   }))
   return worksheet
-}
-
-async function readAllTableRows(tableId: string): Promise<TableRow[]> {
-  const firstPage = await getTableData(tableId, 0, EXPORT_PAGE_SIZE)
-  if (firstPage.error) throw new Error(firstPage.error)
-
-  const expectedTotal = firstPage.totalRows
-  const rows = [...firstPage.rows]
-  while (rows.length < expectedTotal) {
-    const page = await getTableData(
-      tableId,
-      rows.length,
-      Math.min(EXPORT_PAGE_SIZE, expectedTotal - rows.length),
-    )
-    if (page.error) throw new Error(page.error)
-    if (page.totalRows !== expectedTotal) {
-      throw new Error('The table changed while it was being exported. Please try again.')
-    }
-    if (page.rows.length === 0) {
-      throw new Error(
-        `Only ${rows.length.toLocaleString()} of ${expectedTotal.toLocaleString()} rows could be read`,
-      )
-    }
-    rows.push(...page.rows)
-  }
-  return rows
 }
 
 export async function createWorkbook(

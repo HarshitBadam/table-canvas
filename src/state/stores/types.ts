@@ -45,7 +45,10 @@ export interface NodesSliceState {
   
   addNode: (node: ProjectNode) => void
   updateNode: (id: string, updates: Partial<ProjectNode>) => void
-  duplicateNode: (id: string) => string | undefined
+  duplicateNode: (
+    id: string,
+    options?: { selectDuplicate?: boolean },
+  ) => string | undefined
   deleteNode: (id: string) => void
   updateNodePosition: (id: string, position: Position) => void
   updateNodeUI: (id: string, updates: { viewMode?: NodeViewMode }) => void
@@ -54,11 +57,12 @@ export interface NodesSliceState {
     name: string
     fileRef: string
     fileName: string
-    fileType: 'csv' | 'xlsx'
+    fileType: 'csv' | 'xlsx' | 'snapshot'
     sheetName?: string
     schema: TableSchema
     position?: Position
     initialRows?: Array<Record<string, CellValue>>
+    select?: boolean
   }) => string
   addDerivedTable: (params: {
     name: string

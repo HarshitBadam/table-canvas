@@ -12,6 +12,17 @@ export function isViewMode(value: unknown): value is ViewMode {
   return typeof value === 'string' && (VIEW_MODES as readonly string[]).includes(value)
 }
 
+/**
+ * Node rows represent node-scoped destinations only. A canvas graph selection
+ * must not compete with Canvas, Dashboard, or Report in the sidebar.
+ */
+export function activeSidebarNodeId(
+  view: ViewMode,
+  selectedNodeId: string | null,
+): string | null {
+  return view === 'grid' || view === 'chart' ? selectedNodeId : null
+}
+
 export const WORKSPACE_NAV_ITEMS = [
   {
     id: 'canvas',

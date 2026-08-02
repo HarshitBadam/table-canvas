@@ -41,15 +41,21 @@ export const createNodesSlice: StateCreator<
     })
   },
 
-  duplicateNode: (id) => {
+  duplicateNode: (id, options) => {
     const state = get()
     const sourceNode = state.nodes[id]
     if (!sourceNode) return undefined
 
     const duplicate = prepareNodeDuplicate(state, id)
     if (!duplicate) return undefined
+    const selectedNodeId = state.selectedNodeId
     state.saveSnapshot(`Duplicate node ${sourceNode.name}`)
-    set(draft => applyNodeDuplicate(draft, duplicate))
+    set((draft) => {
+      applyNodeDuplicate(draft, duplicate)
+      if (options?.selectDuplicate === false) {
+        draft.selectedNodeId = selectedNodeId
+      }
+    })
     return duplicate.id
   },
 
@@ -146,6 +152,7 @@ export const createNodesSlice: StateCreator<
     schema,
     position,
     initialRows,
+    select = true,
   }) => {
     const state = get()
     state.saveSnapshot(`Import table ${name}`)
@@ -184,7 +191,7 @@ export const createNodesSlice: StateCreator<
     set((state) => {
       state.nodes[id] = newTable
       state.patches[id] = createInitialPatches()
-      state.selectedNodeId = id
+      if (select) state.selectedNodeId = id
     })
 
     return id

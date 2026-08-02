@@ -128,6 +128,19 @@ describe('uploadFileWithSync', () => {
     expect(result.name).toBe('test.csv')
   })
 
+  it('does not report success with a local fallback when cloud persistence is required', async () => {
+    mockUploadFile.mockRejectedValue(new Error('Storage quota exceeded'))
+
+    await expect(uploadFileWithSync(
+      createMockFile('snapshot', 'copy.tablecanvas', 'application/octet-stream'),
+      'proj_1',
+      'snapshot-operation',
+      { requireRemoteWhenOnline: true },
+    )).rejects.toThrow('Storage quota exceeded')
+
+    expect(mockSaveFileLocal).not.toHaveBeenCalled()
+  })
+
   it('keeps a successful remote upload when local caching fails', async () => {
     const file = createMockFile('test content', 'test.csv', 'text/csv')
     mockUploadFile.mockResolvedValue({

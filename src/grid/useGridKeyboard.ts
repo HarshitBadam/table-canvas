@@ -33,6 +33,7 @@ interface UseGridKeyboardOptions {
   getSelectedCellData: () => GridClipboardData | null
   formatClipboardText: (data: GridClipboardData) => string
   onFeedback: (feedback: GridFeedbackMessage) => void
+  onReadOnlyEditAttempt?: () => void
 }
 
 export function useGridKeyboard({
@@ -55,6 +56,7 @@ export function useGridKeyboard({
   getSelectedCellData,
   formatClipboardText,
   onFeedback,
+  onReadOnlyEditAttempt,
 }: UseGridKeyboardOptions) {
   const undo = useProjectStore((state) => state.undo)
 
@@ -131,8 +133,12 @@ export function useGridKeyboard({
           if (targetColumn) {
             selectCell(targetCell.rowIndex, targetColumn.id, { extend: e.shiftKey })
           }
-        } else if (e.key === 'Enter' && isEditable) {
+        } else if (e.key === 'Enter') {
           e.preventDefault()
+          if (!isEditable) {
+            onReadOnlyEditAttempt?.()
+            return
+          }
           const row = rows[rowIndex]
           if (row) {
             startEditing(
@@ -153,8 +159,12 @@ export function useGridKeyboard({
           )
           const targetColumn = columns[targetCell.colIndex]
           if (targetColumn) selectCell(targetCell.rowIndex, targetColumn.id)
-        } else if (e.key === 'F2' && isEditable) {
+        } else if (e.key === 'F2') {
           e.preventDefault()
+          if (!isEditable) {
+            onReadOnlyEditAttempt?.()
+            return
+          }
           const row = rows[rowIndex]
           if (row) {
             startEditing(
@@ -164,8 +174,12 @@ export function useGridKeyboard({
               { selectValue: false },
             )
           }
-        } else if ((e.key === 'Delete' || e.key === 'Backspace') && isEditable) {
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault()
+          if (!isEditable) {
+            onReadOnlyEditAttempt?.()
+            return
+          }
           const cells = getEditableCellsInSelection(
             rowIndex,
             colIndex,
@@ -181,14 +195,17 @@ export function useGridKeyboard({
           e.preventDefault()
           selectCell(rowIndex, columnId)
         } else if (
-          isEditable
-          && e.key.length === 1
+          e.key.length === 1
           && !e.metaKey
           && !e.ctrlKey
           && !e.altKey
           && !e.isComposing
         ) {
           e.preventDefault()
+          if (!isEditable) {
+            onReadOnlyEditAttempt?.()
+            return
+          }
           const row = rows[rowIndex]
           if (row) {
             startEditing(
@@ -210,11 +227,11 @@ export function useGridKeyboard({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [editingCell, selectedCell, selection, columns, rows, isEditable, setSelection, selectCell, commitEdit, cancelEdit, startEditing, getDisplayValue, saveSnapshot, setCellValue, tableId, cellRangeSelection, getSelectedCellData, formatClipboardText, onFeedback])
+  }, [editingCell, selectedCell, selection, columns, rows, isEditable, setSelection, selectCell, commitEdit, cancelEdit, startEditing, getDisplayValue, saveSnapshot, setCellValue, tableId, cellRangeSelection, getSelectedCellData, formatClipboardText, onFeedback, onReadOnlyEditAttempt])
 
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {
-      if (!isEditable || editingCell || !selectedCell) return
+      if (editingCell || !selectedCell) return
 
       const target = event.target instanceof HTMLElement ? event.target : null
       if (!target?.closest('[role="grid"]')) return
@@ -224,6 +241,10 @@ export function useGridKeyboard({
       if (!text) return
 
       event.preventDefault()
+      if (!isEditable) {
+        onReadOnlyEditAttempt?.()
+        return
+      }
 
       const startRow = cellRangeSelection?.startRow ?? selectedCell.rowIndex
       const selectedColumnIndex = columns.findIndex(column => column.id === selectedCell.columnId)
@@ -268,5 +289,5 @@ export function useGridKeyboard({
 
     window.addEventListener('paste', handlePaste)
     return () => window.removeEventListener('paste', handlePaste)
-  }, [cellRangeSelection, columns, editingCell, isEditable, onFeedback, rows, saveSnapshot, selectedCell, setCellValue, tableId, undo])
+  }, [cellRangeSelection, columns, editingCell, isEditable, onFeedback, onReadOnlyEditAttempt, rows, saveSnapshot, selectedCell, setCellValue, tableId, undo])
 }

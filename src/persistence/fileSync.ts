@@ -50,17 +50,22 @@ export async function uploadFileWithSync(
   file: File,
   projectId?: string,
   operationId = createUploadOperationId(),
+  options?: { requireRemoteWhenOnline?: boolean },
 ): Promise<FileWithSync> {
   const buffer = await readFileBuffer(file)
-  if (isNetworkOnline() && isCloudStorageScope()) {
+  const remoteAvailable = isNetworkOnline() && isCloudStorageScope()
+  if (remoteAvailable) {
     let uploaded: Awaited<ReturnType<typeof uploadFile>> | null = null
+    let uploadError: unknown
     try {
       uploaded = await uploadFile(file, projectId, operationId)
     } catch (firstError) {
+      uploadError = firstError
       if (isRetryableRemoteDeferral(firstError)) {
         try {
           uploaded = await uploadFile(file, projectId, operationId)
         } catch (retryError) {
+          uploadError = retryError
           console.error('[syncService] Failed to upload file to backend:', retryError)
         }
       } else {
@@ -74,6 +79,11 @@ export async function uploadFileWithSync(
         console.error('[syncService] Uploaded file but could not cache it locally:', error)
       }
       return { id: uploaded.id, name: uploaded.filename, contentType: uploaded.contentType }
+    }
+    if (options?.requireRemoteWhenOnline) {
+      throw uploadError instanceof Error
+        ? uploadError
+        : new Error('The file could not be saved to cloud storage.')
     }
   }
   const id = `local_file_${Date.now()}_${Math.random().toString(36).slice(2)}`
