@@ -301,12 +301,13 @@ function TableDimensions({ node, selected }: { node: TableNode; selected: boolea
   const columns = node.schema.columns.length
   const rows = cacheInfo?.lastRowCount ?? node.schema.rowCount ?? 0
   return (
-    <span className={`mt-0.5 text-xs tabular-nums ${
+    <span className={`mt-0.5 flex flex-wrap gap-x-1 text-xs tabular-nums ${
       selected
         ? node.kind === 'derived_table' ? 'text-node-derived-border' : 'text-node-source-border'
         : 'text-text-tertiary'
     }`}>
-      {rows.toLocaleString()} rows <span className="ml-1">{columns.toLocaleString()} columns</span>
+      <span className="whitespace-nowrap">{columns.toLocaleString()} columns</span>
+      <span className="whitespace-nowrap">{rows.toLocaleString()} rows</span>
     </span>
   )
 }

@@ -64,18 +64,18 @@ export function CanvasEmptyState({ onNewTable }: EmptyStateProps) {
         <p className="mx-auto mb-6 max-w-sm text-sm leading-relaxed text-text-secondary">
           Import a spreadsheet or create a blank table. Then connect tables to build a repeatable transformation.
         </p>
-        <div className="flex flex-col justify-center gap-2 sm:flex-row">
-          <div className="sm:w-40">
+        <div className="flex flex-col justify-center gap-2 lg:flex-row lg:items-center">
+          <div className="w-full lg:w-40">
             <ImportButton />
           </div>
           <button
             type="button"
-            className="btn btn-secondary px-6"
+            className="btn btn-secondary w-full gap-2 whitespace-nowrap lg:w-40"
             onClick={onNewTable}
             disabled={!canEdit}
             title={canEdit ? undefined : EDITING_ELSEWHERE_TOOLTIP}
           >
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             New Table

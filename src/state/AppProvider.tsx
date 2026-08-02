@@ -68,7 +68,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     syncError: null,
   })
   const initialized = useRef(false)
-  const { saveLatestProject, flushLocalProjectSave, flushProjectSave } = useProjectAutosave({
+  const {
+    saveLatestProject,
+    flushLocalProjectSave,
+    flushImportProjectSave,
+    flushProjectSave,
+  } = useProjectAutosave({
     phase: state.phase,
     isAuthenticated: state.isAuthenticated,
     projectId: state.projectId,
@@ -337,9 +342,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const persistProjectNow = useCallback(async () => {
-    await flushLocalProjectSave()
+    await flushImportProjectSave()
     await useReportStore.getState().flushSaves()
-  }, [flushLocalProjectSave])
+  }, [flushImportProjectSave])
 
   const value: AppContextValue = {
     ...state,

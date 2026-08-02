@@ -52,6 +52,8 @@ export interface ProjectAutosave {
   saveLatestProject: () => Promise<void>
   /** Local durability only — used for import completion and tab handover. */
   flushLocalProjectSave: () => Promise<void>
+  /** Saves completed imports while omitting any other imports that are still pending. */
+  flushImportProjectSave: () => Promise<void>
   /** Local save plus a best-effort remote flush. */
   flushProjectSave: () => Promise<void>
 }
@@ -88,14 +90,19 @@ export function useProjectAutosave({
       : { ...previous, isSaving: saving }))
   }, [setState])
 
-  const saveLatestProject = useCallback(async () => {
+  const saveProjectSnapshot = useCallback(async (allowPendingImports: boolean) => {
     cancelPendingSave()
     if (useProjectStore.getState().history.transaction) {
       throw new Error('A table operation is still in progress.')
     }
     // A pending import is intentionally excluded from durable snapshots. Never let a
     // pagehide/autosave turn that incomplete graph into the latest persisted version.
-    if (hasPendingImportedTables(useProjectStore.getState().nodes)) {
+    // Import completion is the one safe exception: withoutRuntimeNodeState omits other
+    // pending imports while preserving the table that has just finished staging.
+    if (
+      !allowPendingImports
+      && hasPendingImportedTables(useProjectStore.getState().nodes)
+    ) {
       throw new Error('A table operation is still in progress.')
     }
     // Mirror tabs hold the same stores but must never write the document.
@@ -143,10 +150,19 @@ export function useProjectAutosave({
     }
   }, [cancelPendingSave, markSaving])
 
+  const saveLatestProject = useCallback(
+    () => saveProjectSnapshot(false),
+    [saveProjectSnapshot],
+  )
+
   /** IndexedDB (+ sync enqueue) only — callers that also need reports flush those next. */
   const flushLocalProjectSave = useCallback(async () => {
     await saveLatestProject()
   }, [saveLatestProject])
+
+  const flushImportProjectSave = useCallback(async () => {
+    await saveProjectSnapshot(true)
+  }, [saveProjectSnapshot])
 
   const flushProjectSave = useCallback(async () => {
     await flushLocalProjectSave()
@@ -223,5 +239,10 @@ export function useProjectAutosave({
 
   useEffect(() => cancelPendingSave, [cancelPendingSave])
 
-  return { saveLatestProject, flushLocalProjectSave, flushProjectSave }
+  return {
+    saveLatestProject,
+    flushLocalProjectSave,
+    flushImportProjectSave,
+    flushProjectSave,
+  }
 }

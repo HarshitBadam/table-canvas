@@ -129,6 +129,9 @@ function Harness() {
       <button onClick={() => void app.deleteProject('current-project').catch(() => undefined)}>
         Delete current
       </button>
+      <button onClick={() => void app.persistProjectNow().catch(() => undefined)}>
+        Persist import
+      </button>
     </div>
   )
 }
@@ -170,6 +173,36 @@ beforeEach(() => {
 })
 
 describe('AppProvider project lifecycle', () => {
+  it('persists completed import progress while another import is pending', async () => {
+    renderApp()
+    await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))
+    saveProjectWithSync.mockClear()
+
+    act(() => {
+      useProjectStore.getState().addSourceTable({
+        name: 'Ready table',
+        fileRef: 'file-ready',
+        fileName: 'ready.csv',
+        fileType: 'csv',
+        schema: { columns: [], rowCount: 0 },
+        recordHistory: false,
+      })
+      useProjectStore.getState().addSourceTable({
+        name: 'Pending table',
+        fileRef: 'pending:next-import',
+        fileName: 'pending.csv',
+        fileType: 'csv',
+        schema: { columns: [], rowCount: 0 },
+        recordHistory: false,
+      })
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Persist import' }))
+
+    await waitFor(() => expect(saveProjectWithSync).toHaveBeenCalledOnce())
+    expect(flushReportSaves).toHaveBeenCalled()
+  })
+
   it('renames the active project and persists the new name', async () => {
     renderApp()
     await waitFor(() => expect(screen.getByTestId('phase')).toHaveTextContent('ready'))

@@ -433,6 +433,8 @@ export function ImportButton() {
         if (item.kind === 'csv') {
           const rowCheck = checkRowCount(item.rowCount, tier)
           if (!rowCheck.ok) {
+            setSelectionModalOpen(false)
+            clearSelectionState()
             showViolation(rowCheck)
             return
           }
@@ -442,6 +444,8 @@ export function ImportButton() {
         const tableData = parseWorkbookSheet(item.workbook, item.sheetName)
         const rowCheck = checkRowCount(tableData.schema.rowCount ?? tableData.rows.length, tier)
         if (!rowCheck.ok) {
+          setSelectionModalOpen(false)
+          clearSelectionState()
           showViolation(rowCheck)
           return
         }
@@ -452,6 +456,11 @@ export function ImportButton() {
           ? `Import ${selectedItems.length} workbook sheets`
           : `Import ${selectedItems.length} tables`,
       )
+
+      // Dismiss the checklist before the long upload/materialization loop so progress
+      // surfaces (main Importing… control + pending canvas nodes) stay visible.
+      setSelectionModalOpen(false)
+      clearSelectionState()
 
       for (const item of selectedItems) {
         // Reserve before uploading. Uploading is asynchronous and, without an active
@@ -526,15 +535,14 @@ export function ImportButton() {
         completeTableOperation(tableId, generation)
       })
       uploadedFileIds.length = 0
-
-      setSelectionModalOpen(false)
-      clearSelectionState()
     } catch (error) {
       reservedImports.forEach(({ tableId }) => {
         discardPendingImport(tableId)
       })
       await discardFiles(uploadedFileIds)
       console.error('Import selection error:', error)
+      setSelectionModalOpen(false)
+      clearSelectionState()
       setImportError(
         error instanceof Error ? error.message : 'Failed to import selected tables',
       )
