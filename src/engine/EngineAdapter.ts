@@ -221,6 +221,17 @@ class EngineAdapter {
     })
   }
 
+  async countCombinedTransformRows(
+    transformDef: Extract<TransformDef, { type: 'join' | 'union' }>,
+    columnIdToName?: Record<string, string>,
+  ): Promise<number> {
+    await this.ensureInitialized()
+    return this.rpc.call<number>('countCombinedTransformRows', {
+      ...transformDef,
+      columnIdToName,
+    })
+  }
+
   async getSlice(
     tableId: string,
     offset: number,

@@ -122,6 +122,29 @@ export async function createProjectWithinCapacity({
     if (existing) return assertOperationMatches(existing, requestHash);
   }
 
+  if (tier === 'google') {
+    try {
+      return await new Project({
+        userId: objectUserId,
+        clientOperationId: operationId,
+        clientOperationHash: operationId ? requestHash : undefined,
+        name: name || 'Untitled Project',
+        nodes: nodes || {},
+        edges: edges || {},
+        patches: patches || {},
+        reports: reports || {},
+      }).save();
+    } catch (error) {
+      if (!isDuplicateKey(error) || !operationId) throw error;
+      const existing = await Project.findOne({
+        userId: objectUserId,
+        clientOperationId: operationId,
+      });
+      if (existing) return assertOperationMatches(existing, requestHash);
+      throw error;
+    }
+  }
+
   const maxProjects = LIMITS[tier].maxProjects;
   const used = await claimSlotsForLegacyProjects(objectUserId, maxProjects);
   for (let slot = 0; slot < maxProjects; slot += 1) {
@@ -165,6 +188,38 @@ export async function restoreProjectWithinCapacity(
 ): Promise<IProjectDocument> {
   if (!project.isDeleted()) return project;
   const objectUserId = new Types.ObjectId(userId);
+  if (tier === 'google') {
+    const restored = await Project.findOneAndUpdate(
+      {
+        _id: project._id,
+        userId: objectUserId,
+        deletedAt: { $ne: null },
+        ...(expectedRevision === 0
+          ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] }
+          : { revision: expectedRevision }),
+      },
+      {
+        $set: {
+          deletedAt: null,
+          quotaSlot: null,
+        },
+        $inc: { revision: 1 },
+      },
+      { new: true, runValidators: true },
+    );
+    if (restored) return restored;
+    const active = await Project.findOne({
+      _id: project._id,
+      userId: objectUserId,
+      deletedAt: null,
+    });
+    if (active) return active;
+    throw new AppError(
+      'Project changed in another session. Reload before restoring it.',
+      409,
+    );
+  }
+
   const maxProjects = LIMITS[tier].maxProjects;
   const used = await claimSlotsForLegacyProjects(objectUserId, maxProjects);
   for (let slot = 0; slot < maxProjects; slot += 1) {

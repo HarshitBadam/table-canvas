@@ -344,9 +344,4 @@ describe('File Upload', () => {
     expect(allowedExtensions.includes(ext)).toBe(false);
   });
 
-  it('should enforce file size limit', () => {
-    const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-    const largeFileSize = 60 * 1024 * 1024; // 60MB
-    expect(largeFileSize > MAX_SIZE).toBe(true);
-  });
 });

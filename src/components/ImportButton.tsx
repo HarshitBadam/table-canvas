@@ -105,45 +105,25 @@ export function ImportButton() {
       return
     }
 
+    // Parse and validate before reserving a visible table node. A rejected guest
+    // import should not spend time as a zero-row "reading" table on the canvas.
+    const { inspectCSVFile } = await import('@/persistence/importParsers')
+    const { schema, rows } = await inspectCSVFile(file)
+    const rowCheck = checkRowCount(schema.rowCount ?? rows.length, tier)
+    if (!rowCheck.ok) {
+      showViolation(rowCheck)
+      return
+    }
+
     requireImportOwnership()
-    // Reserve before the first await. A focused sibling tab may otherwise take the
-    // write lease while the parser module loads; the old owner would then finish an
-    // import into its mirror and have that table replaced by the new owner's snapshot.
     const { tableId, generation } = reservePendingImport(file)
-    // Node shows import progress; re-enable the button for concurrent imports.
+    // Node shows upload/materialization progress; re-enable concurrent imports.
     onReserved?.()
     try {
-      const { inspectCSVFile } = await import('@/persistence/importParsers')
       const isCurrentImport = () =>
         useProjectStore.getState().projectId === projectId
         && isTableOperationCurrent(tableId, generation)
-      // Small files finish before this fires; skip the 0-row preview flash.
-      let previewSchemaTimer: ReturnType<typeof setTimeout> | null = null
-      const { schema, rows } = await inspectCSVFile(file, {
-        onSchema: (previewSchema) => {
-          if (previewSchemaTimer) clearTimeout(previewSchemaTimer)
-          previewSchemaTimer = setTimeout(() => {
-            previewSchemaTimer = null
-            if (!isCurrentImport()) return
-            const node = useProjectStore.getState().nodes[tableId]
-            if (node?.kind !== 'source_table') return
-            // Retain the pending file reference until the complete dataset has
-            // passed validation, uploaded, and been materialized by the engine.
-            useProjectStore.getState().updateNode(tableId, { schema: previewSchema })
-          }, 150)
-        },
-      })
-      if (previewSchemaTimer) {
-        clearTimeout(previewSchemaTimer)
-        previewSchemaTimer = null
-      }
       if (!isCurrentImport()) return
-      const rowCheck = checkRowCount(schema.rowCount ?? rows.length, tier)
-      if (!rowCheck.ok) {
-        discardPendingImport(tableId)
-        showViolation(rowCheck)
-        return
-      }
 
       // Keep phase on reading through upload so the node doesn't flash a
       // separate "saving" state before engine load.
@@ -334,43 +314,45 @@ export function ImportButton() {
       if (extension === 'csv') {
         await importSingleCsv(file, projectId, uploadedFileIds, () => setIsImporting(false))
       } else if (extension === 'xlsx' || extension === 'xls') {
-        // Establish the operation before loading the parser for the same reason as
-        // CSV: a lease handover must not be able to overtake this import.
-        requireImportOwnership()
-        pendingImport = reservePendingImport(file)
-        setIsImporting(false)
-        const { parseExcelFile } = await import('@/persistence/importParsers')
-        const result = await parseExcelFile(file, projectId, {
-          requireRemoteWhenOnline,
-          deduplicate: true,
-        })
-        if (result.kind === 'single') {
-          uploadedFileIds.push(result.fileRef)
+        // Inspect and validate before creating a pending canvas node. This keeps
+        // rejected imports from lingering as a 0-row operation.
+        const [{ inspectExcelFile }, { parseWorkbookSheet }] = await Promise.all([
+          import('@/persistence/importParsers'),
+          import('@/engine/fileParsers'),
+        ])
+        const { workbook, buffer, sheets } = await inspectExcelFile(file)
+        if (sheets.length === 1) {
+          const tableData = parseWorkbookSheet(workbook, sheets[0].name)
+          const rowCheck = checkRowCount(
+            tableData.schema.rowCount ?? tableData.rows.length,
+            tier,
+          )
+          if (!rowCheck.ok) {
+            showViolation(rowCheck)
+            return
+          }
+          requireImportOwnership()
+          pendingImport = reservePendingImport(file)
+          setIsImporting(false)
+          const uploaded = await uploadFileWithSync(file, projectId, undefined, {
+            requireRemoteWhenOnline,
+            deduplicate: true,
+          })
+          uploadedFileIds.push(uploaded.id)
           if (
             useProjectStore.getState().projectId !== projectId
             || !isTableOperationCurrent(pendingImport.tableId, pendingImport.generation)
           ) {
             throw new Error('The active project changed during import.')
           }
-          const { schema, rows } = result.tableData
-
-          const rowCheck = checkRowCount(schema.rowCount ?? rows.length, tier)
-          if (!rowCheck.ok) {
-            await discardFiles(uploadedFileIds)
-            uploadedFileIds.length = 0
-            discardPendingImport(pendingImport.tableId)
-            pendingImport = null
-            showViolation(rowCheck)
-            return
-          }
           updateTableOperation(pendingImport.tableId, pendingImport.generation, { phase: 'materializing' })
           await stageImportedTable({
             name: fileBaseName(file.name),
-            fileRef: result.fileRef,
+            fileRef: uploaded.id,
             fileName: file.name,
             fileType: 'xlsx',
-            schema,
-            rows,
+            schema: tableData.schema,
+            rows: tableData.rows,
             engineError: 'The data engine did not initialize the imported table.',
             tableId: pendingImport.tableId,
             operationGeneration: pendingImport.generation,
@@ -381,10 +363,8 @@ export function ImportButton() {
           uploadedFileIds.length = 0
           pendingImport = null
         } else {
-          discardPendingImport(pendingImport.tableId)
-          pendingImport = null
           openSelectionModal(
-            result.sheets.map((sheet) => ({
+            sheets.map((sheet) => ({
               id: `sheet:0:${file.name}:${sheet.name}`,
               kind: 'sheet' as const,
               label: sheet.name,
@@ -393,8 +373,8 @@ export function ImportButton() {
               selected: sheet.selected,
               sourceFileName: file.name,
               sheetName: sheet.name,
-              workbook: result.workbook,
-              buffer: result.buffer,
+              workbook,
+              buffer,
             })),
             'sheets',
           )

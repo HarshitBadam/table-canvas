@@ -1,7 +1,13 @@
 import type * as duckdb from '@duckdb/duckdb-wasm'
 import type { TransformResult } from '../types'
 import type { TransformDef, CellValue } from '@/types'
-import { sanitizeTableName, formatValue, mapDuckDBTypeToApp, getCleanColumnName } from './sqlHelpers'
+import {
+  sanitizeTableName,
+  formatValue,
+  mapDuckDBTypeToApp,
+  getCleanColumnName,
+  quoteIdentifier,
+} from './sqlHelpers'
 import { getTableSchema } from './tableOperations'
 import { INTERNAL_ROW_ID_COLUMN } from '../internalColumns'
 
@@ -87,6 +93,43 @@ async function buildJoinColumnSelection(
     selectClause: selectParts.join(',\n    '),
     columnNames,
   }
+}
+
+/**
+ * Counts combined-table output without materializing it. Guest-tier validation
+ * uses this before adding a derived node, avoiding a long-lived 0-row node that
+ * can only fail after a large join/append has completed.
+ */
+export async function countCombinedTransformRows(
+  conn: duckdb.AsyncDuckDBConnection,
+  transformDef: Extract<TransformDef, { type: 'join' | 'union' }> & {
+    columnIdToName?: Record<string, string>
+  },
+): Promise<number> {
+  const toColName = (columnId: string) =>
+    transformDef.columnIdToName?.[columnId] || columnId
+  let sql: string
+
+  if (transformDef.type === 'join') {
+    const leftTable = quoteIdentifier(sanitizeTableName(transformDef.leftTableId))
+    const rightTable = quoteIdentifier(sanitizeTableName(transformDef.rightTableId))
+    const joinType = transformDef.joinType.toUpperCase()
+    sql = `
+      SELECT COUNT(*) AS cnt
+      FROM ${leftTable} AS l
+      ${joinType} JOIN ${rightTable} AS r
+      ON l.${quoteIdentifier(toColName(transformDef.leftKey))}
+        = r.${quoteIdentifier(toColName(transformDef.rightKey))}
+    `
+  } else {
+    const tables = transformDef.sourceTableIds
+      .map(id => `SELECT 1 FROM ${quoteIdentifier(sanitizeTableName(id))}`)
+      .join(' UNION ALL ')
+    sql = `SELECT COUNT(*) AS cnt FROM (${tables})`
+  }
+
+  const result = await conn.query(sql)
+  return Number(result.toArray()[0]?.cnt ?? 0)
 }
 
 export async function executeTransform(

@@ -21,6 +21,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function checkFileSize(fileBytes: number, tier: Tier): LimitCheck {
+  if (tier === 'google') return { ok: true }
   const { maxFileSizeBytes } = getLimits(tier)
   if (fileBytes <= maxFileSizeBytes) return { ok: true }
   return {
@@ -32,6 +33,7 @@ export function checkFileSize(fileBytes: number, tier: Tier): LimitCheck {
 }
 
 export function checkRowCount(rowCount: number, tier: Tier): LimitCheck {
+  if (tier === 'google') return { ok: true }
   const { maxRowsPerTable } = getLimits(tier)
   if (rowCount <= maxRowsPerTable) return { ok: true }
   return {
@@ -43,6 +45,7 @@ export function checkRowCount(rowCount: number, tier: Tier): LimitCheck {
 }
 
 export function checkTableCount(currentTableCount: number, tier: Tier): LimitCheck {
+  if (tier === 'google') return { ok: true }
   const { maxTablesPerProject } = getLimits(tier)
   if (currentTableCount < maxTablesPerProject) return { ok: true }
   return {
@@ -63,6 +66,7 @@ export function checkProjectTableLimits(
   tier: Tier,
   patches: Record<string, Patches> = {},
 ): LimitCheck {
+  if (tier === 'google') return { ok: true }
   const tables = Object.values(nodes).filter(
     (node) => node.kind === 'source_table' || node.kind === 'derived_table',
   )
@@ -101,6 +105,7 @@ export function checkProjectTableLimits(
 }
 
 export function checkProjectCount(currentProjectCount: number, tier: Tier): LimitCheck {
+  if (tier === 'google') return { ok: true }
   const { maxProjects } = getLimits(tier)
   if (currentProjectCount < maxProjects) return { ok: true }
   return {
@@ -116,6 +121,7 @@ export function checkStorageQuota(
   newFileBytes: number,
   tier: Tier,
 ): LimitCheck {
+  if (tier === 'google') return { ok: true }
   const limits = getLimits(tier)
   const maxBytes = limits.maxServerStorageBytes
   if (maxBytes == null) return { ok: true }

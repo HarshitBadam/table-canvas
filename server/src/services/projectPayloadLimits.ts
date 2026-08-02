@@ -7,6 +7,7 @@ export function validateProjectTierLimits(
   tier: Tier,
   patches: Record<string, unknown> = {},
 ): void {
+  if (tier === 'google') return;
   const tables = Object.values(nodes).filter((node) => (
     node !== null
     && typeof node === 'object'

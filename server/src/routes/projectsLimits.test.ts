@@ -25,7 +25,7 @@ async function createGoogleUser(userId: Types.ObjectId, email: string): Promise<
 }
 
 describe('Projects API limits', () => {
-  it('should reject when user has reached the google-tier project limit', async () => {
+  it('allows Google users to create projects beyond the former limit', async () => {
     const { app, mockUser } = getProjectRoutesTestContext()
     const userId = new Types.ObjectId(mockUser.userId)
     await createGoogleUser(userId, mockUser.email)
@@ -33,9 +33,8 @@ describe('Projects API limits', () => {
     const response = await request(app)
       .post('/api/projects')
       .send({ name: 'One Too Many' })
-      .expect(403)
-    expect(response.body.success).toBe(false)
-    expect(response.body.error).toContain('limit')
+      .expect(201)
+    expect(response.body.success).toBe(true)
   })
 
   it('should allow project creation when below the limit', async () => {
@@ -63,7 +62,7 @@ describe('Projects API limits', () => {
     expect(response.body.success).toBe(true)
   })
 
-  it('serializes concurrent creation at the final capacity slot', async () => {
+  it('allows concurrent Google project creation beyond the former capacity', async () => {
     const { app, mockUser } = getProjectRoutesTestContext()
     const userId = new Types.ObjectId(mockUser.userId)
     await createGoogleUser(userId, mockUser.email)
@@ -74,10 +73,10 @@ describe('Projects API limits', () => {
       request(app).post('/api/projects').send({ name: 'Concurrent B' }),
     ])
 
-    expect(responses.map(response => response.status).sort()).toEqual([201, 403])
+    expect(responses.map(response => response.status).sort()).toEqual([201, 201])
   })
 
-  it('enforces the final slot at the database persistence boundary', async () => {
+  it('allows concurrent Google project creation at the persistence boundary', async () => {
     const { mockUser } = getProjectRoutesTestContext()
     const userId = new Types.ObjectId(mockUser.userId)
     await createGoogleUser(userId, mockUser.email)
@@ -98,8 +97,8 @@ describe('Projects API limits', () => {
       }),
     ])
 
-    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
-    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1)
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(2)
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(0)
   })
 
   it('reconciles retries with the same idempotency key', async () => {
@@ -132,7 +131,7 @@ describe('Projects API limits', () => {
       .expect(409)
   })
 
-  it('enforces capacity when restoring a legacy deleted project', async () => {
+  it('allows Google users to restore projects beyond the former capacity', async () => {
     const { app, mockUser } = getProjectRoutesTestContext()
     const userId = new Types.ObjectId(mockUser.userId)
     await createGoogleUser(userId, mockUser.email)
@@ -146,7 +145,7 @@ describe('Projects API limits', () => {
     await request(app)
       .post(`/api/projects/${deleted._id.toString()}/restore`)
       .send({ expectedRevision: deleted.revision })
-      .expect(403)
+      .expect(200)
   })
 })
 
@@ -197,7 +196,7 @@ describe('Projects API edge cases', () => {
     expect(response.body.data.project.name).toBe(name)
   })
 
-  it('rejects a project with more tables than the tier allows', async () => {
+  it('allows Google projects with more tables than the former limit', async () => {
     const { app } = getProjectRoutesTestContext()
     const nodes: Record<string, unknown> = {}
     for (let index = 0; index <= LIMITS.google.maxTablesPerProject; index++) {
@@ -206,11 +205,11 @@ describe('Projects API edge cases', () => {
     const response = await request(app)
       .post('/api/projects')
       .send({ name: 'Large Project', nodes })
-      .expect(400)
-    expect(response.body.errors.join(' ')).toContain('tables')
+      .expect(201)
+    expect(response.body.success).toBe(true)
   })
 
-  it('rejects a project with a table exceeding the tier row limit', async () => {
+  it('allows Google projects with tables beyond the former row limit', async () => {
     const { app } = getProjectRoutesTestContext()
     const nodes = {
       oversized: {
@@ -224,7 +223,7 @@ describe('Projects API edge cases', () => {
     const response = await request(app)
       .post('/api/projects')
       .send({ name: 'Oversized Project', nodes })
-      .expect(400)
-    expect(response.body.errors.join(' ')).toContain('rows')
+      .expect(201)
+    expect(response.body.success).toBe(true)
   })
 })
