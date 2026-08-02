@@ -77,17 +77,14 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
   const isSource = data.kind === 'source_table'
   const schema = data.schema
   const cacheInfo = useNodeCacheInfo(data.id)
-  const actualRowCount = cacheInfo?.lastRowCount ?? schema?.rowCount ?? 0
+  // Keep known dimensions visible while data materializes so the node matches
+  // the sidebar (schema.rowCount / lastRowCount are available before rows load).
+  const rowCount = cacheInfo?.lastRowCount ?? schema?.rowCount ?? 0
   const colCount = schema?.columns.length ?? 0
   const viewMode = getViewMode(data.ui)
   const updating = isTableUpdating(cacheInfo) && !cacheInfo?.error
   const [showUpdatingChrome, setShowUpdatingChrome] = useState(false)
   const hasColumns = (schema?.columns.length ?? 0) > 0
-  // Initial source imports are a two-state UI: columns/loading, then ready.
-  // Keep the final row count out of the loading state so staging cannot create a
-  // third visual transition just before the operation completes.
-  const rowsAreLoading = isSource && updating
-  const rowCount = rowsAreLoading ? 0 : actualRowCount
   const showSchemaBody = (viewMode === 'collapsed' && hasColumns)
     || (showUpdatingChrome && !hasColumns)
   const showDataBody = viewMode === 'data' && hasColumns
@@ -144,13 +141,13 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             <h3 className="truncate text-sm font-semibold tracking-tight text-text-primary">
               {data.name}
             </h3>
-            {!rowsAreLoading && (
+            {hasColumns && (
               <div className={`mt-0.5 text-xs text-text-secondary ${
                 rowCount >= 10_000 ? 'flex flex-col leading-snug' : ''
               }`}>
-                <span>{formatNumber(rowCount)} rows</span>
+                <span>{formatNumber(colCount)} columns</span>
                 <span className={rowCount >= 10_000 ? undefined : 'ml-1'}>
-                  {formatNumber(colCount)} columns
+                  {formatNumber(rowCount)} rows
                 </span>
               </div>
             )}
