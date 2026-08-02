@@ -51,8 +51,23 @@ export function formatValueWithType(value: CellValue, columnType: string): strin
     return "''"
   }
 
+  if (columnType === 'date' || columnType === 'datetime') {
+    const parsed = typeof value === 'number'
+      ? new Date(value)
+      : new Date(String(value))
+    if (isNaN(parsed.getTime())) return 'NULL'
+    return columnType === 'datetime'
+      ? escapeLiteral(parsed.toISOString())
+      : escapeLiteral(parsed.toISOString().split('T')[0])
+  }
+
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
-  if (typeof value === 'number') return String(value)
+  if (typeof value === 'number') {
+    if (columnType === 'number' && !Number.isFinite(value)) {
+      return `CAST(${escapeLiteral(String(value))} AS DOUBLE)`
+    }
+    return String(value)
+  }
 
   if (columnType === 'number') {
     const num = parseFloat(String(value))
@@ -64,28 +79,6 @@ export function formatValueWithType(value: CellValue, columnType: string): strin
     const lower = String(value).toLowerCase()
     if (lower === 'true' || lower === '1' || lower === 'yes') return 'TRUE'
     if (lower === 'false' || lower === '0' || lower === 'no') return 'FALSE'
-    return 'NULL'
-  }
-
-  if (columnType === 'date' || columnType === 'datetime') {
-    if (typeof value === 'object' && value !== null && 'getTime' in value) {
-      const dateValue = value as unknown as Date
-      if (isNaN(dateValue.getTime())) return 'NULL'
-      if (columnType === 'datetime') {
-        return escapeLiteral(dateValue.toISOString())
-      }
-      return escapeLiteral(dateValue.toISOString().split('T')[0])
-    }
-
-    const dateStr = String(value)
-    const parsed = new Date(dateStr)
-    if (!isNaN(parsed.getTime())) {
-      if (columnType === 'datetime') {
-        return escapeLiteral(parsed.toISOString())
-      }
-      return escapeLiteral(parsed.toISOString().split('T')[0])
-    }
-
     return 'NULL'
   }
 

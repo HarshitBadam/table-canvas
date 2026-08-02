@@ -290,7 +290,6 @@ export function AppHeader({
             type="button"
             onClick={() => {
               void leaveGuest()
-                .then(() => window.location.assign('/login'))
                 .catch(() => undefined)
             }}
             className="flex h-12 min-w-11 shrink-0 items-center gap-2.5 rounded-md px-1.5 transition-colors hover:bg-surface-secondary md:px-2"

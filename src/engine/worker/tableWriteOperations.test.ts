@@ -51,4 +51,45 @@ describe('atomic table replacement', () => {
     expect(query.mock.calls.at(-1)?.[0]).toBe('COMMIT')
     expect(query).not.toHaveBeenCalledWith('ROLLBACK')
   })
+
+  it('loads non-finite numeric snapshot values as explicit doubles', async () => {
+    query.mockResolvedValue({})
+
+    await loadTable(connection, {
+      tableId: 'calculated',
+      data: {
+        columns: ['Value'],
+        columnIds: ['value'],
+        types: ['number'],
+        rows: [[Number.NaN], [Number.POSITIVE_INFINITY], [Number.NEGATIVE_INFINITY]],
+      },
+    })
+
+    const insert = query.mock.calls
+      .map(([sql]) => sql as string)
+      .find(sql => sql.startsWith('INSERT INTO'))
+    expect(insert).toContain("CAST('NaN' AS DOUBLE)")
+    expect(insert).toContain("CAST('Infinity' AS DOUBLE)")
+    expect(insert).toContain("CAST('-Infinity' AS DOUBLE)")
+  })
+
+  it('converts DuckDB epoch dates before inserting snapshot rows', async () => {
+    query.mockResolvedValue({})
+
+    await loadTable(connection, {
+      tableId: 'dated-copy',
+      data: {
+        columns: ['Date', 'Created at'],
+        columnIds: ['date', 'created_at'],
+        types: ['date', 'datetime'],
+        rows: [[1704412800000, 1704412800000]],
+      },
+    })
+
+    const insert = query.mock.calls
+      .map(([sql]) => sql as string)
+      .find(sql => sql.startsWith('INSERT INTO'))
+    expect(insert).toContain("'2024-01-05'")
+    expect(insert).toContain("'2024-01-05T00:00:00.000Z'")
+  })
 })

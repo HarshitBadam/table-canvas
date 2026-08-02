@@ -9,6 +9,7 @@ export function useGridEditing(
   columns: ColumnSchema[],
   rows: GridRow[],
   isEditable: boolean,
+  onReadOnlyEditAttempt?: () => void,
 ) {
   const setCellValue = useProjectStore((state) => state.setCellValue)
   const saveSnapshot = useProjectStore((state) => state.saveSnapshot)
@@ -30,7 +31,10 @@ export function useGridEditing(
     currentValue: CellValue,
     options?: { initialValue?: string; selectValue?: boolean },
   ) => {
-    if (!isEditable) return
+    if (!isEditable) {
+      onReadOnlyEditAttempt?.()
+      return
+    }
     const column = columns.find(c => c.id === columnId)
     if (column?.isComputed) return
 
@@ -47,7 +51,7 @@ export function useGridEditing(
     editValueRef.current = editVal
     setSelectEditValue(options?.selectValue ?? true)
     setEditError(null)
-  }, [isEditable, columns])
+  }, [isEditable, columns, onReadOnlyEditAttempt])
 
   const commitEdit = useCallback(() => {
     const cell = editingCellRef.current
@@ -89,17 +93,23 @@ export function useGridEditing(
   }, [])
 
   const handleCellDoubleClick = useCallback((rowIndex: number, columnId: string, currentValue: CellValue) => {
-    if (!isEditable) return
+    if (!isEditable) {
+      onReadOnlyEditAttempt?.()
+      return
+    }
     const column = columns.find(c => c.id === columnId)
     if (column?.isComputed) return
     startEditing(rowIndex, columnId, currentValue, { selectValue: false })
-  }, [isEditable, columns, startEditing])
+  }, [isEditable, columns, startEditing, onReadOnlyEditAttempt])
 
   const handleColumnDoubleClick = useCallback((columnId: string, currentName: string) => {
-    if (!isEditable) return
+    if (!isEditable) {
+      onReadOnlyEditAttempt?.()
+      return
+    }
     setEditingColumnId(columnId)
     setEditColumnName(currentName)
-  }, [isEditable])
+  }, [isEditable, onReadOnlyEditAttempt])
 
   const commitColumnNameEdit = useCallback(() => {
     if (!editingColumnId || !editColumnName.trim()) {

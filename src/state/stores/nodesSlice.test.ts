@@ -47,4 +47,18 @@ describe('duplicateNode', () => {
     expect(nextState.patches[duplicateId!]).toEqual(nextState.patches[tableId])
     expect(nextState.patches[duplicateId!]).not.toBe(nextState.patches[tableId])
   })
+
+  it('can preserve the current selection for sidebar duplication', () => {
+    const tableId = addSource('Sales')
+    const otherTableId = addSource('Inventory')
+    useProjectStore.getState().selectNode(tableId)
+
+    const duplicateId = useProjectStore.getState().duplicateNode(
+      otherTableId,
+      { selectDuplicate: false },
+    )
+
+    expect(duplicateId).toBeDefined()
+    expect(useProjectStore.getState().selectedNodeId).toBe(tableId)
+  })
 })

@@ -29,6 +29,8 @@ import { requestedDocumentProjectId, useDocumentSession } from './useDocumentSes
 import { useDocumentCoordination } from './useDocumentCoordination'
 import { useProjectAutosave } from './useProjectAutosave'
 import { useBackgroundTableRefresh } from './useBackgroundTableRefresh'
+import { getStorageScope } from '@/persistence/storageScope'
+import { clearWorkspaceViews } from '@/layout/workspaceViewPersistence'
 const PHASE_MESSAGES: Record<AppPhase, string> = {
   idle: 'Starting...',
   initializing_engine: 'Starting data engine...',
@@ -186,6 +188,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const postLoginSetup = useCallback(async (tier: Tier) => {
     setPhase('loading_project')
+    clearWorkspaceViews(getStorageScope())
     if (tier !== 'guest') {
       await syncLocalProjectsToBackend()
       await flushAllProjectSavesWithSync()
@@ -228,8 +231,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await flushProjectSave()
       await useReportStore.getState().flushSaves()
-      await resetWorkspace()
+      clearWorkspaceViews(getStorageScope())
       clearGuestAuth()
+      await resetWorkspace()
     } catch (error) {
       setState(previous => ({
         ...previous,
@@ -245,6 +249,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await flushProjectSave()
       await useReportStore.getState().flushSaves()
+      clearWorkspaceViews(getStorageScope())
       await performLogout()
       await resetWorkspace()
     } catch (error) {

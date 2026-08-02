@@ -57,10 +57,11 @@ const upload = multer({
       'text/csv',
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.tablecanvas.snapshot+json',
       'application/octet-stream',
     ];
     
-    const allowedExtensions = ['.csv', '.xlsx', '.xls'];
+    const allowedExtensions = ['.csv', '.xlsx', '.xls', '.tablecanvas'];
     const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
     
     if (allowedMimes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
@@ -162,6 +163,8 @@ router.post(
       contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     } else if (ext.endsWith('.xls')) {
       contentType = 'application/vnd.ms-excel';
+    } else if (ext.endsWith('.tablecanvas')) {
+      contentType = 'application/vnd.tablecanvas.snapshot+json';
     }
 
     let uploadedFile: UploadedFile;
@@ -277,18 +280,6 @@ router.delete(
 
     const metadata = await getFileLifecycleMetadata(fileId, userId);
     if (!metadata) throw new NotFoundError('File');
-    if (metadata.projectId && Types.ObjectId.isValid(metadata.projectId)) {
-      const owningProject = await Project.exists({
-        _id: new Types.ObjectId(metadata.projectId),
-        userId: new Types.ObjectId(userId),
-        deletedAt: null,
-      });
-      if (owningProject) {
-        throw new ConflictError(
-          'Files belonging to an active project cannot be deleted directly',
-        );
-      }
-    }
     const retainedProjects = await Project.find({
       userId: new Types.ObjectId(userId),
       deletedAt: null,

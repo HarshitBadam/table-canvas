@@ -79,7 +79,7 @@ export function ColumnHeader({ column, columnIndex }: ColumnHeaderProps) {
         } else if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
           handleColumnClick(column.id)
-        } else if (event.key === 'F2' && isEditable) {
+        } else if (event.key === 'F2') {
           event.preventDefault()
           handleColumnDoubleClick(column.id, column.name)
         }

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useApp } from '@/state/AppContext'
 import { ApiError } from '@/api/client'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
@@ -13,9 +13,6 @@ export function LoginPage() {
 
   const { googleLogin, continueAsGuest } = useApp()
   const navigate = useNavigate()
-  const location = useLocation()
-
-  const from = (location.state as { from?: Location })?.from?.pathname || '/'
 
   const handleError = useCallback((err: unknown) => {
     if (err instanceof ApiError) {
@@ -47,14 +44,14 @@ export function LoginPage() {
       setPendingMethod(method)
       try {
         await enter()
-        navigate(from, { replace: true })
+        navigate('/', { replace: true })
       } catch (err) {
         handleError(err)
       } finally {
         setPendingMethod(null)
       }
     },
-    [navigate, from, handleError],
+    [navigate, handleError],
   )
 
   const handleGoogleCredential = useCallback(

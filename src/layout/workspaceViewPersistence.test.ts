@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  clearWorkspaceViews,
   isNodeScopedView,
   readWorkspaceView,
   resolveWorkspaceView,
@@ -20,6 +21,10 @@ beforeEach(() => {
     getItem: (key: string) => stored.get(key) ?? null,
     setItem: (key: string, value: string) => stored.set(key, value),
     removeItem: (key: string) => stored.delete(key),
+    key: (index: number) => [...stored.keys()][index] ?? null,
+    get length() {
+      return stored.size
+    },
   } satisfies Partial<Storage>)
 })
 
@@ -77,6 +82,21 @@ describe('read/write round trip', () => {
     writeWorkspaceView(SCOPE, PROJECT, { view: 'report', nodeId: null })
     writeWorkspaceView(SCOPE, PROJECT, { view: 'chart', nodeId: 'chart-1' })
     expect(readWorkspaceView(SCOPE, PROJECT)).toEqual({ view: 'chart', nodeId: 'chart-1' })
+  })
+})
+
+describe('clearWorkspaceViews', () => {
+  it('clears only the remembered views for the signed-out scope', () => {
+    writeWorkspaceView(SCOPE, PROJECT, { view: 'report', nodeId: null })
+    writeWorkspaceView(SCOPE, 'project-2', { view: 'dashboard', nodeId: null })
+    writeWorkspaceView('account:user-1', PROJECT, { view: 'grid', nodeId: 'table-1' })
+
+    clearWorkspaceViews(SCOPE)
+
+    expect(readWorkspaceView(SCOPE, PROJECT)).toBeNull()
+    expect(readWorkspaceView(SCOPE, 'project-2')).toBeNull()
+    expect(readWorkspaceView('account:user-1', PROJECT))
+      .toEqual({ view: 'grid', nodeId: 'table-1' })
   })
 })
 

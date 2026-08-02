@@ -43,7 +43,7 @@ export interface CacheInfo {
 interface SourceTablePlan {
   fileRef: string
   fileName: string
-  fileType: 'csv' | 'xlsx'
+  fileType: 'csv' | 'xlsx' | 'snapshot'
   sheetName?: string
   inferredSchemaVersion: number
   initialRows?: Array<Record<string, CellValue>>

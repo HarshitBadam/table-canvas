@@ -116,3 +116,29 @@ export function writeWorkspaceView(
     // A full or read-only storage costs the memory of the last view, nothing more.
   }
 }
+
+/**
+ * An explicit sign-out starts a fresh workspace next time. Normal reloads and
+ * browser restarts deliberately retain this state.
+ */
+export function clearWorkspaceViews(scope: string): void {
+  const storage = workspaceViewStorage()
+  if (
+    !storage
+    || typeof storage.removeItem !== 'function'
+    || typeof storage.key !== 'function'
+    || typeof storage.length !== 'number'
+  ) return
+
+  const prefix = `${STORAGE_KEY_PREFIX}:${scope}${KEY_SEPARATOR}`
+  const keys: string[] = []
+  try {
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index)
+      if (key?.startsWith(prefix)) keys.push(key)
+    }
+    keys.forEach(key => storage.removeItem(key))
+  } catch {
+    // Clearing a remembered view must never make signing out fail.
+  }
+}
