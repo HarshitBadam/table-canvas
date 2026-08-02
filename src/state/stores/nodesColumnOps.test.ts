@@ -18,6 +18,7 @@ describe('column operations', () => {
   it('rejects duplicate display names case-insensitively without mutating schema', () => {
     const tableId = addSource('Source')
     const store = useProjectStore.getState()
+    useProjectStore.setState({ history: { past: [], future: [] } })
 
     expect(store.addColumn(tableId, ' id ')).toMatchObject({
       ok: false,
@@ -36,6 +37,7 @@ describe('column operations', () => {
       code: 'DUPLICATE_NAME',
     })
     expect(source(tableId).schema?.columns.map(column => column.name)).toEqual(['ID', 'Value'])
+    expect(useProjectStore.getState().history.past).toHaveLength(0)
   })
 
   it('stores a stable canonical formula while preserving readable source text', () => {

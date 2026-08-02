@@ -52,7 +52,6 @@ export function useGridOperations(
     index: number, name: string, type: UserColumnType, formula?: string
   ) => {
     if (!isEditable) return
-    saveSnapshot(formula ? 'Add formula column' : 'Insert column')
     if (formula) {
       addFormulaColumn(tableId, name, formula, type, index)
     } else if (insertColumnAt) {
@@ -60,7 +59,7 @@ export function useGridOperations(
     } else {
       addColumn(tableId, name, type)
     }
-  }, [isEditable, saveSnapshot, insertColumnAt, addColumn, addFormulaColumn, tableId])
+  }, [isEditable, insertColumnAt, addColumn, addFormulaColumn, tableId])
 
   const openContextMenu = useCallback((
     x: number,

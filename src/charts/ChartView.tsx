@@ -18,6 +18,7 @@ export function ChartView({ chartId }: ChartViewProps) {
   const updateNode = useProjectStore((state) => state.updateNode)
   const updateChartConfig = useProjectStore((state) => state.updateChartConfig)
   const updateChartName = useProjectStore((state) => state.updateChartName)
+  const saveSnapshot = useProjectStore((state) => state.saveSnapshot)
   const tables = useMemo(
     () => Object.values(nodes).filter(
       (node): node is TableNode => node.kind === 'source_table' || node.kind === 'derived_table',
@@ -60,12 +61,13 @@ export function ChartView({ chartId }: ChartViewProps) {
   }, [chartId, chartNode, updateChartConfig])
   
   const handleChartTypeChange = useCallback((newType: ChartType) => {
-    if (!chartNode) return
+    if (!chartNode || chartNode.plan.chartType === newType) return
+    saveSnapshot(`Change chart type for ${chartNode.name}`)
     updateNode(chartId, {
       plan: { ...chartNode.plan, chartType: newType },
       updatedAt: new Date().toISOString(),
     } as Partial<ChartNode>)
-  }, [chartId, chartNode, updateNode])
+  }, [chartId, chartNode, saveSnapshot, updateNode])
 
   const handleSourceChange = useCallback((newSourceTableId: string) => {
     if (!chartNode || newSourceTableId === chartNode.plan.sourceTableId) return

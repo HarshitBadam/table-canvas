@@ -6,7 +6,6 @@ import {
   readWorkbook,
   type ParsedTableData,
 } from '@/engine/fileParsers'
-import { useProjectStore } from '@/state/projectStore'
 import { uploadFileWithSync } from '@/persistence/syncService'
 
 const EXCEL_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -36,20 +35,20 @@ interface ExcelSingleSheet {
 
 type ExcelParseResult = ExcelMultiSheet | ExcelSingleSheet
 
-export async function parseCSVFile(file: File): Promise<CSVParseResult> {
+export async function parseCSVFile(file: File, projectId: string): Promise<CSVParseResult> {
   const buffer = await readFileAsArrayBuffer(file)
   const tableData = await parseCsvBuffer(buffer)
-  const uploaded = await uploadFileWithSync(file, useProjectStore.getState().projectId)
+  const uploaded = await uploadFileWithSync(file, projectId)
   return { ...tableData, fileRef: uploaded.id }
 }
 
-export async function parseExcelFile(file: File): Promise<ExcelParseResult> {
+export async function parseExcelFile(file: File, projectId: string): Promise<ExcelParseResult> {
   const buffer = await readFileAsArrayBuffer(file)
   const workbook = readWorkbook(buffer)
 
   if (workbook.SheetNames.length === 1) {
     const tableData = parseWorkbookSheet(workbook, workbook.SheetNames[0])
-    const uploaded = await uploadFileWithSync(file, useProjectStore.getState().projectId)
+    const uploaded = await uploadFileWithSync(file, projectId)
     return { kind: 'single', tableData, fileRef: uploaded.id }
   }
 
@@ -69,11 +68,12 @@ export async function importSheetAndPersist(
   workbook: WorkBook,
   sheetName: string,
   fileName: string,
+  projectId: string,
   fileBuffer?: ArrayBuffer,
 ): Promise<{ tableData: ParsedTableData; fileRef: string }> {
   const tableData = parseWorkbookSheet(workbook, sheetName)
   if (!fileBuffer) throw new Error('The workbook data is unavailable')
   const file = new File([fileBuffer], fileName, { type: EXCEL_MIME_TYPE })
-  const uploaded = await uploadFileWithSync(file, useProjectStore.getState().projectId)
+  const uploaded = await uploadFileWithSync(file, projectId)
   return { tableData, fileRef: uploaded.id }
 }

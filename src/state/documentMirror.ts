@@ -7,6 +7,8 @@ import { documentMirrorChannel, documentTabId } from './documentIdentity'
 import { useDataStore } from './dataStore'
 import { useProjectStore } from './projectStore'
 import { useTableRuntimeStore } from './tableRuntimeStore'
+import { retainHistoryFileRefs } from '@/persistence/historyFileCleanup'
+import { getStorageScope } from '@/persistence/storageScope'
 
 /**
  * Mirrors the owner's document into every other tab on the same document. Followers
@@ -99,10 +101,12 @@ export function applyDocumentSnapshot(snapshot: {
     // Another tab's edits are not this tab's undo stack.
     history: { past: [], future: [] },
   })
+  retainHistoryFileRefs(getStorageScope(), [])
   const runtime = useTableRuntimeStore.getState()
   runtime.forgetNodes(
     Object.keys(project.nodes).filter(id => !(id in snapshot.nodes)),
   )
+  runtime.clearSchemas(changed)
   runtime.invalidateNodes(changed)
   for (const id of changed) useDataStore.getState().clearTableData(id)
 

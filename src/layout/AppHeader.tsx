@@ -28,8 +28,12 @@ export function AppHeader({
   const { user, leaveGuest } = useAppAuth()
   const { isSaving } = useApp()
   const { canEdit } = useWorkspaceLease()
-  const canUndo = useProjectStore(state => state.history.past.length > 0)
-  const canRedo = useProjectStore(state => state.history.future.length > 0)
+  const canUndo = useProjectStore(
+    state => !state.history.transaction && state.history.past.length > 0,
+  )
+  const canRedo = useProjectStore(
+    state => !state.history.transaction && state.history.future.length > 0,
+  )
   const undo = useProjectStore(state => state.undo)
   const redo = useProjectStore(state => state.redo)
   const exportButtonRef = useRef<HTMLButtonElement>(null)

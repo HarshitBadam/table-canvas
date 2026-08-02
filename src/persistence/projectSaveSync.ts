@@ -32,6 +32,7 @@ import {
 } from './syncNotifications'
 import { deleteUnreferencedLocalFiles } from './fileGarbageCollection'
 import { loadReportsForProject } from './reportStorage'
+import { flushHistoryFileCleanup } from './historyFileCleanup'
 
 export {
   reportProjectSyncError,
@@ -82,6 +83,7 @@ async function flushQueuedSave(
         scope,
       )
       await captureProjectSyncBase(projectId, updated.revision, payload, scope)
+      await flushHistoryFileCleanup(payload.nodes, scope)
       if (merge) notifyProjectMerge({ projectId, ...merge })
       return
     } catch (error) {
@@ -174,6 +176,7 @@ export async function saveProjectWithSync(
   const persistedNodes = withoutRuntimeNodeState(nodes)
   if (scope === GUEST_STORAGE_SCOPE || projectId.startsWith('local_')) {
     await saveProjectLocal(projectId, name, persistedNodes, edges, patches, undefined, scope)
+    await flushHistoryFileCleanup(persistedNodes, scope)
     return
   }
   await saveProjectAndEnqueue(

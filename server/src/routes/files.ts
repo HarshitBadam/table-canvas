@@ -72,6 +72,19 @@ const upload = multer({
   },
 });
 
+function nodesReferenceFile(nodes: unknown, fileId: string): boolean {
+  if (!nodes || typeof nodes !== 'object' || Array.isArray(nodes)) return false;
+  return Object.values(nodes as Record<string, unknown>).some((node) => {
+    if (!node || typeof node !== 'object') return false;
+    const plan = (node as { plan?: unknown }).plan;
+    return Boolean(
+      plan
+      && typeof plan === 'object'
+      && (plan as { fileRef?: unknown }).fileRef === fileId
+    );
+  });
+}
+
 router.use(requireAuth);
 
 router.get(
@@ -285,7 +298,7 @@ router.delete(
       deletedAt: null,
     }).select('nodes');
     const referenced = retainedProjects.some(project => (
-      JSON.stringify(project.nodes).includes(fileId)
+      nodesReferenceFile(project.nodes, fileId)
     ));
     if (referenced) {
       throw new ConflictError('File is still referenced by an active project');
