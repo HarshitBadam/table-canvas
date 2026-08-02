@@ -32,6 +32,10 @@ describe('getEditableCellsInSelection', () => {
     { id: 'amount', name: 'Amount', type: 'number', nullable: true },
   ]
   const rows = [{ __rowId: 'row-1' }, { __rowId: 'row-2' }]
+  const rowAccess = {
+    totalRows: rows.length,
+    getRowAtIndex: (index: number) => rows[index] ?? null,
+  }
 
   it('returns every editable cell in a range and skips computed columns', () => {
     expect(getEditableCellsInSelection(0, 0, {
@@ -39,7 +43,7 @@ describe('getEditableCellsInSelection', () => {
       endRow: 1,
       startColIndex: 0,
       endColIndex: 2,
-    }, rows, columns)).toEqual([
+    }, rowAccess, columns)).toEqual([
       { rowId: 'row-1', columnId: 'name' },
       { rowId: 'row-1', columnId: 'amount' },
       { rowId: 'row-2', columnId: 'name' },

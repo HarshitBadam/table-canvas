@@ -15,8 +15,10 @@ import { computeDerivedTable } from './derivedTableComputation'
 import {
   effectiveTableSchema,
   getNodeCacheInfo,
+  isTableWaiting,
   updateNodeCacheInfo,
 } from '@/state/tableRuntimeStore'
+import { waitForTableOperation } from '@/state/tableOperationCoordinator'
 import { loadEngineTable } from './loadTableIntoEngine'
 import {
   captureMaterializationScope,
@@ -150,6 +152,13 @@ async function loadSourceTable(
     }
   }
   try {
+    if (isTableWaiting(snapshot.cacheInfo)) {
+      return {
+        status: 'error',
+        tableId,
+        error: 'Table is still preparing. Try again in a moment.',
+      }
+    }
     const engineRowCount = await getEngineTableRowCount(tableId)
     if (!sourceGenerationIsCurrent(tableId, snapshot.generation, scope)) {
       return staleMaterialization(tableId)
@@ -167,6 +176,7 @@ async function loadSourceTable(
       updateNodeCacheInfo(tableId, {
         isComputing: false,
         error: undefined,
+        phase: 'ready',
       })
       return {
         status: 'cached',
@@ -176,7 +186,10 @@ async function loadSourceTable(
       }
     }
 
-    if (announce) updateNodeCacheInfo(tableId, { isComputing: true })
+    if (announce) updateNodeCacheInfo(tableId, {
+      isComputing: true,
+      phase: 'materializing',
+    })
     let rows: TableRow[] = []
     if (snapshot.node.plan.fileRef) {
       const fileData = await loadFileWithSync(snapshot.node.plan.fileRef)
@@ -205,6 +218,7 @@ async function loadSourceTable(
           isDirty: true,
           isComputing: false,
           error: 'Data file not found. Please re-import the file.',
+          phase: 'error',
         })
 
         return {
@@ -255,6 +269,7 @@ async function loadSourceTable(
       lastRowCount: rowCount,
       error: undefined,
       warnings: loadResult?.warnings,
+      phase: 'ready',
     })
 
     return {
@@ -266,12 +281,14 @@ async function loadSourceTable(
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
+    const generation = snapshot?.generation
 
-    if (sourceGenerationIsCurrent(tableId, snapshot.generation, scope)) {
+    if (generation && sourceGenerationIsCurrent(tableId, generation, scope)) {
       updateNodeCacheInfo(tableId, {
         isDirty: true,
         isComputing: false,
         error: errorMessage,
+        phase: 'error',
       })
     }
 
@@ -283,6 +300,23 @@ async function loadSourceTable(
   }
 }
 
+
+async function waitForRelatedTableOperations(tableId: string): Promise<void> {
+  const projectStore = useProjectStore.getState()
+  const node = projectStore.getTableNode(tableId)
+  if (!node) {
+    await waitForTableOperation(tableId)
+    return
+  }
+  if (node.kind === 'source_table') {
+    await waitForTableOperation(tableId)
+    return
+  }
+  const order = getComputationOrder(tableId, projectStore.nodes, projectStore.edges)
+  for (const relatedId of order) {
+    await waitForTableOperation(relatedId)
+  }
+}
 
 export async function ensureTableMaterialized(
   tableId: string,
@@ -297,13 +331,19 @@ export async function ensureTableMaterialized(
     return existingPromise
   }
 
-  const materializationPromise = enqueueEngineMutation(async () => {
-    let result = await materializeTableInternal(tableId, scope, options)
-    while (result.status === 'loading' && scopeIsCurrent(scope)) {
-      result = await materializeTableInternal(tableId, scope, options)
-    }
-    return result
-  })
+  // Wait for import/op gates BEFORE taking the mutation queue. Waiting inside
+  // the queue deadlocks against loadTableIntoEngine, which uses the same lane.
+  const materializationPromise = (async () => {
+    await waitForRelatedTableOperations(tableId)
+    if (!scopeIsCurrent(scope)) return staleMaterialization(tableId)
+    return enqueueEngineMutation(async () => {
+      let result = await materializeTableInternal(tableId, scope, options)
+      while (result.status === 'loading' && scopeIsCurrent(scope)) {
+        result = await materializeTableInternal(tableId, scope, options)
+      }
+      return result
+    })
+  })()
 
   inProgressMaterializations.set(requestKey, materializationPromise)
 

@@ -1,6 +1,12 @@
 import type { CellValue } from '@/types'
 
 export type { TableRow as GridRow } from '@/state/dataStore'
+import type { TableRow as GridRow } from '@/state/dataStore'
+
+export interface GridRowAccess {
+  totalRows: number
+  getRowAtIndex: (index: number) => GridRow | null
+}
 
 export interface ContextMenuState {
   x: number

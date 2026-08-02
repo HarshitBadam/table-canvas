@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { CacheInfo, TableNode, TableSchema } from '@/types'
+import type { CacheInfo, TableNode, TableRuntimePhase, TableSchema } from '@/types'
 
 /**
  * Per-tab derived state for table nodes. None of this is persisted or shared: it
@@ -107,7 +107,32 @@ export function getNodeCacheInfo(nodeId: string): CacheInfo | undefined {
 }
 
 export function isTableUpdating(cacheInfo: CacheInfo | undefined): boolean {
-  return !cacheInfo?.error && Boolean(cacheInfo?.isDirty || cacheInfo?.isComputing)
+  return !cacheInfo?.error && Boolean(
+    cacheInfo?.isDirty
+    || cacheInfo?.isComputing
+    || (cacheInfo?.phase && cacheInfo.phase !== 'ready' && cacheInfo.phase !== 'error'),
+  )
+}
+
+export function isTableWaiting(cacheInfo: CacheInfo | undefined): boolean {
+  return cacheInfo?.phase === 'reading'
+    || cacheInfo?.phase === 'uploading'
+    || cacheInfo?.phase === 'waiting'
+}
+
+export function tablePhaseLabel(
+  phase: TableRuntimePhase | undefined,
+  fallback = 'Loading…',
+): string {
+  switch (phase) {
+    case 'reading': return 'Loading…'
+    case 'uploading': return 'Loading…'
+    case 'waiting': return 'Waiting for source tables…'
+    case 'materializing': return 'Loading…'
+    case 'error': return 'Table operation failed'
+    case 'ready': return 'Ready'
+    default: return fallback
+  }
 }
 
 export function updateNodeCacheInfo(

@@ -52,6 +52,8 @@ export function useSuggestionsPanel(
   const dismissed = useSuggestionsStore((state) => state.dismissed)
   const dismissSuggestion = useSuggestionsStore((state) => state.dismissSuggestion)
   const undismissSuggestion = useSuggestionsStore((state) => state.undismissSuggestion)
+  const setCurrentRequestId = useSuggestionsStore((state) => state.setCurrentRequestId)
+  const shouldCancelRequest = useSuggestionsStore((state) => state.shouldCancelRequest)
 
   const [effectiveCleaningCount, setEffectiveCleaningCount] = useState<number | null>(null)
   const [retryNonce, setRetryNonce] = useState(0)
@@ -127,9 +129,12 @@ export function useSuggestionsPanel(
     const cached = getSuggestions(contextKey)
     if (cached && cached.length > 0) {
       lastContextKeyRef.current = contextKey
+      setLoading(false)
       return
     }
 
+    const requestId = `${contextKey}:${retryNonce}`
+    setCurrentRequestId(requestId)
     setLoading(true)
     setError(null)
 
@@ -152,12 +157,16 @@ export function useSuggestionsPanel(
       const newSuggestions = selectedColumnId
         ? getColumnSuggestions(context)
         : generateSuggestions(context)
+      if (shouldCancelRequest(requestId)) return
       setSuggestions(contextKey, newSuggestions)
       lastContextKeyRef.current = contextKey
       lastPhase2StatsSeenRef.current = hasPhase2Stats
+      setLoading(false)
     } catch (cause) {
+      if (shouldCancelRequest(requestId)) return
       const message = cause instanceof Error ? cause.message : 'Suggestion analysis failed'
       setError(message)
+      setLoading(false)
     }
   }, [
     isOpen,
@@ -174,6 +183,8 @@ export function useSuggestionsPanel(
     hasPhase2Stats,
     retryNonce,
     setError,
+    setCurrentRequestId,
+    shouldCancelRequest,
   ])
 
   const cachedSuggestions = useMemo(() => {

@@ -1,5 +1,6 @@
 import type { ColumnSchema } from '@/types'
 import type { CellRangeSelection } from './useGridSelection'
+import type { GridRowAccess } from './types'
 
 export interface CellPosition {
   rowIndex: number
@@ -41,7 +42,7 @@ export function getEditableCellsInSelection(
   selectedRow: number,
   selectedColIndex: number,
   range: CellRangeSelection | null,
-  rows: { __rowId: string }[],
+  rowAccess: GridRowAccess,
   columns: ColumnSchema[],
 ) {
   const bounds = range ?? {
@@ -53,7 +54,7 @@ export function getEditableCellsInSelection(
 
   const cells: { rowId: string; columnId: string }[] = []
   for (let rowIndex = bounds.startRow; rowIndex <= bounds.endRow; rowIndex++) {
-    const row = rows[rowIndex]
+    const row = rowAccess.getRowAtIndex(rowIndex)
     if (!row) continue
     for (let colIndex = bounds.startColIndex; colIndex <= bounds.endColIndex; colIndex++) {
       const column = columns[colIndex]

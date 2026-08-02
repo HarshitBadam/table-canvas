@@ -5,6 +5,7 @@ import { useSuggestionsStore } from './suggestionsStore'
 import { computeCombinedSuggestionEffect } from './computeEffects'
 import { loadProfileForTable, useProfilingStore } from '@/lib/profiling'
 import { showToast } from './commands/types'
+import { loadCleaningRows } from './cleaningRows'
 import type { Suggestion } from '@/types'
 
 interface SuggestionWithEffect {
@@ -17,6 +18,7 @@ interface UseCleaningApplyParams {
   tableId: string
   setSelectedIds: (updater: (prev: Set<string>) => Set<string>) => void
   rows: TableRow[]
+  totalRows?: number
 }
 
 export function useCleaningApply({
@@ -25,6 +27,7 @@ export function useCleaningApply({
   tableId,
   setSelectedIds,
   rows,
+  totalRows = rows.length,
 }: UseCleaningApplyParams) {
   const saveSnapshot = useProjectStore((state) => state.saveSnapshot)
   const markNodeAndDescendantsDirty = useProjectStore(
@@ -47,10 +50,13 @@ export function useCleaningApply({
     setIsApplying(true)
 
     try {
+      const applyRows = rows.length >= totalRows
+        ? rows
+        : await loadCleaningRows(tableId, totalRows)
       const { changes: allChanges, highlights: allHighlights } =
         computeCombinedSuggestionEffect(
           currentSelectedSuggestions.map(item => item.suggestion),
-          rows,
+          applyRows,
         )
 
       if (allChanges.length > 0) {
@@ -63,7 +69,7 @@ export function useCleaningApply({
           changesByRow.set(change.rowId, rowChanges)
         }
 
-        const updatedRows = rows.map((row) => {
+        const updatedRows = applyRows.map((row) => {
           const rowChanges = changesByRow.get(row.__rowId)
           if (!rowChanges) return row
 
@@ -136,6 +142,7 @@ export function useCleaningApply({
     suggestionsWithEffects,
     selectedIds,
     rows,
+    totalRows,
     tableId,
     saveSnapshot,
     setTableData,

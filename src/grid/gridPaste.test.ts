@@ -13,6 +13,10 @@ const rows = [
   { __rowId: 'row-1', name: '', amount: '', active: '', computed: 0 },
   { __rowId: 'row-2', name: '', amount: '', active: '', computed: 0 },
 ]
+const rowAccess = {
+  totalRows: rows.length,
+  getRowAtIndex: (index: number) => rows[index] ?? null,
+}
 
 describe('parseTabularClipboard', () => {
   it('parses CRLF rows, tabs, and a trailing newline', () => {
@@ -35,7 +39,7 @@ describe('createGridPastePlan', () => {
       text: 'Alpha\t1,250\tYes\nBeta\t-3.5\t0',
       startRow: 0,
       startColIndex: 0,
-      rows,
+      rowAccess,
       columns,
     })
 
@@ -55,7 +59,7 @@ describe('createGridPastePlan', () => {
       text: '100\tYes\tignored\textra\nnot-a-number',
       startRow: 0,
       startColIndex: 1,
-      rows,
+      rowAccess,
       columns,
     })
 

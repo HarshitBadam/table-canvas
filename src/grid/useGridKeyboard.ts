@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import type { CellValue, ColumnSchema } from '@/types'
-import type { GridRow, SelectionType } from './types'
+import type { GridRow, GridRowAccess, SelectionType } from './types'
 import type { CellRangeSelection } from './useGridSelection'
 import type { GridClipboardData } from './types'
 import type { GridFeedbackMessage } from './GridFeedback'
@@ -13,7 +13,7 @@ interface UseGridKeyboardOptions {
   selectedCell: { rowIndex: number; columnId: string } | null
   selection: SelectionType
   columns: ColumnSchema[]
-  rows: GridRow[]
+  rowAccess: GridRowAccess
   isEditable: boolean
   cellRangeSelection: CellRangeSelection | null
   setSelection: (sel: SelectionType) => void
@@ -41,7 +41,7 @@ export function useGridKeyboard({
   selectedCell,
   selection,
   columns,
-  rows,
+  rowAccess,
   isEditable,
   cellRangeSelection,
   setSelection,
@@ -58,6 +58,7 @@ export function useGridKeyboard({
   onFeedback,
   onReadOnlyEditAttempt,
 }: UseGridKeyboardOptions) {
+  const { totalRows, getRowAtIndex } = rowAccess
   const undo = useProjectStore((state) => state.undo)
 
   useEffect(() => {
@@ -81,7 +82,7 @@ export function useGridKeyboard({
           const targetCell = getNavigationTarget(
             { rowIndex: editingCell.rowIndex, colIndex },
             e.key,
-            rows.length,
+            totalRows,
             columns.length,
             e.shiftKey,
           )
@@ -126,7 +127,7 @@ export function useGridKeyboard({
           const targetCell = getNavigationTarget(
             { rowIndex, colIndex },
             e.key,
-            rows.length,
+            totalRows,
             columns.length,
           )
           const targetColumn = columns[targetCell.colIndex]
@@ -139,7 +140,7 @@ export function useGridKeyboard({
             onReadOnlyEditAttempt?.()
             return
           }
-          const row = rows[rowIndex]
+          const row = getRowAtIndex(rowIndex)
           if (row) {
             startEditing(
               rowIndex,
@@ -153,7 +154,7 @@ export function useGridKeyboard({
           const targetCell = getNavigationTarget(
             { rowIndex, colIndex },
             e.key,
-            rows.length,
+            totalRows,
             columns.length,
             e.shiftKey,
           )
@@ -165,7 +166,7 @@ export function useGridKeyboard({
             onReadOnlyEditAttempt?.()
             return
           }
-          const row = rows[rowIndex]
+          const row = getRowAtIndex(rowIndex)
           if (row) {
             startEditing(
               rowIndex,
@@ -184,7 +185,7 @@ export function useGridKeyboard({
             rowIndex,
             colIndex,
             cellRangeSelection,
-            rows,
+            rowAccess,
             columns,
           )
           if (cells.length) {
@@ -206,7 +207,7 @@ export function useGridKeyboard({
             onReadOnlyEditAttempt?.()
             return
           }
-          const row = rows[rowIndex]
+          const row = getRowAtIndex(rowIndex)
           if (row) {
             startEditing(
               rowIndex,
@@ -216,7 +217,7 @@ export function useGridKeyboard({
             )
           }
         }
-      } else if (selection?.type === 'header-row' && e.key === 'ArrowDown' && rows.length > 0) {
+      } else if (selection?.type === 'header-row' && e.key === 'ArrowDown' && totalRows > 0) {
         e.preventDefault()
         setSelection({ type: 'cell', rowIndex: 0, columnId: columns[0]?.id || '' })
       } else if (selection?.type === 'row' && e.key === 'ArrowRight' && columns.length > 0) {
@@ -227,7 +228,7 @@ export function useGridKeyboard({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [editingCell, selectedCell, selection, columns, rows, isEditable, setSelection, selectCell, commitEdit, cancelEdit, startEditing, getDisplayValue, saveSnapshot, setCellValue, tableId, cellRangeSelection, getSelectedCellData, formatClipboardText, onFeedback, onReadOnlyEditAttempt])
+  }, [editingCell, selectedCell, selection, columns, rowAccess, totalRows, getRowAtIndex, isEditable, setSelection, selectCell, commitEdit, cancelEdit, startEditing, getDisplayValue, saveSnapshot, setCellValue, tableId, cellRangeSelection, getSelectedCellData, formatClipboardText, onFeedback, onReadOnlyEditAttempt])
 
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {
@@ -255,7 +256,7 @@ export function useGridKeyboard({
         text,
         startRow,
         startColIndex,
-        rows,
+        rowAccess,
         columns,
       })
       const skippedCount = plan.invalidCount + plan.readOnlyCount + plan.outOfBoundsCount
@@ -289,5 +290,5 @@ export function useGridKeyboard({
 
     window.addEventListener('paste', handlePaste)
     return () => window.removeEventListener('paste', handlePaste)
-  }, [cellRangeSelection, columns, editingCell, isEditable, onFeedback, onReadOnlyEditAttempt, rows, saveSnapshot, selectedCell, setCellValue, tableId, undo])
+  }, [cellRangeSelection, columns, editingCell, isEditable, onFeedback, onReadOnlyEditAttempt, rowAccess, saveSnapshot, selectedCell, setCellValue, tableId, undo])
 }

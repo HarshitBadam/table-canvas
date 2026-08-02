@@ -6,8 +6,6 @@ import { useProjectStore } from './projectStore'
 import { withoutRuntimeNodeState } from './transientProjectState'
 import {
   clearProjectRuntime,
-  hasProjectTables,
-  materializeProjectTables,
 } from './projectLifecycle'
 import { ProjectActionError } from './projectOperations'
 import { retainHistoryFileRefs } from '@/persistence/historyFileCleanup'
@@ -56,24 +54,11 @@ export async function prepareProjectState(project: ProjectWithSync): Promise<voi
       persistenceStatus: 'idle',
       persistenceError: null,
     })
-    if (hasProjectTables(nodes)) {
-      const result = await materializeProjectTables(nodes)
-      if (result.failures.length > 0) {
-        throw new Error(
-          `Could not prepare ${result.failures.length} project table${
-            result.failures.length === 1 ? '' : 's'
-          }: ${result.failures[0].error}`,
-        )
-      }
-    }
   } catch (error) {
     try {
       await clearProjectRuntime(nodes)
       useProjectStore.setState(projectSnapshot)
       useReportStore.setState(reportSnapshot)
-      if (hasProjectTables(projectSnapshot.nodes)) {
-        await materializeProjectTables(projectSnapshot.nodes)
-      }
       useDataStore.setState({ tableData: previousData })
     } catch (restoreError) {
       throw new ProjectActionError(

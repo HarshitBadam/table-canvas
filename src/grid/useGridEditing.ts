@@ -7,7 +7,7 @@ import { validateCellInput } from './cellValueValidation'
 export function useGridEditing(
   tableId: string,
   columns: ColumnSchema[],
-  rows: GridRow[],
+  getRowAtIndex: (index: number) => GridRow | null,
   isEditable: boolean,
   onReadOnlyEditAttempt?: () => void,
 ) {
@@ -56,7 +56,7 @@ export function useGridEditing(
   const commitEdit = useCallback(() => {
     const cell = editingCellRef.current
     if (!cell) return true
-    const row = rows[cell.rowIndex]
+    const row = getRowAtIndex(cell.rowIndex)
     if (!row) return false
     const column = columns.find(c => c.id === cell.columnId)
     const columnType = column?.type || 'string'
@@ -76,7 +76,7 @@ export function useGridEditing(
     editValueRef.current = ''
     setEditError(null)
     return true
-  }, [rows, tableId, setCellValue, saveSnapshot, columns])
+  }, [getRowAtIndex, tableId, setCellValue, saveSnapshot, columns])
 
   const cancelEdit = useCallback(() => {
     editingCellRef.current = null

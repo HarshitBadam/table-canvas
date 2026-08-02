@@ -66,7 +66,7 @@ export interface GridContextValue {
     columnId?: string
   ) => void
   contextMenu: ContextMenuState | null
-  filteredRows: GridRow[]
+  getRowAtIndex: (index: number) => GridRow | null
   closeContextMenu: () => void
   onInsertRowAbove: () => void
   onInsertRowBelow: () => void

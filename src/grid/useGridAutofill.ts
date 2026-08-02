@@ -2,13 +2,13 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import type { CellValue } from '@/types'
 import type { ColumnSchema } from '@/types'
 import { detectPattern, generateNextValues } from './autofill'
-import type { GridRow } from './types'
+import type { GridRow, GridRowAccess } from './types'
 import type { CellRangeSelection } from './useGridSelection'
 
 interface UseGridAutofillOptions {
   isEditable: boolean
   columns: ColumnSchema[]
-  rows: GridRow[]
+  rowAccess: GridRowAccess
   cellRangeSelection: CellRangeSelection | null
   getDisplayValue: (rowId: string, columnId: string, baseValue: CellValue, row?: GridRow) => CellValue
   saveSnapshot: (label: string) => void
@@ -19,13 +19,14 @@ interface UseGridAutofillOptions {
 export function useGridAutofill({
   isEditable,
   columns,
-  rows,
+  rowAccess,
   cellRangeSelection,
   getDisplayValue,
   saveSnapshot,
   setCellValue,
   tableId,
 }: UseGridAutofillOptions) {
+  const { getRowAtIndex } = rowAccess
   const [autofillDragging, setAutofillDragging] = useState(false)
   const [autofillEndRow, setAutofillEndRow] = useState<number | null>(null)
   const [autofillPreview, setAutofillPreview] = useState<{ rowIndex: number; value: CellValue }[]>([])
@@ -72,7 +73,7 @@ export function useGridAutofill({
 
     const sourceValues: CellValue[] = []
     for (let i = sourceStartRow; i <= sourceEndRow; i++) {
-      const row = rows[i]
+      const row = getRowAtIndex(i)
       if (row) {
         const value = getDisplayValue(row.__rowId, columnId, row[columnId], row)
         sourceValues.push(value)
@@ -91,18 +92,18 @@ export function useGridAutofill({
     }))
 
     setAutofillPreview(preview)
-  }, [autofillDragging, rows, getDisplayValue])
+  }, [autofillDragging, getRowAtIndex, getDisplayValue])
 
   const handleAutofillOneRow = useCallback((rowIndex: number, columnId: string) => {
     if (!isEditable) return
 
     const sourceRange = getAutofillSourceRange(rowIndex, columnId)
-    const targetRow = rows[sourceRange.endRow + 1]
+    const targetRow = getRowAtIndex(sourceRange.endRow + 1)
     if (!targetRow) return
 
     const sourceValues: CellValue[] = []
     for (let index = sourceRange.startRow; index <= sourceRange.endRow; index++) {
-      const row = rows[index]
+      const row = getRowAtIndex(index)
       if (row) {
         sourceValues.push(getDisplayValue(row.__rowId, columnId, row[columnId], row))
       }
@@ -116,7 +117,7 @@ export function useGridAutofill({
     getAutofillSourceRange,
     getDisplayValue,
     isEditable,
-    rows,
+    getRowAtIndex,
     saveSnapshot,
     setCellValue,
     tableId,
@@ -144,7 +145,7 @@ export function useGridAutofill({
     if (count > 0) {
       const sourceValues: CellValue[] = []
       for (let i = sourceStartRow; i <= sourceEndRow; i++) {
-        const row = rows[i]
+        const row = getRowAtIndex(i)
         if (row) {
           const value = getDisplayValue(row.__rowId, columnId, row[columnId], row)
           sourceValues.push(value)
@@ -157,7 +158,7 @@ export function useGridAutofill({
 
         saveSnapshot('Autofill')
         newValues.forEach((value, idx) => {
-          const targetRow = rows[sourceEndRow + idx + 1]
+          const targetRow = getRowAtIndex(sourceEndRow + idx + 1)
           if (targetRow) {
             setCellValue(tableId, targetRow.__rowId, columnId, value)
           }
@@ -170,7 +171,7 @@ export function useGridAutofill({
     setAutofillPreview([])
     autofillColumnId.current = null
     autofillSourceRange.current = null
-  }, [autofillDragging, autofillEndRow, rows, getDisplayValue, saveSnapshot, setCellValue, tableId])
+  }, [autofillDragging, autofillEndRow, getRowAtIndex, getDisplayValue, saveSnapshot, setCellValue, tableId])
 
   const cancelAutofill = useCallback(() => {
     setAutofillDragging(false)

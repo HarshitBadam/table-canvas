@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import type { ColumnSchema } from '@/types'
 import { useProjectStore } from '@/state/projectStore'
-import type { SelectionType, GridRow } from './types'
+import type { SelectionType, GridRowAccess } from './types'
 
 export interface CellRangeSelection {
   startRow: number
@@ -13,10 +13,10 @@ export interface CellRangeSelection {
 export function useGridSelection(
   tableId: string,
   columns: ColumnSchema[],
-  rows: GridRow[],
-  filteredRows: GridRow[],
+  rowAccess: GridRowAccess,
   _isEditable: boolean,
 ) {
+  const { totalRows, getRowAtIndex } = rowAccess
   const toggleCellHighlight = useProjectStore((state) => state.toggleCellHighlight)
 
   const [selection, setSelection] = useState<SelectionType>(null)
@@ -132,7 +132,7 @@ export function useGridSelection(
   }, [])
 
   const getRowInsertionIndex = useCallback((): number => {
-    if (!selection) return rows.length
+    if (!selection) return totalRows
     switch (selection.type) {
       case 'cell':
         return selection.rowIndex + 1
@@ -143,11 +143,11 @@ export function useGridSelection(
         return 0
       case 'column':
       case 'index-column':
-        return rows.length
+        return totalRows
       default:
-        return rows.length
+        return totalRows
     }
-  }, [selection, rows.length])
+  }, [selection, totalRows])
 
   const getColumnInsertionIndex = useCallback((): number => {
     if (!selection) return columns.length
@@ -209,12 +209,12 @@ export function useGridSelection(
   }, [selection, columns])
 
   const toggleHighlightForSelection = useCallback(() => {
-    if (!filteredRows.length) return
+    if (totalRows === 0) return
 
     if (cellRangeSelection) {
       const { startRow, endRow, startColIndex, endColIndex } = cellRangeSelection
       for (let r = startRow; r <= endRow; r++) {
-        const row = filteredRows[r]
+        const row = getRowAtIndex(r)
         if (!row) continue
         for (let c = startColIndex; c <= endColIndex; c++) {
           const col = columns[c]
@@ -223,12 +223,12 @@ export function useGridSelection(
         }
       }
     } else if (selection?.type === 'cell') {
-      const row = filteredRows[selection.rowIndex]
+      const row = getRowAtIndex(selection.rowIndex)
       if (row) {
         toggleCellHighlight(tableId, row.__rowId, selection.columnId)
       }
     }
-  }, [cellRangeSelection, selection, filteredRows, columns, tableId, toggleCellHighlight])
+  }, [cellRangeSelection, selection, totalRows, getRowAtIndex, columns, tableId, toggleCellHighlight])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

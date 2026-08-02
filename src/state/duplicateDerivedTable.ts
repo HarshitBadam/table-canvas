@@ -14,16 +14,27 @@ import {
   type LimitExceeded,
 } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
+import type { SourceTableNode } from '@/types'
 import { useProjectStore } from './projectStore'
 import { canWriteDocument } from './transientProjectState'
 import {
   effectiveTableSchema,
   getNodeCacheInfo,
 } from './tableRuntimeStore'
+import {
+  beginTableOperation,
+  completeTableOperation,
+  failTableOperation,
+  isTableOperationCurrent,
+  updateTableOperation,
+  waitForTableOperation,
+} from './tableOperationCoordinator'
 
 // Use the long-supported binary upload type so signed-in duplication remains
 // compatible with servers deployed before the internal snapshot format existed.
 const SNAPSHOT_MIME_TYPE = 'application/octet-stream'
+const TABLE_CHANGED_ERROR = 'The table changed while it was being copied. Please try again.'
+const WRITE_LEASE_ERROR = 'Editing moved to another tab while the table was being copied. Please try again there.'
 
 export type DuplicateDerivedTableResult =
   | { ok: true; tableId: string }
@@ -70,54 +81,140 @@ export async function duplicateDerivedTable(
   const initialCapacity = checkTableCount(tableCount(initialState.nodes), tier)
   if (!initialCapacity.ok) return limitFailure(initialCapacity)
 
+  const schema = effectiveTableSchema(initialNode) ?? initialNode.schema
+  if (!schema) {
+    return failure('MATERIALIZATION_FAILED', 'The derived table schema is unavailable.')
+  }
+
+  const copyName = createCopyName(
+    initialNode.name,
+    Object.values(initialState.nodes).map(node => node.name),
+  )
+  const pendingFileRef = `pending:duplicate:${crypto.randomUUID()}`
+  const duplicateId = initialState.addSourceTable({
+    name: copyName,
+    fileRef: pendingFileRef,
+    fileName: `${sanitizeFileName(copyName)}.tablecanvas`,
+    fileType: 'snapshot',
+    schema,
+    position: {
+      x: initialNode.ui.position.x + 32,
+      y: initialNode.ui.position.y + 32,
+    },
+    select: options?.selectDuplicate !== false,
+  })
+  const operationGeneration = beginTableOperation(duplicateId, 'waiting')
+
+  void finalizeDerivedDuplicate({
+    sourceTableId: tableId,
+    duplicateId,
+    projectId,
+    tier,
+    operationGeneration,
+    sourceName: initialNode.name,
+  })
+
+  return { ok: true, tableId: duplicateId }
+}
+
+async function finalizeDerivedDuplicate(args: {
+  sourceTableId: string
+  duplicateId: string
+  projectId: string
+  tier: Tier
+  operationGeneration: number
+  sourceName: string
+}): Promise<void> {
+  const {
+    sourceTableId,
+    duplicateId,
+    projectId,
+    tier,
+    operationGeneration,
+    sourceName,
+  } = args
   let uploadedFileId: string | undefined
   try {
-    const materialized = await ensureTableMaterialized(tableId)
+    await waitForTableOperation(sourceTableId)
+    if (!isTableOperationCurrent(duplicateId, operationGeneration)) return
+    if (useProjectStore.getState().projectId !== projectId) {
+      failTableOperation(duplicateId, operationGeneration, 'The active project changed while copying.')
+      return
+    }
+
+    updateTableOperation(duplicateId, operationGeneration, { phase: 'materializing' })
+    const materialized = await ensureTableMaterialized(sourceTableId)
+    if (!isTableOperationCurrent(duplicateId, operationGeneration)) return
     if (materialized.status === 'error') {
-      return failure(
-        'MATERIALIZATION_FAILED',
+      failTableOperation(
+        duplicateId,
+        operationGeneration,
         materialized.error || 'The derived table could not be calculated.',
       )
+      return
     }
 
     const stateBeforeRead = useProjectStore.getState()
-    const nodeBeforeRead = stateBeforeRead.nodes[tableId]
+    const nodeBeforeRead = stateBeforeRead.nodes[sourceTableId]
     if (
       stateBeforeRead.projectId !== projectId
       || nodeBeforeRead?.kind !== 'derived_table'
     ) {
-      return changedFailure()
+      failTableOperation(duplicateId, operationGeneration, TABLE_CHANGED_ERROR)
+      return
     }
     const schema = effectiveTableSchema(nodeBeforeRead)
     if (!schema) {
-      return failure('MATERIALIZATION_FAILED', 'The derived table schema is unavailable.')
+      failTableOperation(
+        duplicateId,
+        operationGeneration,
+        'The derived table schema is unavailable.',
+      )
+      return
     }
-    const generation = captureGeneration(tableId, nodeBeforeRead.updatedAt)
-    const rows = await readAllTableRows(tableId, { raw: true })
+    const generation = captureGeneration(sourceTableId, nodeBeforeRead.updatedAt)
+    updateTableOperation(duplicateId, operationGeneration, {
+      phase: 'materializing',
+      progress: { completed: 0, label: 'Reading rows' },
+    })
+    const rows = await readAllTableRows(sourceTableId, { raw: true })
+    if (!isTableOperationCurrent(duplicateId, operationGeneration)) return
 
     const currentState = useProjectStore.getState()
-    const currentNode = currentState.nodes[tableId]
+    const currentNode = currentState.nodes[sourceTableId]
     if (
       currentState.projectId !== projectId
       || currentNode?.kind !== 'derived_table'
-      || captureGeneration(tableId, currentNode.updatedAt) !== generation
+      || captureGeneration(sourceTableId, currentNode.updatedAt) !== generation
     ) {
-      return changedFailure()
+      failTableOperation(duplicateId, operationGeneration, TABLE_CHANGED_ERROR)
+      return
     }
-    if (!canWriteDocument()) return writeLeaseFailure()
+    if (!canWriteDocument()) {
+      failTableOperation(duplicateId, operationGeneration, WRITE_LEASE_ERROR)
+      return
+    }
 
     const rowLimit = checkRowCount(rows.length, tier)
-    if (!rowLimit.ok) return limitFailure(rowLimit)
+    if (!rowLimit.ok) {
+      failTableOperation(duplicateId, operationGeneration, rowLimit.reason)
+      return
+    }
 
     const snapshot = createTableSnapshot(schema, rows)
     const fileLimit = checkFileSize(snapshot.bytes.byteLength, tier)
-    if (!fileLimit.ok) return limitFailure(fileLimit)
+    if (!fileLimit.ok) {
+      failTableOperation(duplicateId, operationGeneration, fileLimit.reason)
+      return
+    }
 
-    const fileBaseName = createCopyName(
-      initialNode.name,
-      Object.values(currentState.nodes).map(node => node.name),
-    )
-    const fileName = `${sanitizeFileName(fileBaseName)}.tablecanvas`
+    updateTableOperation(duplicateId, operationGeneration, {
+      phase: 'uploading',
+      progress: { completed: rows.length, total: rows.length, label: 'Saving snapshot' },
+    })
+    const fileName = `${sanitizeFileName(
+      createCopyName(sourceName, Object.values(currentState.nodes).map(node => node.name)),
+    )}.tablecanvas`
     const file = new File([snapshot.bytes], fileName, { type: SNAPSHOT_MIME_TYPE })
     const uploaded = await uploadFileWithSync(
       file,
@@ -126,52 +223,61 @@ export async function duplicateDerivedTable(
       { requireRemoteWhenOnline: true },
     )
     uploadedFileId = uploaded.id
+    if (!isTableOperationCurrent(duplicateId, operationGeneration)) {
+      await discardUploadedSnapshot(uploadedFileId)
+      return
+    }
 
     const finalState = useProjectStore.getState()
-    const finalSource = finalState.nodes[tableId]
+    const finalSource = finalState.nodes[sourceTableId]
+    const duplicate = finalState.nodes[duplicateId]
     if (
       finalState.projectId !== projectId
       || finalSource?.kind !== 'derived_table'
-      || captureGeneration(tableId, finalSource.updatedAt) !== generation
+      || duplicate?.kind !== 'source_table'
+      || captureGeneration(sourceTableId, finalSource.updatedAt) !== generation
     ) {
       await discardUploadedSnapshot(uploadedFileId)
       uploadedFileId = undefined
-      return changedFailure()
+      failTableOperation(duplicateId, operationGeneration, TABLE_CHANGED_ERROR)
+      return
     }
     if (!canWriteDocument()) {
       await discardUploadedSnapshot(uploadedFileId)
       uploadedFileId = undefined
-      return writeLeaseFailure()
+      failTableOperation(duplicateId, operationGeneration, WRITE_LEASE_ERROR)
+      return
     }
-    const finalCapacity = checkTableCount(tableCount(finalState.nodes), tier)
-    if (!finalCapacity.ok) {
-      await discardUploadedSnapshot(uploadedFileId)
-      uploadedFileId = undefined
-      return limitFailure(finalCapacity)
-    }
-    const copyName = createCopyName(
-      finalSource.name,
-      Object.values(finalState.nodes).map(node => node.name),
-    )
 
-    const duplicateId = finalState.addSourceTable({
-      name: copyName,
-      fileRef: uploaded.id,
-      fileName: uploaded.name,
-      fileType: 'snapshot',
+    finalState.updateNode(duplicateId, {
       schema: snapshot.schema,
-      position: {
-        x: initialNode.ui.position.x + 32,
-        y: initialNode.ui.position.y + 32,
+      plan: {
+        fileRef: uploaded.id,
+        fileName: uploaded.name,
+        fileType: 'snapshot',
+        inferredSchemaVersion: 1,
       },
-      select: options?.selectDuplicate !== false,
-    })
+    } as Partial<SourceTableNode>)
     uploadedFileId = undefined
-    return { ok: true, tableId: duplicateId }
+
+    updateTableOperation(duplicateId, operationGeneration, { phase: 'materializing' })
+    const loaded = await ensureTableMaterialized(duplicateId)
+    if (!isTableOperationCurrent(duplicateId, operationGeneration)) return
+    if (loaded.status === 'error') {
+      failTableOperation(
+        duplicateId,
+        operationGeneration,
+        loaded.error || 'The editable copy could not be loaded.',
+      )
+      return
+    }
+    completeTableOperation(duplicateId, operationGeneration)
   } catch (error) {
     if (uploadedFileId) await discardUploadedSnapshot(uploadedFileId)
-    return failure(
-      'DUPLICATE_FAILED',
+    if (!isTableOperationCurrent(duplicateId, operationGeneration)) return
+    failTableOperation(
+      duplicateId,
+      operationGeneration,
       error instanceof Error ? error.message : 'The editable copy could not be created.',
     )
   }
@@ -222,15 +328,8 @@ function failure(
   return { ok: false, code, error }
 }
 
-function changedFailure(): DuplicateDerivedTableResult {
-  return failure('TABLE_CHANGED', 'The table changed while it was being copied. Please try again.')
-}
-
 function writeLeaseFailure(): DuplicateDerivedTableResult {
-  return failure(
-    'WRITE_LEASE_LOST',
-    'Editing moved to another tab while the table was being copied. Please try again there.',
-  )
+  return failure('WRITE_LEASE_LOST', WRITE_LEASE_ERROR)
 }
 
 function limitFailure(violation: LimitExceeded): DuplicateDerivedTableResult {

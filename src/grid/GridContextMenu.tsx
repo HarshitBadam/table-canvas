@@ -8,7 +8,7 @@ export function GridContextMenu() {
   const [position, setPosition] = useState({ left: 0, top: 0 })
   const {
     contextMenu,
-    filteredRows,
+    getRowAtIndex,
     cellRangeSelection,
     highlightedCells,
     columns,
@@ -137,7 +137,7 @@ export function GridContextMenu() {
         <>
           <div className="border-t border-border" />
           {(() => {
-            const row = filteredRows[contextMenu.rowIndex!]
+            const row = getRowAtIndex(contextMenu.rowIndex!)
             const cellKey = row ? `${row.__rowId}:${contextMenu.columnId}` : ''
             const isCurrentlyHighlighted = highlightedCells?.has(cellKey) ?? false
             return (

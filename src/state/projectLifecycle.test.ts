@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ProjectNode } from '@/types'
 
 vi.mock('@/engine', () => ({
   getEngine: vi.fn(() => ({ init: vi.fn() })),
@@ -13,13 +12,12 @@ vi.mock('@/persistence/syncService', () => ({
   loadProjectWithSync: vi.fn(),
 }))
 
-import { ensureTableMaterialized } from '@/engine/materializationService'
 import {
   createProjectWithSync,
   fetchProjects,
   loadProjectWithSync,
 } from '@/persistence/syncService'
-import { loadOrCreateProject, materializeProjectTables } from './projectLifecycle'
+import { hasProjectTables, loadOrCreateProject } from './projectLifecycle'
 
 beforeEach(() => {
   vi.mocked(createProjectWithSync).mockReset()
@@ -27,76 +25,18 @@ beforeEach(() => {
   vi.mocked(loadProjectWithSync).mockReset()
 })
 
-function tableNode(id: string, kind: 'source_table' | 'derived_table'): ProjectNode {
-  return {
-    id,
-    kind,
-    name: id,
-    ui: { position: { x: 0, y: 0 } },
-    plan: kind === 'source_table'
-      ? {
-          fileRef: `file-${id}`,
-          fileName: `${id}.csv`,
-          fileType: 'csv',
-          inferredSchemaVersion: 1,
-        }
-      : {
-          transformDef: {
-            type: 'filter',
-            sourceTableId: 'source',
-            conditions: [],
-            logic: 'and',
-          },
-          upstreamNodeIds: ['source'],
-        },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  } as ProjectNode
-}
-
-describe('materializeProjectTables', () => {
-  it('materializes source tables before derived tables regardless of insertion order', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    vi.mocked(ensureTableMaterialized)
-      .mockRejectedValueOnce(new Error('source failed'))
-      .mockResolvedValueOnce({ status: 'computed', tableId: 'derived' })
-    const nodes = {
-      derived: tableNode('derived', 'derived_table'),
-      source: tableNode('source', 'source_table'),
-    }
-
-    const summary = await materializeProjectTables(nodes)
-
-    expect(ensureTableMaterialized).toHaveBeenNthCalledWith(1, 'source')
-    expect(ensureTableMaterialized).toHaveBeenNthCalledWith(2, 'derived')
-    expect(errorSpy).toHaveBeenCalledOnce()
-    expect(summary).toEqual({
-      completedTableIds: ['derived'],
-      failures: [{ tableId: 'source', error: 'source failed' }],
-    })
-    errorSpy.mockRestore()
-  })
-
-  it('reports error results instead of silently treating them as completed', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    vi.mocked(ensureTableMaterialized).mockResolvedValueOnce({
-      status: 'error',
-      tableId: 'source',
-      error: 'Missing workbook file',
-    })
-
-    const summary = await materializeProjectTables({
-      source: tableNode('source', 'source_table'),
-    })
-
-    expect(summary).toEqual({
-      completedTableIds: [],
-      failures: [{ tableId: 'source', error: 'Missing workbook file' }],
-    })
-    expect(errorSpy).toHaveBeenCalledWith(
-      '[AppContext] Failed to materialize table source: Missing workbook file',
-    )
-    errorSpy.mockRestore()
+describe('hasProjectTables', () => {
+  it('detects source and derived tables without requiring eager materialization', () => {
+    expect(hasProjectTables({})).toBe(false)
+    expect(hasProjectTables({
+      chart: { kind: 'chart' },
+    })).toBe(false)
+    expect(hasProjectTables({
+      source: { kind: 'source_table' },
+    })).toBe(true)
+    expect(hasProjectTables({
+      derived: { kind: 'derived_table' },
+    })).toBe(true)
   })
 })
 

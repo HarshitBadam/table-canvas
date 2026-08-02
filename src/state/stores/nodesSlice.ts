@@ -18,6 +18,7 @@ import { createChartOps } from './nodesChartOps'
 import { applyNodeDuplicate, prepareNodeDuplicate } from './duplicateNode'
 import { invalidateMaterializations } from '@/engine/materializationCoordinator'
 import { applyNodeUpdate, isTableRename, markRenameDependentsDirty } from './nodesRename'
+import { cancelTableOperation } from '@/state/tableOperationCoordinator'
 
 export const createNodesSlice: StateCreator<
   ProjectStoreState,
@@ -26,7 +27,6 @@ export const createNodesSlice: StateCreator<
   NodesSliceState
 > = (set, get) => ({
   nodes: {},
-
   addNode: (node) => {
     set((state) => {
       state.nodes[node.id] = node
@@ -67,6 +67,7 @@ export const createNodesSlice: StateCreator<
     }
     const nodeIds = new Set([id, ...getDependentNodeIds(state.nodes, state.edges, id)])
     invalidateMaterializations()
+    nodeIds.forEach(cancelTableOperation)
     useTableRuntimeStore.getState().forgetNodes(nodeIds)
 
     set((state) => {

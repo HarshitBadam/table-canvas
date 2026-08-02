@@ -10,6 +10,7 @@ import { useWindowedRows } from './hooks/useWindowedRows'
 import type { GridRow } from './types'
 
 export function useGridData(tableId: string) {
+  const projectId = useProjectStore((state) => state.projectId)
   const node = useProjectStore((state) => state.getTableNode(tableId))
   const patches = useProjectStore((state) => state.patches[tableId])
   const cacheInfo = useNodeCacheInfo(tableId)
@@ -46,14 +47,21 @@ export function useGridData(tableId: string) {
   }, [tableId, setTableFilters])
 
   const windowed = useWindowedRows(
+    projectId,
     tableId,
     columns,
     hasActiveFilters(filters) ? filters : null,
     undefined,
     undefined,
   )
-  const { getLoadedRows, invalidate, totalRows: windowedTotalRows, version: windowedVersion } = windowed
-  const isMaterializing = windowed.isLoading
+  const {
+    getLoadedRows,
+    getRowAtIndex,
+    invalidate,
+    totalRows: windowedTotalRows,
+    version: windowedVersion,
+  } = windowed
+  const isMaterializing = windowed.isInitialLoading
   const materializationError = localMaterializationError ?? windowed.error
 
   const prevDataRevision = useRef(dataRevision)
@@ -68,21 +76,12 @@ export function useGridData(tableId: string) {
     return computeDisplayValue(rowId, columnId, baseValue, row, columns, patches?.cellPatches)
   }, [patches, columns])
 
-  const rows: GridRow[] = useMemo(() => {
+  const loadedRows: GridRow[] = useMemo(() => {
     void windowedVersion
-    const total = windowedTotalRows
-    const baseRows: GridRow[] = []
-    baseRows.length = total
-
-    const loaded = getLoadedRows()
-    loaded.forEach((row, idx) => {
-      if (idx >= 0 && idx < total) baseRows[idx] = row
-    })
-
-    return baseRows
-  }, [getLoadedRows, windowedTotalRows, windowedVersion])
-
-  const filteredRows = rows
+    return [...getLoadedRows().entries()]
+      .sort(([left], [right]) => left - right)
+      .map(([, row]) => row)
+  }, [getLoadedRows, windowedVersion])
 
   const unfilteredTotalRows = hasActiveFilters(filters)
     ? (schema?.rowCount ?? tableData?.rows.length ?? windowedTotalRows)
@@ -92,8 +91,9 @@ export function useGridData(tableId: string) {
     node,
     patches,
     columns,
-    rows,
-    filteredRows,
+    loadedRows,
+    totalRows: windowedTotalRows,
+    getRowAtIndex,
     unfilteredTotalRows,
     isEditable,
     canEdit,

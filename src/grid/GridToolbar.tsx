@@ -60,7 +60,7 @@ export function GridToolbar({
         )}
         {isComputing && (
           <span className="ml-2 animate-pulse text-xs text-text-secondary">
-            Updating table…
+            Loading…
           </span>
         )}
       </div>

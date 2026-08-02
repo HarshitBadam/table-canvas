@@ -16,6 +16,7 @@ export type {
 export type {
   ChartType,
   NodeViewMode,
+  TableRuntimePhase,
   NodeUI,
   CacheInfo,
   SourceTableNode,

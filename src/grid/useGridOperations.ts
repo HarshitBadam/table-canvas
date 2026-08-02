@@ -5,7 +5,7 @@ import type { CellValue, ColumnSchema, UserColumnType } from '@/types'
 import { checkRowCount } from '@/shared/enforce'
 import { generateId } from '@/lib/utils'
 import type { ContextMenuState } from './GridContextMenu'
-import type { GridRow } from './types'
+import type { GridRowAccess } from './types'
 import type { GridFeedbackMessage } from './GridFeedback'
 
 type ContextMenuTarget = 'cell' | 'row' | 'column' | 'header' | 'index' | 'corner'
@@ -13,11 +13,12 @@ type ContextMenuTarget = 'cell' | 'row' | 'column' | 'header' | 'index' | 'corne
 export function useGridOperations(
   tableId: string,
   columns: ColumnSchema[],
-  rows: GridRow[],
+  rowAccess: GridRowAccess,
   isEditable: boolean,
   saveSnapshot: (label: string) => void,
   onFeedback: (feedback: GridFeedbackMessage) => void,
 ) {
+  const { totalRows, getRowAtIndex } = rowAccess
   const { user } = useAppAuth()
   const insertRow = useProjectStore((state) => state.insertRow)
   const deleteRow = useProjectStore((state) => state.deleteRow)
@@ -31,7 +32,7 @@ export function useGridOperations(
 
   const doInsertRow = useCallback((index: number) => {
     if (!isEditable) return
-    const rowCountCheck = checkRowCount(rows.length + 1, user?.tier ?? 'guest')
+    const rowCountCheck = checkRowCount(totalRows + 1, user?.tier ?? 'guest')
     if (!rowCountCheck.ok) {
       onFeedback({ message: rowCountCheck.reason, tone: 'warning' })
       return
@@ -41,7 +42,7 @@ export function useGridOperations(
     const values: Record<string, CellValue> = {}
     columns.forEach(col => { values[col.id] = '' })
     insertRow(tableId, newRowId, values, index)
-  }, [isEditable, rows.length, user?.tier, onFeedback, saveSnapshot, columns, insertRow, tableId])
+  }, [isEditable, totalRows, user?.tier, onFeedback, saveSnapshot, columns, insertRow, tableId])
 
   const openNewColumnModal = useCallback((index: number) => {
     if (!isEditable) return
@@ -96,7 +97,7 @@ export function useGridOperations(
 
   const handleDeleteRow = useCallback(() => {
     if (!isEditable || contextMenu?.rowIndex === undefined) return
-    const row = rows[contextMenu.rowIndex]
+    const row = getRowAtIndex(contextMenu.rowIndex)
     if (!row) return
     saveSnapshot('Delete row')
     deleteRow(tableId, row.__rowId)
@@ -110,7 +111,7 @@ export function useGridOperations(
         onFeedback({ message: 'Row restored.', tone: 'success' })
       },
     })
-  }, [isEditable, contextMenu, rows, saveSnapshot, deleteRow, tableId, onFeedback, undo])
+  }, [isEditable, contextMenu, getRowAtIndex, saveSnapshot, deleteRow, tableId, onFeedback, undo])
 
   const handleInsertColumnLeft = useCallback(() => {
     if (contextMenu?.columnId) {

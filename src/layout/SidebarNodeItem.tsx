@@ -3,9 +3,14 @@ import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { ProjectNode, TableNode } from '@/types'
 import { useProjectStore } from '@/state/projectStore'
+import { continuePendingSourceDuplicate } from '@/state/continuePendingSourceDuplicate'
 import { duplicateDerivedTable } from '@/state/duplicateDerivedTable'
 import { useAppAuth } from '@/state/AppContext'
-import { isTableUpdating, useNodeCacheInfo } from '@/state/tableRuntimeStore'
+import {
+  isTableUpdating,
+  isTableWaiting,
+  useNodeCacheInfo,
+} from '@/state/tableRuntimeStore'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { focusMenuItem } from '@/lib/focusMenuItem'
 import { ChartTypeIcon } from '@/charts/ChartTypeIcon'
@@ -13,6 +18,7 @@ import { TableTypeIcon } from '@/components/TableTypeIcon'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { DuplicateTableErrorDialog } from '@/components/DuplicateTableErrorDialog'
 import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
+import { beginTableOperation } from '@/state/tableOperationCoordinator'
 
 interface SidebarNodeItemProps {
   node: ProjectNode
@@ -149,7 +155,15 @@ export function SidebarNodeItem({
       return
     }
 
-    duplicateNode(node.id, { selectDuplicate: false })
+    const duplicateId = duplicateNode(node.id, { selectDuplicate: false })
+    if (
+      duplicateId
+      && node.kind === 'source_table'
+      && isTableWaiting(cacheInfo)
+    ) {
+      const generation = beginTableOperation(duplicateId, 'waiting')
+      void continuePendingSourceDuplicate(node.id, duplicateId, generation)
+    }
   }
 
   const isTable = node.kind === 'source_table' || node.kind === 'derived_table'
@@ -196,10 +210,10 @@ export function SidebarNodeItem({
           <button
             type="button"
             onClick={() => onOpen(node.id)}
-            disabled={tableIsUpdating}
+            aria-busy={tableIsUpdating || undefined}
             aria-current={selected ? 'page' : undefined}
-            title={tableIsUpdating ? 'This table is updating. It will open once the refresh finishes.' : undefined}
-            className={`min-w-0 flex-1 rounded-lg px-2 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset disabled:cursor-wait disabled:opacity-60 ${
+            title={tableIsUpdating ? 'This table is still loading; you can open it now.' : undefined}
+            className={`min-w-0 flex-1 rounded-lg px-2 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset ${
               isDerivedTable ? 'focus-visible:ring-node-derived-border' : 'focus-visible:ring-accent-green'
             } ${
               selected

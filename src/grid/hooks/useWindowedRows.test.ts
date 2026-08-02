@@ -56,7 +56,7 @@ describe('useWindowedRows', () => {
 
   it('fetches initial window from engine with bounded offset/limit', async () => {
     const { result } = renderHook(() =>
-      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+      useWindowedRows('project-1', 'test_table', testColumns, null, undefined, undefined)
     )
 
     await act(async () => {
@@ -69,7 +69,7 @@ describe('useWindowedRows', () => {
 
   it('getRowAtIndex returns rows within the window', async () => {
     const { result } = renderHook(() =>
-      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+      useWindowedRows('project-1', 'test_table', testColumns, null, undefined, undefined)
     )
 
     await act(async () => {
@@ -83,7 +83,7 @@ describe('useWindowedRows', () => {
 
   it('getRowAtIndex returns null for indices outside window', async () => {
     const { result } = renderHook(() =>
-      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+      useWindowedRows('project-1', 'test_table', testColumns, null, undefined, undefined)
     )
 
     await act(async () => {
@@ -111,7 +111,7 @@ describe('useWindowedRows', () => {
       totalRows: 500_000,
     }))
     const { result } = renderHook(() =>
-      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+      useWindowedRows('project-1', 'test_table', testColumns, null, undefined, undefined)
     )
 
     await act(async () => {
@@ -140,7 +140,7 @@ describe('useWindowedRows', () => {
     }
 
     const { result } = renderHook(() =>
-      useWindowedRows('test_table', testColumns, filters, undefined, undefined)
+      useWindowedRows('project-1', 'test_table', testColumns, filters, undefined, undefined)
     )
 
     await act(async () => {
@@ -153,7 +153,7 @@ describe('useWindowedRows', () => {
 
   it('invalidate refetches the current window', async () => {
     const { result } = renderHook(() =>
-      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+      useWindowedRows('project-1', 'test_table', testColumns, null, undefined, undefined)
     )
 
     await act(async () => {
@@ -172,7 +172,7 @@ describe('useWindowedRows', () => {
 
   it('keeps an already-loaded grid visible while a cell edit refresh is pending', async () => {
     const { result } = renderHook(() =>
-      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+      useWindowedRows('project-1', 'test_table', testColumns, null, undefined, undefined)
     )
     await act(async () => {
       await new Promise(resolve => setTimeout(resolve, 50))
@@ -209,7 +209,7 @@ describe('useWindowedRows', () => {
     })
 
     const { result } = renderHook(() =>
-      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+      useWindowedRows('project-1', 'test_table', testColumns, null, undefined, undefined)
     )
 
     await act(async () => {
@@ -221,9 +221,9 @@ describe('useWindowedRows', () => {
     expect(result.current.error).toBe('Source file is unavailable. Re-import it.')
   })
 
-  it('preserves visible rows through a failed refresh and atomically replaces them on retry', async () => {
+  it('clears the stale window on a failed refresh and restores rows on retry', async () => {
     const { result } = renderHook(() =>
-      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+      useWindowedRows('project-1', 'test_table', testColumns, null, undefined, undefined)
     )
     await act(async () => {
       await new Promise(resolve => setTimeout(resolve, 50))
@@ -238,8 +238,8 @@ describe('useWindowedRows', () => {
       result.current.invalidate()
       await new Promise(resolve => setTimeout(resolve, 50))
     })
-    expect(result.current.getLoadedRows().size).toBe(50)
-    expect(result.current.totalRows).toBe(500000)
+    expect(result.current.getLoadedRows().size).toBe(0)
+    expect(result.current.totalRows).toBe(0)
     expect(result.current.error).toBe('Temporary materialization failure')
 
     mocks.ensureTableMaterialized.mockResolvedValueOnce({ status: 'computed' })
@@ -253,7 +253,7 @@ describe('useWindowedRows', () => {
 
   it('generation guard: new fetch after invalidate uses latest generation', async () => {
     const { result } = renderHook(() =>
-      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+      useWindowedRows('project-1', 'test_table', testColumns, null, undefined, undefined)
     )
 
     await act(async () => {
@@ -287,7 +287,7 @@ describe('useWindowedRows', () => {
       logic: 'and' as const,
     }
     const { result, rerender } = renderHook(
-      ({ filters }) => useWindowedRows('test_table', testColumns, filters, undefined, undefined),
+      ({ filters }) => useWindowedRows('project-1', 'test_table', testColumns, filters, undefined, undefined),
       { initialProps: { filters: initialFilters as typeof nextFilters | null } },
     )
     await waitFor(() => expect(mocks.getSlice).toHaveBeenCalledOnce())
@@ -327,7 +327,7 @@ describe('useWindowedRows', () => {
     const fresh = deferredSlice()
     mocks.getSlice.mockReturnValueOnce(stale.promise).mockReturnValueOnce(fresh.promise)
     const { result, rerender } = renderHook(
-      ({ tableId }) => useWindowedRows(tableId, testColumns, null, undefined, undefined),
+      ({ tableId }) => useWindowedRows('project-1', tableId, testColumns, null, undefined, undefined),
       { initialProps: { tableId: 'project_a_table' } },
     )
     await waitFor(() => expect(mocks.getSlice).toHaveBeenCalledOnce())
@@ -361,7 +361,7 @@ describe('useWindowedRows', () => {
 
   it('does NOT store full table in dataStore (memory bounded)', async () => {
     renderHook(() =>
-      useWindowedRows('test_table', testColumns, null, undefined, undefined)
+      useWindowedRows('project-1', 'test_table', testColumns, null, undefined, undefined)
     )
 
     await act(async () => {
