@@ -9,6 +9,11 @@ interface PendingGate {
 
 const gates = new Map<string, PendingGate>()
 
+/** True while an import or materialization must keep ownership of the document. */
+export function hasActiveTableOperations(): boolean {
+  return gates.size > 0
+}
+
 function nextGeneration(tableId: string): number {
   return (getNodeCacheInfo(tableId)?.operationGeneration ?? 0) + 1
 }

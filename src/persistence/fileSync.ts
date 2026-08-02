@@ -1,6 +1,7 @@
 import {
   deleteFile as deleteFileRemote,
   getFileAsArrayBuffer,
+  listFiles,
   uploadFile,
 } from '@/api/files.api'
 import {
@@ -18,6 +19,15 @@ export interface FileWithSync {
   contentType: string
 }
 
+export interface UploadFileSyncOptions {
+  requireRemoteWhenOnline?: boolean
+  /**
+   * Reuse an identical cloud file instead of consuming quota again. Import retries
+   * need this because the project save can be lost after the file upload succeeds.
+   */
+  deduplicate?: boolean
+}
+
 async function readFileBuffer(file: File): Promise<ArrayBuffer> {
   if (typeof file.arrayBuffer === 'function') return file.arrayBuffer()
   return new Promise((resolve, reject) => {
@@ -26,6 +36,43 @@ async function readFileBuffer(file: File): Promise<ArrayBuffer> {
     reader.onerror = () => reject(reader.error ?? new Error('Unable to read file'))
     reader.readAsArrayBuffer(file)
   })
+}
+
+function buffersEqual(left: ArrayBuffer, right: ArrayBuffer): boolean {
+  if (left.byteLength !== right.byteLength) return false
+  const a = new Uint8Array(left)
+  const b = new Uint8Array(right)
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return false
+  }
+  return true
+}
+
+async function findIdenticalRemoteFile(
+  file: File,
+  buffer: ArrayBuffer,
+): Promise<FileWithSync | null> {
+  try {
+    const candidates = (await listFiles()).filter(candidate => (
+      candidate.filename === file.name && candidate.size === file.size
+    ))
+    for (const candidate of candidates) {
+      const existing = await loadFileLocal(candidate.id)
+        ?? await getFileAsArrayBuffer(candidate.id)
+      if (!buffersEqual(existing, buffer)) continue
+      await saveFileLocal(candidate.id, candidate.filename, candidate.contentType, buffer)
+      return {
+        id: candidate.id,
+        name: candidate.filename,
+        contentType: candidate.contentType,
+      }
+    }
+  } catch (error) {
+    // Deduplication is an optimization and recovery path. A lookup failure must not
+    // prevent the normal upload from reporting its own authoritative result.
+    console.warn('[syncService] Could not check for an existing identical file:', error)
+  }
+  return null
 }
 
 export async function loadFileWithSync(fileId: string): Promise<ArrayBuffer | null> {
@@ -50,11 +97,15 @@ export async function uploadFileWithSync(
   file: File,
   projectId?: string,
   operationId = createUploadOperationId(),
-  options?: { requireRemoteWhenOnline?: boolean },
+  options?: UploadFileSyncOptions,
 ): Promise<FileWithSync> {
   const buffer = await readFileBuffer(file)
   const remoteAvailable = isNetworkOnline() && isCloudStorageScope()
   if (remoteAvailable) {
+    if (options?.deduplicate) {
+      const existing = await findIdenticalRemoteFile(file, buffer)
+      if (existing) return existing
+    }
     let uploaded: Awaited<ReturnType<typeof uploadFile>> | null = null
     let uploadError: unknown
     try {

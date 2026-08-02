@@ -17,7 +17,9 @@ export function isDataFile(file: File): boolean {
   return extension === 'csv' || extension === 'xlsx' || extension === 'xls'
 }
 
-export function reservePendingImport(file: File): { tableId: string; generation: number } {
+export function reservePendingImport(
+  file: Pick<File, 'name'>,
+): { tableId: string; generation: number } {
   const name = fileBaseName(file.name)
   // Snapshot the pre-import project so undo can remove a failed/incomplete reserve.
   useProjectStore.getState().saveSnapshot(`Import table ${name}`)

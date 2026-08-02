@@ -1,12 +1,14 @@
 import type { WorkBook } from 'xlsx'
 import { readFileAsArrayBuffer } from '@/lib/utils'
 import {
-  parseCsvBuffer,
+  parseCsvFile,
   parseWorkbookSheet,
   readWorkbook,
+  type CsvParseOptions,
   type ParsedTableData,
 } from '@/engine/fileParsers'
 import { uploadFileWithSync } from '@/persistence/syncService'
+import type { UploadFileSyncOptions } from './fileSync'
 
 const EXCEL_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -35,15 +37,17 @@ interface ExcelSingleSheet {
 
 type ExcelParseResult = ExcelMultiSheet | ExcelSingleSheet
 
-export async function inspectCSVFile(file: File): Promise<ParsedTableData> {
-  const buffer = await readFileAsArrayBuffer(file)
-  return parseCsvBuffer(buffer)
+export async function inspectCSVFile(
+  file: File,
+  options?: CsvParseOptions,
+): Promise<ParsedTableData> {
+  return parseCsvFile(file, undefined, options)
 }
 
 export async function parseCSVFile(
   file: File,
   projectId: string,
-  options?: { requireRemoteWhenOnline?: boolean },
+  options?: UploadFileSyncOptions,
 ): Promise<CSVParseResult> {
   const tableData = await inspectCSVFile(file)
   const uploaded = await uploadFileWithSync(file, projectId, undefined, options)
@@ -74,7 +78,7 @@ export async function inspectExcelFile(file: File): Promise<{
 export async function parseExcelFile(
   file: File,
   projectId: string,
-  options?: { requireRemoteWhenOnline?: boolean },
+  options?: UploadFileSyncOptions,
 ): Promise<ExcelParseResult> {
   const { workbook, buffer, sheets } = await inspectExcelFile(file)
 
@@ -93,7 +97,7 @@ export async function importSheetAndPersist(
   fileName: string,
   projectId: string,
   fileBuffer?: ArrayBuffer,
-  options?: { requireRemoteWhenOnline?: boolean },
+  options?: UploadFileSyncOptions,
 ): Promise<{ tableData: ParsedTableData; fileRef: string }> {
   const tableData = parseWorkbookSheet(workbook, sheetName)
   if (!fileBuffer) throw new Error('The workbook data is unavailable')

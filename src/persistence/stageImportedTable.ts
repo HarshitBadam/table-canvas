@@ -21,6 +21,8 @@ interface StageImportedTableOptions {
   engineError: string
   tableId?: string
   operationGeneration?: number
+  /** Keep the write lease until the promoted node has been persisted. */
+  deferCompletion?: boolean
 }
 
 export async function stageImportedTable({
@@ -35,6 +37,7 @@ export async function stageImportedTable({
   engineError,
   tableId: existingTableId,
   operationGeneration,
+  deferCompletion = false,
 }: StageImportedTableOptions): Promise<string> {
   const tableId = existingTableId ?? useProjectStore.getState().addSourceTable({
     name,
@@ -70,7 +73,7 @@ export async function stageImportedTable({
     if (!loaded) {
       throw new Error(engineError)
     }
-    completeTableOperation(tableId, generation)
+    if (!deferCompletion) completeTableOperation(tableId, generation)
     return tableId
   } catch (error) {
     const message = error instanceof Error ? error.message : engineError

@@ -1,19 +1,23 @@
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { Handle, Position, NodeProps } from 'reactflow'
 import { TableSchema, NodeUI, NodeViewMode, CellValue, ViewFilterConfig } from '@/types'
 import { formatNumber } from '@/lib/utils'
-import { isTableUpdating, tablePhaseLabel, useNodeCacheInfo } from '@/state/tableRuntimeStore'
+import { isTableUpdating, useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { MiniTableView } from './MiniTableView'
 import { NODE_WIDTH } from '../canvasConstants'
 import { ColumnTypeBadge } from '@/components/ColumnTypeBadge'
 import { TableTypeIcon } from '@/components/TableTypeIcon'
+
+/** Fast imports finish before this; skip skeleton/footer so they don't flash. */
+const UPDATING_CHROME_DELAY_MS = 180
 
 interface TableNodeData {
   id: string
   kind: 'source_table' | 'derived_table'
   name: string
   schema?: TableSchema
+  plan?: { fileRef?: string }
   ui: NodeUI
   selected: boolean
   patches?: {
@@ -73,13 +77,41 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
   const isSource = data.kind === 'source_table'
   const schema = data.schema
   const cacheInfo = useNodeCacheInfo(data.id)
-  const rowCount = cacheInfo?.lastRowCount ?? schema?.rowCount ?? 0
+  const actualRowCount = cacheInfo?.lastRowCount ?? schema?.rowCount ?? 0
   const colCount = schema?.columns.length ?? 0
   const viewMode = getViewMode(data.ui)
+  const updating = isTableUpdating(cacheInfo) && !cacheInfo?.error
+  const [showUpdatingChrome, setShowUpdatingChrome] = useState(false)
+  const hasColumns = (schema?.columns.length ?? 0) > 0
+  // Initial source imports are a two-state UI: columns/loading, then ready.
+  // Keep the final row count out of the loading state so staging cannot create a
+  // third visual transition just before the operation completes.
+  const rowsAreLoading = isSource && updating
+  const rowCount = rowsAreLoading ? 0 : actualRowCount
+  const showSchemaBody = (viewMode === 'collapsed' && hasColumns)
+    || (showUpdatingChrome && !hasColumns)
+  const showDataBody = viewMode === 'data' && hasColumns
+
+  useEffect(() => {
+    if (!updating) {
+      setShowUpdatingChrome(false)
+      return
+    }
+    const timer = window.setTimeout(() => setShowUpdatingChrome(true), UPDATING_CHROME_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [updating])
 
   const handleSetViewMode = useCallback((mode: NodeViewMode) => {
     data.onSetViewMode(data.id, mode)
   }, [data])
+
+  // A pending node is an internal reservation, not a visual state. Fast imports
+  // finish before it is revealed; larger imports appear once their columns exist.
+  if (
+    updating
+    && (!showUpdatingChrome || (isSource && !hasColumns))
+    && !cacheInfo?.error
+  ) return null
 
   return (
     <div
@@ -112,9 +144,16 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             <h3 className="truncate text-sm font-semibold tracking-tight text-text-primary">
               {data.name}
             </h3>
-            <div className="mt-0.5 text-xs text-text-secondary">
-              <span>{formatNumber(rowCount)} rows <span className="ml-1">{formatNumber(colCount)} columns</span></span>
-            </div>
+            {!rowsAreLoading && (
+              <div className={`mt-0.5 text-xs text-text-secondary ${
+                rowCount >= 10_000 ? 'flex flex-col leading-snug' : ''
+              }`}>
+                <span>{formatNumber(rowCount)} rows</span>
+                <span className={rowCount >= 10_000 ? undefined : 'ml-1'}>
+                  {formatNumber(colCount)} columns
+                </span>
+              </div>
+            )}
           </div>
           
           <ViewModeControl 
@@ -126,7 +165,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
       </div>
 
       <div>
-        {schema && schema.columns.length === 0 && !isTableUpdating(cacheInfo) && !cacheInfo?.error && (
+        {schema && !hasColumns && !updating && !cacheInfo?.error && (
           <div className="flex flex-col items-center justify-center px-6 py-6 text-center">
             <svg
               className="mb-2 h-5 w-5 text-text-tertiary"
@@ -143,24 +182,23 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             <p className="mt-1 text-xs text-text-tertiary">Add a column to see table data here.</p>
           </div>
         )}
-        {schema && schema.columns.length === 0 && isTableUpdating(cacheInfo) && !cacheInfo?.error && (
-          <div className="flex flex-col items-center justify-center gap-2 px-6 py-6 text-center">
-            <LoadingSpinner size="sm" />
-            <p className="text-xs font-medium text-text-secondary">{tablePhaseLabel(cacheInfo?.phase)}</p>
-          </div>
-        )}
 
-        {viewMode === 'collapsed' && schema && schema.columns.length > 0 && (
+        {showSchemaBody && schema && (
           <div className="px-4 py-3">
             <div className="space-y-2">
-              {schema.columns.slice(0, 4).map((col) => {
-                return (
-                  <div key={col.id} className="flex items-center justify-between gap-3">
-                    <span className="text-xs text-text-primary truncate">{col.name}</span>
-                    <ColumnTypeBadge type={col.type} />
-                  </div>
-                )
-              })}
+              {hasColumns
+                ? schema.columns.slice(0, 4).map((col) => (
+                    <div key={col.id} className="flex items-center justify-between gap-3">
+                      <span className="text-xs text-text-primary truncate">{col.name}</span>
+                      <ColumnTypeBadge type={col.type} />
+                    </div>
+                  ))
+                : [0, 1, 2].map((index) => (
+                    <div key={index} className="flex items-center justify-between gap-3" aria-hidden="true">
+                      <span className="h-3 w-24 animate-pulse rounded bg-surface-tertiary" />
+                      <span className="h-4 w-12 animate-pulse rounded bg-surface-tertiary" />
+                    </div>
+                  ))}
             </div>
             {schema.columns.length > 4 && (
               <div className="mt-3 text-xs text-text-tertiary">
@@ -170,7 +208,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
           </div>
         )}
 
-        {viewMode === 'data' && schema && schema.columns.length > 0 && (
+        {showDataBody && schema && (
           <MiniTableView
             tableId={data.id}
             columns={schema.columns}
@@ -179,10 +217,11 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             viewFilters={data.viewFilters}
             versionHash={cacheInfo?.currentVersionHash}
             dataRevision={cacheInfo?.dataRevision}
+            isUpdating={showUpdatingChrome}
+            updatingLabel="Loading data…"
           />
         )}
 
-        
         {cacheInfo?.error && (
           <div className="px-4 py-2.5 text-xs font-medium text-error-text bg-error/10 flex items-center gap-2">
             <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -193,11 +232,11 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
             </span>
           </div>
         )}
-        
-        {isTableUpdating(cacheInfo) && !cacheInfo?.error && (schema?.columns.length ?? 0) > 0 && (
+
+        {showUpdatingChrome && !showDataBody && (
           <div className="px-4 py-2.5 text-xs font-medium text-text-secondary bg-surface-secondary flex items-center gap-2">
             <LoadingSpinner size="sm" />
-            {tablePhaseLabel(cacheInfo?.phase)}
+            Loading data…
           </div>
         )}
 

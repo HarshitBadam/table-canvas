@@ -20,6 +20,10 @@ export interface LoadTableResult {
   warnings: string[]
 }
 
+const LOAD_TABLE_BASE_TIMEOUT_MS = 120_000
+const LOAD_TABLE_BATCH_SIZE = 1_000
+const LOAD_TABLE_BATCH_TIMEOUT_MS = 1_000
+
 export function validateComputedColumnSchema(columns: ColumnSchema[]): void {
   const seenIds = new Set<string>()
   const byReference = new Map<string, ColumnSchema>()
@@ -193,7 +197,13 @@ class EngineAdapter {
       },
     }
 
-    await this.rpc.call('loadTable', request)
+    // Large imports are written in 1,000-row SQL batches in the worker. The generic
+    // two-minute RPC limit can expire while a healthy 500k-row import is still making
+    // progress, causing the caller to roll back its node as if the import had failed.
+    const loadTimeoutMs = LOAD_TABLE_BASE_TIMEOUT_MS
+      + Math.ceil(rowsWithComputedValues.length / LOAD_TABLE_BATCH_SIZE)
+        * LOAD_TABLE_BATCH_TIMEOUT_MS
+    await this.rpc.call('loadTable', request, loadTimeoutMs)
     return { warnings }
   }
 

@@ -1,5 +1,19 @@
 import type { ProjectNode } from '@/types'
 
+function isPendingImport(node: ProjectNode): boolean {
+  return (
+    node.kind === 'source_table'
+    && typeof node.plan?.fileRef === 'string'
+    && node.plan.fileRef.startsWith('pending:')
+  )
+}
+
+export function hasPendingImportedTables(
+  nodes: Record<string, ProjectNode>,
+): boolean {
+  return Object.values(nodes).some(isPendingImport)
+}
+
 /**
  * Per-tab compute state used to live on the node (`cacheInfo`) and now lives in
  * `tableRuntimeStore`. Documents written before that change still carry it, so strip it
@@ -11,11 +25,7 @@ export function withoutRuntimeNodeState(
 ): Record<string, ProjectNode> {
   return Object.fromEntries(Object.entries(nodes).flatMap(([id, node]) => {
     // Incomplete imports use a synthetic fileRef; never persist them.
-    if (
-      node.kind === 'source_table'
-      && typeof node.plan?.fileRef === 'string'
-      && node.plan.fileRef.startsWith('pending:')
-    ) {
+    if (isPendingImport(node)) {
       return []
     }
     if (!('cacheInfo' in node)) return [[id, node]]

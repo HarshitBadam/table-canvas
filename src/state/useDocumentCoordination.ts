@@ -4,6 +4,7 @@ import { deserializePatches } from '@/persistence/patchSerialization'
 import { loadReportsForProject } from '@/persistence/reportStorage'
 import { useReportStore } from '@/report/reportStore'
 import type { ProjectNode } from '@/types'
+import { hasActiveTableOperations } from './tableOperationCoordinator'
 import type { DocumentIdentity } from './documentIdentity'
 import {
   holdsWriteLease,
@@ -68,6 +69,12 @@ export function useDocumentCoordination({
     const stopLease = startDocumentLease({
       key: identity.key,
       flush: async () => {
+        // A pending import is deliberately omitted from durable snapshots. Releasing
+        // the lease now would let the next owner replace it while its async work is
+        // still running, making the table briefly appear and then disappear.
+        if (hasActiveTableOperations()) {
+          throw new Error('A table operation is still in progress.')
+        }
         await flushRef.current()
         await useReportStore.getState().flushSaves()
       },
