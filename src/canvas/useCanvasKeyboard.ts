@@ -3,9 +3,13 @@ import { useProjectStore } from '@/state/projectStore'
 import { useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { useNodeDeletion } from '@/components/nodeDeletionContext'
 
+/**
+ * Deleting the selected node, which is the one keyboard action that only means
+ * something on the canvas. Undo and redo are workspace-wide and handled once in
+ * `useHistoryShortcuts`, so that the same keystroke does the same thing on every
+ * view instead of only where a handler happened to be mounted.
+ */
 export function useCanvasKeyboard() {
-  const undo = useProjectStore((state) => state.undo)
-  const redo = useProjectStore((state) => state.redo)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
   const { canEdit } = useWorkspaceLease()
   const { requestNodeDeletion, deletionPending } = useNodeDeletion()
@@ -30,29 +34,9 @@ export function useCanvasKeyboard() {
           requestNodeDeletion(selectedNodeId)
         }
       }
-
-      if (
-        (e.metaKey || e.ctrlKey)
-        && e.key === 'z'
-        && !e.shiftKey
-        && !isEditing
-        && !isInDialog
-      ) {
-        e.preventDefault()
-        undo()
-      }
-      if (
-        (e.metaKey || e.ctrlKey)
-        && (e.key === 'y' || (e.key === 'z' && e.shiftKey))
-        && !isEditing
-        && !isInDialog
-      ) {
-        e.preventDefault()
-        redo()
-      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [canEdit, deletionPending, redo, requestNodeDeletion, selectedNodeId, undo])
+  }, [canEdit, deletionPending, requestNodeDeletion, selectedNodeId])
 }

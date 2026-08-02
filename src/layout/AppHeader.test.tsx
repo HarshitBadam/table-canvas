@@ -17,7 +17,6 @@ function HeaderHarness() {
   const exportState: ProjectExportState = {
     isExporting: false,
     isImporting: false,
-    exportProgress: '',
     exportError: null,
     exportDropdownOpen: open,
     dropdownRef,

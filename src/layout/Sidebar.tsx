@@ -6,7 +6,7 @@ import { NewTableModal } from '@/canvas/modals/NewTableModal'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { useNavigation } from './NavigationContext'
-import { WORKSPACE_NAV_ITEMS } from './viewNavigation'
+import { WORKSPACE_NAV_ITEMS, type ViewMode } from './viewNavigation'
 import type { ProjectNode, TableNode, ChartNode } from '@/types'
 import { useDialogFocus } from '@/components/useDialogFocus'
 import { SidebarNodeItem } from './SidebarNodeItem'
@@ -14,7 +14,7 @@ import { SidebarNodeItem } from './SidebarNodeItem'
 interface SidebarProps {
   isOpen?: boolean
   onClose?: () => void
-  activeView?: 'canvas' | 'grid' | 'chart' | 'dashboard' | 'report'
+  activeView?: ViewMode
 }
 
 export function Sidebar({
@@ -29,6 +29,16 @@ export function Sidebar({
   const { canEdit } = useWorkspaceLease()
   
   const [newTableModalOpen, setNewTableModalOpen] = useState(false)
+
+  /*
+   * `selectedNodeId` means "the node the canvas/grid/chart views are pointed at",
+   * which is not the same as "what the user is looking at". Importing a table
+   * sets it, so on the report and dashboard views a table would appear active in
+   * the list while the main area shows something else entirely. Those views own
+   * the whole screen, so nothing in the list is current while they are open.
+   */
+  const highlightsNode = activeView !== 'report' && activeView !== 'dashboard'
+  const activeNodeId = highlightsNode ? selectedNodeId : null
 
   const allNodes = Object.values(nodes) as ProjectNode[]
   const tableNodes = allNodes.filter(
@@ -129,7 +139,7 @@ export function Sidebar({
               <SidebarNodeItem
                 key={node.id}
                 node={node}
-                selected={selectedNodeId === node.id}
+                selected={activeNodeId === node.id}
                 onOpen={handleTableClick}
                 onDelete={handleDeleteNode}
               />
@@ -152,7 +162,7 @@ export function Sidebar({
                 <SidebarNodeItem
                   key={node.id}
                   node={node}
-                  selected={selectedNodeId === node.id}
+                  selected={activeNodeId === node.id}
                   onOpen={handleChartClick}
                   onDelete={handleDeleteNode}
                 />

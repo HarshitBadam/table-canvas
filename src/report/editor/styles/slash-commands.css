@@ -26,11 +26,18 @@
   }
 }
 
+/*
+ * No vertical padding: the highlight on an item runs the full width of the menu,
+ * so padding under the last one shows through as an unpainted strip along the
+ * menu's bottom edge. The group title carries the spacing above instead, and only
+ * a group with a divider below it needs room before the rule.
+ */
 .slash-command-group {
-  padding: 0.5rem 0;
+  padding: 0;
 }
 
 .slash-command-group:not(:last-child) {
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--color-border, #e4e4e7);
 }
 

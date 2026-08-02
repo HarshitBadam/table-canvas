@@ -9,6 +9,7 @@
 import { useCallback, useRef, useEffect, useMemo, useState } from 'react';
 import { useWorkspaceLease } from '@/state/useWorkspaceLease';
 import { useReportStore } from './reportStore';
+import { setActiveReportEditor } from './activeReportEditor';
 import { TipTapEditor, type TipTapEditorHandle } from './editor/TipTapEditor';
 import { ReportToolbar } from './ReportToolbar';
 import type { Editor, JSONContent } from '@tiptap/react';
@@ -62,6 +63,17 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
     updateReport(reportId, { tiptapContent: content as unknown as any });
   }, [reportId, updateReport]);
 
+  /*
+   * Publishing the editor is what lets undo reach this document from the rest of
+   * the report view — the toolbar, a selected block, the inside of an embedded
+   * table — none of which hold focus in the document itself. The editor component
+   * reports null as it tears down, which retires the registration with it.
+   */
+  const handleEditorReady = useCallback((instance: Editor | null) => {
+    setEditor(instance);
+    setActiveReportEditor(instance);
+  }, []);
+
   // Focus editor on mount
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -90,7 +102,7 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
           activeReportId={null}
           onSelectReport={() => setIsChoosingTemplate(false)}
         />
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto overscroll-x-contain">
           <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-16">
             {persistenceStatus === 'loading' ? (
               <div className="text-center text-sm text-text-secondary">Loading reports…</div>
@@ -122,7 +134,7 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
       />
 
       {/* Editor */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto overscroll-x-contain">
         <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12 print:max-w-none print:px-0 print:py-8">
           <TipTapEditor
             ref={editorRef}
@@ -130,7 +142,7 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
             onChange={handleContentChange}
             reportId={reportId}
             onOpenTable={onOpenTable}
-            onEditorReady={setEditor}
+            onEditorReady={handleEditorReady}
             editable={canEdit}
             placeholder="Type '/' for commands..."
           />

@@ -23,7 +23,7 @@ export function ProjectActionsMenu({
         </svg>
         <div>
           <div className="font-medium">Export Project</div>
-          <div className="text-xs text-text-tertiary">ZIP with project file + Excel data</div>
+          <div className="text-xs text-text-tertiary">ZIP with project file, Excel data and reports</div>
         </div>
       </button>
 

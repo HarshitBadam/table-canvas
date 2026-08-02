@@ -8,7 +8,8 @@
 
 .react-flow__node:focus,
 .react-flow__node:focus-visible {
-  outline: none;
+  outline: none !important;
+  outline-offset: 0 !important;
 }
 
 .react-flow__node.dragging {

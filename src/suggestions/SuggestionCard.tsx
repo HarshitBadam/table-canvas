@@ -81,7 +81,7 @@ function SuggestionPreview({ suggestion }: { suggestion: Suggestion }) {
         </div>
       )}
       {(data.kind === 'tableSample' || data.kind === 'aggregateSample') && (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overscroll-x-contain">
           <table className="w-full text-left">
             <thead><tr>{data.columns.map((column) => <th key={column} className="pr-3 font-medium">{column}</th>)}</tr></thead>
             <tbody>

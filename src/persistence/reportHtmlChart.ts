@@ -72,10 +72,23 @@ function piePath(cx: number, cy: number, radius: number, start: number, end: num
   return `M ${cx} ${cy} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY} Z`
 }
 
-function renderPie(points: ChartPoint[]): string {
+/** Slice colours, so a legend can be rebuilt for a target without HTML/CSS. */
+export interface ReportChartLegendItem {
+  label: string
+  value: number
+  color: string
+}
+
+interface ChartGraphic {
+  /** Empty when the data holds nothing plottable. */
+  svg: string
+  legend: ReportChartLegendItem[]
+}
+
+function renderPie(points: ChartPoint[]): ChartGraphic {
   const positive = points.filter((point) => point.y > 0)
   const total = positive.reduce((sum, point) => sum + point.y, 0)
-  if (total <= 0) return ''
+  if (total <= 0) return { svg: '', legend: [] }
   let angle = -Math.PI / 2
   const slices = positive.map((point, index) => {
     const next = angle + point.y / total * Math.PI * 2
@@ -83,10 +96,18 @@ function renderPie(points: ChartPoint[]): string {
     angle = next
     return path
   }).join('')
-  const legend = positive.slice(0, 10).map((point, index) =>
-    `<span class="chart-legend-item"><i style="background:${COLORS[index % COLORS.length]}"></i>${escapeHtml(point.label)} (${point.y})</span>`
+  const legend = positive.slice(0, 10).map((point, index) => ({
+    label: point.label,
+    value: point.y,
+    color: COLORS[index % COLORS.length],
+  }))
+  return { svg: `<svg viewBox="0 0 640 290" role="img">${slices}</svg>`, legend }
+}
+
+function pieLegendHtml(legend: ReportChartLegendItem[]): string {
+  return legend.map((item) =>
+    `<span class="chart-legend-item"><i style="background:${item.color}"></i>${escapeHtml(item.label)} (${item.value})</span>`
   ).join('')
-  return `<svg viewBox="0 0 640 290" role="img">${slices}</svg><div class="chart-legend">${legend}</div>`
 }
 
 function renderCartesian(points: ChartPoint[], type: string): string {
@@ -153,18 +174,32 @@ function renderCartesian(points: ChartPoint[], type: string): string {
   </svg>`
 }
 
-export function renderReportChart(
-  attrs: Record<string, unknown>,
-  entry: ChartEntry,
-): string {
+/**
+ * A rendered chart, independent of any output format: the plain SVG graphic plus
+ * the labels and legend that surround it. Consumers that cannot rely on CSS —
+ * the PDF exporter — compose their own frame from these parts.
+ */
+export interface ReportChartVector {
+  chartType: string
+  svg: string
+  legend: ReportChartLegendItem[]
+  title: string
+  subtitle?: string
+  caption: string
+}
+
+type ChartResolution =
+  | { status: 'unconfigured' }
+  | { status: 'empty'; title: string }
+  | { status: 'ok'; chart: ReportChartVector }
+
+function resolveChart(attrs: Record<string, unknown>, entry: ChartEntry): ChartResolution {
   const config = (attrs.config ?? {}) as Record<string, unknown>
   const chartType = String(attrs.chartType || 'bar')
   const xAxis = String(config.xAxis || '')
   const yAxis = String(config.yAxis || '')
   const title = String(config.title || `${entry.tableName} chart`)
-  if (!xAxis || !yAxis) {
-    return '<div class="block-placeholder">[Chart — select X and Y axes to render]</div>\n'
-  }
+  if (!xAxis || !yAxis) return { status: 'unconfigured' }
 
   const points = buildPoints(
     entry.rows,
@@ -174,17 +209,56 @@ export function renderReportChart(
   ).slice(0, 500)
   const graphic = chartType === 'pie'
     ? renderPie(points)
-    : renderCartesian(points, chartType)
-  if (!graphic) {
-    return `<div class="block-placeholder">[Chart: ${escapeHtml(title)} — no numeric data]</div>\n`
-  }
+    : { svg: renderCartesian(points, chartType), legend: [] }
+  if (!graphic.svg) return { status: 'empty', title }
 
   const xLabel = String(config.xAxisLabel || entry.columnNames?.[xAxis] || xAxis)
   const yLabel = String(config.yAxisLabel || entry.columnNames?.[yAxis] || yAxis)
-  return `<figure class="report-chart" aria-label="${escapeHtml(title)}">
-    <h3>${escapeHtml(title)}</h3>
-    ${config.subtitle ? `<p class="chart-subtitle">${escapeHtml(String(config.subtitle))}</p>` : ''}
+  return {
+    status: 'ok',
+    chart: {
+      chartType,
+      svg: graphic.svg,
+      legend: graphic.legend,
+      title,
+      subtitle: config.subtitle ? String(config.subtitle) : undefined,
+      caption: `X: ${xLabel} · Y: ${yLabel} · Source: ${entry.tableName} · ${entry.rows.length.toLocaleString()} sampled rows`,
+    },
+  }
+}
+
+/**
+ * Resolves a chart block to its vector graphic, or `null` when it cannot be
+ * plotted (no axes chosen, or nothing numeric to plot).
+ */
+export function buildReportChartVector(
+  attrs: Record<string, unknown>,
+  entry: ChartEntry,
+): ReportChartVector | null {
+  const resolved = resolveChart(attrs, entry)
+  return resolved.status === 'ok' ? resolved.chart : null
+}
+
+export function renderReportChart(
+  attrs: Record<string, unknown>,
+  entry: ChartEntry,
+): string {
+  const resolved = resolveChart(attrs, entry)
+  if (resolved.status === 'unconfigured') {
+    return '<div class="block-placeholder">[Chart — select X and Y axes to render]</div>\n'
+  }
+  if (resolved.status === 'empty') {
+    return `<div class="block-placeholder">[Chart: ${escapeHtml(resolved.title)} — no numeric data]</div>\n`
+  }
+
+  const { chart } = resolved
+  const graphic = chart.chartType === 'pie'
+    ? `${chart.svg}<div class="chart-legend">${pieLegendHtml(chart.legend)}</div>`
+    : chart.svg
+  return `<figure class="report-chart" aria-label="${escapeHtml(chart.title)}">
+    <h3>${escapeHtml(chart.title)}</h3>
+    ${chart.subtitle ? `<p class="chart-subtitle">${escapeHtml(chart.subtitle)}</p>` : ''}
     ${graphic}
-    <figcaption>X: ${escapeHtml(xLabel)} · Y: ${escapeHtml(yLabel)} · Source: ${escapeHtml(entry.tableName)} · ${entry.rows.length.toLocaleString()} sampled rows</figcaption>
+    <figcaption>${escapeHtml(chart.caption)}</figcaption>
   </figure>\n`
 }

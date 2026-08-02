@@ -107,11 +107,14 @@ export function SidebarNodeItem({
   }
 
   const isTable = node.kind === 'source_table' || node.kind === 'derived_table'
+  const isDerivedTable = node.kind === 'derived_table'
 
   return (
     <li
       className={`group flex min-h-14 items-center rounded-lg transition-colors ${
-        selected ? 'sidebar-node-active' : 'hover:bg-surface-secondary'
+        selected
+          ? isDerivedTable ? 'sidebar-node-active-derived' : 'sidebar-node-active'
+          : 'hover:bg-surface-secondary'
       }`}
     >
       {renaming ? (
@@ -147,8 +150,12 @@ export function SidebarNodeItem({
             type="button"
             onClick={() => onOpen(node.id)}
             aria-current={selected ? 'page' : undefined}
-            className={`min-w-0 flex-1 rounded-lg px-2 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-green ${
-              selected ? 'text-node-source-border' : 'text-text-primary'
+            className={`min-w-0 flex-1 rounded-lg px-2 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset ${
+              isDerivedTable ? 'focus-visible:ring-node-derived-border' : 'focus-visible:ring-accent-green'
+            } ${
+              selected
+                ? isDerivedTable ? 'text-node-derived-border' : 'text-node-source-border'
+                : 'text-text-primary'
             }`}
           >
             <div className="flex items-center gap-2.5">
@@ -168,7 +175,7 @@ export function SidebarNodeItem({
             aria-expanded={menuOpen}
             className={`sidebar-node-action mr-1 flex h-8 w-8 shrink-0 items-center justify-center text-text-tertiary outline-none transition-[opacity,color] focus:opacity-100 focus-visible:ring-2 focus-visible:ring-accent-green group-hover:opacity-100 group-focus-within:opacity-100 ${
               selected
-                ? 'hover:text-node-source-border'
+                ? isDerivedTable ? 'hover:text-node-derived-border' : 'hover:text-node-source-border'
                 : 'hover:text-text-primary'
             } ${
               selected || menuOpen ? 'opacity-100' : 'opacity-0'
@@ -218,7 +225,9 @@ function TableDimensions({ node, selected }: { node: TableNode; selected: boolea
   const rows = cacheInfo?.lastRowCount ?? node.schema.rowCount ?? 0
   return (
     <span className={`mt-0.5 text-xs tabular-nums ${
-      selected ? 'text-node-source-border' : 'text-text-tertiary'
+      selected
+        ? node.kind === 'derived_table' ? 'text-node-derived-border' : 'text-node-source-border'
+        : 'text-text-tertiary'
     }`}>
       {rows.toLocaleString()} rows <span className="ml-1">{columns.toLocaleString()} columns</span>
     </span>
@@ -228,15 +237,17 @@ function TableDimensions({ node, selected }: { node: TableNode; selected: boolea
 function NodeIcon({ node }: { node: ProjectNode }) {
   if (node.kind === 'chart') {
     return (
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-node-chart text-node-chart-border">
+      <span className="sidebar-node-icon sidebar-node-icon-chart flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-node-chart text-node-chart-border transition-colors">
         <ChartTypeIcon type={node.plan.chartType} className="h-4 w-4" />
       </span>
     )
   }
   const source = node.kind === 'source_table'
   return (
-    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
-      source ? 'bg-node-source text-node-source-border' : 'bg-node-derived text-node-derived-border'
+    <span className={`sidebar-node-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${
+      source
+        ? 'sidebar-node-icon-source bg-node-source text-node-source-border'
+        : 'sidebar-node-icon-derived bg-node-derived text-node-derived-border'
     }`}>
       <TableTypeIcon className="h-4 w-4" />
     </span>

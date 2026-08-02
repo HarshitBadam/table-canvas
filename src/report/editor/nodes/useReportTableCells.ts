@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FocusEvent, MouseEvent } from 'react';
+import { historyIntentFor } from '@/layout/historyShortcuts';
 import {
   HEADER_ROW,
   isNavigationKey,
@@ -37,11 +38,12 @@ function isTypedCharacter(event: KeyboardEvent): boolean {
  * Enter toggles the two states — open the editor, then commit and go back to
  * having the cell selected.
  *
- * The selected cell holds real DOM focus, and the grid stops keystrokes from
- * propagating any further. Both matter: a table is an atomic block, so any key
- * that reaches the document is applied to the selection sitting behind the
+ * The selected cell holds real DOM focus, and the grid stops editing keystrokes
+ * from propagating any further. Both matter: a table is an atomic block, so any
+ * key that reaches the document is applied to the selection sitting behind the
  * block instead — which is how Backspace in a cell could reach for the block
- * itself, and how the arrows ended up scrolling the report.
+ * itself, and how the arrows ended up scrolling the report. Undo and redo are
+ * deliberately let through, because they act on the report as a whole.
  */
 export function useReportTableCells({
   headers,
@@ -127,16 +129,28 @@ export function useReportTableCells({
   }, [onLeaveGrid]);
 
   /**
-   * Every key pressed anywhere in the grid, taken off the document's hands.
-   * Stopping propagation is what keeps ProseMirror out of it; the default action
-   * is left alone, so an open editor still types, deletes and moves its caret
-   * exactly like the text field it is.
+   * The editing keys pressed anywhere in the grid, taken off the document's
+   * hands. Stopping propagation is what keeps ProseMirror out of it; the default
+   * action is left alone, so an open editor still types, deletes and moves its
+   * caret exactly like the text field it is.
    */
   useEffect(() => {
     const grid = gridRef.current;
     if (!grid) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      /*
+       * Undo belongs to the report, not to one of its tables. The grid claims
+       * plain keys so an atomic block never leaks them to the selection behind
+       * it, but claiming undo left it with nothing to act on: the keystroke
+       * reached neither the document's history nor anything else, so it looked
+       * like undo simply stopped working whenever a cell was selected.
+       *
+       * An open cell editor is the exception. It is a text field mid-edit, and
+       * its own undo is the only one that should answer until it is committed.
+       */
+      if (!editingCell && historyIntentFor(event)) return;
+
       event.stopPropagation();
 
       if (editingCell) {

@@ -28,7 +28,7 @@ export function CategoryTabs({
     <div
       role="tablist"
       aria-label="Suggestion categories"
-      className="flex gap-1 overflow-x-auto border-b border-border-subtle bg-surface px-4 pb-3 pt-1"
+      className="flex gap-1 overflow-x-auto overscroll-x-contain border-b border-border-subtle bg-surface px-4 pb-3 pt-1"
     >
       {categories.map((cat, index) => (
         <button

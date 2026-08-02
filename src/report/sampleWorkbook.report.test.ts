@@ -5,8 +5,8 @@ import { parseWorkbookSheet, readWorkbook } from '@/engine/fileParsers'
 import {
   buildEmbeddedDataMap,
   collectEmbeddedTableIds,
-  generateReportHtml,
 } from '@/persistence/reportHtmlGenerator'
+import { generateReportHtml } from '@/persistence/reportHtmlDocument'
 import type { Report } from './types'
 import {
   aggregateReportChartRows,

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { SourceTableNode, DerivedTableNode } from '@/types'
-import { generateReportHtml, collectEmbeddedTableIds, buildEmbeddedDataMap } from '@/persistence/reportHtmlGenerator'
+import { collectEmbeddedTableIds, buildEmbeddedDataMap } from '@/persistence/reportHtmlGenerator'
+import { generateReportHtml } from '@/persistence/reportHtmlDocument'
 import type { Report } from '@/report/types'
 
 function createSourceTable(id: string, name: string): SourceTableNode {
