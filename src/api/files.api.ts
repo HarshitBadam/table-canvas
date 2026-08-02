@@ -9,6 +9,10 @@ export interface UploadedFile {
   uploadDate: Date;
 }
 
+export async function listFiles(): Promise<UploadedFile[]> {
+  const { files } = await api.get<{ files: UploadedFile[] }>('/files');
+  return files;
+}
 
 export async function uploadFile(
   file: File,

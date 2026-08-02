@@ -1,4 +1,8 @@
 import { memo, useState, useCallback, useEffect, useMemo } from 'react'
+import { LoadingSpinner } from '@/components/LoadingSpinner'
+
+/** Skip preview skeleton/footer when the engine answers in the same paint window. */
+const PREVIEW_LOADING_DELAY_MS = 120
 import { TableRow } from '@/state/dataStore'
 import { ColumnSchema, CellValue, ViewFilterConfig } from '@/types'
 import { formatNumber } from '@/lib/utils'
@@ -23,6 +27,9 @@ interface MiniTableViewProps {
   versionHash?: string
   /** Monotonic data revision; changes trigger a preview refetch even if the hash is unchanged. */
   dataRevision?: number
+  /** Parent table is still importing/materializing; keep the column chrome visible. */
+  isUpdating?: boolean
+  updatingLabel?: string
 }
 
 // Column width: minimum width, will expand to fill container
@@ -56,6 +63,8 @@ export const MiniTableView = memo(({
   viewFilters,
   versionHash,
   dataRevision,
+  isUpdating = false,
+  updatingLabel = 'Loading…',
 }: MiniTableViewProps) => {
   const [scrollTop, setScrollTop] = useState(0)
 
@@ -205,16 +214,21 @@ export const MiniTableView = memo(({
 
   const tableMinWidth = columns.length * MIN_CELL_WIDTH
   const gridTemplateColumns = `repeat(${columns.length}, minmax(${MIN_CELL_WIDTH}px, 1fr))`
+  const [showPreviewLoading, setShowPreviewLoading] = useState(false)
+  useEffect(() => {
+    if (isLoaded && !isUpdating) {
+      setShowPreviewLoading(false)
+      return
+    }
+    const timer = window.setTimeout(() => setShowPreviewLoading(true), PREVIEW_LOADING_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [isLoaded, isUpdating])
+  const showLoadingChrome = showPreviewLoading && (!isLoaded || isUpdating)
+  const bodyHeight = showLoadingChrome && totalRows === 0
+    ? Math.min(maxHeight, HEADER_HEIGHT + CELL_HEIGHT * 3 + FOOTER_HEIGHT)
+    : previewHeight
 
-  if (!isLoaded) {
-    return (
-      <div className="flex h-[100px] items-center justify-center text-xs text-text-tertiary" role="status">
-        Loading table preview…
-      </div>
-    )
-  }
-
-  if (loadError) {
+  if (loadError && isLoaded) {
     return (
       <div className="flex h-[100px] flex-col items-center justify-center gap-2 px-4 text-center text-xs text-text-secondary" role="alert">
         <span>{loadError}</span>
@@ -229,21 +243,14 @@ export const MiniTableView = memo(({
     )
   }
 
-  if (visibleRows.length === 0) {
-    return (
-      <div className="flex h-[100px] items-center justify-center px-4 text-center text-xs text-text-tertiary">
-        {filtersActive ? 'No rows match these filters.' : 'This table has no rows.'}
-      </div>
-    )
-  }
-
   return (
     <div 
       className="flex flex-col overflow-hidden rounded-b-2xl"
-      style={{ height: previewHeight }}
+      style={{ height: bodyHeight }}
       role="table"
       aria-colcount={columns.length}
       aria-rowcount={filtersActive ? matchingTotalRows : engineTotalRows}
+      aria-busy={showLoadingChrome || undefined}
     >
       {/* Scrollable table area - hide scrollbars but keep functionality */}
       <div 
@@ -256,7 +263,7 @@ export const MiniTableView = memo(({
           style={{ 
             width: tableMinWidth,
             minWidth: '100%',
-            height: totalRows * CELL_HEIGHT + HEADER_HEIGHT,
+            height: Math.max(totalRows, showLoadingChrome ? 3 : 0) * CELL_HEIGHT + HEADER_HEIGHT,
             position: 'relative'
           }}
         >
@@ -271,7 +278,6 @@ export const MiniTableView = memo(({
                 className={`flex items-center px-1.5 text-xs font-medium text-text-secondary truncate ${
                   idx < columns.length - 1 ? 'border-r border-border' : ''
                 }`}
-                title={col.name}
                 role="columnheader"
               >
                 <span className="truncate">{col.name}</span>
@@ -279,40 +285,69 @@ export const MiniTableView = memo(({
             ))}
           </div>
 
-          <div style={{ marginTop: startIndex * CELL_HEIGHT }} role="rowgroup">
-            {virtualRows.map((row) => {
-              return (
+          {isLoaded && !isUpdating && visibleRows.length === 0 ? (
+            <div
+              className="flex items-center justify-center px-4 text-center text-xs text-text-tertiary"
+              style={{ height: CELL_HEIGHT * 3 }}
+            >
+              {filtersActive ? 'No rows match these filters.' : 'This table has no rows.'}
+            </div>
+          ) : showLoadingChrome && totalRows === 0 ? (
+            <div role="rowgroup" aria-hidden="true">
+              {[0, 1, 2].map((index) => (
                 <div
-                  key={row.__rowId}
+                  key={index}
                   className="grid border-b border-border-subtle bg-surface"
                   style={{ height: CELL_HEIGHT, gridTemplateColumns }}
-                  role="row"
                 >
-                  {columns.map((col, idx) => {
-                    const value = getDisplayValue(row.__rowId, col.id, row[col.id], row)
-                    const displayValue = formatCellValue(value, col.type)
-                    const isLastColumn = idx === columns.length - 1
-                    return (
-                      <div
-                        key={col.id}
-                        className={`flex items-center px-1.5 text-xs overflow-hidden ${
-                          !isLastColumn ? 'border-r border-border' : ''
-                        } ${
-                          col.type === 'number' ? 'justify-end font-mono text-text-primary' : 'text-text-primary'
-                        }`}
-                        title={displayValue}
-                        role="cell"
-                      >
-                        <span className="truncate">
-                          {displayValue || <span className="sr-only">Empty cell</span>}
-                        </span>
-                      </div>
-                    )
-                  })}
+                  {columns.map((col, idx) => (
+                    <div
+                      key={col.id}
+                      className={`flex items-center px-1.5 ${
+                        idx < columns.length - 1 ? 'border-r border-border' : ''
+                      }`}
+                    >
+                      <span className="h-2.5 w-16 animate-pulse rounded bg-surface-tertiary" />
+                    </div>
+                  ))}
                 </div>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ marginTop: startIndex * CELL_HEIGHT }} role="rowgroup">
+              {virtualRows.map((row) => {
+                return (
+                  <div
+                    key={row.__rowId}
+                    className="grid border-b border-border-subtle bg-surface"
+                    style={{ height: CELL_HEIGHT, gridTemplateColumns }}
+                    role="row"
+                  >
+                    {columns.map((col, idx) => {
+                      const value = getDisplayValue(row.__rowId, col.id, row[col.id], row)
+                      const displayValue = formatCellValue(value, col.type)
+                      const isLastColumn = idx === columns.length - 1
+                      return (
+                        <div
+                          key={col.id}
+                          className={`flex items-center px-1.5 text-xs overflow-hidden ${
+                            !isLastColumn ? 'border-r border-border' : ''
+                          } ${
+                            col.type === 'number' ? 'justify-end font-mono text-text-primary' : 'text-text-primary'
+                          }`}
+                          role="cell"
+                        >
+                          <span className="truncate">
+                            {displayValue || <span className="sr-only">Empty cell</span>}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -320,7 +355,12 @@ export const MiniTableView = memo(({
         className="flex shrink-0 items-center gap-3 border-t border-border-subtle bg-surface-secondary px-3 text-xs text-text-secondary"
         style={{ height: FOOTER_HEIGHT }}
       >
-        {filtersActive ? (
+        {showLoadingChrome ? (
+          <span className="flex items-center gap-2" role="status">
+            <LoadingSpinner size="sm" />
+            {isUpdating ? updatingLabel : 'Loading table preview…'}
+          </span>
+        ) : filtersActive ? (
           previewIsTruncated ? (
             <span>
               Previewing <span className="font-medium text-text-primary">{formatNumber(totalRows)}</span>

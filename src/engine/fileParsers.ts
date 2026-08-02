@@ -3,12 +3,14 @@ import type { TableRow } from '@/state/dataStore'
 import type { TableSchema } from '@/types'
 import { parseTableSnapshot } from './tableSnapshot'
 import {
+  type CsvParseOptions,
   parseCsvData,
+  parseCsvFile as parseCsvFileData,
   processTabularData,
   type ParsedTableData,
 } from './tabularParser'
 
-export type { ParsedTableData }
+export type { ParsedTableData, CsvParseOptions }
 export { processTabularData }
 
 export async function parseFileData(
@@ -31,8 +33,18 @@ export async function parseFileData(
 export function parseCsvBuffer(
   fileData: ArrayBuffer,
   schema?: TableSchema,
+  options?: CsvParseOptions,
 ): Promise<ParsedTableData> {
-  return parseCsvData(fileData, schema)
+  return parseCsvData(fileData, schema, options)
+}
+
+/** Parse a browser File progressively without first copying it into a buffer. */
+export function parseCsvFile(
+  file: File,
+  schema?: TableSchema,
+  options?: CsvParseOptions,
+): Promise<ParsedTableData> {
+  return parseCsvFileData(file, schema, options)
 }
 
 export function readWorkbook(fileData: ArrayBuffer): XLSX.WorkBook {

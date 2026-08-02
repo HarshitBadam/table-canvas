@@ -8,6 +8,11 @@ export interface ParsedTableData {
   rows: TableRow[]
 }
 
+export interface CsvParseOptions {
+  /** Called once the source columns have been inferred from the initial sample. */
+  onSchema?: (schema: TableSchema) => void
+}
+
 /** Yield to the browser between CSV chunks so import UI can paint immediately. */
 function yieldToUi(): Promise<void> {
   return new Promise((resolve) => {
@@ -19,9 +24,28 @@ function yieldToUi(): Promise<void> {
 export function parseCsvData(
   fileData: ArrayBuffer,
   existingSchema?: TableSchema,
+  options?: CsvParseOptions,
 ): Promise<ParsedTableData> {
-  const text = new TextDecoder('utf-8').decode(fileData)
+  return parseCsvSource(new TextDecoder('utf-8').decode(fileData), existingSchema, options)
+}
 
+/**
+ * Streams a browser File through Papa Parse so callers can receive the inferred
+ * schema before the entire CSV has been parsed.
+ */
+export function parseCsvFile(
+  file: File,
+  existingSchema?: TableSchema,
+  options?: CsvParseOptions,
+): Promise<ParsedTableData> {
+  return parseCsvSource(file, existingSchema, options)
+}
+
+function parseCsvSource(
+  source: string | File,
+  existingSchema?: TableSchema,
+  options?: CsvParseOptions,
+): Promise<ParsedTableData> {
   return new Promise((resolve, reject) => {
     const rows: TableRow[] = []
     const samples: Record<string, string>[] = []
@@ -31,6 +55,7 @@ export function parseCsvData(
     let columnsByName: Map<string, ColumnSchema> | undefined
     let parseError: unknown
     let settling = false
+    let schemaPublished = false
 
     const prepareColumns = () => {
       if (columnsByName) return
@@ -39,6 +64,18 @@ export function parseCsvData(
       columnsByName = new Map(
         columns.map((column) => [column.sourceName ?? column.name, column]),
       )
+    }
+
+    const publishSchema = () => {
+      if (schemaPublished) return
+      prepareColumns()
+      schemaPublished = true
+      options?.onSchema?.({
+        ...existingSchema,
+        columns: columns!,
+        // This is a schema preview, not evidence that any rows are ready.
+        rowCount: 0,
+      })
     }
 
     const appendRows = (records: Record<string, string>[]) => {
@@ -54,17 +91,23 @@ export function parseCsvData(
     }
 
     try {
-      Papa.parse<Record<string, string>>(text, {
+      Papa.parse<Record<string, string>>(source, {
         header: true,
         skipEmptyLines: true,
+        // Keep the first parse slice small enough for schema inference to be
+        // surfaced without waiting for a multi-megabyte default chunk.
+        chunkSize: 64 * 1024,
         chunk: (results: Papa.ParseResult<Record<string, string>>, parser: Papa.Parser) => {
           if (settling) return
           try {
             fields = results.meta.fields ?? fields
+            // Headers are enough to show column count immediately; keep sampling
+            // only until types can be inferred, then flush the buffered rows.
             if (!columns && samples.length < 100) {
               const needed = 100 - samples.length
               samples.push(...results.data.slice(0, needed))
               pendingRows.push(...results.data)
+              if (fields.length > 0) publishSchema()
               if (samples.length >= 100) {
                 appendRows(pendingRows)
                 pendingRows.length = 0
@@ -93,8 +136,12 @@ export function parseCsvData(
             console.warn('CSV parsing warnings:', results.errors)
           }
           try {
-            if (pendingRows.length > 0) appendRows(pendingRows)
-            else prepareColumns()
+            if (pendingRows.length > 0) {
+              publishSchema()
+              appendRows(pendingRows)
+            } else {
+              publishSchema()
+            }
             resolve({
               schema: {
                 ...existingSchema,

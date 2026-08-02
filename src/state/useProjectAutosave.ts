@@ -10,7 +10,10 @@ import { useReportStore } from '@/report/reportStore'
 import { holdsWriteLease } from './documentLease'
 import { publishDocumentSnapshot } from './documentMirror'
 import { useProjectStore } from './projectStore'
-import { withoutRuntimeNodeState } from './transientProjectState'
+import {
+  hasPendingImportedTables,
+  withoutRuntimeNodeState,
+} from './transientProjectState'
 import type { AppPhase, AppProviderState } from './appContextValue'
 import type { Edge, ProjectNode } from '@/types'
 
@@ -90,6 +93,11 @@ export function useProjectAutosave({
     if (useProjectStore.getState().history.transaction) {
       throw new Error('A table operation is still in progress.')
     }
+    // A pending import is intentionally excluded from durable snapshots. Never let a
+    // pagehide/autosave turn that incomplete graph into the latest persisted version.
+    if (hasPendingImportedTables(useProjectStore.getState().nodes)) {
+      throw new Error('A table operation is still in progress.')
+    }
     // Mirror tabs hold the same stores but must never write the document.
     if (!holdsWriteLease()) {
       markSaving(false)
@@ -154,6 +162,11 @@ export function useProjectAutosave({
 
   const scheduleSave = useCallback(() => {
     if (!holdsWriteLease()) return
+    if (hasPendingImportedTables(useProjectStore.getState().nodes)) {
+      cancelPendingSave()
+      markSaving(false)
+      return
+    }
     markSaving(true)
     const project = useProjectStore.getState()
     if (project.history.transaction) {
