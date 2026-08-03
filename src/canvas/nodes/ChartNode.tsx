@@ -136,9 +136,36 @@ export const ChartNodeComponent = memo(({ data }: NodeProps<ChartNodeData>) => {
         </div>
       </div>
 
+      {/*
+        computeSmartEdges (edgeRouter.ts) assigns each edge a targetHandle id of
+        'left' | 'right' | 'top' | 'bottom' based on where its source table sits
+        relative to this node. A single unnamed handle only ever matches an edge
+        that happens to get no id, so charts positioned to the side or below
+        their source table would silently lose their connecting line. Charts are
+        never a connection source, so every side just needs a target handle.
+      */}
       <Handle
         type="target"
         position={Position.Left}
+        id="left"
+        className="!w-2 !h-2 !border-2 !border-surface !rounded-full !bg-accent-green"
+      />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="right"
+        className="!w-2 !h-2 !border-2 !border-surface !rounded-full !bg-accent-green"
+      />
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="top"
+        className="!w-2 !h-2 !border-2 !border-surface !rounded-full !bg-accent-green"
+      />
+      <Handle
+        type="target"
+        position={Position.Bottom}
+        id="bottom"
         className="!w-2 !h-2 !border-2 !border-surface !rounded-full !bg-accent-green"
       />
     </div>

@@ -59,7 +59,7 @@
   background: transparent;
   border: none;
   border-radius: 8px;
-  cursor: pointer;
+  cursor: default;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
@@ -79,7 +79,7 @@
   background: var(--color-accent);
   border: none;
   border-radius: 8px;
-  cursor: pointer;
+  cursor: default;
   transition: background-color 0.15s ease;
   box-shadow: var(--shadow-sm);
 }
@@ -90,7 +90,7 @@
 
 .join-btn-create:disabled {
   opacity: 0.4;
-  cursor: pointer;
+  cursor: default;
   box-shadow: none;
 }
 

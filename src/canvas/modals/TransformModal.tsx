@@ -27,6 +27,12 @@ type TransformModalProps = {
   targetNodeId: string
 }
 const MAX_TABLE_NAME_LENGTH = 100
+// Comparing values across two full tables (up to hundreds of thousands of rows
+// each) on every keystroke of key selection would make the modal janky, and
+// findBestKeys already runs this for every left/right column pair. Capping the
+// preview keeps match-rate checks bounded regardless of table size; the actual
+// join/append is still computed exactly over the full tables at creation time.
+const MATCH_PREVIEW_SAMPLE_LIMIT = 1_000
 
 export function TransformModal({
   isOpen,
@@ -51,6 +57,8 @@ export function TransformModal({
   const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [leftData, setLeftData] = useState<TableRow[]>([])
   const [rightData, setRightData] = useState<TableRow[]>([])
+  const [leftTotalRows, setLeftTotalRows] = useState(0)
+  const [rightTotalRows, setRightTotalRows] = useState(0)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState<string>()
   const [previewRequestKey, setPreviewRequestKey] = useState(0)
@@ -93,12 +101,14 @@ export function TransformModal({
     setPreviewLoading(true)
     setPreviewError(undefined)
     void Promise.all([
-      getTableData(sourceNodeId, 0, 1_000),
-      getTableData(targetNodeId, 0, 1_000),
+      getTableData(sourceNodeId, 0, MATCH_PREVIEW_SAMPLE_LIMIT),
+      getTableData(targetNodeId, 0, MATCH_PREVIEW_SAMPLE_LIMIT),
     ]).then(([left, right]) => {
       if (cancelled) return
       setLeftData(left.rows)
       setRightData(right.rows)
+      setLeftTotalRows(left.totalRows)
+      setRightTotalRows(right.totalRows)
       setPreviewError(left.error || right.error)
     }).catch((error) => {
       if (!cancelled) {
@@ -120,6 +130,9 @@ export function TransformModal({
     }
   }, [leftCols, rightCols, leftData, rightData])
   const match = useMemo(() => analyzeMatch(leftData, rightData, leftKey, rightKey), [leftData, rightData, leftKey, rightKey])
+  // Both sides fit under the preview limit, so the fetched rows are the whole
+  // table, not a slice of it - the match rate is exact, not an estimate.
+  const isExactMatch = leftTotalRows <= MATCH_PREVIEW_SAMPLE_LIMIT && rightTotalRows <= MATCH_PREVIEW_SAMPLE_LIMIT
   const canUnion = leftCols.length > 0 && leftCols.length === rightCols.length && leftCols.every(
     (column, index) => column.type === rightCols[index]?.type,
   )
@@ -372,9 +385,11 @@ export function TransformModal({
                     </button>
                   </>
                 ) : match.rate > 0 ? (
-                  <>{match.rate}% match across {match.rows} rows</>
+                  isExactMatch
+                    ? <>{match.rate}% match across all {match.sampleSize} rows</>
+                    : <>{match.rate}% match in a sample of {match.sampleSize} rows</>
                 ) : (
-                  <>No matching values in this sample.</>
+                  <>No matching values in this {isExactMatch ? 'table' : 'sample'}.</>
                 )}
               </div>
             </section>

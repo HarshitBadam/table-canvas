@@ -12,7 +12,7 @@
   background: var(--color-surface-secondary);
   border: 1.5px solid transparent;
   border-radius: var(--radius-md);
-  cursor: pointer;
+  cursor: default;
   transition: border-color 0.15s ease;
 }
 
@@ -96,7 +96,7 @@
   border: none;
   background: none;
   border-radius: 0;
-  cursor: pointer;
+  cursor: default;
   text-align: left;
   transition: background 0.1s ease;
 }
