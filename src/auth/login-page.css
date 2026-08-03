@@ -39,7 +39,7 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 24px;
-  font-size: 15px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.015em;
   color: var(--color-text-primary);
@@ -52,13 +52,16 @@
   flex: none;
   place-items: center;
   border-radius: 12px;
-  background-color: rgb(var(--color-accent-rgb) / 0.1);
+  background-color: var(--color-accent);
+  box-shadow:
+    0 6px 16px -4px rgba(0, 0, 0, 0.22),
+    0 3px 8px -2px rgb(var(--color-accent-rgb) / 0.25);
 }
 
 .login-mark {
   width: 23px;
   height: 23px;
-  color: var(--color-accent);
+  color: #ffffff;
 }
 
 .login-panel {

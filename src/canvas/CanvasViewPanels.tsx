@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Panel } from 'reactflow'
 import { ImportButton } from '@/components/ImportButton'
+import { BrandMark } from '@/components/BrandMark'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import type { LayoutDirection } from './autoLayout'
 
@@ -54,9 +55,7 @@ export function CanvasEmptyState({ onNewTable }: EmptyStateProps) {
     <Panel position="top-center" className="mt-12 max-w-[calc(100vw-2rem)] sm:mt-16">
       <div className="max-w-md rounded-xl border border-border bg-surface p-6 text-center shadow-md sm:p-8">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-accent-green">
-          <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
+          <BrandMark className="h-6 w-6 text-white" />
         </div>
         <h2 className="mb-2 text-lg font-semibold text-text-primary">
           Start with a table

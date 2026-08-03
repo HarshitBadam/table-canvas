@@ -1,4 +1,5 @@
 import type { AppPhase } from '@/state/AppContext'
+import { BrandMark } from './BrandMark'
 
 interface LoadingScreenProps {
   phase: AppPhase
@@ -18,20 +19,13 @@ export function LoadingScreen({ phase, message }: LoadingScreenProps) {
   return (
     <div className="flex h-screen items-center justify-center bg-canvas">
       <div className="text-center w-full max-w-sm px-4">
-        <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-accent-green/10 flex items-center justify-center">
-          <svg
-            className="w-8 h-8 text-accent-green"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-            />
-          </svg>
+        <div
+          className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-accent-green flex items-center justify-center"
+          style={{
+            boxShadow: '0 6px 16px -4px rgba(0, 0, 0, 0.22), 0 3px 8px -2px rgb(var(--color-accent-rgb) / 0.25)',
+          }}
+        >
+          <BrandMark className="w-8 h-8 text-white" />
         </div>
 
         <h1 className="text-xl font-semibold text-text-primary mb-2">
