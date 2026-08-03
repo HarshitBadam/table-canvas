@@ -5,6 +5,7 @@ import {
   connectTables,
   createManualTable,
   importCsv,
+  openCanvasView,
 } from '../app.support'
 
 test.describe('Core workflows', () => {
@@ -31,6 +32,9 @@ test.describe('Core workflows', () => {
 
     const dialog = page.getByRole('dialog', { name: 'Combine Tables' })
     await expect(dialog).toBeVisible()
+    await page.addStyleTag({
+      content: '*, *::before, *::after { animation: none !important; transition: none !important; }',
+    })
     const axe = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .analyze()
@@ -40,15 +44,13 @@ test.describe('Core workflows', () => {
     await dialog.getByRole('option', { name: /ID/ }).click()
     await dialog.getByRole('button', { name: 'Orders match column' }).click()
     await dialog.getByRole('option', { name: /ID/ }).click()
-    await expect(dialog.getByLabel('Table Name')).toBeHidden()
-    await dialog.getByText('Output options', { exact: true }).click()
-    await dialog.getByLabel('Table Name').fill('Customer Orders')
+    await dialog.getByLabel('New Table Name').fill('Customer Orders')
     await dialog.getByRole('button', { name: 'Create joined table' }).click()
 
     await expect(dialog).toBeHidden({ timeout: 20_000 })
     await expect(page.locator('.react-flow__node')).toHaveCount(3)
     const derived = page.locator('aside').getByRole('button', {
-      name: /^Customer Orders 3 rows/,
+      name: /^Customer Orders .*3 rows/,
     })
     await expect(derived).toBeVisible({ timeout: 30_000 })
     await derived.click()
@@ -57,11 +59,11 @@ test.describe('Core workflows', () => {
     await expect(page.getByRole('gridcell').filter({ hasText: '240' })).toHaveCount(1)
 
     await page.reload()
-    await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+    await openCanvasView(page)
     await expect(page.locator('.react-flow__node')).toHaveCount(3)
     await expect(page.locator('.react-flow__edge')).toHaveCount(2)
     await page.locator('aside').getByRole('button', {
-      name: /^Customer Orders 3 rows/,
+      name: /^Customer Orders .*3 rows/,
     }).click()
     await expect(page.getByText('3 rows × 3 columns')).toBeVisible({ timeout: 20_000 })
     await expect(page.getByRole('gridcell').filter({ hasText: 'Ada' })).toHaveCount(1)
@@ -74,8 +76,8 @@ test.describe('Core workflows', () => {
     await createManualTable(page, 'First Workspace Table')
 
     await page.getByRole('button', { name: 'Current project' }).click()
-    await page.getByRole('menuitem', { name: 'New project' }).click()
-    const createDialog = page.getByRole('dialog', { name: 'Create project' })
+    await page.getByRole('menuitem', { name: /Create project/ }).click()
+    const createDialog = page.getByRole('dialog', { name: /Create.*project/i })
     await createDialog.getByLabel('Project name').fill('Second Workspace')
     await createDialog.getByRole('button', { name: 'Create project' }).click()
     await expect(createDialog).toBeHidden({ timeout: 20_000 })
@@ -87,20 +89,20 @@ test.describe('Core workflows', () => {
     await projectSwitcher.click()
     await page.getByRole('option', { name: 'Sample Workbook Project', exact: true }).click()
     await expect(page.locator('aside').getByRole('button', {
-      name: /^First Workspace Table 5 rows/,
+      name: /^First Workspace Table .*5 rows/,
     })).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('aside').getByText('Second Workspace Table')).toHaveCount(0)
 
     await projectSwitcher.click()
     await page.getByRole('option', { name: 'Second Workspace', exact: true }).click()
     await expect(page.locator('aside').getByRole('button', {
-      name: /^Second Workspace Table 5 rows/,
+      name: /^Second Workspace Table .*5 rows/,
     })).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('aside').getByText('First Workspace Table')).toHaveCount(0)
 
     await projectSwitcher.click()
-    await page.getByRole('menuitem', { name: 'More project actions' }).click()
-    await page.getByRole('menuitem', { name: 'Rename current project' }).click()
+    await page.getByRole('button', { name: 'Actions for Second Workspace', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Rename', exact: true }).click()
     const renameInput = page.getByLabel('Rename project')
     await renameInput.fill('Operations Workspace')
     await page.getByRole('button', { name: 'Save', exact: true }).click()
@@ -127,7 +129,7 @@ test.describe('Core workflows at 320px', () => {
     ])
 
     const nodes = page.locator('.react-flow__node')
-    await page.locator('aside').getByRole('button', { name: 'Close navigation' }).click()
+    await page.locator('aside').getByRole('button', { name: 'Canvas', exact: true }).click()
     await expect(nodes).toHaveCount(2)
     await page.getByRole('button', { name: 'Arrange tables top to bottom' }).click()
     await connectTables(page, 'Narrow Customers', 'Narrow Orders', '.table-handle-top')

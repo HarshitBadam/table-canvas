@@ -1,5 +1,5 @@
 import { expect, test } from './e2e.fixture'
-import { bootApp, createManualTable, openManualTable } from './app.support'
+import { bootApp, createManualTable, openCanvasView, openManualTable } from './app.support'
 
 test.describe('Canvas and table behavior', () => {
   test.beforeEach(async ({ page }) => {
@@ -17,11 +17,12 @@ test.describe('Canvas and table behavior', () => {
 
     const node = page.locator('.react-flow__node').filter({ hasText: 'Canvas Table' })
     await expect(node).toHaveCount(1)
-    await expect(node).toContainText('7 rows · 2 columns')
+    await expect(node).toContainText('2 columns')
+    await expect(node).toContainText('7 rows')
     await expect(node).toContainText('Name')
     await expect(node).toContainText('Value')
     await expect(page.locator('aside').getByRole('button', {
-      name: /^Canvas Table 7 rows/,
+      name: /^Canvas Table .*7 rows/,
     })).toBeVisible()
   })
 
@@ -29,10 +30,11 @@ test.describe('Canvas and table behavior', () => {
     await createManualTable(page, 'Navigation Table')
     await openManualTable(page, 'Navigation Table')
 
-    await expect(page.getByText('Source - Editable')).toBeVisible()
+    await expect(page.getByText('Source', { exact: true })).toBeVisible()
+    await expect(page.getByText('Editable', { exact: true })).toBeVisible()
     await expect(page.getByRole('grid', { name: 'Table data' })).toBeVisible()
     await expect(page.getByRole('gridcell')).toHaveCount(10)
-    await page.getByRole('button', { name: 'Back to Canvas' }).click()
+    await openCanvasView(page)
 
     await expect(page.locator('.react-flow__node').filter({
       hasText: 'Navigation Table',
@@ -63,7 +65,7 @@ test.describe('Canvas and table behavior', () => {
     })
 
     const table = page.locator('aside').getByRole('button', {
-      name: /^imported-data 3 rows/,
+      name: /^imported-data .*3 rows/,
     })
     await expect(table).toBeVisible({ timeout: 20_000 })
     await table.click()

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import request from 'supertest'
 import { Types } from 'mongoose'
+import { LIMITS } from '../config/limits.js'
 import { Project } from '../models/Project.js'
+import { User } from '../models/User.js'
 import {
   createSampleEdge,
   createSampleNode,
@@ -103,6 +105,13 @@ describe('Projects API update and delete', () => {
 
     it('rejects an update that exceeds the row limit', async () => {
       const { app, mockUser } = getProjectRoutesTestContext()
+      await User.create({
+        _id: new Types.ObjectId(mockUser.userId),
+        email: mockUser.email,
+        name: 'Guest User',
+        tier: 'guest',
+        passwordHash: 'hash',
+      })
       const project = await createTestProject({
         userId: new Types.ObjectId(mockUser.userId),
       })
@@ -111,7 +120,7 @@ describe('Projects API update and delete', () => {
           ...createSampleNode('oversized'),
           schema: {
             columns: [],
-            rowCount: 500_001,
+            rowCount: LIMITS.guest.maxRowsPerTable + 1,
           },
         },
       }

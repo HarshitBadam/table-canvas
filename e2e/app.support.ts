@@ -20,7 +20,7 @@ export async function importCsv(
     buffer: Buffer.from(lines.join('\n')),
   })
   await expect(page.locator('aside').getByRole('button', {
-    name: new RegExp(`^${name} ${lines.length - 1} rows`),
+    name: new RegExp(`^${name} .*${lines.length - 1} rows`),
   })).toBeVisible({ timeout: 30_000 })
 }
 
@@ -94,8 +94,13 @@ export async function freezeVisualMotion(page: Page) {
   })
 }
 
+export async function openCanvasView(page: Page) {
+  await page.locator('aside').getByRole('button', { name: 'Canvas', exact: true }).click()
+  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+}
+
 export async function downloadProjectZip(page: Page): Promise<JSZip> {
-  await page.getByRole('button', { name: 'Export', exact: true }).click()
+  await page.getByRole('button', { name: 'Import or export project' }).click()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('menuitem', { name: /Export Project ZIP/ }).click()
   const download = await downloadPromise

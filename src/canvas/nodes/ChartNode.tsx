@@ -8,8 +8,7 @@ import { useProjectStore } from '@/state/projectStore'
 import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { ChartTypeIcon } from '@/charts/ChartTypeIcon'
 
-export interface ChartNodeData extends ChartNodeType {
-}
+export type ChartNodeData = ChartNodeType
 
 export const ChartNodeComponent = memo(({ data }: NodeProps<ChartNodeData>) => {
   const chartType = data.plan.chartType

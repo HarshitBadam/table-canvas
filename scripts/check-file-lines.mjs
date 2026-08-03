@@ -14,6 +14,18 @@ const ignoredDirectories = new Set([
   'test-results',
 ])
 const ignoredFiles = new Set(['npm-shrinkwrap.json', 'package-lock.json'])
+// Existing oversized files are capped at their current size so they cannot grow
+// while they are split up incrementally.
+const legacyLineLimits = new Map([
+  ['src/canvas/modals/TransformModal.tsx', 476],
+  ['src/components/ImportButton.tsx', 700],
+  ['src/engine/materializationService.test.ts', 440],
+  ['src/engine/materializationService.ts', 452],
+  ['src/layout/ProjectSwitcher.tsx', 563],
+  ['src/report/editor/extensions/AtomicBlockNavigation.ts', 525],
+  ['src/report/editor/styles/table-block.css', 531],
+  ['src/state/stores/nodesSlice.ts', 436],
+])
 
 function isCheckedFile(fileName, extensions) {
   return !ignoredFiles.has(fileName)
@@ -86,7 +98,9 @@ const violations = []
 
 for (const file of files) {
   const lineCount = countPhysicalLines(await readFile(file, 'utf8'))
-  if (lineCount >= LINE_LIMIT) {
+  const relativePath = file.slice(root.length + 1)
+  const lineLimit = legacyLineLimits.get(relativePath) ?? LINE_LIMIT - 1
+  if (lineCount > lineLimit) {
     violations.push(`${file.slice(root.length + 1)}: ${lineCount} lines`)
   }
 }

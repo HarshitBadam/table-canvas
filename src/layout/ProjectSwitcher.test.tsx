@@ -36,13 +36,15 @@ function renderSwitcher(overrides: Partial<AppContextValue> = {}) {
 
 function openCreateDialog() {
   fireEvent.click(screen.getByRole('button', { name: 'Current project' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'New project' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: /Create project/i }))
   return screen.getByRole('textbox', { name: 'Project name' })
 }
 
 function openProjectActions() {
-  fireEvent.click(screen.getByRole('button', { name: 'Current project' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'More project actions' }))
+  if (!screen.queryByRole('listbox', { name: 'Projects' })) {
+    fireEvent.click(screen.getByRole('button', { name: 'Current project' }))
+  }
+  fireEvent.click(screen.getByRole('button', { name: 'Actions for Quarterly plan' }))
 }
 
 beforeEach(() => {
@@ -85,7 +87,7 @@ describe('ProjectSwitcher project actions', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('keeps the name and dialog open when capacity rejects creation', async () => {
+  it('surfaces a server-side capacity rejection through the global limit notice', async () => {
     actions.createNewProject.mockRejectedValue(
       new ProjectActionError('limit', 'You already have 3 projects (limit: 3)'),
     )
@@ -94,19 +96,24 @@ describe('ProjectSwitcher project actions', () => {
     fireEvent.change(input, { target: { value: 'Keep this name' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create project' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Project limit reached')
-    expect(screen.getByRole('textbox', { name: 'Project name' })).toHaveValue('Keep this name')
-    expect(actions.setProjectLimitViolation).toHaveBeenCalledWith(null)
+    await waitFor(() => {
+      expect(actions.setProjectLimitViolation).toHaveBeenCalledWith(expect.objectContaining({
+        ok: false,
+        reason: 'You already have 3 projects (limit: 3)',
+      }))
+    })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('duplicates once and surfaces a retryable failure', async () => {
     actions.duplicateActiveProject.mockRejectedValueOnce(new Error('Sync unavailable'))
     renderSwitcher()
     openProjectActions()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate current project' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Sync unavailable')
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate current project' }))
+    openProjectActions()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }))
     await waitFor(() => expect(actions.duplicateActiveProject).toHaveBeenCalledTimes(2))
   })
 
@@ -114,7 +121,7 @@ describe('ProjectSwitcher project actions', () => {
     actions.deleteProject.mockRejectedValueOnce(new Error('Delete failed'))
     renderSwitcher()
     openProjectActions()
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete current project' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
 
     expect(screen.getByRole('heading', { name: 'Delete “Quarterly plan”?' })).toBeVisible()
     expect(screen.getByText(/permanently removes the project and its reports/i)).toBeVisible()
@@ -133,6 +140,6 @@ describe('ProjectSwitcher project actions', () => {
       ],
     })
     openProjectActions()
-    expect(screen.getByRole('menuitem', { name: 'Delete current project' })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeDisabled()
   })
 })

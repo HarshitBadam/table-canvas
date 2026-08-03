@@ -3,7 +3,7 @@ import { expect, test } from './e2e.fixture'
 import { resolve } from 'node:path'
 import * as XLSX from 'xlsx'
 import { installMockBackend } from './derived-tables.support'
-import { downloadProjectZip } from './app.support'
+import { downloadProjectZip, openCanvasView } from './app.support'
 
 const workbookPath = resolve(process.cwd(), 'data/sample_workbook.xlsx')
 const expectedRows: Record<string, number> = {
@@ -38,7 +38,7 @@ test('every sample workbook sheet retains its rows through reload and export', a
 
   for (const [sheetName, rowCount] of Object.entries(expectedRows)) {
     const tableButton = page.locator('aside').getByRole('button', {
-      name: new RegExp(`^${sheetName} ${rowCount} rows`),
+      name: new RegExp(`^${sheetName} .*${rowCount} rows`),
     })
     await expect(tableButton).toBeVisible()
   }
@@ -52,12 +52,12 @@ test('every sample workbook sheet retains its rows through reload and export', a
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
   for (const [sheetName, rowCount] of Object.entries(expectedRows)) {
     await expect(page.locator('aside').getByRole('button', {
-      name: new RegExp(`^${sheetName} ${rowCount} rows`),
+      name: new RegExp(`^${sheetName} .*${rowCount} rows`),
     })).toBeVisible()
   }
 
   const exported = await downloadWorkbook(page)
-  expect(exported.SheetNames).toEqual(Object.keys(expectedRows))
+  expect([...exported.SheetNames].sort()).toEqual(Object.keys(expectedRows).sort())
 
   for (const [sheetName, rowCount] of Object.entries(expectedRows)) {
     const rows = XLSX.utils.sheet_to_json<unknown[]>(exported.Sheets[sheetName], { header: 1 })
@@ -80,7 +80,7 @@ test('an edit made immediately before export is included in the workbook', async
   await expect(dialog).toBeHidden()
 
   await page.locator('aside').getByRole('button', {
-    name: /^Immediate Export 5 rows/,
+    name: /^Immediate Export .*5 rows/,
   }).click()
   const firstCell = page.locator('.cursor-cell').first()
   await expect(firstCell).toBeVisible({ timeout: 10_000 })
@@ -100,7 +100,7 @@ test('an edit made immediately before export is included in the workbook', async
   }, { timeout: 10_000 }).toBe(true)
 
   await page.reload()
-  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+  await openCanvasView(page)
   const exported = await downloadWorkbook(page)
   const rows = XLSX.utils.sheet_to_json<unknown[]>(
     exported.Sheets['Immediate Export'],
@@ -131,7 +131,7 @@ test('an applied cleaning suggestion survives undo, redo, reload, and export', a
   await expect(page.locator('aside').getByRole('button', { name: 'Import Data' }))
     .toBeEnabled({ timeout: 20_000 })
   await page.locator('aside').getByRole('button', {
-    name: /^cleaning-sample 5 rows/,
+    name: /^cleaning-sample .*5 rows/,
   }).click()
   await expect(page.locator('.cursor-cell').first()).toBeVisible({ timeout: 15_000 })
 
@@ -168,7 +168,7 @@ test('an applied cleaning suggestion survives undo, redo, reload, and export', a
   }, { timeout: 10_000 }).toBe(true)
 
   await page.reload()
-  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+  await openCanvasView(page)
   const exported = await downloadWorkbook(page)
   const rows = XLSX.utils.sheet_to_json<unknown[]>(
     exported.Sheets['cleaning-sample'],

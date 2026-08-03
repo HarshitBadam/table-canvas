@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { JSONContent } from '@tiptap/core'
 import { buildEmbeddedDataMap } from '@/persistence/reportHtmlGenerator'
+import type { TableRow } from '@/state/dataStore'
 import type { ProjectNode, SourceTableNode } from '@/types'
-import type { Report } from '../types'
+import type { Report, TipTapContent } from '../types'
 import { buildReportDocDefinition } from './document'
 import { createReportPdf } from './pdfmakeClient'
 
@@ -27,7 +27,7 @@ function node(id: string, columnCount: number): SourceTableNode {
   }
 }
 
-function report(content: JSONContent[]): Report {
+function report(content: TipTapContent['content']): Report {
   const now = new Date().toISOString()
   return {
     id: 'r', projectId: 'p', name: 'Probe',
@@ -38,9 +38,9 @@ function report(content: JSONContent[]): Report {
 
 const TABLE_ID = 't1'
 
-function rows(columnCount: number) {
+function rows(columnCount: number): TableRow[] {
   return Array.from({ length: 6 }, (_, r) => {
-    const row: Record<string, unknown> = { __rowId: `r${r}` }
+    const row: TableRow = { __rowId: `r${r}` }
     for (let c = 0; c < columnCount; c++) {
       row[`c${c}`] = `Value ${c} for record ${r} pending review`
     }
@@ -48,25 +48,25 @@ function rows(columnCount: number) {
   })
 }
 
-const embeddedTable: JSONContent = {
+const embeddedTable: TipTapContent['content'][number] = {
   type: 'embeddedTable',
   attrs: { sourceTableId: TABLE_ID, selectedColumns: [], rowSelectionMode: 'first_n', rowLimit: 6 },
 }
-const paragraph: JSONContent = {
+const paragraph: TipTapContent['content'][number] = {
   type: 'paragraph', content: [{ type: 'text', text: 'Some narrative text.' }],
 }
 
-async function pageCount(content: JSONContent[], columnCount: number): Promise<number> {
+async function pageCount(content: TipTapContent['content'], columnCount: number): Promise<number> {
   const nodes: Record<string, ProjectNode> = { [TABLE_ID]: node(TABLE_ID, columnCount) }
   const dataMap = buildEmbeddedDataMap([{ tableId: TABLE_ID, rows: rows(columnCount) }], nodes)
   const pdf = await createReportPdf(buildReportDocDefinition({ report: report(content), dataMap }))
-  const buffer = await new Promise<Buffer>((resolve) => { pdf.getBuffer(resolve) })
+  const buffer = await pdf.getBuffer()
   return buffer.toString('latin1').split('/Type /Page\n').length - 1
 }
 
 describe('page counts', () => {
   it('reports page counts for representative shapes', async () => {
-    const shapes: [string, JSONContent[], number][] = [
+    const shapes: [string, TipTapContent['content'], number][] = [
       ['narrow table only', [embeddedTable], 3],
       ['wide table only', [embeddedTable], 20],
       ['text + wide table', [paragraph, embeddedTable], 20],

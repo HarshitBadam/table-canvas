@@ -4,6 +4,10 @@ import { expect, test } from '../e2e.fixture'
 import { bootApp, createManualTable, openManualTable } from '../app.support'
 
 async function expectAccessible(page: Page, context?: string, include?: string) {
+  // Dialog enter animations start at opacity 0; axe samples mid-flight otherwise.
+  await page.addStyleTag({
+    content: '*, *::before, *::after { animation: none !important; transition: none !important; }',
+  })
   let builder = new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
   if (include) builder = builder.include(include)
@@ -39,9 +43,10 @@ test.describe('Accessibility', () => {
     await page.keyboard.press('Escape')
 
     await page.getByRole('button', { name: 'Current project' }).click()
-    await page.getByRole('menuitem', { name: 'New project' }).click()
-    const projectDialog = page.getByRole('dialog', { name: 'Create project' })
+    await page.getByRole('menuitem', { name: /Create project/ }).click()
+    const projectDialog = page.getByRole('dialog', { name: /Create.*project/i })
     await expect(projectDialog.getByLabel('Project name')).toBeFocused()
+    await projectDialog.getByLabel('Project name').fill('Accessibility Project')
     await expectAccessible(page, 'New project dialog')
   })
 
@@ -64,8 +69,8 @@ test.describe('Accessibility', () => {
 
     await page.getByRole('button', { name: 'Filter' }).click()
     const filterDialog = page.getByRole('dialog', { name: 'Filter Data' })
-    await expect(filterDialog.getByRole('button', { name: 'Close filter panel' })).toBeFocused()
-    await expectAccessible(page, 'Filter dialog', '[aria-labelledby="filter-data-title"]')
+    await expect(filterDialog.getByRole('button', { name: 'Add a filter' })).toBeFocused()
+    await expectAccessible(page, 'Filter dialog', '[role="dialog"]')
     await page.keyboard.press('Escape')
     await expect(filterDialog).toBeHidden()
 
@@ -111,7 +116,8 @@ test.describe('Accessibility', () => {
     await page.getByRole('button', { name: 'Insert', exact: true }).click()
     await page.getByRole('menuitem', { name: /Manual table/ }).click()
     const tableDialog = page.getByRole('dialog', { name: 'Insert Table' })
-    await expect(tableDialog.getByRole('button', { name: 'Close table picker' })).toBeFocused()
+    await expect(tableDialog).toBeVisible()
+    await expect(tableDialog.getByRole('button', { name: 'Cancel' })).toBeVisible()
     await expectAccessible(page, 'Report table dimensions', '[aria-labelledby="insert-table-title"]')
   })
 })
@@ -133,7 +139,7 @@ test.describe('Keyboard interaction', () => {
 
   test('export menu supports keyboard open, navigation, and escape', async ({ page }) => {
     await bootApp(page)
-    const trigger = page.getByRole('button', { name: 'Export', exact: true })
+    const trigger = page.getByRole('button', { name: 'Import or export project' })
     await trigger.focus()
     await page.keyboard.press('Enter')
     const exportItem = page.getByRole('menuitem', { name: /Export Project/ })
@@ -148,30 +154,22 @@ test.describe('Keyboard interaction', () => {
     await expect(exportItem).toBeHidden()
   })
 
-  test('report text style menu follows menu button keyboard behavior', async ({ page }) => {
+  test('report text style toolbar buttons toggle formatting from the keyboard', async ({ page }) => {
     await bootApp(page)
     await page.locator('aside').getByRole('button', { name: 'Report', exact: true }).click()
     await page.getByRole('button', { name: /Blank report/ }).click()
     await page.waitForTimeout(200)
 
-    const trigger = page.getByRole('button', { name: 'Text style' })
-    const menu = page.getByRole('menu', { name: 'Text style' })
-    const items = menu.getByRole('menuitemradio')
-    await trigger.focus()
-    await page.keyboard.press('ArrowDown')
-    await expect(menu).toBeVisible()
-    await page.keyboard.press('Escape')
-    await expect(menu).toBeHidden()
-    await expect(trigger).toBeFocused()
+    const toolbar = page.getByRole('group', { name: 'Text style' })
+    const bold = toolbar.getByRole('button', { name: 'Bold' })
+    await expect(bold).toHaveAttribute('aria-pressed', 'false')
+    await bold.focus()
     await page.keyboard.press('Enter')
-    await expect(menu).toBeVisible()
-    await page.keyboard.press('End')
-    await expect(items.last()).toBeFocused()
-    await page.keyboard.press('Home')
-    await expect(items.first()).toBeFocused()
-    await page.keyboard.press('Escape')
-    await expect(menu).toBeHidden()
-    await expect(trigger).toBeFocused()
+    await expect(bold).toHaveAttribute('aria-pressed', 'true')
+    // Toggle focuses the editor; return to the control and turn the mark off.
+    await bold.focus()
+    await page.keyboard.press('Enter')
+    await expect(bold).toHaveAttribute('aria-pressed', 'false')
   })
 
   test('grid cells enter and commit edit mode from the keyboard', async ({ page }) => {

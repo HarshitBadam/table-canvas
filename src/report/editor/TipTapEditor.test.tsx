@@ -68,10 +68,10 @@ describe('TipTapEditor tabular paste', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /include headers/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /exclude headers/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /use as headings/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /keep as data/i })).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole('button', { name: /include headers/i }));
+    fireEvent.click(screen.getByRole('button', { name: /use as headings/i }));
 
     await waitFor(() => {
       expect(ref.current?.getJSON().content?.[0]).toMatchObject({
@@ -105,7 +105,7 @@ describe('TipTapEditor tabular paste', () => {
 
     pasteTable(editorContent, 'Name\tScore\nAda\t10');
     await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /exclude headers/i }));
+    fireEvent.click(screen.getByRole('button', { name: /keep as data/i }));
 
     await waitFor(() => {
       expect(ref.current?.getJSON().content?.[0]).toMatchObject({
@@ -163,7 +163,7 @@ describe('TipTapEditor tabular paste', () => {
     };
     pasteTable(editorContent, 'Ada\t10');
     await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /include headers/i }));
+    fireEvent.click(screen.getByRole('button', { name: /use as headings/i }));
 
     await waitFor(() => {
       expect(ref.current?.getJSON().content?.[0]).toMatchObject({
@@ -194,7 +194,7 @@ describe('TipTapEditor tabular paste', () => {
     };
     pasteTable(editorContent, 'Ada\t10');
     await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /include headers/i }));
+    fireEvent.click(screen.getByRole('button', { name: /use as headings/i }));
 
     await waitFor(() => {
       expect(ref.current?.getJSON().content?.[0]).toMatchObject({

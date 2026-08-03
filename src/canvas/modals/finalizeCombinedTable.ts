@@ -1,6 +1,6 @@
 import { getEngine } from '@/engine/EngineAdapter'
 import { ensureTableMaterialized } from '@/engine/materializationService'
-import { checkRowCount } from '@/shared/enforce'
+import { checkRowCount, checkTransformOutputSafety } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import {
   completeTableOperation,
@@ -32,7 +32,9 @@ export async function finalizeCombinedTable(
       )
       return
     }
-    const rowCheck = checkRowCount(result.rowCount ?? 0, tier)
+    const outputRows = result.rowCount ?? 0
+    const safetyCheck = checkTransformOutputSafety(outputRows)
+    const rowCheck = safetyCheck.ok ? checkRowCount(outputRows, tier) : safetyCheck
     if (!rowCheck.ok) {
       try {
         await getEngine().dropTable(tableId)

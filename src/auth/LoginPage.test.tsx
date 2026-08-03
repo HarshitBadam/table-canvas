@@ -31,7 +31,7 @@ describe('LoginPage guest entry', () => {
     }))
 
     await waitFor(() => expect(auth.continueAsGuest).toHaveBeenCalledOnce())
-    expect(screen.getByText(/Your work stays in this browser/)).toBeInTheDocument()
+    expect(screen.getByText(/Guest work stays on this device/)).toBeInTheDocument()
     expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument()
   })
@@ -47,7 +47,7 @@ describe('LoginPage guest entry', () => {
     expect(screen.getByRole('dialog', { name: 'Terms of Service' })).toBeVisible()
     expect(screen.getByText('Using Table Canvas')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close Terms of Service' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Privacy Policy' }))

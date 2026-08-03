@@ -16,8 +16,8 @@ vi.mock('@/report/activeReportEditor', () => ({
 }))
 
 let reportEditor: { commands: typeof editorCommands } | null = null
-let projectUndo: ReturnType<typeof vi.fn>
-let projectRedo: ReturnType<typeof vi.fn>
+let projectUndo = vi.fn<() => void>()
+let projectRedo = vi.fn<() => void>()
 
 beforeEach(() => {
   lease.canEdit = true

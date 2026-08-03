@@ -34,6 +34,21 @@ export default tseslint.config(
     },
   },
   {
+    files: [
+      'src/canvas/modals/TransformModal.tsx',
+      'src/components/ImportButton.tsx',
+      'src/engine/materializationService.test.ts',
+      'src/engine/materializationService.ts',
+      'src/layout/ProjectSwitcher.tsx',
+      'src/report/editor/extensions/AtomicBlockNavigation.ts',
+      'src/state/stores/nodesSlice.ts',
+    ],
+    rules: {
+      // scripts/check-file-lines.mjs caps these legacy files at their current sizes.
+      'max-lines': 'off',
+    },
+  },
+  {
     files: ['scripts/**/*.{cjs,js,mjs}'],
     languageOptions: {
       globals: globals.node,
