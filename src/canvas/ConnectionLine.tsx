@@ -8,7 +8,6 @@ export function CustomConnectionLine({
   fromPosition,
   toPosition,
 }: ConnectionLineComponentProps) {
-  // Use smooth step path for consistent look with edges
   const [path] = getSmoothStepPath({
     sourceX: fromX,
     sourceY: fromY,
@@ -30,7 +29,7 @@ export function CustomConnectionLine({
         strokeLinecap="round"
         filter="url(#connectionGlow)"
       />
-      
+
       <path
         d={path}
         fill="none"
@@ -39,7 +38,7 @@ export function CustomConnectionLine({
         strokeLinecap="round"
         className="animate-pulse"
       />
-      
+
       <path
         d={path}
         fill="none"
@@ -49,7 +48,7 @@ export function CustomConnectionLine({
         strokeDasharray="10 6"
         className="connection-line-animated"
       />
-      
+
       <defs>
         <filter id="connectionGlow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />

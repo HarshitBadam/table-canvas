@@ -7,14 +7,16 @@ export function validateProjectTierLimits(
   tier: Tier,
   patches: Record<string, unknown> = {},
 ): void {
+  // Google tier is uncapped at the enforcement layer.
   if (tier === 'google') return;
+
   const tables = Object.values(nodes).filter((node) => (
     node !== null
     && typeof node === 'object'
     && !Array.isArray(node)
     && ((node as Record<string, unknown>).kind === 'source_table'
       || (node as Record<string, unknown>).kind === 'derived_table')
-  ))
+  ));
   const { maxTablesPerProject } = getLimits(tier);
   if (tables.length > maxTablesPerProject) {
     throw new ValidationError([
@@ -66,6 +68,7 @@ export function validateProjectTierLimits(
         : undefined;
       return typeof rowId === 'string' && !deletedRows.includes(rowId);
     }).length;
+    // max(schema, initialRows) can disagree; subtract base deletes, add live inserts.
     const rowCount = Math.max(0, Math.max(schemaRowCount, initialRows) - deletedBaseRows)
       + activeInsertedRows;
     const rowCountCheck = checkRowCount(rowCount, tier);

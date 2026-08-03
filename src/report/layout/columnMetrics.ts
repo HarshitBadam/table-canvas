@@ -1,56 +1,43 @@
 /**
- * Measures how much width each column of a table actually needs.
+ * Column width measurement in `em`, shared by PDF and HTML exporters.
  *
- * Kept separate from the fitting decision because measurement is the part that
- * has to be right: every layout choice downstream is only as good as these
- * numbers. Widths are in `em` so one measurement serves every candidate type
- * size.
+ * Approximate Roboto advances are used because real font metrics are only
+ * available once pdfmake has loaded; `SAFETY` absorbs the few-percent error.
  */
 
 export interface ColumnMetric {
-  /** Content laid out on a single line, at the 90th percentile of sampled rows. */
+  /** Single-line width at the chosen percentile of sampled rows. */
   naturalEm: number
-  /** Narrowest the column goes without breaking inside a word. */
+  /** Narrowest width without breaking inside a word. */
   minEm: number
-  /** Widest single unbreakable token, uncapped. */
+  /** Widest unbreakable token, uncapped. */
   longestTokenEm: number
-  /** Whether wrapping can buy this column anything, i.e. values contain spaces. */
+  /** True when values contain spaces, so wrapping can reclaim width. */
   flexible: boolean
 }
 
-export interface MeasureOptions {
+interface MeasureOptions {
   showHeaders?: boolean
   /**
-   * Which cell width counts as the column's natural width. Below 1 a few long
-   * values are allowed to wrap so they cannot claim room from every other column
-   * — worth it on paper, where width is finite, and not worth it on a screen that
-   * scrolls.
+   * Fraction of the cell-width sample used as natural width. Below 1, a few long
+   * values wrap instead of claiming room from every other column — useful on
+   * paper, unnecessary when the medium can scroll.
    */
   naturalPercentile?: number
-  /** Ceiling on the natural width, so one essay-length cell cannot dominate. */
+  /** Cap so one essay-length cell cannot dominate. */
   maxNaturalEm?: number
 }
 
 const SAFETY = 1.04
 const MAX_SAMPLE_ROWS = 250
 
-/**
- * A token wider than this is treated as breakable rather than allowed to dictate
- * the whole table's layout — one 200-character cell should not force a split.
- */
+/** Tokens wider than this are treated as breakable rather than dictating layout. */
 const MAX_TOKEN_EM = 18
 
 /** Floor so an all-empty column still reads as a column. */
 const MIN_COLUMN_EM = 2.2
 
-/**
- * Per-character advance widths for Roboto, in `em`.
- *
- * Approximate on purpose: real font metrics are only available once pdfmake has
- * loaded, and a fit decision needs a few percent of accuracy, not exact glyph
- * positions. `SAFETY` absorbs the error. Being independent of the renderer is
- * what lets the PDF and HTML exporters share one answer.
- */
+/** Approximate Roboto advance widths in `em`. */
 function charEm(char: string): number {
   if (char >= '0' && char <= '9') return 0.556
   if (char === ' ') return 0.26
@@ -62,7 +49,7 @@ function charEm(char: string): number {
   return 0.58
 }
 
-export function textEm(text: string): number {
+function textEm(text: string): number {
   let total = 0
   for (const char of text) total += charEm(char)
   return total * SAFETY
@@ -74,17 +61,10 @@ function percentile(sorted: number[], fraction: number): number {
 }
 
 /**
- * Measures each column from the text that will actually be rendered.
- *
- * Deliberately reads the formatted strings rather than the column schema, so it
- * works the same for embedded tables (which have types) and inline tables (which
- * do not). Whitespace is the signal that matters: a value with no spaces cannot
- * be wrapped, which is exactly what makes numbers, dates, IDs and codes
- * incompressible and prose compressible.
- *
- * The natural width uses the 90th percentile so a single outlier value does not
- * claim room from every other column, while the minimum uses the widest token,
- * because that one really cannot be wrapped away.
+ * Measures columns from the text that will actually render (not the schema),
+ * so embedded and inline tables share one answer. Natural width uses a
+ * percentile so outliers do not starve neighbours; minimum uses the widest
+ * token, which cannot wrap away.
  */
 export function measureColumns(
   headers: string[],
@@ -111,9 +91,8 @@ export function measureColumns(
       }
     }
 
-    // The header is held apart from the cell sample rather than mixed into it: as
-    // one value among hundreds it would be discarded by the percentile, which
-    // silently squeezes any column whose label is wider than its data.
+    // Keep the header out of the percentile sample: as one value among hundreds
+    // it would be discarded, silently squeezing columns whose label is widest.
     let headerEm = 0
     if (showHeaders && header.trim()) {
       headerEm = textEm(header.trim())

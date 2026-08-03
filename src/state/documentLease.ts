@@ -191,12 +191,9 @@ function thisTabHoldsPresence(key: string): boolean {
 }
 
 /**
- * Whether this browser may delete the document. Any other tab that still has it
- * open holds a shared presence lock. Fail closed when the API exists but the
- * probe errors — deletion is destructive. When Web Locks is entirely
- * unavailable, follow the same convention as the rest of this module (`hold`,
- * `acquire`, `holdsWriteLease`): assume a single tab rather than blocking a
- * capability gap into a stuck "can't delete anything" state.
+ * Whether this browser may delete the document. Other open tabs hold shared presence.
+ * Fail closed on probe errors (deletion is destructive). If Web Locks is missing,
+ * assume a single tab — same recovery convention as `hold` / `acquire`.
  */
 export async function canDeleteDocument(
   key: string,

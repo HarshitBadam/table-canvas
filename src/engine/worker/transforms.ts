@@ -15,14 +15,13 @@ async function buildJoinColumnSelection(
   conn: duckdb.AsyncDuckDBConnection,
   leftTable: string,
   rightTable: string,
-  _leftKey: string,
   rightKey: string,
   leftColumns?: string[],
   rightColumns?: string[],
   columnPrefix: 'table_name' | 'left_right' | 'none' = 'none',
   leftTableName?: string,
   rightTableName?: string
-): Promise<{ selectClause: string; columnNames: string[] }> {
+): Promise<string> {
   const leftSchema = await getTableSchema(conn, leftTable)
   const rightSchema = await getTableSchema(conn, rightTable)
 
@@ -55,7 +54,6 @@ async function buildJoinColumnSelection(
     : 'Right'
 
   const selectParts: string[] = []
-  const columnNames: string[] = []
 
   for (const colId of leftColIds) {
     const cleanName = leftCleanNames.get(colId) || colId
@@ -70,7 +68,6 @@ async function buildJoinColumnSelection(
     }
 
     selectParts.push(`l."${colId}" AS "${alias}"`)
-    columnNames.push(alias)
   }
 
   for (const colId of rightColIds) {
@@ -86,13 +83,16 @@ async function buildJoinColumnSelection(
     }
 
     selectParts.push(`r."${colId}" AS "${alias}"`)
-    columnNames.push(alias)
   }
 
-  return {
-    selectClause: selectParts.join(',\n    '),
-    columnNames,
-  }
+  return selectParts.join(',\n    ')
+}
+
+function resolveColumnName(
+  columnId: string,
+  columnIdToName?: Record<string, string>,
+): string {
+  return columnIdToName?.[columnId] || columnId
 }
 
 /**
@@ -106,8 +106,7 @@ export async function countCombinedTransformRows(
     columnIdToName?: Record<string, string>
   },
 ): Promise<number> {
-  const toColName = (columnId: string) =>
-    transformDef.columnIdToName?.[columnId] || columnId
+  const toColName = (columnId: string) => resolveColumnName(columnId, transformDef.columnIdToName)
   let sql: string
 
   if (transformDef.type === 'join') {
@@ -140,9 +139,7 @@ export async function executeTransform(
   const outputTableName = sanitizeTableName(outputTableId)
   const dataColumns = `* EXCLUDE ("${INTERNAL_ROW_ID_COLUMN}")`
 
-  const toColName = (colId: string): string => {
-    return columnIdToName[colId] || colId
-  }
+  const toColName = (colId: string): string => resolveColumnName(colId, columnIdToName)
 
   let sql: string
 
@@ -155,11 +152,10 @@ export async function executeTransform(
       const leftKey = toColName(transformDef.leftKey)
       const rightKey = toColName(transformDef.rightKey)
 
-      const { selectClause } = await buildJoinColumnSelection(
+      const selectClause = await buildJoinColumnSelection(
         conn,
         leftTable,
         rightTable,
-        leftKey,
         rightKey,
         transformDef.leftColumns?.map(toColName),
         transformDef.rightColumns?.map(toColName),

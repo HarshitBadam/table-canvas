@@ -82,7 +82,7 @@ export function GridView({ tableId }: GridViewProps) {
     getRowInsertionIndex, getColumnInsertionIndex,
     getRowInsertionDescription, getColumnInsertionDescription,
     toggleHighlightForSelection,
-  } = useGridSelection(tableId, columns, rowAccess, canMutate)
+  } = useGridSelection(tableId, columns, rowAccess)
 
   const {
     contextMenu, setContextMenu, newColumnModal, setNewColumnModal,
@@ -173,13 +173,13 @@ export function GridView({ tableId }: GridViewProps) {
     tableId, isEditable, canEdit, columns, getDisplayValue, getColumnWidth,
     selection, selectedCell, selectedColumn, isHeaderRowSelected,
     isIndexColumnSelected, isCornerSelected, cellRangeSelection,
-    setSelection, selectCell, handleCellMouseDown, handleCellMouseEnter,
+    setSelection, handleCellMouseDown, handleCellMouseEnter,
     handleColumnClick, handleRowClick, handleCornerClick,
     toggleHighlightForSelection, isDraggingSelectionRef,
     editingColumnId, editColumnName, setEditColumnName,
     commitColumnNameEdit, cancelColumnNameEdit, handleColumnDoubleClick,
     editingCell, editValue, editError, selectEditValue, setEditValue,
-    startEditing, commitEdit, cancelEdit, handleContextMenu, openContextMenu,
+    commitEdit, handleContextMenu, openContextMenu,
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
     handleAutofillStart, handleAutofillMove, handleAutofillOneRow,
     filters, handleToggleFilters, resizingColumn, handleResizeStart,
@@ -203,13 +203,13 @@ export function GridView({ tableId }: GridViewProps) {
     tableId, isEditable, canEdit, columns, getDisplayValue, getColumnWidth,
     selection, selectedCell, selectedColumn, isHeaderRowSelected,
     isIndexColumnSelected, isCornerSelected, cellRangeSelection,
-    setSelection, selectCell, handleCellMouseDown, handleCellMouseEnter,
+    setSelection, handleCellMouseDown, handleCellMouseEnter,
     handleColumnClick, handleRowClick, handleCornerClick,
     toggleHighlightForSelection, isDraggingSelectionRef,
     editingColumnId, editColumnName, setEditColumnName,
     commitColumnNameEdit, cancelColumnNameEdit, handleColumnDoubleClick,
     editingCell, editValue, editError, selectEditValue, setEditValue,
-    startEditing, commitEdit, cancelEdit, handleContextMenu, openContextMenu,
+    commitEdit, handleContextMenu, openContextMenu,
     autofillDragging, autofillEndRow, autofillPreview, autofillColumnId,
     handleAutofillStart, handleAutofillMove, handleAutofillOneRow,
     filters, handleToggleFilters, resizingColumn, handleResizeStart,
@@ -292,20 +292,20 @@ export function GridView({ tableId }: GridViewProps) {
               {node.kind === 'derived_table' ? 'Executing transform and loading data...' : 'Loading table data...'}
             </p>
             {loadingElapsedSeconds >= 8 && (
-              <p className="text-sm text-text-secondary mt-2">
-                This is taking longer than expected. Your table and edits are still safe.
-              </p>
-            )}
-            {loadingElapsedSeconds >= 8 && (
-              <div className="mt-5 flex items-center justify-center">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleRetry}
-                >
-                  Retry
-                </button>
-              </div>
+              <>
+                <p className="text-sm text-text-secondary mt-2">
+                  This is taking longer than expected. Your table and edits are still safe.
+                </p>
+                <div className="mt-5 flex items-center justify-center">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleRetry}
+                  >
+                    Retry
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

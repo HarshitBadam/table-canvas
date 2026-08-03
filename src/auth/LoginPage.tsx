@@ -79,7 +79,7 @@ export function LoginPage() {
           </p>
 
           {formError && (
-            <div id="login-error" role="alert" className="login-alert">
+            <div role="alert" className="login-alert">
               {formError}
             </div>
           )}

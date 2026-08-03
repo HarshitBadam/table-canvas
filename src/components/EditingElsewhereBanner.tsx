@@ -1,8 +1,8 @@
 import { useWorkspaceLease } from '@/state/useWorkspaceLease'
 
 /**
- * Compact document status for the header. Read-only is normal coordination state,
- * not a page-level warning, so this component never shifts the workspace.
+ * Header status only: read-only is normal multi-tab coordination, not a warning,
+ * so this never shifts the workspace layout.
  */
 export function EditingElsewhereBanner() {
   const { role } = useWorkspaceLease()

@@ -7,7 +7,7 @@ const VIEW_MODES = ['canvas', 'grid', 'chart', 'dashboard', 'report'] as const
 
 export type ViewMode = typeof VIEW_MODES[number]
 
-/** Guards a view read back from storage, which may predate this build. */
+/** Rejects stored view strings that predate this build. */
 export function isViewMode(value: unknown): value is ViewMode {
   return typeof value === 'string' && (VIEW_MODES as readonly string[]).includes(value)
 }

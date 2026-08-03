@@ -1,6 +1,5 @@
 /*
- * Sign-in surface. The backdrop reuses the canvas grid tokens so the first
- * screen is made of the same material as the workspace behind it.
+ * Backdrop reuses canvas grid tokens so sign-in shares the workspace material.
  */
 
 .login-shell {

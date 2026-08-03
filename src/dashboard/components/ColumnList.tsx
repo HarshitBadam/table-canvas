@@ -21,11 +21,12 @@ export function ColumnList({
 }) {
   const profileMap = new Map<string, ColumnProfile>()
   const profileByName = new Map<string, ColumnProfile>()
-  
+
   if (profile?.columns) {
     for (const cp of profile.columns) {
       profileMap.set(cp.columnId, cp)
       if (cp.columnId) {
+        // Fallback when profile columnId matches schema column name (case-insensitive).
         profileByName.set(cp.columnId.toLowerCase(), cp)
       }
     }
@@ -34,18 +35,15 @@ export function ColumnList({
   return (
     <div className="divide-y divide-border">
       {schema.columns.map((col, index) => {
-        let colProfile = profileMap.get(col.id)
-        if (!colProfile) {
-          colProfile = profileByName.get(col.name.toLowerCase())
-        }
-        if (!colProfile && profile?.columns?.[index]) {
-          colProfile = profile.columns[index]
-        }
-        
+        const colProfile =
+          profileMap.get(col.id)
+          ?? profileByName.get(col.name.toLowerCase())
+          ?? profile?.columns?.[index]
+
         return (
-          <ColumnRow 
-            key={col.id} 
-            column={col} 
+          <ColumnRow
+            key={col.id}
+            column={col}
             profile={colProfile}
             rowCount={rowCount}
           />
@@ -103,7 +101,8 @@ function ColumnRow({
             )}
             {isBoolean && <BooleanStats profile={profile} />}
             {isDate && <DateStats profile={profile} />}
-            
+
+            {/* Strings already show Distinct; identifiers would always equal row count */}
             {profile.distinctCount !== undefined && !isString && !isIdentifier && (
               <Stat label="Distinct Values" value={profile.distinctCount.toLocaleString()} />
             )}

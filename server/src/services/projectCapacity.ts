@@ -24,6 +24,7 @@ interface CreateProjectInput {
   reports?: Record<string, unknown>;
 }
 
+/** Mongo E11000 — race loser on the unique capacity/idempotency indexes. */
 function isDuplicateKey(error: unknown): boolean {
   return Boolean(
     error
@@ -62,6 +63,7 @@ function assertOperationMatches(
   return existing;
 }
 
+/** Backfill quotaSlot on pre-capacity docs so unique (userId, quotaSlot) can bind. */
 async function claimSlotsForLegacyProjects(
   userId: Types.ObjectId,
   maxProjects: number,
@@ -122,6 +124,7 @@ export async function createProjectWithinCapacity({
     if (existing) return assertOperationMatches(existing, requestHash);
   }
 
+  // Google is uncapped: skip quotaSlot reservation (still honor idempotency).
   if (tier === 'google') {
     try {
       return await new Project({

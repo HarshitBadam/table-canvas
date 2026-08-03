@@ -29,8 +29,7 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
   getPos,
 }: NodeViewProps) {
   const attrs = node.attrs as EditableTableNodeAttrs;
-  // Cells own their clicks, so they can be selected and edited; the surrounding
-  // chrome selects the block instead, which is how it gets deleted or dragged.
+  // Cells own clicks for editing; surrounding chrome selects the deletable block.
   const selectBlock = useNodeSelect(editor, getPos, 'td, th');
   const selectNode = useSelectNode(editor, getPos);
   const releaseBlockSelection = useReleaseNodeSelection(editor);
@@ -75,8 +74,7 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
   });
   const { commitEdit } = cells;
 
-  // Grabbing the handle takes focus off the cell editor without a blur, so the
-  // pending edit has to be written back before the input unmounts.
+  // Grip mousedown steals focus without a blur — commit before the input unmounts.
   const selectTable = useCallback(() => {
     commitEdit();
     selectNode();
@@ -125,10 +123,7 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
       <NodeViewWrapper className="editable-table-block">
         <DimensionPicker
           onSelect={handleDimensionSelect}
-          onCancel={() => {
-            // Use default 3x3
-            handleDimensionSelect(3, 3);
-          }}
+          onCancel={() => handleDimensionSelect(3, 3)}
         />
       </NodeViewWrapper>
     );
@@ -196,8 +191,7 @@ const EditableTableNodeView = memo(function EditableTableNodeView({
             <TableAddIcon />
           </button>
 
-          {/* Anchored to the table box, not to the block: anything the block
-              renders below the table must not push this off the border. */}
+          {/* Anchored to the table box so content below the table cannot push it off. */}
           <button
             onClick={() => addRow()}
             className="table-add-btn table-add-row-btn"

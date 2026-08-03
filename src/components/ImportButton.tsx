@@ -26,33 +26,29 @@ import { stageImportedTable } from '@/persistence/stageImportedTable'
 import type { ParsedTableData } from '@/engine/fileParsers'
 import { uploadFileWithSync } from '@/persistence/syncService'
 
+interface PendingImportBase {
+  id: string
+  label: string
+  tableName: string
+  rowCount: number
+  selected: boolean
+  /** Groups sheets from one workbook (or a standalone CSV) so processing never interleaves files. */
+  sourceKey: string
+}
+
 type PendingImportItem =
-  | {
-      id: string
+  | (PendingImportBase & {
       kind: 'csv'
-      label: string
-      tableName: string
-      rowCount: number
-      selected: boolean
       file: File
       tableData: ParsedTableData
-      /** Which source file this item came from; shared by every sheet of one workbook. */
-      sourceKey: string
-    }
-  | {
-      id: string
+    })
+  | (PendingImportBase & {
       kind: 'sheet'
-      label: string
-      tableName: string
-      rowCount: number
-      selected: boolean
       sourceFileName: string
       sheetName: string
       workbook: WorkBook
       buffer: ArrayBuffer
-      /** Which source file this item came from; shared by every sheet of one workbook. */
-      sourceKey: string
-    }
+    })
 
 type SelectionMode = 'sheets' | 'tables'
 
@@ -109,8 +105,7 @@ export function ImportButton() {
       return
     }
 
-    // Parse and validate before reserving a visible table node. A rejected guest
-    // import should not spend time as a zero-row "reading" table on the canvas.
+    // Validate before reserving a canvas node so rejected imports never linger as 0-row tables.
     const { inspectCSVFile } = await import('@/persistence/importParsers')
     const { schema, rows } = await inspectCSVFile(file)
     const rowCheck = checkRowCount(schema.rowCount ?? rows.length, tier)
@@ -121,7 +116,7 @@ export function ImportButton() {
 
     requireImportOwnership()
     const { tableId, generation } = reservePendingImport(file)
-    // Node shows upload/materialization progress; re-enable concurrent imports.
+    // Hand off to the node's progress UI so another import can start.
     onReserved?.()
     try {
       const isCurrentImport = () =>
@@ -129,8 +124,7 @@ export function ImportButton() {
         && isTableOperationCurrent(tableId, generation)
       if (!isCurrentImport()) return
 
-      // Keep phase on reading through upload so the node doesn't flash a
-      // separate "saving" state before engine load.
+      // Stay on "reading" through upload to avoid a brief "saving" flash before engine load.
       updateTableOperation(tableId, generation, {
         progress: { completed: rows.length, total: rows.length, label: 'Rows parsed' },
       })
@@ -321,8 +315,7 @@ export function ImportButton() {
       if (extension === 'csv') {
         await importSingleCsv(file, projectId, uploadedFileIds, () => setIsImporting(false))
       } else if (extension === 'xlsx' || extension === 'xls') {
-        // Inspect and validate before creating a pending canvas node. This keeps
-        // rejected imports from lingering as a 0-row operation.
+        // Validate before reserving a canvas node so rejected imports never linger as 0-row tables.
         const [{ inspectExcelFile }, { parseWorkbookSheet }] = await Promise.all([
           import('@/persistence/importParsers'),
           import('@/engine/fileParsers'),
@@ -403,9 +396,7 @@ export function ImportButton() {
   }
 
   const handleImportSelectedItems = async () => {
-    // Import happens one item at a time below. Blocks (all sheets of one workbook, or
-    // a standalone CSV) are reordered by total size and their own items by size too,
-    // but items from different files are never interleaved with each other.
+    // Size-ordered within each source file; never interleave items across files.
     const selectedItems = getImportProcessingOrder(pendingItems.filter((item) => item.selected))
     if (selectedItems.length === 0) return
 
@@ -468,21 +459,16 @@ export function ImportButton() {
           : `Import ${selectedItems.length} tables`,
       )
 
-      // Dismiss the checklist before the long upload/materialization loop so progress
-      // surfaces (main Importing… control + pending canvas nodes) stay visible.
+      // Close the checklist before the long loop so Importing… + pending nodes stay visible.
       setSelectionModalOpen(false)
       clearSelectionState()
 
       for (const item of selectedItems) {
-        // Reserve before uploading. Uploading is asynchronous and, without an active
-        // operation, another focused tab can legitimately take ownership in between.
+        // Reserve before upload so another focused tab cannot take the write lease mid-flight.
         requireImportOwnership()
         const pendingImport = reservePendingImport(
           { name: item.kind === 'csv' ? item.file.name : item.sourceFileName },
-          // item.tableName is the sheet name for workbook sheets and the file's base
-          // name for CSVs — the same name that gets staged below. Passing it here
-          // keeps the placeholder node's name correct from the moment it appears on
-          // the canvas, instead of relying on staging to correct a wrong reservation.
+          // Reserve with the staged name (sheet or CSV base) so the placeholder is correct immediately.
           { name: item.tableName },
         )
         reservedImports.push(pendingImport)

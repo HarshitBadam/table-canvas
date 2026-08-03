@@ -22,14 +22,6 @@ export interface DataQualityIssue {
   affectedCount?: number
 }
 
-export interface ColumnTypeBreakdown {
-  numeric: number
-  categorical: number
-  boolean: number
-  date: number
-  other: number
-}
-
 export interface TableQualityMetrics {
   tableId: string
   tableName: string
@@ -38,24 +30,15 @@ export interface TableQualityMetrics {
   columnCount: number
   completeness: number
   issueCount: number
-  issues: DataQualityIssue[]
-  isLoading: boolean
   hasProfile: boolean
-  importedAt: string | null
-  isStale: boolean
   freshnessLabel: string
-  typeBreakdown: ColumnTypeBreakdown
 }
 
 export interface ProjectHealthMetrics {
   overallCompleteness: number
-  totalIssues: number
-  tablesWithIssues: number
   totalTables: number
   totalRows: number
   totalColumns: number
-  chartCount: number
-  isLoading: boolean
 }
 
 export interface LineageNode {
@@ -71,8 +54,6 @@ export interface LineageEdge {
   from: string
   to: string
 }
-
-const STALE_THRESHOLD_DAYS = 7
 
 export function formatRelativeTime(dateString: string | null | undefined): string {
   if (!dateString) return 'Unknown'
@@ -93,44 +74,6 @@ export function formatRelativeTime(dateString: string | null | undefined): strin
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`
   if (diffDays < 365) return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`
   return `${Math.floor(diffDays / 365)} year${Math.floor(diffDays / 365) > 1 ? 's' : ''} ago`
-}
-
-export function isDataStale(dateString: string | null | undefined): boolean {
-  if (!dateString) return false
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = diffMs / (1000 * 60 * 60 * 24)
-  return diffDays > STALE_THRESHOLD_DAYS
-}
-
-export function computeTypeBreakdown(schema: TableSchema | undefined): ColumnTypeBreakdown {
-  const breakdown: ColumnTypeBreakdown = {
-    numeric: 0,
-    categorical: 0,
-    boolean: 0,
-    date: 0,
-    other: 0,
-  }
-
-  if (!schema?.columns) return breakdown
-
-  for (const col of schema.columns) {
-    const t = col.type.toLowerCase()
-    if (t === 'number' || t === 'integer' || t === 'float' || t === 'double') {
-      breakdown.numeric++
-    } else if (t === 'boolean' || t === 'bool') {
-      breakdown.boolean++
-    } else if (t === 'date' || t === 'datetime' || t === 'timestamp') {
-      breakdown.date++
-    } else if (t === 'string' || t === 'varchar' || t === 'text') {
-      breakdown.categorical++
-    } else {
-      breakdown.other++
-    }
-  }
-
-  return breakdown
 }
 
 export function computeTableCompleteness(profile: ProfileResult | undefined, rowCount: number): number {

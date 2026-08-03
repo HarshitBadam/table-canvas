@@ -3,7 +3,7 @@ import type { ToastNotification } from './commands'
 
 export const Toast = forwardRef<HTMLDivElement, {
   notification: ToastNotification
-  onDismiss: () => void 
+  onDismiss: () => void
 }>(function Toast({ notification, onDismiss }, ref) {
   useEffect(() => {
     const timer = setTimeout(onDismiss, 4000)

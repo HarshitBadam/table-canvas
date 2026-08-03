@@ -52,11 +52,11 @@ export function ChartHeaderContent({
   )
 }
 
-export function ProjectSwitcherHeader({ mode = 'full' }: { mode?: 'full' | 'switch-only' }) {
+export function ProjectSwitcherHeader() {
   return (
     <>
       <div className="flex self-stretch items-center border-r border-border-subtle pr-2 sm:pr-3">
-        <ProjectSwitcher mode={mode} />
+        <ProjectSwitcher mode="switch-only" />
       </div>
       <div className="flex-1" />
     </>

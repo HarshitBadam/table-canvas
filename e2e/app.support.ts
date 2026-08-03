@@ -2,6 +2,10 @@ import { expect, type Page } from '@playwright/test'
 import JSZip from 'jszip'
 import { installMockBackend } from './derived-tables.support'
 
+function tableSidebarName(name: string, rowCount: number | string) {
+  return new RegExp(`^${name} .*${rowCount} rows`)
+}
+
 export async function bootApp(page: Page) {
   await installMockBackend(page)
   // Preview can briefly 404 while workers start in parallel; retry until the
@@ -26,7 +30,7 @@ export async function importCsv(
     buffer: Buffer.from(lines.join('\n')),
   })
   await expect(page.locator('aside').getByRole('button', {
-    name: new RegExp(`^${name} .*${lines.length - 1} rows`),
+    name: tableSidebarName(name, lines.length - 1),
   })).toBeVisible({ timeout: 30_000 })
 }
 
@@ -64,14 +68,14 @@ export async function createManualTable(
   await dialog.getByRole('button', { name: 'Create Table' }).click()
   await expect(dialog).toBeHidden({ timeout: 20_000 })
   await expect(page.locator('aside').getByRole('button', {
-    name: new RegExp(`^${name} .*${rowCount} rows`),
+    name: tableSidebarName(name, rowCount),
     includeHidden: true,
   })).toBeAttached()
 }
 
 export async function openManualTable(page: Page, name = 'Test Table', rowCount = 5) {
   await page.locator('aside').getByRole('button', {
-    name: new RegExp(`^${name} .*${rowCount} rows`),
+    name: tableSidebarName(name, rowCount),
   }).click()
   await expect(page.locator('.cursor-cell').first()).toBeVisible({ timeout: 20_000 })
 }

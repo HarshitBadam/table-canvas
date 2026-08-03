@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export const legalContactEmail = 'table.canvas.support@gmail.com'
+const legalContactEmail = 'table.canvas.support@gmail.com'
 
 export function TermsContent() {
   return (

@@ -24,16 +24,18 @@ async function resetLongTasks(page: Page) {
 }
 
 async function expectLongTasksWithinBudget(page: Page) {
+  // Settle briefly so deferred main-thread work is included in the sample.
   await page.waitForTimeout(250)
   const durations = await page.evaluate(
     () => (window as unknown as LongTaskWindow).__longTasks ?? [],
   )
-  const maxDuration = durations.length > 0 ? Math.max(...durations) : 0
+  const maxDuration = Math.max(0, ...durations)
   expect(maxDuration, `Longest main-thread task was ${maxDuration.toFixed(1)}ms`).toBeLessThan(250)
+  const overBudget = durations.filter(duration => duration >= 100)
   expect(
-    durations.filter(duration => duration >= 100),
+    overBudget.length,
     'At most one main-thread task may exceed 100ms',
-  ).toHaveLength(durations.some(duration => duration >= 100) ? 1 : 0)
+  ).toBeLessThanOrEqual(1)
 }
 
 test.describe('Performance budgets', () => {

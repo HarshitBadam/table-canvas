@@ -168,9 +168,9 @@ function TableCard({
         </div>
       </div>
 
-      {/* Column Details - Always rendered for PDF export, hidden via CSS when collapsed */}
+      {/* Keep in DOM for PDF export; collapse with CSS rather than unmounting */}
       {schema && (
-        <div 
+        <div
           className={`border-t border-border table-card-content ${isExpanded ? '' : 'hidden'}`}
           data-expanded={isExpanded}
         >

@@ -26,7 +26,6 @@
   outline-color: var(--color-accent-green);
 }
 
-/* Match chart blocks: the configuration panel itself identifies its source. */
 .embedded-table-window.is-configuring,
 .embedded-table-window.is-configuring:hover {
   outline-color: transparent;
@@ -84,7 +83,7 @@
 }
 
 /*
- * `overscroll-behavior: contain` stops the macOS rubber-band from chaining into
+ * `overscroll-behavior: none` stops the macOS rubber-band from chaining into
  * the report scroller once the grid hits its end, which made the block feel
  * detached from the document. The cap is generous enough that the default
  * ten-row preview never scrolls, so the grid is normally a plain static block.

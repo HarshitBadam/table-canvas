@@ -215,38 +215,28 @@ export function findTypos(topValues: Array<{ value: unknown; count: number }>): 
       const a = strings[i].str.toLowerCase();
       const b = strings[j].str.toLowerCase();
       
-      // Purely whitespace-driven differences (leading/trailing padding) are the
-      // trim_whitespace rule's job. Without this, a padded value looks like a
-      // cheap 1-2 char edit and gets double-flagged as a "typo" too.
+      // Whitespace-only diffs belong to trim_whitespace; otherwise padded values
+      // look like cheap 1-2 char edits and get double-flagged as typos.
       if (a.trim() === b.trim()) continue;
-      
-      if (Math.abs(a.length - b.length) > 2) continue;
+
+      if (Math.abs(a.length - b.length) > MAX_TYPO_DISTANCE) continue;
       if (a.length < 3 || b.length < 3) continue;
       if (!hasEnoughCharDiversity(a) || !hasEnoughCharDiversity(b)) continue;
-      
+
       const minorityCount = Math.min(strings[i].count, strings[j].count);
       const majorityCount = Math.max(strings[i].count, strings[j].count);
       if (minorityCount > majorityCount * MAX_MINORITY_FREQUENCY_RATIO) continue;
-      
+
       const distance = levenshteinDistance(a, b);
-      
-      if (distance > 0 && distance <= MAX_TYPO_DISTANCE) {
-        if (strings[i].count >= strings[j].count) {
-          results.push({
-            from: strings[j].str,
-            to: strings[i].str,
-            fromCount: strings[j].count,
-            toCount: strings[i].count,
-          });
-        } else {
-          results.push({
-            from: strings[i].str,
-            to: strings[j].str,
-            fromCount: strings[i].count,
-            toCount: strings[j].count,
-          });
-        }
-      }
+      if (distance <= 0 || distance > MAX_TYPO_DISTANCE) continue;
+
+      const [fromIdx, toIdx] = strings[i].count >= strings[j].count ? [j, i] : [i, j];
+      results.push({
+        from: strings[fromIdx].str,
+        to: strings[toIdx].str,
+        fromCount: strings[fromIdx].count,
+        toCount: strings[toIdx].count,
+      });
     }
   }
   return results;

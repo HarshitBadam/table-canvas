@@ -4,7 +4,6 @@ import type { ProjectNode, TableNode } from '@/types'
 import { escapeHtml, renderInlineTable, safeLink, wrapTable } from './reportHtmlUtils'
 import { renderReportChart } from './reportHtmlChart'
 
-/** A block the author inserted but never pointed at a data source. */
 function isUnconfigured(node: JSONContent): boolean {
   if (node.type !== 'embeddedTable' && node.type !== 'chartBlock') return false
   if (!node.attrs?.sourceTableId) return true
@@ -73,8 +72,7 @@ function renderEmbeddedTable(
   inner += '</tbody>'
   html += wrapTable({ headers: headerNames, rows: cells, showHeaders: true, inner })
 
-  // State the truncation, so a reader cannot mistake a windowed view for the
-  // whole table or for a subset of columns being all there is.
+  // Export caption: windowed rows/columns must not look like the full table.
   const notes: string[] = []
   if (displayRows.length < entry.rows.length) {
     const window = rowSelectionMode === 'last_n' ? 'last' : 'first'
@@ -171,11 +169,8 @@ function nodeToHtml(node: JSONContent, dataMap: EmbeddedDataMap): string {
     case 'hardBreak':
       return '<br>\n'
 
-    // An unconfigured block is an unfinished editing affordance, not content, so
-    // it is dropped from the export rather than shipped as a placeholder in a
-    // document someone else reads. A block that *is* configured but whose data
-    // is missing keeps its placeholder, because silently dropping real content
-    // would hide the problem instead of reporting it.
+    // Unconfigured blocks are editor-only — omit from export. Configured blocks
+    // with missing data keep a placeholder so the gap is visible.
     case 'embeddedTable': {
       if (isUnconfigured(node)) return ''
       const tableId = node.attrs?.sourceTableId as string

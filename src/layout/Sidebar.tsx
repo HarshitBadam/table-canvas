@@ -28,7 +28,6 @@ export function Sidebar({
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
   const { requestNodeDeletion } = useNodeDeletion()
   const { canEdit } = useWorkspaceLease()
-  
   const [newTableModalOpen, setNewTableModalOpen] = useState(false)
 
   const activeNodeId = activeSidebarNodeId(activeView, selectedNodeId)

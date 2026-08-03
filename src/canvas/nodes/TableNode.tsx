@@ -17,9 +17,7 @@ interface TableNodeData {
   kind: 'source_table' | 'derived_table'
   name: string
   schema?: TableSchema
-  plan?: { fileRef?: string }
   ui: NodeUI
-  selected: boolean
   patches?: {
     cellPatches?: Record<string, Record<string, CellValue>>
     deletedRows?: Set<string>
@@ -27,7 +25,6 @@ interface TableNodeData {
   viewFilters?: ViewFilterConfig
   onSetViewMode: (nodeId: string, mode: NodeViewMode) => void
 }
-
 
 function getViewMode(ui: NodeUI | undefined): NodeViewMode {
   return ui?.viewMode ?? 'collapsed'
@@ -39,10 +36,10 @@ const VIEW_MODE_LABELS: Record<NodeViewMode, string> = {
 }
 
 function ViewModeControl({
-  currentMode, 
+  currentMode,
   onSelect,
-  isSource 
-}: { 
+  isSource,
+}: {
   currentMode: NodeViewMode
   onSelect: (mode: NodeViewMode) => void
   isSource: boolean
@@ -120,9 +117,9 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
       <div
         className="overflow-hidden rounded-2xl bg-surface transition-shadow duration-200 ease-out"
         style={{
-        boxShadow: selected
-          ? '0 14px 40px -10px rgba(0,0,0,0.24), 0 5px 18px -5px rgba(0,0,0,0.16), 0 0 0 1px var(--color-border-elevation)'
-          : '0 4px 16px -4px rgba(0,0,0,0.15), 0 12px 32px -8px rgba(0,0,0,0.12), 0 0 0 1px var(--color-border-elevation)',
+          boxShadow: selected
+            ? '0 14px 40px -10px rgba(0,0,0,0.24), 0 5px 18px -5px rgba(0,0,0,0.16), 0 0 0 1px var(--color-border-elevation)'
+            : '0 4px 16px -4px rgba(0,0,0,0.15), 0 12px 32px -8px rgba(0,0,0,0.12), 0 0 0 1px var(--color-border-elevation)',
         }}
       >
       <div className="bg-surface-secondary px-4 py-3.5">
@@ -136,7 +133,7 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
           `}>
             <TableTypeIcon className="h-4 w-4 text-white" />
           </div>
-          
+
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-sm font-semibold tracking-tight text-text-primary">
               {data.name}
@@ -152,9 +149,9 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
               </div>
             )}
           </div>
-          
-          <ViewModeControl 
-            currentMode={viewMode} 
+
+          <ViewModeControl
+            currentMode={viewMode}
             onSelect={handleSetViewMode}
             isSource={isSource}
           />

@@ -16,20 +16,19 @@ import {
   TABLE_FIT_CANDIDATES,
 } from './theme'
 
-export interface TableBlockOptions {
+interface TableBlockOptions {
   /** Column labels; also decides the column count when headers are hidden. */
   headers: string[]
   rows: string[][]
   showHeaders: boolean
   caption?: string
-  /** Embedded tables label the table above it; inline tables caption below. */
+  /** Embedded tables label above; inline tables caption below. */
   captionAbove?: boolean
-  /** Truncation note printed under the table. */
   note?: string
   /**
-   * Whether the table may claim a landscape page. Only true at the top level of
-   * the document: pdfmake ties orientation to a page break, which a nested block
-   * cannot request. Banding needs no page break, so it works either way.
+   * Landscape is only available at the document top level: pdfmake ties
+   * orientation to a page break, which a nested block cannot request. Banding
+   * needs no page break, so it works either way.
    */
   allowLandscape: boolean
 }
@@ -58,8 +57,7 @@ function bandTable(options: TableBlockOptions, plan: TableFitPlan, band: TableBa
   return {
     table: {
       headerRows: options.showHeaders ? 1 : 0,
-      // A header stranded at the foot of a page belongs to rows nobody can see,
-      // so it moves with at least one of them.
+      // Keep a header with at least one row so it is not stranded at a page foot.
       keepWithHeaderRows: 1,
       dontBreakRows: true,
       widths: band.widths,
@@ -81,16 +79,12 @@ function bandTable(options: TableBlockOptions, plan: TableFitPlan, band: TableBa
 }
 
 /**
- * Builds a table together with its caption and any layout notes.
+ * Builds a table with caption and layout notes. Wide tables come back as stacked
+ * bands (not forced pages) so short tables keep bands together and nested
+ * callouts/lists still work where page breaks are unavailable.
  *
- * A table too wide for the page comes back from the fitter as several bands,
- * which render as stacked tables rather than forced pages: short tables then keep
- * all their bands on one page, and the whole thing still works inside a callout
- * or list where a page break is not available.
- *
- * The first block of the group carries the landscape request when the table needs
- * one; the document assembler reads that back to restore portrait for whatever
- * follows.
+ * The first block carries the landscape request when needed; the document
+ * assembler restores portrait for whatever follows.
  */
 export function tableBlocks(options: TableBlockOptions): Content[] {
   const available = options.allowLandscape

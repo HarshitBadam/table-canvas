@@ -151,7 +151,6 @@ export function SuggestionsPanel({
                 <CleaningPanel
                   suggestions={filteredSuggestions}
                   tableId={tableId}
-                  onComplete={onClose}
                   onCountChange={setEffectiveCleaningCount}
                 />
               ) : !error ? (

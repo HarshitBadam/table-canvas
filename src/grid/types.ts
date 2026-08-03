@@ -1,7 +1,7 @@
 import type { CellValue } from '@/types'
+import type { TableRow } from '@/state/dataStore'
 
-export type { TableRow as GridRow } from '@/state/dataStore'
-import type { TableRow as GridRow } from '@/state/dataStore'
+export type GridRow = TableRow
 
 export interface GridRowAccess {
   totalRows: number

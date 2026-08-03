@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { focusMenuItem } from '@/lib/focusMenuItem';
 
-/** Shared open/close, dismissal and roving-focus wiring for the report toolbar menus. */
 export function useToolbarMenu() {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

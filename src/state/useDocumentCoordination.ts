@@ -30,10 +30,7 @@ async function adoptLatestLocalSnapshot(identity: DocumentIdentity): Promise<voi
   })
 }
 
-/**
- * Binds this tab to the active document: one explicit writer, everyone else a
- * durable reader. Focus and visibility never change ownership.
- */
+/** One explicit writer; others are durable readers. Focus/visibility never change ownership. */
 export function useDocumentCoordination({
   identity,
 }: CoordinationOptions): void {
@@ -42,8 +39,7 @@ export function useDocumentCoordination({
     const stopMirror = startDocumentMirror(identity)
     const stopLease = startDocumentLease({
       key: identity.key,
-      // The previous owner's final durable save is authoritative before this tab
-      // re-enables writes.
+      // Adopt the previous owner's final durable save before re-enabling writes.
       onPromoted: () => adoptLatestLocalSnapshot(identity),
     })
     setDocumentWriteGuard(holdsWriteLease)

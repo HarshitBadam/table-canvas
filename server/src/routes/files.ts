@@ -287,8 +287,8 @@ router.delete(
       throw new ValidationError(['Invalid file ID format']);
     }
 
-    const metadata = await getFileLifecycleMetadata(fileId, userId);
-    if (!metadata) throw new NotFoundError('File');
+    const exists = await getFileLifecycleMetadata(fileId, userId);
+    if (!exists) throw new NotFoundError('File');
     const retainedProjects = await Project.find({
       userId: new Types.ObjectId(userId),
       deletedAt: null,

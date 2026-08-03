@@ -33,7 +33,7 @@ export function LoadingScreen({ phase, message }: LoadingScreenProps) {
         </h1>
 
         <div className="w-full h-1 bg-border rounded-full overflow-hidden mb-4">
-          <div 
+          <div
             className="h-full bg-accent-green transition-all duration-500 ease-out"
             style={{ width: `${Math.max(progress, 10)}%` }}
           />
@@ -48,8 +48,8 @@ export function LoadingScreen({ phase, message }: LoadingScreenProps) {
             <div
               key={p}
               className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                i <= currentIndex 
-                  ? 'bg-accent-green' 
+                i <= currentIndex
+                  ? 'bg-accent-green'
                   : 'bg-border'
               }`}
             />

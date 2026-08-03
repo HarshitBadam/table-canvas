@@ -5,7 +5,6 @@ function parseInlineFormatting(text: string): JSONContent[] {
   let remaining = text;
 
   while (remaining.length > 0) {
-    // Bold: **text**
     let match = remaining.match(/^\*\*(.+?)\*\*/);
     if (match) {
       nodes.push({ type: 'text', text: match[1], marks: [{ type: 'bold' }] });
@@ -13,7 +12,6 @@ function parseInlineFormatting(text: string): JSONContent[] {
       continue;
     }
 
-    // Italic: *text*
     match = remaining.match(/^\*([^*]+)\*/);
     if (match) {
       nodes.push({ type: 'text', text: match[1], marks: [{ type: 'italic' }] });
@@ -21,7 +19,6 @@ function parseInlineFormatting(text: string): JSONContent[] {
       continue;
     }
 
-    // Code: `text`
     match = remaining.match(/^`([^`]+)`/);
     if (match) {
       nodes.push({ type: 'text', text: match[1], marks: [{ type: 'code' }] });
@@ -29,7 +26,6 @@ function parseInlineFormatting(text: string): JSONContent[] {
       continue;
     }
 
-    // Link: [text](url)
     match = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
     if (match) {
       nodes.push({ type: 'text', text: match[1], marks: [{ type: 'link', attrs: { href: match[2] } }] });
@@ -37,7 +33,6 @@ function parseInlineFormatting(text: string): JSONContent[] {
       continue;
     }
 
-    // Plain text
     match = remaining.match(/^[^*`[]+/);
     if (match && match[0]) {
       nodes.push({ type: 'text', text: match[0] });
@@ -63,14 +58,12 @@ export function markdownToTipTapContent(markdown: string): JSONContent[] {
 
     if (!trimmed) { i++; continue; }
 
-    // Horizontal rule
     if (/^[-*_]{3,}$/.test(trimmed)) {
       content.push({ type: 'horizontalRule' });
       i++;
       continue;
     }
 
-    // Heading
     const headingMatch = trimmed.match(/^(#{1,3})\s+(.*)$/);
     if (headingMatch) {
       const level = headingMatch[1].length as 1 | 2 | 3;
@@ -85,7 +78,6 @@ export function markdownToTipTapContent(markdown: string): JSONContent[] {
       continue;
     }
 
-    // Code block
     if (trimmed.startsWith('```')) {
       const codeLines: string[] = [];
       i++;
@@ -101,7 +93,6 @@ export function markdownToTipTapContent(markdown: string): JSONContent[] {
       continue;
     }
 
-    // Blockquote
     if (trimmed.startsWith('> ')) {
       const quoteText = trimmed.slice(2);
       content.push({
@@ -112,7 +103,6 @@ export function markdownToTipTapContent(markdown: string): JSONContent[] {
       continue;
     }
 
-    // Bullet list
     if (/^[-*]\s+/.test(trimmed)) {
       const items: JSONContent[] = [];
       while (i < lines.length && /^[-*]\s+/.test(lines[i].trim())) {
@@ -127,7 +117,6 @@ export function markdownToTipTapContent(markdown: string): JSONContent[] {
       continue;
     }
 
-    // Ordered list
     if (/^\d+\.\s+/.test(trimmed)) {
       const items: JSONContent[] = [];
       while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
@@ -142,7 +131,6 @@ export function markdownToTipTapContent(markdown: string): JSONContent[] {
       continue;
     }
 
-    // Markdown table (| col1 | col2 |)
     if (isMarkdownTable(lines, i)) {
       const { rows, endIndex } = parseMarkdownTable(lines, i);
       if (rows.length > 0) {
@@ -154,7 +142,8 @@ export function markdownToTipTapContent(markdown: string): JSONContent[] {
           attrs: {
             headers: headers,
             rows: dataRows.length > 0 ? dataRows : [headers.map(() => '')],
-            initialized: true, // Important: skip the dimension picker dialog
+            // Skip the dimension picker — pasted markdown tables are already shaped.
+            initialized: true,
           },
         });
       }
@@ -162,7 +151,6 @@ export function markdownToTipTapContent(markdown: string): JSONContent[] {
       continue;
     }
 
-    // Paragraph
     content.push({
       type: 'paragraph',
       content: parseInlineFormatting(trimmed),

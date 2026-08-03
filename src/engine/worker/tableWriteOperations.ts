@@ -10,6 +10,9 @@ import {
 } from './sqlHelpers'
 import { INTERNAL_ROW_ID_COLUMN } from '../internalColumns'
 
+/** Keep INSERT value lists bounded so large loads do not build one giant SQL string. */
+const INSERT_BATCH_SIZE = 1000
+
 export async function loadTable(
   conn: duckdb.AsyncDuckDBConnection,
   request: LoadTableRequest,
@@ -20,18 +23,18 @@ export async function loadTable(
   const columnDefinitions = data.columns
     .map((name, index) => `${quoteIdentifier(name)} ${mapTypeToDuckDB(data.types[index])}`)
     .join(', ')
+  const columns = data.columns.map(quoteIdentifier).join(', ')
 
   await conn.query('BEGIN TRANSACTION')
   try {
     await conn.query(`DROP TABLE IF EXISTS ${tableName}`)
     await conn.query(`CREATE TABLE ${tableName} (${columnDefinitions})`)
 
-    for (let index = 0; index < data.rows.length; index += 1000) {
-      const batch = data.rows.slice(index, index + 1000)
+    for (let index = 0; index < data.rows.length; index += INSERT_BATCH_SIZE) {
+      const batch = data.rows.slice(index, index + INSERT_BATCH_SIZE)
       const values = batch.map(row =>
         `(${row.map((value, columnIndex) => formatValueWithType(value, data.types[columnIndex])).join(', ')})`
       ).join(', ')
-      const columns = data.columns.map(quoteIdentifier).join(', ')
       await conn.query(`INSERT INTO ${tableName} (${columns}) VALUES ${values}`)
       // Let short reads for other tables slip in between INSERT batches.
       if (onBatchComplete) await onBatchComplete()

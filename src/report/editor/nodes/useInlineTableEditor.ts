@@ -19,7 +19,7 @@ interface InlineTableNodeAttrs {
 export function useInlineTableEditor(
   node: NodeViewProps['node'],
   updateAttributes: NodeViewProps['updateAttributes'],
-  grip: { onEnterGrid?: () => void; onLeaveGrid?: () => void } = {},
+  gridSelection: { onEnterGrid?: () => void; onLeaveGrid?: () => void } = {},
 ) {
   const attrs = node.attrs as InlineTableNodeAttrs;
   const headers = useMemo(() => attrs.headers ?? [], [attrs.headers]);
@@ -33,8 +33,8 @@ export function useInlineTableEditor(
     headers,
     rows,
     updateAttributes,
-    onEnterGrid: grip.onEnterGrid,
-    onLeaveGrid: grip.onLeaveGrid,
+    onEnterGrid: gridSelection.onEnterGrid,
+    onLeaveGrid: gridSelection.onLeaveGrid,
   });
 
   useEffect(() => {

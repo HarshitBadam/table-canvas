@@ -139,15 +139,15 @@ class EngineAdapter {
     const dataColumnIds = schema.columns.map(c => c.id)
     const columnIds = [...dataColumnIds, INTERNAL_ROW_ID_COLUMN]
     const types = [...schema.columns.map(c => c.type), 'string']
-    
+
     type ProcessedRow = Record<string, CellValue> & { __rowId: string }
     const processedRows: ProcessedRow[] = rows.map<ProcessedRow | null>((row, rowIndex) => {
       const rowId = row.__rowId as string || `row_${rowIndex}`
-      
+
       if (patches?.deletedRows?.has(rowId)) {
         return null
       }
-      
+
       const values = dataColumnIds.map(colId => {
         if (patches?.cellPatches?.[colId]?.[rowId] !== undefined) {
           return patches.cellPatches[colId][rowId]
@@ -197,9 +197,9 @@ class EngineAdapter {
       },
     }
 
-    // Large imports are written in 1,000-row SQL batches in the worker. The generic
-    // two-minute RPC limit can expire while a healthy 500k-row import is still making
-    // progress, causing the caller to roll back its node as if the import had failed.
+    // Worker loadTable writes fixed-size SQL batches. A static RPC timeout can expire
+    // while a large healthy import is still progressing, so scale with batch count to
+    // avoid false failures that roll back the caller's import node.
     const loadTimeoutMs = LOAD_TABLE_BASE_TIMEOUT_MS
       + Math.ceil(rowsWithComputedValues.length / LOAD_TABLE_BATCH_SIZE)
         * LOAD_TABLE_BATCH_TIMEOUT_MS
@@ -213,7 +213,7 @@ class EngineAdapter {
     columnIdToName?: Record<string, string>
   ): Promise<TransformResult> {
     await this.ensureInitialized()
-    
+
     return this.rpc.call<TransformResult>('executeTransform', {
       ...transformDef,
       outputTableId,
@@ -280,19 +280,19 @@ class EngineAdapter {
 
   async getAggregation(tableId: string, aggDef: AggregationDef): Promise<AggregationResult> {
     await this.ensureInitialized()
-    
+
     return this.rpc.call<AggregationResult>('getAggregation', { tableId, aggDef })
   }
 
   async getProfile(tableId: string, phase: 1 | 2 = 1): Promise<ProfileResult> {
     await this.ensureInitialized()
-    
+
     return this.rpc.call<ProfileResult>('getProfile', { tableId, phase })
   }
 
   async dropTable(tableId: string): Promise<void> {
     await this.ensureInitialized()
-    
+
     await this.rpc.call('dropTable', tableId)
   }
 

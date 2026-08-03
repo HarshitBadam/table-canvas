@@ -108,11 +108,9 @@ export function RecipeWizard({ isOpen, onClose, suggestion, onExecute }: RecipeW
         <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm animate-fade-in z-[60]" />
         <Dialog.Content className="fixed inset-0 z-[60] m-auto h-fit w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl motion-safe:animate-scale-in">
           <div className="px-6 pt-5 pb-4">
-            <div>
-              <Dialog.Title className="text-lg font-semibold text-text-primary">
-                {recipeConfig.title}
-              </Dialog.Title>
-            </div>
+            <Dialog.Title className="text-lg font-semibold text-text-primary">
+              {recipeConfig.title}
+            </Dialog.Title>
             <Dialog.Description className="text-sm text-text-secondary mt-1">
               {recipeConfig.description}
             </Dialog.Description>

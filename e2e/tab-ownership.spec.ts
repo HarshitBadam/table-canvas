@@ -25,10 +25,15 @@ async function openSecondTab(page: Page, state: MockBackendState) {
 }
 
 function sidebarTable(page: Page, name: string) {
+  // Entries remain in the a11y tree while non-canvas views hide them visually.
   return page.locator('aside').getByRole('button', {
     name: new RegExp(`^${name} .*rows`),
     includeHidden: true,
   })
+}
+
+function newTableButton(page: Page) {
+  return page.locator('aside').getByRole('button', { name: 'New Table' })
 }
 
 function dashboardSummary(page: Page) {
@@ -51,16 +56,15 @@ test('the second tab on a project mirrors it and never gets walled', async ({ pa
   })).toHaveCount(0)
   await expect(mirror.getByRole('button', { name: 'Edit here' })).toHaveCount(0)
 
-  const newTable = mirror.locator('aside').getByRole('button', { name: 'New Table' })
+  const newTable = newTableButton(mirror)
   await expect(newTable).toBeVisible()
   await expect(newTable).toBeDisabled()
   await expect(newTable).toHaveAttribute('title', 'Editing is active in another tab.')
-  await expect(page.locator('aside').getByRole('button', { name: 'New Table' }))
-    .toBeEnabled()
+  await expect(newTableButton(page)).toBeEnabled()
 
   await mirror.close()
 
-  // Closing the reader naturally leaves the owner editing; a reload reclaims the lock.
+  // Reload must reclaim the lock the closed tab used to hold.
   await expect(page.getByText(MIRROR_NOTICE)).toHaveCount(0, { timeout: 20_000 })
   await page.reload()
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
@@ -68,8 +72,7 @@ test('the second tab on a project mirrors it and never gets walled', async ({ pa
     name: 'Table Canvas is open in another tab',
   })).toHaveCount(0)
   await expect(page.getByText(MIRROR_NOTICE)).toHaveCount(0, { timeout: 20_000 })
-  await expect(page.locator('aside').getByRole('button', { name: 'New Table' }))
-    .toBeEnabled({ timeout: 20_000 })
+  await expect(newTableButton(page)).toBeEnabled({ timeout: 20_000 })
   await expect(sidebarTable(page, 'Shared Numbers')).toBeAttached()
 })
 
@@ -88,12 +91,10 @@ test('a mirroring dashboard tab shows edits from the editing tab live', async ({
   await mirror.locator('aside').getByRole('button', { name: 'Dashboard' }).click()
   await expect(dashboardSummary(mirror)).toContainText(/1\s*Tables/, { timeout: 20_000 })
   await expect(mirror.getByText(MIRROR_NOTICE)).toBeVisible()
-  await expect(mirror.locator('aside').getByRole('button', { name: 'New Table' }))
-    .toBeDisabled()
+  await expect(newTableButton(mirror)).toBeDisabled()
 
   await page.bringToFront()
-  await expect(page.locator('aside').getByRole('button', { name: 'New Table' }))
-    .toBeEnabled({ timeout: 20_000 })
+  await expect(newTableButton(page)).toBeEnabled({ timeout: 20_000 })
   await createManualTable(page, 'Live Table')
 
   await expect(sidebarTable(mirror, 'Live Table')).toBeAttached({ timeout: 20_000 })
@@ -111,13 +112,13 @@ test('closing the owner promotes the queued reader after durable adoption', asyn
   await expect(mirror.getByText(MIRROR_NOTICE)).toBeVisible({ timeout: 20_000 })
 
   await createManualTable(page, 'Final Owner Edit')
+  // Wait for the edit to reach the reader before releasing ownership.
   await expect(sidebarTable(mirror, 'Final Owner Edit')).toBeAttached({ timeout: 20_000 })
 
   await page.close()
 
   await expect(mirror.getByText(MIRROR_NOTICE)).toHaveCount(0, { timeout: 20_000 })
-  await expect(mirror.locator('aside').getByRole('button', { name: 'New Table' }))
-    .toBeEnabled({ timeout: 20_000 })
+  await expect(newTableButton(mirror)).toBeEnabled({ timeout: 20_000 })
   await expect(sidebarTable(mirror, 'Owned Table')).toBeAttached()
   await expect(sidebarTable(mirror, 'Final Owner Edit')).toBeAttached()
 
@@ -144,12 +145,10 @@ test('two tabs on different projects are both editable', async ({ page }) => {
 
   await expect(second.getByText(MIRROR_NOTICE)).toHaveCount(0, { timeout: 20_000 })
   await expect(page.getByText(MIRROR_NOTICE)).toHaveCount(0, { timeout: 20_000 })
-  await expect(second.locator('aside').getByRole('button', { name: 'New Table' }))
-    .toBeEnabled()
+  await expect(newTableButton(second)).toBeEnabled()
 
   await page.bringToFront()
-  await expect(page.locator('aside').getByRole('button', { name: 'New Table' }))
-    .toBeEnabled({ timeout: 20_000 })
+  await expect(newTableButton(page)).toBeEnabled({ timeout: 20_000 })
   await createManualTable(page, 'Project One Second Table')
 
   await second.close()

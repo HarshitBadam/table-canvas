@@ -15,6 +15,30 @@ interface ChartBuilderProps {
   preselectedColumn?: string
 }
 
+const CHART_TYPE_OPTIONS: Array<{ type: ChartType; label: string }> = [
+  { type: 'bar', label: 'Bar' },
+  { type: 'line', label: 'Line' },
+  { type: 'pie', label: 'Pie' },
+  { type: 'scatter', label: 'Scatter' },
+]
+
+const AGGREGATION_OPTIONS: Array<{ value: AggregationType; label: string }> = [
+  { value: 'sum', label: 'Sum' },
+  { value: 'avg', label: 'Average' },
+  { value: 'count', label: 'Count' },
+  { value: 'count_distinct', label: 'Distinct' },
+  { value: 'min', label: 'Min' },
+  { value: 'max', label: 'Max' },
+]
+
+function optionClassName(selected: boolean): string {
+  return `flex min-h-11 cursor-pointer items-center justify-center rounded-md border text-xs font-semibold transition-colors focus-within:ring-2 focus-within:ring-accent-green focus-within:ring-offset-2 ${
+    selected
+      ? 'border-accent-green bg-accent-green/10 text-accent-text'
+      : 'border-transparent bg-surface-secondary text-text-secondary hover:bg-surface-tertiary hover:text-text-primary'
+  }`
+}
+
 export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn }: ChartBuilderProps) {
   const nodes = useProjectStore((state) => state.nodes)
   const addNode = useProjectStore((state) => state.addNode)
@@ -130,162 +154,143 @@ export function ChartBuilder({ isOpen, onClose, sourceTableId, preselectedColumn
               </div>
             </div>
           </div>
-          
+
           <div className="flex min-h-0 flex-col">
-          <div className="max-h-[60dvh] overflow-y-auto bg-surface">
-            <section className="px-5 py-5 sm:px-6" aria-labelledby="chart-type-heading">
-              <div className="mb-3">
-                <h3 id="chart-type-heading" className="text-sm font-semibold text-text-primary">Chart type</h3>
-                <p className="mt-0.5 text-xs text-text-secondary">Choose how to visualize this data.</p>
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {[
-                  { type: 'bar' as ChartType, label: 'Bar' },
-                  { type: 'line' as ChartType, label: 'Line' },
-                  { type: 'pie' as ChartType, label: 'Pie' },
-                  { type: 'scatter' as ChartType, label: 'Scatter' },
-                ].map((ct) => (
-                  <label
-                    key={ct.type}
-                    className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold transition-colors focus-within:ring-2 focus-within:ring-accent-green focus-within:ring-offset-2 ${
-                      chartType === ct.type
-                        ? 'border-accent-green bg-accent-green/10 text-accent-text'
-                        : 'border-transparent bg-surface-secondary text-text-secondary hover:bg-surface-tertiary hover:text-text-primary'
-                    }`}
-                  >
-                    <input
-                      className="sr-only"
-                      type="radio"
-                      name="chart-type"
-                      value={ct.type}
-                      checked={chartType === ct.type}
-                      onChange={() => { setChartType(ct.type); setXAxis(''); setYAxis(''); }}
-                    />
-                    <ChartTypeIcon type={ct.type} className="h-4 w-4" />
-                    {ct.label}
-                  </label>
-                ))}
-              </div>
-            </section>
-
-            {selectedTable && (
-              <div>
-                <section className="border-t border-border-subtle px-5 py-5 sm:px-6" aria-labelledby="field-mapping-heading">
-                  <div className="mb-4">
-                    <h3 id="field-mapping-heading" className="text-sm font-semibold text-text-primary">Field mapping</h3>
-                    <p className="mt-0.5 text-xs text-text-secondary">Select the columns used to build the chart.</p>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-text-primary">
-                        {chartType === 'scatter' ? 'X axis column' : 'Category column'}
-                      </label>
-                      <p className="text-xs text-text-tertiary">
-                        {chartType === 'scatter' ? 'Numeric values' : 'Text or date values'}
-                      </p>
-                      <SelectField
-                        value={xAxis}
-                        onValueChange={setXAxis}
-                        ariaLabel={chartType === 'scatter' ? 'X axis column' : 'Category column'}
-                        placeholder="Choose a column"
-                        variant="soft"
-                        options={(chartType === 'scatter' ? numericColumns : categoricalColumns.length > 0 ? categoricalColumns : columns)
-                          .map(column => ({ value: column.id, label: column.name }))}
+            {/* Cap scroll height so the footer actions stay visible in short viewports */}
+            <div className="max-h-[60dvh] overflow-y-auto bg-surface">
+              <section className="px-5 py-5 sm:px-6" aria-labelledby="chart-type-heading">
+                <div className="mb-3">
+                  <h3 id="chart-type-heading" className="text-sm font-semibold text-text-primary">Chart type</h3>
+                  <p className="mt-0.5 text-xs text-text-secondary">Choose how to visualize this data.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {CHART_TYPE_OPTIONS.map((ct) => (
+                    <label
+                      key={ct.type}
+                      className={`${optionClassName(chartType === ct.type)} gap-2 px-3 py-2`}
+                    >
+                      <input
+                        className="sr-only"
+                        type="radio"
+                        name="chart-type"
+                        value={ct.type}
+                        checked={chartType === ct.type}
+                        onChange={() => { setChartType(ct.type); setXAxis(''); setYAxis(''); }}
                       />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-text-primary">
-                        {chartType === 'pie' ? 'Value column' : 'Y axis column'}
-                      </label>
-                      <p className="text-xs text-text-tertiary">Numeric values</p>
-                      <SelectField
-                        value={yAxis}
-                        onValueChange={setYAxis}
-                        ariaLabel={chartType === 'pie' ? 'Value column' : 'Y axis column'}
-                        placeholder="Choose a column"
-                        disabled={numericColumns.length === 0}
-                        variant="soft"
-                        options={numericColumns.map(column => ({ value: column.id, label: column.name }))}
-                      />
-                    </div>
-                  </div>
-                  {numericColumns.length === 0 && (
-                    <p className="mt-3 text-xs leading-5 text-warning-text" role="status">
-                      No numeric columns are available. Convert a column to Number in the table, then return to create this chart.
-                    </p>
-                  )}
-                  {chartType === 'scatter' && numericColumns.length === 1 && (
-                    <p className="mt-3 text-xs leading-5 text-warning-text" role="status">
-                      Scatter charts need two numeric columns. Add or convert another numeric column to continue.
-                    </p>
-                  )}
-                </section>
+                      <ChartTypeIcon type={ct.type} className="h-4 w-4" />
+                      {ct.label}
+                    </label>
+                  ))}
+                </div>
+              </section>
 
-                {chartType !== 'scatter' && (
-                  <section className="border-t border-border-subtle px-5 py-5 sm:px-6" aria-labelledby="chart-summary-heading">
-                    <div className="mb-3">
-                      <h3 id="chart-summary-heading" className="text-sm font-semibold text-text-primary">Summarize values</h3>
-                      <p className="mt-0.5 text-xs text-text-secondary">Choose how values are grouped for each category.</p>
+              {selectedTable && (
+                <div>
+                  <section className="border-t border-border-subtle px-5 py-5 sm:px-6" aria-labelledby="field-mapping-heading">
+                    <div className="mb-4">
+                      <h3 id="field-mapping-heading" className="text-sm font-semibold text-text-primary">Field mapping</h3>
+                      <p className="mt-0.5 text-xs text-text-secondary">Select the columns used to build the chart.</p>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                      {[
-                        { value: 'sum', label: 'Sum' },
-                        { value: 'avg', label: 'Average' },
-                        { value: 'count', label: 'Count' },
-                        { value: 'count_distinct', label: 'Distinct' },
-                        { value: 'min', label: 'Min' },
-                        { value: 'max', label: 'Max' },
-                      ].map((agg) => (
-                        <label
-                          key={agg.value}
-                          className={`flex min-h-11 cursor-pointer items-center justify-center rounded-md border px-2 py-2 text-xs font-semibold transition-colors focus-within:ring-2 focus-within:ring-accent-green focus-within:ring-offset-2 ${
-                            aggregation === agg.value
-                              ? 'border-accent-green bg-accent-green/10 text-accent-text'
-                              : 'border-transparent bg-surface-secondary text-text-secondary hover:bg-surface-tertiary hover:text-text-primary'
-                          }`}
-                        >
-                          <input
-                            className="sr-only"
-                            type="radio"
-                            name="aggregation"
-                            value={agg.value}
-                            checked={aggregation === agg.value}
-                            onChange={() => setAggregation(agg.value as AggregationType)}
-                          />
-                          {agg.label}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-text-primary">
+                          {chartType === 'scatter' ? 'X axis column' : 'Category column'}
                         </label>
-                      ))}
+                        <p className="text-xs text-text-tertiary">
+                          {chartType === 'scatter' ? 'Numeric values' : 'Text or date values'}
+                        </p>
+                        <SelectField
+                          value={xAxis}
+                          onValueChange={setXAxis}
+                          ariaLabel={chartType === 'scatter' ? 'X axis column' : 'Category column'}
+                          placeholder="Choose a column"
+                          variant="soft"
+                          options={(chartType === 'scatter'
+                            ? numericColumns
+                            : categoricalColumns.length > 0 ? categoricalColumns : columns
+                          ).map(column => ({ value: column.id, label: column.name }))}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-text-primary">
+                          {chartType === 'pie' ? 'Value column' : 'Y axis column'}
+                        </label>
+                        <p className="text-xs text-text-tertiary">Numeric values</p>
+                        <SelectField
+                          value={yAxis}
+                          onValueChange={setYAxis}
+                          ariaLabel={chartType === 'pie' ? 'Value column' : 'Y axis column'}
+                          placeholder="Choose a column"
+                          disabled={numericColumns.length === 0}
+                          variant="soft"
+                          options={numericColumns.map(column => ({ value: column.id, label: column.name }))}
+                        />
+                      </div>
                     </div>
+                    {numericColumns.length === 0 && (
+                      <p className="mt-3 text-xs leading-5 text-warning-text" role="status">
+                        No numeric columns are available. Convert a column to Number in the table, then return to create this chart.
+                      </p>
+                    )}
+                    {chartType === 'scatter' && numericColumns.length === 1 && (
+                      <p className="mt-3 text-xs leading-5 text-warning-text" role="status">
+                        Scatter charts need two numeric columns. Add or convert another numeric column to continue.
+                      </p>
+                    )}
                   </section>
-                )}
-              </div>
-            )}
-          </div>
 
-          <div 
-            className="shrink-0 border-t border-border-subtle bg-surface-secondary/40 px-4 py-3 sm:px-5"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs text-text-tertiary">Chart name</p>
-                <p className="max-w-36 truncate text-xs font-medium text-text-primary sm:max-w-[230px]">{chartName}</p>
-              </div>
-              <div className="ml-auto flex gap-2">
-                <Dialog.Close asChild>
-                  <button className="btn btn-ghost">
-                    Cancel
+                  {chartType !== 'scatter' && (
+                    <section className="border-t border-border-subtle px-5 py-5 sm:px-6" aria-labelledby="chart-summary-heading">
+                      <div className="mb-3">
+                        <h3 id="chart-summary-heading" className="text-sm font-semibold text-text-primary">Summarize values</h3>
+                        <p className="mt-0.5 text-xs text-text-secondary">Choose how values are grouped for each category.</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                        {AGGREGATION_OPTIONS.map((agg) => (
+                          <label
+                            key={agg.value}
+                            className={`${optionClassName(aggregation === agg.value)} px-2 py-2`}
+                          >
+                            <input
+                              className="sr-only"
+                              type="radio"
+                              name="aggregation"
+                              value={agg.value}
+                              checked={aggregation === agg.value}
+                              onChange={() => setAggregation(agg.value)}
+                            />
+                            {agg.label}
+                          </label>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="shrink-0 border-t border-border-subtle bg-surface-secondary/40 px-4 py-3 sm:px-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-text-tertiary">Chart name</p>
+                  <p className="max-w-36 truncate text-xs font-medium text-text-primary sm:max-w-[230px]">{chartName}</p>
+                </div>
+                <div className="ml-auto flex gap-2">
+                  <Dialog.Close asChild>
+                    <button className="btn btn-ghost">
+                      Cancel
+                    </button>
+                  </Dialog.Close>
+                  <button
+                    onClick={handleCreate}
+                    disabled={!isValid}
+                    className="btn btn-primary px-5"
+                  >
+                    Create chart
                   </button>
-                </Dialog.Close>
-                <button 
-                  onClick={handleCreate}
-                  disabled={!isValid}
-                  className="btn btn-primary px-5"
-                >
-                  Create chart
-                </button>
+                </div>
               </div>
             </div>
-          </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

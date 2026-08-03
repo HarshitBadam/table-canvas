@@ -14,7 +14,7 @@ export async function getTableData(
   offset = 0,
   limit = 1000,
 ): Promise<{ rows: TableRow[]; totalRows: number; error?: string }> {
-  return readTableData(tableId, offset, limit, true)
+  return readTableData(tableId, offset, limit, 'schema')
 }
 
 export async function getRawTableData(
@@ -22,14 +22,14 @@ export async function getRawTableData(
   offset = 0,
   limit = 1000,
 ): Promise<{ rows: TableRow[]; totalRows: number; error?: string }> {
-  return readTableData(tableId, offset, limit, false)
+  return readTableData(tableId, offset, limit, 'raw')
 }
 
 async function readTableData(
   tableId: string,
   offset: number,
   limit: number,
-  remapColumns: boolean,
+  columnNames: 'schema' | 'raw',
 ): Promise<{ rows: TableRow[]; totalRows: number; error?: string }> {
   const projectId = useProjectStore.getState().projectId
   const scope = captureMaterializationScope(projectId)
@@ -50,7 +50,7 @@ async function readTableData(
       tableId,
       offset,
       limit,
-      remapColumns ? node?.schema?.columns : undefined,
+      columnNames === 'schema' ? node?.schema?.columns : undefined,
     )
     if (!isMaterializationScopeCurrent(scope, useProjectStore.getState().projectId)) {
       return { rows: [], totalRows: 0, error: STALE_DATA_ERROR }

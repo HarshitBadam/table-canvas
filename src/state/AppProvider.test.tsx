@@ -17,8 +17,6 @@ const loadProjectWithSync = vi.hoisted(() => vi.fn())
 const loadOrCreateProject = vi.hoisted(() => vi.fn())
 const initializeEngine = vi.hoisted(() => vi.fn())
 const clearProjectRuntime = vi.hoisted(() => vi.fn())
-const materializeProjectTables = vi.hoisted(() => vi.fn())
-const hasProjectTables = vi.hoisted(() => vi.fn())
 const flushReportSaves = vi.hoisted(() => vi.fn())
 const loadReportsForProject = vi.hoisted(() => vi.fn())
 const deleteReportsForProject = vi.hoisted(() => vi.fn())
@@ -72,10 +70,8 @@ vi.mock('@/persistence/syncService', () => ({
 }))
 vi.mock('./projectLifecycle', () => ({
   clearProjectRuntime,
-  hasProjectTables,
   initializeEngine,
   loadOrCreateProject,
-  materializeProjectTables,
 }))
 vi.mock('@/report/reportStore', () => ({
   useReportStore: reportStore,
@@ -151,8 +147,6 @@ beforeEach(() => {
   })
   initializeEngine.mockResolvedValue(undefined)
   clearProjectRuntime.mockResolvedValue(undefined)
-  hasProjectTables.mockReturnValue(false)
-  materializeProjectTables.mockResolvedValue({ completedTableIds: [], failures: [] })
   loadReportsForProject.mockResolvedValue({})
   Object.assign(reportStore.state, {
     reports: {},
@@ -365,8 +359,6 @@ describe('AppProvider project lifecycle', () => {
       expect(deleteProjectWithSync).toHaveBeenCalledWith('current-project')
     })
     expect(deleteReportsForProject).not.toHaveBeenCalled()
-    // Deletion is terminal and explicit: no other project is silently loaded in
-    // its place. The workspace goes empty until the user creates or opens one.
     expect(screen.getByTestId('project')).toHaveTextContent('')
     expect(screen.getByTestId('store-project')).toHaveTextContent('')
   })

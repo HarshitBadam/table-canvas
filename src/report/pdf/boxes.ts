@@ -1,19 +1,17 @@
 import type { Content, ContentTable } from 'pdfmake/interfaces'
 import { CONTENT_WIDTH, MUTED, RULE } from './theme'
 
-export interface BoxOptions {
-  /** Cell background. */
+interface BoxOptions {
   fill?: string
   /** Colour of a 3pt bar down the left edge, in place of a full border. */
   accent?: string
-  /** Colour of a hairline border on all four sides. */
   border?: string
   padding?: [number, number]
 }
 
 /**
- * Wraps blocks in a single-cell table, which is the only pdfmake construct that
- * can give a group of blocks a background, a border and padding at once.
+ * Wraps blocks in a single-cell table — the only pdfmake construct that can
+ * give a group of blocks a background, border and padding at once.
  */
 export function boxed(children: Content[], options: BoxOptions = {}): ContentTable {
   const [paddingX, paddingY] = options.padding ?? [9, 6]
@@ -63,7 +61,6 @@ export function horizontalRule(): Content {
   }
 }
 
-/** Surfaces a block whose data could not be resolved, rather than dropping it. */
 export function placeholder(label: string): Content {
   return { text: label, style: 'placeholder', color: MUTED }
 }

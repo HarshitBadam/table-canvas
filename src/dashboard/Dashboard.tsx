@@ -114,6 +114,12 @@ export function Dashboard() {
   )
 }
 
+const STAT_STATUS_COLOR = {
+  good: 'text-success-dark',
+  warning: 'text-amber-600 dark:text-amber-400',
+  critical: 'text-red-600 dark:text-red-400',
+} as const
+
 function Stat({
   value,
   label,
@@ -121,15 +127,9 @@ function Stat({
 }: {
   value: string | number
   label: string
-  status?: 'good' | 'warning' | 'critical'
+  status?: keyof typeof STAT_STATUS_COLOR
 }) {
-  const valueColor = status === 'good'
-    ? 'text-success-dark'
-    : status === 'warning'
-      ? 'text-amber-600 dark:text-amber-400'
-      : status === 'critical'
-        ? 'text-red-600 dark:text-red-400'
-        : 'text-text-primary'
+  const valueColor = status ? STAT_STATUS_COLOR[status] : 'text-text-primary'
 
   return (
     <span className="inline-flex items-baseline gap-1 rounded-md bg-surface-secondary px-2 py-1 text-text-secondary">
@@ -140,7 +140,6 @@ function Stat({
     </span>
   )
 }
-
 
 function DashboardEmptyState() {
   return (

@@ -4,13 +4,9 @@ import { getStorageScope } from '@/persistence/storageScope'
 import { markProjectActive } from '@/layout/projectActivity'
 
 /**
- * Flags the active project as holding unexported work the moment it gains
- * anything to undo. Keying off the undo stack — rather than raw node/edge
- * changes, which also fire on every project load — means a freshly created,
- * imported, or just-opened project is never flagged until the user actually
- * does something with it. Undoing back to an empty stack correctly drops the
- * flag's trigger too, since the project is once again identical to its
- * starting point.
+ * Marks unexported work from the undo stack, not raw node/edge changes (those
+ * also fire on every project load). A freshly opened project stays unmarked
+ * until the user edits; emptying the stack clears the trigger again.
  */
 export function useProjectActivityTracking(): void {
   const projectId = useProjectStore(store => store.projectId)

@@ -21,8 +21,6 @@ export function Stat({ label, value, subtext }: { label: string; value: string; 
   )
 }
 
-
-
 export function CompletenessBar({
   value,
   barWidth = 'w-20',
@@ -30,19 +28,16 @@ export function CompletenessBar({
   label = 'Completeness',
 }: {
   value: number
-  /** Tailwind width class for the track. @default 'w-20' */
   barWidth?: string
-  /** Tailwind height class for the track. @default 'h-1.5' */
   barHeight?: string
-  /** Visible context for the percentage. @default 'Completeness' */
   label?: string
 }) {
   const color = value >= 95 ? 'bg-success' : value >= 80 ? 'bg-amber-500' : 'bg-red-500'
-  const textColor = value >= 95 
+  const textColor = value >= 95
     ? 'text-success-dark'
-    : value >= 80 
-    ? 'text-amber-600 dark:text-amber-400' 
-    : 'text-red-600 dark:text-red-400'
+    : value >= 80
+      ? 'text-amber-600 dark:text-amber-400'
+      : 'text-red-600 dark:text-red-400'
 
   return (
     <div className="flex items-center gap-2" aria-label={`${label}: ${value}%`}>
@@ -64,6 +59,16 @@ export function CompletenessBar({
   )
 }
 
+/** One unique value per row — suppress distribution stats that would be noise. */
+function IdentifierStat({ profile, rowCount }: { profile: ColumnProfile; rowCount: number }) {
+  return (
+    <Stat
+      label="Role"
+      value="Identifier"
+      subtext={`${profile.distinctCount?.toLocaleString() || rowCount} unique values, one per row`}
+    />
+  )
+}
 
 export function NumericStats({
   profile,
@@ -75,13 +80,7 @@ export function NumericStats({
   isIdentifier: boolean
 }) {
   if (isIdentifier) {
-    return (
-      <Stat
-        label="Role"
-        value="Identifier"
-        subtext={`${profile.distinctCount?.toLocaleString() || rowCount} unique values, one per row`}
-      />
-    )
+    return <IdentifierStat profile={profile} rowCount={rowCount} />
   }
 
   return (
@@ -96,7 +95,6 @@ export function NumericStats({
   )
 }
 
-
 export function StringStats({
   profile,
   rowCount,
@@ -107,23 +105,18 @@ export function StringStats({
   isIdentifier: boolean
 }) {
   if (isIdentifier) {
-    return (
-      <Stat 
-        label="Role" 
-        value="Identifier" 
-        subtext={`${profile.distinctCount?.toLocaleString() || rowCount} unique values, one per row`}
-      />
-    )
+    return <IdentifierStat profile={profile} rowCount={rowCount} />
   }
 
+  // High-cardinality strings drown top-value chips; only show when distribution is meaningful.
   const distinctPct = rowCount > 0 ? Math.round((profile.distinctCount / rowCount) * 100) : 0
   const topValues = distinctPct < 95 ? profile.topValues?.slice(0, 5) || [] : []
-  
+
   return (
     <>
-      <Stat 
-        label="Distinct" 
-        value={profile.distinctCount?.toLocaleString() || '—'} 
+      <Stat
+        label="Distinct"
+        value={profile.distinctCount?.toLocaleString() || '—'}
         subtext={distinctPct === 100 ? 'Every value is unique' : `${distinctPct}% of ${rowCount} rows`}
       />
       {topValues.length > 0 && (
@@ -148,17 +141,16 @@ export function StringStats({
   )
 }
 
-
 export function BooleanStats({ profile }: { profile: ColumnProfile }) {
   const topValues = profile.topValues || []
   const trueVal = topValues.find(v => v.value === true || v.value === 'true' || v.value === 1)
   const falseVal = topValues.find(v => v.value === false || v.value === 'false' || v.value === 0)
   const total = (trueVal?.count || 0) + (falseVal?.count || 0)
-  
+
   if (total === 0) {
     return <Stat label="Values" value="No data" />
   }
-  
+
   const truePct = Math.round((trueVal?.count || 0) / total * 100)
   const falsePct = 100 - truePct
 
@@ -169,7 +161,6 @@ export function BooleanStats({ profile }: { profile: ColumnProfile }) {
     </>
   )
 }
-
 
 export function DateStats({ profile }: { profile: ColumnProfile }) {
   const fmtDate = (val: number | string | undefined) => {

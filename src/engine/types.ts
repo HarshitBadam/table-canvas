@@ -1,11 +1,10 @@
-import { 
-  CellValue, 
-  TableSchema, 
+import {
+  CellValue,
+  TableSchema,
   ColumnProfile,
   ColumnSchema,
-  AggregationType 
+  AggregationType,
 } from '@/types'
-
 
 export type WorkerRequestType =
   | 'init'
@@ -35,8 +34,6 @@ export interface WorkerResponse {
   error?: string
 }
 
-
-
 export interface TableSlice {
   tableId: string
   offset: number
@@ -44,7 +41,6 @@ export interface TableSlice {
   rows: Record<string, CellValue>[]
   totalRows: number
 }
-
 
 export interface AggregationDef {
   groupBy?: string[]
@@ -60,7 +56,6 @@ export interface AggregationResult {
   rows: CellValue[][]
 }
 
-
 export interface ProfileResult {
   tableId: string
   rowCount: number
@@ -69,14 +64,12 @@ export interface ProfileResult {
   computedAt: string
 }
 
-
 export interface TransformResult {
   tableId: string
   schema: TableSchema
   rowCount: number
   preview: Record<string, CellValue>[]
 }
-
 
 export interface LoadTableRequest {
   tableId: string

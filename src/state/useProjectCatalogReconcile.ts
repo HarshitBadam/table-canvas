@@ -19,10 +19,6 @@ interface Options {
   userId: string | undefined
 }
 
-/**
- * Keeps the in-memory project list aligned with IndexedDB / cross-tab catalog
- * events once boot has finished loading a project.
- */
 export function useProjectCatalogReconcile({
   isAuthenticated,
   phase,
@@ -33,12 +29,11 @@ export function useProjectCatalogReconcile({
   userId,
 }: Options): void {
   useEffect(() => {
-    // Wait until boot/login has finished loading a project. Running reconcile
-    // while phase is still briefly 'ready' before postLoginSetup flips it to
-    // loading_project races getDB() against the login path.
+    // Reconcile only after boot/login finished loading. A brief 'ready' window
+    // before postLoginSetup flips to loading_project races getDB() against login.
     if (!isAuthenticated || phase !== 'ready' || !initialized.current) return
-    // Skip the first ready paint that happens before initialize() finishes —
-    // initialize sets ready only after the first project load.
+    // Skip the first ready paint before initialize() finishes; initialize sets
+    // ready only after the first project load.
     if (!engineReady) return
     const scope = getStorageScope()
     const stopBinding = bindProjectCatalog(scope)

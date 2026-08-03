@@ -14,16 +14,13 @@ export interface WindowedRowsState {
   getLoadedRows: () => Map<number, GridRow>
   ensureRange: (startIndex: number, endIndex: number) => void
   version: number
-  loadPhase: WindowLoadPhase
   isLoading: boolean
   isInitialLoading: boolean
-  isFetching: boolean
-  isPrefetching: boolean
   error: string | null
   invalidate: () => void
 }
 
-export type WindowLoadPhase =
+type WindowLoadPhase =
   | 'idle'
   | 'initial-materialization'
   | 'initial-fetch'
@@ -94,7 +91,7 @@ export function useWindowedRows(
   const fingerprint = `${projectId ?? ''}|${tableId}|${filterStr}|${sortStr}|${search || ''}|${columnStr}`
   const currentFingerprintRef = useRef(fingerprint)
   currentFingerprintRef.current = fingerprint
-  const latestConfigRef = useRef<Omit<WindowRequest, 'offset' | 'limit' | 'generation'>>({
+  const latestConfigRef = useRef({
     projectId,
     tableId,
     columns,
@@ -102,8 +99,9 @@ export function useWindowedRows(
     sorts,
     search,
     fingerprint,
-    kind: 'fetch',
+    kind: 'fetch' as const,
   })
+  // Keep request payloads current without putting unstable deps on the fetch pump.
   latestConfigRef.current = {
     projectId,
     tableId,
@@ -115,6 +113,7 @@ export function useWindowedRows(
     kind: 'fetch',
   }
   const requestPumpRef = useRef<(request: WindowRequest) => void>(() => undefined)
+  // Drop stale async results after invalidate/filter/table changes bump generation or fingerprint.
   const isCurrentRequest = useCallback((request: WindowRequest) => (
     request.generation === generationRef.current
     && request.fingerprint === currentFingerprintRef.current
@@ -124,6 +123,7 @@ export function useWindowedRows(
 
   const pumpRequest = useCallback((request: WindowRequest) => {
     if (fetchInFlightRef.current) {
+      // Coalesce: keep only the latest queued window while a fetch is in flight.
       pendingFetchRef.current = request
       return
     }
@@ -142,36 +142,31 @@ export function useWindowedRows(
         }
         setLoadPhase(request.kind === 'initial' ? 'initial-fetch' : request.kind)
         const engine = getEngine()
-        let slice: TableSlice
-
-        if (request.filterDefs || request.sorts?.length || request.search) {
-          slice = await engine.getFilteredSlice({
-            tableId: request.tableId,
-            filters: request.filterDefs,
-            sorts: request.sorts,
-            search: request.search,
-            offset: request.offset,
-            limit: request.limit,
-            columns: request.columns,
-          })
-        } else {
-          slice = await engine.getSlice(
-            request.tableId,
-            request.offset,
-            request.limit,
-            request.columns,
-          )
-        }
+        const slice: TableSlice = request.filterDefs || request.sorts?.length || request.search
+          ? await engine.getFilteredSlice({
+              tableId: request.tableId,
+              filters: request.filterDefs,
+              sorts: request.sorts,
+              search: request.search,
+              offset: request.offset,
+              limit: request.limit,
+              columns: request.columns,
+            })
+          : await engine.getSlice(
+              request.tableId,
+              request.offset,
+              request.limit,
+              request.columns,
+            )
 
         if (!isCurrentRequest(request)) return
 
         const newRows = new Map<number, GridRow>()
         slice.rows.forEach((row, idx) => {
-          const gridRow: GridRow = {
+          newRows.set(request.offset + idx, {
             __rowId: (row.__rowId as string) || `row_${request.offset + idx}`,
             ...row,
-          }
-          newRows.set(request.offset + idx, gridRow)
+          })
         })
 
         const previous = windowRef.current
@@ -185,6 +180,7 @@ export function useWindowedRows(
           : new Map<number, GridRow>()
         newRows.forEach((row, index) => mergedRows.set(index, row))
 
+        // Cap cache around the latest window so scroll prefetch cannot grow without bound.
         const maxCachedRows = WINDOW_SIZE * 3
         if (mergedRows.size > maxCachedRows) {
           const center = request.offset + Math.floor(slice.rows.length / 2)
@@ -272,9 +268,7 @@ export function useWindowedRows(
   }, [fetchWindow])
 
   const getLoadedRows = useCallback((): Map<number, GridRow> => {
-    const merged = new Map<number, GridRow>()
-    windowRef.current.rows.forEach((row, idx) => merged.set(idx, row))
-    return merged
+    return new Map(windowRef.current.rows)
   }, [])
 
   const ensureRange = useCallback((startIndex: number, endIndex: number) => {
@@ -291,8 +285,6 @@ export function useWindowedRows(
   }, [fetchWindow])
 
   const isInitialLoading = loadPhase === 'initial-materialization' || loadPhase === 'initial-fetch'
-  const isPrefetching = loadPhase === 'prefetch'
-  const isFetching = loadPhase === 'initial-fetch' || loadPhase === 'fetch' || isPrefetching
   const isLoading = isInitialLoading || loadPhase === 'fetch'
 
   return {
@@ -301,11 +293,8 @@ export function useWindowedRows(
     getLoadedRows,
     ensureRange,
     version,
-    loadPhase,
     isLoading,
     isInitialLoading,
-    isFetching,
-    isPrefetching,
     error,
     invalidate,
   }

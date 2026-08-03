@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import type { Page, Route } from '@playwright/test'
+import type { Page, Request, Route } from '@playwright/test'
 
 interface MockProject {
   id: string
@@ -28,14 +28,10 @@ export interface MockBackendState {
   files: Map<string, MockFile>
   projectNumber: number
   fileNumber: number
-  pendingProjectUpdates: number
 }
 
 interface MockBackendOptions {
-  projectId?: string
-  projectName?: string
   state?: MockBackendState
-  projectUpdateDelayMs?: number
 }
 
 export function createMockBackendState(): MockBackendState {
@@ -44,13 +40,12 @@ export function createMockBackendState(): MockBackendState {
     files: new Map<string, MockFile>(),
     projectNumber: 0,
     fileNumber: 0,
-    pendingProjectUpdates: 0,
   }
 }
 
-/** Pulls the `file` field's raw bytes and filename out of a multipart/form-data body. */
+// Playwright exposes the upload as raw multipart bytes; parse the `file` part ourselves.
 function extractUploadedFilePart(
-  request: import('@playwright/test').Request,
+  request: Request,
 ): { filename: string; buffer: Buffer } | null {
   const body = request.postDataBuffer()
   const contentType = request.headers()['content-type']
@@ -98,8 +93,8 @@ export async function installMockBackend(
   page: Page,
   options: MockBackendOptions = {},
 ) {
-  const projectId = options.projectId ?? 'sample-project'
-  const projectName = options.projectName ?? 'Sample Workbook Project'
+  const projectId = 'sample-project'
+  const projectName = 'Sample Workbook Project'
   const workbookPath = resolve(process.cwd(), 'data/sample_workbook.xlsx')
   const state = options.state ?? createMockBackendState()
   const projects = state.projects
@@ -181,14 +176,6 @@ export async function installMockBackend(
         updatedAt: new Date().toISOString(),
       }
       projects.set(requestedProjectId, project)
-      if (options.projectUpdateDelayMs) {
-        state.pendingProjectUpdates += 1
-        try {
-          await new Promise(resolve => setTimeout(resolve, options.projectUpdateDelayMs))
-        } finally {
-          state.pendingProjectUpdates -= 1
-        }
-      }
       await fulfillJson(route, { project })
       return
     }
@@ -235,7 +222,7 @@ export async function installMockBackend(
     }
     if (path === '/api/files' && request.method() === 'GET') {
       await fulfillJson(route, {
-        files: [...state.files.values()].map(({ buffer, ...meta }) => meta),
+        files: [...state.files.values()].map(({ buffer: _buffer, ...meta }) => meta),
       })
       return
     }
@@ -261,6 +248,5 @@ export async function installMockBackend(
 
   return {
     getProject: () => projects.get(projectId) ?? null,
-    getProjects: () => [...projects.values()],
   }
 }

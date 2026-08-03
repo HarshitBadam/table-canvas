@@ -20,8 +20,6 @@ export function generateTableVersionHash(
 
 interface SuggestionsState {
   activeTab: SuggestionCategory | 'all'
-  selectedTableId: string | null
-  selectedColumnId: string | null
   
   // Suggestions cache: contextKey -> suggestions
   suggestionsCache: Map<string, Suggestion[]>
@@ -40,18 +38,14 @@ interface SuggestionsState {
   
   setActiveTab: (tab: SuggestionCategory | 'all') => void
   
-  setSelection: (tableId: string | null, columnId?: string | null) => void
-  
   setSuggestions: (contextKey: string, suggestions: Suggestion[]) => void
   getSuggestions: (contextKey: string) => Suggestion[] | undefined
   clearCache: (tableId?: string) => void
   
   dismissSuggestion: (contextKey: string, suggestionId: string) => void
   undismissSuggestion: (contextKey: string, suggestionId: string) => void
-  isDismissed: (contextKey: string, suggestionId: string) => boolean
   
   consumeSuggestion: (suggestionId: string) => void
-  unconsumeSuggestion: (suggestionId: string) => void
   isConsumed: (suggestionId: string) => boolean
   
   setLoading: (isLoading: boolean) => void
@@ -63,8 +57,6 @@ interface SuggestionsState {
 
 export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
   activeTab: 'all',
-  selectedTableId: null,
-  selectedColumnId: null,
   suggestionsCache: new Map(),
   dismissed: new Map(),
   consumed: new Set(),
@@ -73,12 +65,6 @@ export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
   currentRequestId: null,
   
   setActiveTab: (tab) => set({ activeTab: tab }),
-  
-  setSelection: (tableId, columnId) => set({
-    selectedTableId: tableId,
-    selectedColumnId: columnId ?? null,
-    error: null,
-  }),
   
   setSuggestions: (contextKey, suggestions) => {
     set((state) => {
@@ -130,22 +116,10 @@ export const useSuggestionsStore = create<SuggestionsState>((set, get) => ({
     })
   },
   
-  isDismissed: (contextKey, suggestionId) => {
-    return get().dismissed.get(contextKey)?.has(suggestionId) ?? false
-  },
-  
   consumeSuggestion: (suggestionId) => {
     set((state) => {
       const newConsumed = new Set(state.consumed)
       newConsumed.add(suggestionId)
-      return { consumed: newConsumed }
-    })
-  },
-  
-  unconsumeSuggestion: (suggestionId) => {
-    set((state) => {
-      const newConsumed = new Set(state.consumed)
-      newConsumed.delete(suggestionId)
       return { consumed: newConsumed }
     })
   },

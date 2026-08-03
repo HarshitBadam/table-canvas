@@ -97,9 +97,8 @@ async function flushQueuedSave(
         if (error instanceof ApiError && error.statusCode === 409) {
           await preserveConflictCopy(projectId, payload, scope)
         } else if (error instanceof ApiError && error.statusCode === 404) {
-          // The project was permanently deleted elsewhere. Preserve the queued
-          // edits as a conflict copy, then reconcile the now-phantom original so
-          // it stops lingering in the local project list.
+          // Deleted elsewhere: keep queued edits as a conflict copy, then drop the
+          // phantom original so it cannot linger in the local project list.
           await preserveConflictCopy(projectId, payload, scope)
           await deleteProjectSnapshot(projectId, scope)
           await dropProjectSyncBase(projectId, scope)

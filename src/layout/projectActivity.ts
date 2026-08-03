@@ -65,7 +65,6 @@ export function clearProjectActivity(scope: string, projectId: string): void {
   }
 }
 
-/** True if any of the given projects holds work that has never been exported. */
 export function hasUnexportedActivity(scope: string, projectIds: readonly string[]): boolean {
   return projectIds.some(id => isProjectActive(scope, id))
 }

@@ -1,22 +1,15 @@
-/**
- * API Client with automatic token refresh and error handling
- */
-
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
-
 
 interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
   errors?: string[];
-  message?: string;
 }
 
 export interface RequestOptions extends RequestInit {
   skipAuth?: boolean;
 }
-
 
 export class ApiError extends Error {
   statusCode: number;
@@ -66,7 +59,6 @@ class AuthError extends ApiError {
   }
 }
 
-
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
 let onAuthError: (() => void) | null = null;
@@ -108,7 +100,6 @@ export async function refreshSession(): Promise<boolean> {
   }
 }
 
-
 async function request<T>(
   endpoint: string,
   options: RequestOptions = {}
@@ -135,7 +126,7 @@ async function request<T>(
 
   if (response.status === 401 && !skipAuth) {
     const refreshed = await refreshSession();
-    
+
     if (refreshed) {
       response = await fetch(url, config);
     } else {
@@ -178,7 +169,6 @@ async function request<T>(
   return data.data as T;
 }
 
-
 export const api = {
   get: <T>(endpoint: string, options?: RequestOptions): Promise<T> =>
     request<T>(endpoint, { ...options, method: 'GET' }),
@@ -194,13 +184,6 @@ export const api = {
     request<T>(endpoint, {
       ...options,
       method: 'PUT',
-      body: body ? JSON.stringify(body) : undefined,
-    }),
-
-  patch: <T>(endpoint: string, body?: unknown, options?: RequestOptions): Promise<T> =>
-    request<T>(endpoint, {
-      ...options,
-      method: 'PATCH',
       body: body ? JSON.stringify(body) : undefined,
     }),
 

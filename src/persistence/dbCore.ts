@@ -135,9 +135,7 @@ function openTableCanvasDB(): Promise<IDBPDatabase<TableCanvasDB>> {
         baseStore.createIndex('by-owner', 'ownerId')
       }
     },
-    // Another tab wants to upgrade or delete this database. Release our
-    // connection immediately instead of silently blocking that tab (and, via
-    // deleteDB's own blocking wait, ourselves) forever.
+    // Release immediately so another tab's upgrade/deleteDB is not blocked forever.
     blocking() {
       dbInstance?.close()
       dbInstance = null
@@ -171,12 +169,8 @@ async function openWithRecovery(): Promise<IDBPDatabase<TableCanvasDB>> {
       'Local database did not open in time. Close other Table Canvas tabs and try again.',
     )
   } catch (error) {
-    // The browser can hold an on-disk copy of this database at a version newer
-    // than DB_VERSION (e.g. left over from a local build that briefly used a
-    // higher schema version, or a stale WebKit version record). That makes
-    // every open attempt fail forever with a VersionError. Recover by
-    // dropping the stale database instead of leaving the app permanently
-    // stuck before it can even reach the login screen.
+    // On-disk DB can sit above DB_VERSION (stale local build / WebKit version
+    // record). Without a reset, every open fails with VersionError permanently.
     if (error instanceof DOMException && error.name === 'VersionError') {
       console.warn('[db] Local database version is newer than expected; resetting it.', error)
       await resetTableCanvasDB()

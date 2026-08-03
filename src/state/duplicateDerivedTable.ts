@@ -30,8 +30,6 @@ import {
   waitForTableOperation,
 } from './tableOperationCoordinator'
 
-// Use the long-supported binary upload type so signed-in duplication remains
-// compatible with servers deployed before the internal snapshot format existed.
 const SNAPSHOT_MIME_TYPE = 'application/octet-stream'
 const TABLE_CHANGED_ERROR = 'The table changed while it was being copied. Please try again.'
 const WRITE_LEASE_ERROR = 'Editing moved to another tab while the table was being copied. Please try again there.'
@@ -44,8 +42,6 @@ export type DuplicateDerivedTableResult =
         | 'NOT_FOUND'
         | 'NOT_DERIVED'
         | 'MATERIALIZATION_FAILED'
-        | 'TABLE_CHANGED'
-        | 'DUPLICATE_FAILED'
         | 'WRITE_LEASE_LOST'
         | 'OFFLINE'
       error: string

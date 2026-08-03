@@ -10,10 +10,7 @@ interface UseDocumentTitleArgs {
   reportName: string | null
 }
 
-/**
- * Keeps the browser tab title in sync with what's open, following the
- * "context | project | app" convention (e.g. Slack, Jira).
- */
+/** Tab title uses the "context | project | app" convention (e.g. Slack, Jira). */
 export function useDocumentTitle({ projectName, viewMode, nodeName, reportName }: UseDocumentTitleArgs) {
   useEffect(() => {
     const segments: string[] = []

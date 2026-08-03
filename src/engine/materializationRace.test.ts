@@ -83,6 +83,14 @@ function setCache(updates: Partial<CacheInfo>): void {
   useTableRuntimeStore.getState().updateCacheInfo('table_1', updates)
 }
 
+function watchIsComputing(tableId: string) {
+  const states: Array<boolean | undefined> = []
+  const unsubscribe = useTableRuntimeStore.subscribe((state) => {
+    states.push(state.cacheInfo[tableId]?.isComputing)
+  })
+  return { states, unsubscribe }
+}
+
 function sourceNode(cacheInfo: Partial<CacheInfo>): SourceTableNode {
   setCache({ isDirty: true, isComputing: false, ...cacheInfo })
   return {
@@ -133,18 +141,15 @@ describe('generation-safe source materialization', () => {
       error: 'Previous load failed',
     })
     engine.getSlice.mockResolvedValue({ rows: [], totalRows: 1 })
-    const computingStates: Array<boolean | undefined> = []
-    const unsubscribe = useTableRuntimeStore.subscribe((state) => {
-      computingStates.push(state.cacheInfo.table_1?.isComputing)
-    })
+    const computing = watchIsComputing('table_1')
 
     const result = await ensureTableMaterialized('table_1')
-    unsubscribe()
+    computing.unsubscribe()
 
     expect(result.status).toBe('cached')
     expect(cacheOf('table_1')).toMatchObject({ isComputing: false })
     expect(cacheOf('table_1')?.error).toBeUndefined()
-    expect(computingStates).not.toContain(true)
+    expect(computing.states).not.toContain(true)
   })
 
   it('restarts with fresh schema after a change during file loading', async () => {

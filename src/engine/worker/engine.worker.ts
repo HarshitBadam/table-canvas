@@ -4,8 +4,10 @@ import type {
   WorkerResponse,
   LoadTableRequest,
   AggregationDef,
+  FilterConditionDef,
+  SortDef,
 } from '../types'
-import type { TransformDef } from '@/types'
+import type { CellValue, TransformDef } from '@/types'
 import { loadTable, getSlice, getFilteredSlice, updateCell, insertRow, deleteRow, getDistinctValues, getAggregation, getProfile, dropTable } from './tableOperations'
 import { countCombinedTransformRows, executeTransform } from './transforms'
 import { WorkerRequestScheduler } from './requestScheduler'
@@ -104,8 +106,12 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
 
       case 'getFilteredSlice': {
         const { tableId, filters, sorts, search, offset, limit } = payload as {
-          tableId: string; filters?: import('../types').FilterConditionDef[];
-          sorts?: import('../types').SortDef[]; search?: string; offset: number; limit: number
+          tableId: string
+          filters?: FilterConditionDef[]
+          sorts?: SortDef[]
+          search?: string
+          offset: number
+          limit: number
         }
         result = await getFilteredSlice(requireConn(), tableId, filters, sorts, search, offset, limit)
         break
@@ -119,7 +125,11 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
 
       case 'updateCell': {
         const { tableId, rowId, column, value, columnType } = payload as {
-          tableId: string; rowId: string; column: string; value: import('@/types').CellValue; columnType?: string
+          tableId: string
+          rowId: string
+          column: string
+          value: CellValue
+          columnType?: string
         }
         await updateCell(requireConn(), tableId, rowId, column, value, columnType)
         result = { success: true }
@@ -128,7 +138,10 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
 
       case 'insertRow': {
         const { tableId, values, columns, types } = payload as {
-          tableId: string; values: Record<string, import('@/types').CellValue>; columns: string[]; types: string[]
+          tableId: string
+          values: Record<string, CellValue>
+          columns: string[]
+          types: string[]
         }
         await insertRow(requireConn(), tableId, values, columns, types)
         result = { success: true }

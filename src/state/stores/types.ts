@@ -50,7 +50,7 @@ interface HistoryState {
 
 export interface NodesSliceState {
   nodes: Record<string, ProjectNode>
-  
+
   addNode: (node: ProjectNode) => void
   updateNode: (id: string, updates: Partial<ProjectNode>) => void
   duplicateNode: (
@@ -60,7 +60,6 @@ export interface NodesSliceState {
   deleteNode: (id: string, options?: { recordHistory?: boolean }) => void
   updateNodePosition: (id: string, position: Position) => void
   updateNodeUI: (id: string, updates: { viewMode?: NodeViewMode }) => void
-  addNewTable: () => void
   addSourceTable: (params: {
     name: string
     fileRef: string
@@ -97,19 +96,16 @@ export interface NodesSliceState {
   updateChartConfig: (chartId: string, updates: Partial<ChartConfig>) => void
   updateChartName: (chartId: string, name: string) => void
   setTableFilters: (tableId: string, filters: ViewFilterConfig | null) => void
-  getTableFilters: (tableId: string) => ViewFilterConfig | undefined
   markNodeAndDescendantsDirty: (nodeId: string) => void
   touchNodeUpdatedAt: (nodeId: string) => void
-  
-  getNode: (id: string) => ProjectNode | undefined
+
   getTableNode: (id: string) => import('@/types').TableNode | undefined
   getUpstreamNodes: (nodeId: string) => ProjectNode[]
-  getDownstreamNodes: (nodeId: string) => ProjectNode[]
 }
 
 export interface EdgesSliceState {
   edges: Record<string, Edge>
-  
+
   addEdge: (edge: Omit<Edge, 'id'>) => void
   deleteEdge: (id: string) => void
   wouldCreateCycle: (sourceId: string, targetId: string) => boolean
@@ -117,26 +113,24 @@ export interface EdgesSliceState {
 
 export interface PatchesSliceState {
   patches: Record<string, Patches>
-  
+
   setCellValue: (tableId: string, rowId: string, columnId: string, value: CellValue) => void
   deleteRow: (tableId: string, rowId: string) => void
   insertRow: (tableId: string, rowId: string, values: Record<string, CellValue>, index: number) => void
-  getPatches: (tableId: string) => Patches | undefined
   toggleCellHighlight: (tableId: string, rowId: string, columnId: string) => void
   clearHighlights: (tableId: string) => void
   setHighlights: (tableId: string, cells: string[]) => void
-  isCellHighlighted: (tableId: string, rowId: string, columnId: string) => boolean
 }
 
 export interface SelectionSliceState {
   selectedNodeId: string | null
-  
+
   selectNode: (id: string | null) => void
 }
 
 export interface HistorySliceState {
   history: HistoryState
-  
+
   undo: () => void
   redo: () => void
   canUndo: () => boolean

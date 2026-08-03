@@ -1,9 +1,6 @@
 /**
- * Standalone HTML document for a single report.
- *
- * Used both for the files written into a project ZIP and for the report menu's
- * "Export as HTML" action, so the two produce identical output. Styles are
- * embedded rather than linked so the file stays readable offline on its own.
+ * Standalone HTML for one report (ZIP export and "Export as HTML" share this).
+ * Styles are embedded so the file is readable offline without linked assets.
  */
 
 import type { Report } from '@/report/types'
@@ -76,13 +73,8 @@ export function generateReportHtml(report: Report, dataMap: EmbeddedDataMap = {}
       margin: 2em 0;
     }
     /*
-     * Read on screen, a wide table scrolls sideways rather than crushing its
-     * columns. The paired gradients are a pure-CSS scroll cue: the white masks
-     * scroll with the content (background-attachment: local) and uncover the
-     * fixed shadows only on the side where content is still hidden, so a table
-     * that fits shows no shadow at all. Scrollbars stay hidden so the gradients
-     * are the only affordance, and overscroll is pinned so the table cannot
-     * rubber-band away from its edges.
+     * Horizontal scroll for wide tables. Paired gradients (local masks + fixed
+     * shadows) cue overflow without scrollbars; overscroll-behavior pins edges.
      */
     .table-scroll {
       overflow-x: auto;
@@ -106,10 +98,8 @@ export function generateReportHtml(report: Report, dataMap: EmbeddedDataMap = {}
       margin: 1em 0;
     }
     /*
-     * Fixed layout so the measured column widths in the colgroup are what the
-     * browser actually uses; left on auto it would re-sort them by content and
-     * undo the sizing. The floor is only published for a table that overflows,
-     * so narrow tables never scroll.
+     * table-layout:fixed honors colgroup widths (auto would reflow by content).
+     * --table-min-width is set only when the table overflows the container.
      */
     .table-scroll table {
       margin: 0;
@@ -178,9 +168,7 @@ export function generateReportHtml(report: Report, dataMap: EmbeddedDataMap = {}
       }
       body { max-width: none; padding: 0; }
       .footer { display: none; }
-      /* Paper cannot scroll: a clipped container would silently drop columns, so
-         an overflowing table gives up its floor and compresses to the page. Use
-         the PDF export for wide tables — it splits them into bands instead. */
+      /* Print has no scroll — drop the min-width floor rather than clip columns. */
       .table-scroll {
         overflow: visible;
         background: none;

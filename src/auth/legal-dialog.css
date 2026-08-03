@@ -1,6 +1,5 @@
 /*
- * The document area scrolls once the dialog reaches its viewport-bound cap.
- * Scrollbars remain visually hidden so the reading surface stays uncluttered.
+ * Scrolls at the viewport-bound dialog height; scrollbars stay visually hidden.
  */
 
 .legal-scroll {

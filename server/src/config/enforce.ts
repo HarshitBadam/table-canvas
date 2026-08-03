@@ -1,7 +1,8 @@
 /**
  * Server-side enforcement helpers — mirrors src/shared/enforce.ts.
- *
  * Keep logic in sync with the client copy.
+ *
+ * Google tier deliberately bypasses these caps (product uncap).
  */
 
 import { type Tier, getLimits } from './limits.js';

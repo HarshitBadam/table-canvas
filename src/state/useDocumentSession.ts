@@ -9,20 +9,17 @@ import {
 
 interface DocumentSessionOptions {
   projectId: string | null
-  /** Any value that changes on an auth transition, so the scope is re-read. */
+  /** Changes on auth transition so storage scope is re-read into the identity. */
   authToken: string
 }
 
-/** The project id this tab asked for, read once before the project list is known. */
+/** Project id from the URL, read before the project list is known. */
 export function requestedDocumentProjectId(): string | null {
   if (typeof window === 'undefined') return null
   return documentProjectIdFromPath(window.location.pathname)
 }
 
-/**
- * Resolves the active document and keeps the URL addressable. Auth transitions rewrite
- * the storage scope, so the identity is recomputed whenever the auth token changes.
- */
+/** Keeps the URL addressable; recomputes identity when auth rewrites storage scope. */
 export function useDocumentSession({
   projectId,
   authToken,
@@ -37,7 +34,7 @@ export function useDocumentSession({
 
   useEffect(() => {
     if (!identity) {
-      // Active project was cleared (deleted elsewhere, empty workspace). Leave
+      // Active project was cleared (deleted elsewhere, empty workspace). Clear
       // the stale /p/:id URL so refresh does not try to reopen a missing project.
       if (documentProjectIdFromPath(location.pathname)) {
         navigate('/', { replace: true })

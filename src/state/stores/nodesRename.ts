@@ -1,15 +1,18 @@
-import type { ProjectNode } from '@/types'
+import type { ProjectNode, TableNode } from '@/types'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
 import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import type { ProjectStoreState } from './types'
+
+function isTableNode(node: ProjectNode | undefined): node is TableNode {
+  return node?.kind === 'source_table' || node?.kind === 'derived_table'
+}
 
 export function isTableRename(
   node: ProjectNode | undefined,
   updates: Partial<ProjectNode>,
 ): boolean {
   return Boolean(
-    node
-    && (node.kind === 'source_table' || node.kind === 'derived_table')
+    isTableNode(node)
     && updates.name
     && updates.name !== node.name,
   )
@@ -27,6 +30,7 @@ export function applyNodeUpdate(
   Object.assign(node, updates, { updatedAt: now })
   if (!renamingTable || !updates.name) return
 
+  // Join plans store display names alongside ids; keep them aligned for the editor.
   for (const candidate of Object.values(state.nodes)) {
     if (candidate.kind !== 'derived_table') continue
     const transform = candidate.plan.transformDef
@@ -48,9 +52,7 @@ export function markRenameDependentsDirty(
   state: ProjectStoreState,
   id: string,
 ): void {
-  const affected = [...getDependentNodeIds(state.nodes, state.edges, id)].filter((nodeId) => {
-    const node = state.nodes[nodeId]
-    return node?.kind === 'source_table' || node?.kind === 'derived_table'
-  })
+  const affected = [...getDependentNodeIds(state.nodes, state.edges, id)]
+    .filter((nodeId) => isTableNode(state.nodes[nodeId]))
   useTableRuntimeStore.getState().markNodesDirty(affected)
 }

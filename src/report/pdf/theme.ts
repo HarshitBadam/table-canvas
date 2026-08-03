@@ -2,7 +2,7 @@ import type { Margins, Style, StyleDictionary } from 'pdfmake/interfaces'
 import type { FitCandidate } from '@/report/layout/tableFit'
 
 export const BRAND = '#217346'
-export const INK = '#1a1a1a'
+const INK = '#1a1a1a'
 export const MUTED = '#5f6b7a'
 export const RULE = '#d8dee6'
 export const SUBTLE_FILL = '#f6f8fa'
@@ -44,11 +44,8 @@ export const STYLES: StyleDictionary = {
 export const LANDSCAPE_CONTENT_WIDTH = 692
 
 /**
- * Type sizes a table may be rendered at, widest first.
- *
- * 8pt is the floor, not a tier of last resort: below it a table is present on the
- * page but not readable off it, which is a worse outcome than splitting the
- * columns across bands. `planTableFit` escalates instead of shrinking further.
+ * Type sizes widest-first. 8pt is the floor: below it a table is present but
+ * not readable, which is worse than banding. `planTableFit` escalates instead.
  */
 export const TABLE_FIT_CANDIDATES: FitCandidate[] = [
   { fontSize: 9, paddingX: 6, paddingY: 3 },

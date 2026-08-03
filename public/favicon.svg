@@ -1,7 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <!-- Warm olive tile; white stacked sheets (front grid over a second sheet). -->
   <rect width="32" height="32" rx="7" fill="#344a2a" />
-  <!-- Back sheet (peeking top-left, offset further from the front sheet) -->
   <rect
     x="7"
     y="7"
@@ -15,7 +13,6 @@
   />
   <!-- Front sheet fill covers the overlapping back stroke -->
   <rect x="11.5" y="11.5" width="13.5" height="13.5" rx="2.1" fill="#344a2a" />
-  <!-- 2×2 grid -->
   <path
     d="M18.25 12.65v11.2M12.65 18.25h11.2"
     fill="none"
@@ -23,7 +20,6 @@
     stroke-width="1.6"
     stroke-linecap="round"
   />
-  <!-- Front sheet outline -->
   <rect
     x="11.5"
     y="11.5"

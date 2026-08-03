@@ -3,12 +3,9 @@ import type { TCreatedPdf, TDocumentDefinitions } from 'pdfmake/interfaces'
 type PdfMake = typeof import('pdfmake/build/pdfmake')
 
 /**
- * pdfmake plus its Roboto font data is over a megabyte, so it is loaded on first
- * export only and cached for the rest of the session.
- *
- * Roboto is used in place of the standard WinAnsi fonts because imported CSV and
- * Excel data routinely carries accented and Cyrillic characters, which the
- * standard fonts cannot encode.
+ * pdfmake plus Roboto is over a megabyte, so it is loaded on first export only.
+ * Roboto replaces WinAnsi fonts because CSV/Excel data routinely carries
+ * accented and Cyrillic characters the standard fonts cannot encode.
  */
 let engine: Promise<PdfMake> | null = null
 

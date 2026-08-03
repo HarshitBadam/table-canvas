@@ -11,9 +11,8 @@ import { MUTED, RULE } from './theme'
 const CHART_WIDTH = 470
 
 /**
- * pdfmake renders SVG strings without a CSS engine, so the stylesheet that the
- * HTML export relies on never reaches the labels: `<text>` needs presentation
- * attributes instead. `<title>` only exists for HTML tooltips.
+ * pdfmake renders SVG without a CSS engine, so labels need presentation
+ * attributes. `<title>` exists only for HTML tooltips.
  */
 function toPdfSvg(svg: string): string {
   return svg
@@ -21,7 +20,7 @@ function toPdfSvg(svg: string): string {
     .replace(/<text /g, `<text fill="${MUTED}" font-size="10" `)
 }
 
-/** Colour-coded text, since a PDF legend cannot lean on CSS swatches. */
+/** Colour-coded text — a PDF legend cannot lean on CSS swatches. */
 function legendRuns(legend: ReportChartLegendItem[]): Content[] {
   const runs: Content[] = []
   legend.forEach((item, index) => {

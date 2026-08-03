@@ -164,11 +164,8 @@ export async function computeDerivedTable(
 
     const transformDef = snapshot.node.plan.transformDef
     if (transformDef.type === 'join' || transformDef.type === 'union') {
-      // Defense-in-depth beyond the TransformModal pre-check: upstream data can
-      // change after this join/union was created (edits, imports, undo), so a
-      // combination that was safe at creation time can later fan out into a
-      // browser-crashing row count. Estimate before materializing so we fail
-      // with a clear message instead of an engine Out of Memory crash.
+      // Upstream data can change after join/union creation, so re-estimate output
+      // size before materializing and fail clearly instead of browser/engine OOM.
       const estimatedRows = await engine.countCombinedTransformRows(
         transformDef as Extract<TransformDef, { type: 'join' | 'union' }>,
         columnIdToName,

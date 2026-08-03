@@ -100,7 +100,4 @@ export interface ReportStoreState {
   deleteReport: (id: string) => void;
   selectReport: (id: string | null) => void;
   flushSaves: () => Promise<void>;
-
-  // Selectors
-  getReport: (id: string) => Report | undefined;
 }

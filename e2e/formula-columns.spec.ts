@@ -1,24 +1,17 @@
 import { expect, test } from './e2e.fixture'
-import { bootApp } from './app.support'
+import { bootApp, importCsv } from './app.support'
 
 test('formula columns can be created, edited, deleted, and reloaded', async ({ page }) => {
   await bootApp(page)
 
-  const csv = [
+  await importCsv(page, 'Formula Regression', [
     'product,price,quantity',
     'Laptop,950,25',
     'Mouse,15,150',
-  ].join('\n')
-  await page.locator('aside input[type="file"][accept*=".csv"]').setInputFiles({
-    name: 'Formula Regression.csv',
-    mimeType: 'text/csv',
-    buffer: Buffer.from(csv),
-  })
-
+  ])
   const table = page.locator('aside').getByRole('button', {
     name: /^Formula Regression\b/,
   })
-  await expect(table).toBeVisible({ timeout: 30_000 })
   await table.click()
   await expect(page.getByRole('gridcell').first()).toBeVisible({ timeout: 20_000 })
 
@@ -48,16 +41,13 @@ test('formula columns can be created, edited, deleted, and reloaded', async ({ p
   await page.getByRole('menuitem', { name: 'Delete Formula Column' }).click()
   await expect(page.getByText('2 rows × 3 columns')).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('columnheader', { name: /total/ })).toHaveCount(0)
+  // Debounced project save can lag the UI delete; wait before asserting idle save state.
   await page.waitForTimeout(250)
   await expect(page.getByText('Saving...')).toBeHidden({ timeout: 20_000 })
 
   await page.reload()
-  await expect(page.locator('aside').getByRole('button', {
-    name: /^Formula Regression\b/,
-  })).toBeVisible({ timeout: 20_000 })
-  await page.locator('aside').getByRole('button', {
-    name: /^Formula Regression\b/,
-  }).click()
+  await expect(table).toBeVisible({ timeout: 20_000 })
+  await table.click()
   await expect(page.getByRole('gridcell').first()).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('columnheader', { name: /total/ })).toHaveCount(0)
 })

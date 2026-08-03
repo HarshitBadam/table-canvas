@@ -33,25 +33,17 @@ export async function loginWithGoogle(credential: string): Promise<AuthResponse>
   });
 }
 
-/**
- * Get the current authenticated user
- * Uses skipAuth to prevent automatic token refresh loop
- */
+/** Uses skipAuth so a 401 on /auth/me does not trigger the client's refresh loop. */
 async function getCurrentUser(): Promise<{ user: User }> {
   return api.get<{ user: User }>('/auth/me', { skipAuth: true });
 }
 
-/**
- * Check if the user is authenticated
- * First tries to get current user, then attempts token refresh if needed
- */
 export async function checkAuth(): Promise<User | null> {
   try {
     const { user } = await getCurrentUser();
     return user;
   } catch (error) {
     if (error instanceof ApiError && error.statusCode === 401) {
-      // Access token expired or missing, try to refresh
       try {
         if (!await refreshSession()) return null;
         const { user } = await getCurrentUser();
@@ -61,7 +53,6 @@ export async function checkAuth(): Promise<User | null> {
         return null;
       }
     }
-    // Other error, assume not authenticated
     return null;
   }
 }

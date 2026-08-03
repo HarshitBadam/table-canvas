@@ -5,13 +5,9 @@ interface BrandMarkProps {
 }
 
 /**
- * Table Canvas mark: a stacked-sheets glyph matching `public/favicon.svg`.
- * Stroke-only and `currentColor`-based so it works on any background
- * (accent-tinted circles, solid tiles, plain text color).
- *
- * The back sheet is clipped by a mask shaped exactly like the front sheet's
- * rounded rect, rather than a hand-traced arc path — that keeps the two
- * strokes perfectly aligned at every render size instead of leaving a seam.
+ * Stacked-sheets mark matching `public/favicon.svg` (`currentColor` strokes).
+ * The back sheet is clipped with a mask of the front rect so the two strokes
+ * stay aligned at every size — a hand-traced arc leaves a seam.
  */
 export function BrandMark({ className }: BrandMarkProps) {
   const maskId = useId()

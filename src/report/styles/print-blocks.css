@@ -70,19 +70,6 @@
     margin: 8pt 0 !important;
   }
 
-  .toggle-block-content {
-    display: block !important;
-    padding-top: 8pt !important;
-  }
-
-  .toggle-block-trigger {
-    font-weight: 600 !important;
-  }
-
-  .toggle-block-trigger svg {
-    display: none !important;
-  }
-
   /* Prevent awkward breaks */
   h1, h2, h3, h4 {
     page-break-after: avoid !important;
@@ -102,16 +89,6 @@
     break-inside: avoid !important;
   }
 
-  .page-break-before {
-    page-break-before: always !important;
-    break-before: page !important;
-  }
-
-  .page-break-avoid-after {
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-  }
-
   /* TipTap content blocks - keep together */
   .tiptap-block-wrapper {
     page-break-inside: avoid !important;
@@ -119,7 +96,7 @@
   }
 
   /* Keep content sections together */
-  section, article, .content-block {
+  section, article {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }

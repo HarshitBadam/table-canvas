@@ -276,7 +276,7 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
     await handleDuplicate()
   }
 
-  const focusProjectOption = (position: 'first' | 'last' | 'active') => {
+  const focusProjectOption = (position: 'last' | 'active') => {
     requestAnimationFrame(() => {
       const options = Array.from(
         menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? [],
@@ -286,13 +286,8 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
         options.at(-1)?.focus()
         return
       }
-      if (position === 'active') {
-        const active = options.find(option => option.getAttribute('aria-selected') === 'true')
-        const optionToFocus = active ?? options[0]
-        optionToFocus.focus()
-        return
-      }
-      options[0].focus()
+      const active = options.find(option => option.getAttribute('aria-selected') === 'true')
+      ;(active ?? options[0]).focus()
     })
   }
 
@@ -436,10 +431,6 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
             onRenameFromActions={openRenameForProject}
             onDuplicateFromActions={duplicateProjectFromActions}
             onRenameNameChange={setRenameName}
-            onRenameStart={() => {
-              setRenameName(projectName)
-              setIsRenaming(true)
-            }}
             onRenameCancel={() => setIsRenaming(false)}
             onRenameSubmit={handleRename}
             setProjectLimitViolation={setProjectLimitViolation}

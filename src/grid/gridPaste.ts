@@ -54,6 +54,7 @@ export function parseTabularClipboard(text: string): string[][] {
 
   rows.at(-1)!.push(field)
 
+  // Spreadsheet TSV usually ends with a newline; drop that empty trailing row.
   if (
     rows.length > 1
     && rows.at(-1)!.length === 1
@@ -63,6 +64,7 @@ export function parseTabularClipboard(text: string): string[][] {
     rows.pop()
   }
 
+  // Excel/Windows clipboard text may start with a UTF-8 BOM.
   if (rows[0]?.[0]?.startsWith('\uFEFF')) {
     rows[0][0] = rows[0][0].slice(1)
   }

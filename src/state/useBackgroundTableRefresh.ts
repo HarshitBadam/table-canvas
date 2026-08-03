@@ -7,17 +7,14 @@ import { getNodeCacheInfo, useTableRuntimeStore } from './tableRuntimeStore'
 
 const REFRESH_DEBOUNCE_MS = 350
 
-/** Best known row count for a table we have not (re)materialized in this tab yet. */
 function estimateTableSize(node: ProjectNode | undefined, cacheInfo: CacheInfo | undefined): number {
   const schemaRowCount = node && 'schema' in node ? node.schema?.rowCount : undefined
   return cacheInfo?.lastRowCount ?? schemaRowCount ?? 0
 }
 
 /**
- * Dirty tables in an order that respects dependencies (a table always comes after
- * everything it reads from) and, within that constraint, smallest first. A single
- * huge table landing first in the shared materialization queue would otherwise make
- * every unrelated small table sit and wait behind it before its own turn comes up.
+ * Dirty tables in dependency order, then smallest-first within a level, so one
+ * huge table does not block unrelated small tables in the shared materialization queue.
  */
 export function getDirtyTableRefreshOrder(
   nodes: Record<string, ProjectNode>,
@@ -45,10 +42,8 @@ export function getDirtyTableRefreshOrder(
 }
 
 /**
- * Recomputes stale tables after an edit burst. Grid and chart readers materialize
- * their own table on demand; this fills the gap for downstream tables that are not
- * currently open. Progress is silent so undo/redo does not flash Updating badges
- * across the canvas.
+ * Silently rematerializes dirty downstream tables after an edit burst (open grid/
+ * chart readers already materialize on demand). Silence avoids Updating-badge flash on undo/redo.
  */
 export function useBackgroundTableRefresh(enabled: boolean): void {
   const projectId = useProjectStore(state => state.projectId)
@@ -60,10 +55,9 @@ export function useBackgroundTableRefresh(enabled: boolean): void {
     [cacheInfo, edges, nodes],
   )
   const refreshKey = refreshOrder.join('|')
-  // prepareProjectState marks every table dirty as soon as a project loads, so the
-  // very first drain for a project is that load's warm-up, not an edit burst — start
-  // it immediately so small tables finish (and clear their loading badge) inside the
-  // canvas node's own anti-flash window instead of waiting out the debounce first.
+  // prepareProjectState dirties every table on load; the first drain is that warm-up,
+  // so start immediately and clear small-table loading badges inside the canvas
+  // anti-flash window instead of waiting out the edit debounce.
   const initialDrainProjectIdRef = useRef<string | null>(null)
 
   useEffect(() => {

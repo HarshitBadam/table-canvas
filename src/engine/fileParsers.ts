@@ -11,7 +11,6 @@ import {
 } from './tabularParser'
 
 export type { ParsedTableData, CsvParseOptions }
-export { processTabularData }
 
 export async function parseFileData(
   fileData: ArrayBuffer,
@@ -61,8 +60,9 @@ export function parseWorkbookSheet(
 
   const data = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 })
   if (data.length === 0) {
-    // Preserve header validation for rematerialization of empty sheets.
-    return processTabularData([], schema?.columns.map(column => column.sourceName ?? column.name) ?? [], schema)
+    // Empty sheets still need header validation when rematerializing against a schema.
+    const headers = schema?.columns.map(column => column.sourceName ?? column.name) ?? []
+    return processTabularData([], headers, schema)
   }
 
   const headers = (data[0] as unknown[]).map((value, index) =>

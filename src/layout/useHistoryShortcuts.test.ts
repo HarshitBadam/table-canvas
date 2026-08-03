@@ -41,7 +41,6 @@ interface Keys {
   altKey?: boolean
 }
 
-/** Dispatches a keydown the way the browser would, and reports if it was consumed. */
 function press(view: ViewMode, keys: Keys, from?: HTMLElement): boolean {
   renderHook(() => useHistoryShortcuts(view))
   const event = new KeyboardEvent('keydown', { key: 'z', bubbles: true, cancelable: true, ...keys })

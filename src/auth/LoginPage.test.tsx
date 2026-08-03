@@ -5,7 +5,6 @@ import { LoginPage } from './LoginPage'
 
 const auth = vi.hoisted(() => ({
   continueAsGuest: vi.fn(),
-  login: vi.fn(),
   googleLogin: vi.fn(),
 }))
 

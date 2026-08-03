@@ -229,7 +229,6 @@ export function useSuggestionsPanel(
 
   const categoryCounts = useCategoryCounts(
     cachedSuggestions,
-    tableId,
     effectiveCleaningCount,
     dismissedIds,
   )

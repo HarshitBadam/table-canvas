@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useProjectStore } from '@/state/projectStore';
 import { useReportStore } from './reportStore';
 
-export type ReportExportFormat = 'pdf' | 'html';
+type ReportExportFormat = 'pdf' | 'html';
 
 export interface ReportExport {
   /** The format currently being exported, or null when idle. */
@@ -12,11 +12,9 @@ export interface ReportExport {
 }
 
 /**
- * Exports the open report as a PDF or an HTML file.
- *
- * Pending edits are flushed first so the export always reflects what the user
- * sees, then the stored document is serialised. Reads state at call time rather
- * than through subscriptions to keep the callback stable.
+ * Pending edits are flushed first so the export reflects what the user sees,
+ * then the stored document is serialised. Reads state at call time rather than
+ * through subscriptions to keep the callback stable.
  */
 export function useReportExport(): ReportExport {
   const [exporting, setExporting] = useState<ReportExportFormat | null>(null);

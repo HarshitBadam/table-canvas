@@ -36,6 +36,13 @@ function expectedRevision(value: unknown): number {
   return value as number;
 }
 
+// Optimistic lock: revision 0 also matches documents that predate the field.
+function revisionLockFilter(revision: number) {
+  return revision === 0
+    ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] }
+    : { revision };
+}
+
 function validateProjectPayload(body: Record<string, unknown>): void {
   const objectFields = ['nodes', 'edges', 'patches', 'reports'] as const;
   for (const field of objectFields) {
@@ -78,9 +85,7 @@ async function updateOwnedProject(
     if (body[field] !== undefined) updates[field] = body[field];
   }
 
-  const revisionFilter = revision === 0
-    ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] }
-    : { revision };
+  const lockFilter = revisionLockFilter(revision);
   const ownershipFilter = {
     _id: new Types.ObjectId(projectId),
     userId: new Types.ObjectId(userId),
@@ -88,7 +93,7 @@ async function updateOwnedProject(
   };
   const currentProject = await Project.findOne({
     ...ownershipFilter,
-    ...revisionFilter,
+    ...lockFilter,
   });
   if (!currentProject) {
     const exists = await Project.exists(ownershipFilter);
@@ -105,7 +110,7 @@ async function updateOwnedProject(
   const project = await Project.findOneAndUpdate(
     {
       ...ownershipFilter,
-      ...revisionFilter,
+      ...lockFilter,
     },
     {
       $set: updates,
@@ -119,12 +124,28 @@ async function updateOwnedProject(
   );
 }
 
-// All project routes require authentication
-router.use(requireAuth);
+async function handleProjectWrite(req: AuthenticatedRequest, res: Response) {
+  const userId = req.user!.userId;
+  const projectId = req.params.id;
+  if (!Types.ObjectId.isValid(projectId)) {
+    throw new ValidationError(['Invalid project ID format']);
+  }
 
-// ============================================================================
-// GET /api/projects - List user's projects
-// ============================================================================
+  const userDoc = await User.findById(userId);
+  const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
+  const project = await updateOwnedProject(projectId, userId, req.body, tier);
+
+  const response: ApiResponse<{ project: IProjectPublic }> = {
+    success: true,
+    data: {
+      project: project.toPublic(),
+    },
+  };
+
+  res.json(response);
+}
+
+router.use(requireAuth);
 
 router.get(
   '/',
@@ -148,10 +169,6 @@ router.get(
     res.json(response);
   })
 );
-
-// ============================================================================
-// POST /api/projects - Create new project
-// ============================================================================
 
 router.post(
   '/',
@@ -190,17 +207,12 @@ router.post(
   })
 );
 
-// ============================================================================
-// GET /api/projects/:id - Get project by ID
-// ============================================================================
-
 router.get(
   '/:id',
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const projectId = req.params.id;
 
-    // Validate ObjectId format
     if (!Types.ObjectId.isValid(projectId)) {
       throw new ValidationError(['Invalid project ID format']);
     }
@@ -222,70 +234,8 @@ router.get(
   })
 );
 
-// ============================================================================
-// PUT /api/projects/:id - Update project
-// ============================================================================
-
-router.put(
-  '/:id',
-  projectWriteLimiter,
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.user!.userId;
-    const projectId = req.params.id;
-    // Validate ObjectId format
-    if (!Types.ObjectId.isValid(projectId)) {
-      throw new ValidationError(['Invalid project ID format']);
-    }
-
-    const userDoc = await User.findById(userId);
-    const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
-    const project = await updateOwnedProject(projectId, userId, req.body, tier);
-
-    const response: ApiResponse<{ project: IProjectPublic }> = {
-      success: true,
-      data: {
-        project: project.toPublic(),
-      },
-    };
-
-    res.json(response);
-  })
-);
-
-// ============================================================================
-// PATCH /api/projects/:id - Partial update project
-// ============================================================================
-
-router.patch(
-  '/:id',
-  projectWriteLimiter,
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.user!.userId;
-    const projectId = req.params.id;
-
-    // Validate ObjectId format
-    if (!Types.ObjectId.isValid(projectId)) {
-      throw new ValidationError(['Invalid project ID format']);
-    }
-
-    const userDoc = await User.findById(userId);
-    const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
-    const project = await updateOwnedProject(projectId, userId, req.body, tier);
-
-    const response: ApiResponse<{ project: IProjectPublic }> = {
-      success: true,
-      data: {
-        project: project.toPublic(),
-      },
-    };
-
-    res.json(response);
-  })
-);
-
-// ============================================================================
-// DELETE /api/projects/:id - Permanently delete project
-// ============================================================================
+router.put('/:id', projectWriteLimiter, asyncHandler(handleProjectWrite));
+router.patch('/:id', projectWriteLimiter, asyncHandler(handleProjectWrite));
 
 router.delete(
   '/:id',
@@ -294,21 +244,17 @@ router.delete(
     const userId = req.user!.userId;
     const projectId = req.params.id;
 
-    // Validate ObjectId format
     if (!Types.ObjectId.isValid(projectId)) {
       throw new ValidationError(['Invalid project ID format']);
     }
 
     const revision = expectedRevision(req.body.expectedRevision);
-    const revisionFilter = revision === 0
-      ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] }
-      : { revision };
     const project = await Project.findOneAndDelete(
       {
         _id: new Types.ObjectId(projectId),
         userId: new Types.ObjectId(userId),
         deletedAt: null,
-        ...revisionFilter,
+        ...revisionLockFilter(revision),
       },
     );
 

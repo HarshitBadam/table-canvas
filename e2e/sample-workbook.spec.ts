@@ -3,7 +3,12 @@ import { expect, test } from './e2e.fixture'
 import { resolve } from 'node:path'
 import * as XLSX from 'xlsx'
 import { installMockBackend } from './derived-tables.support'
-import { downloadProjectZip, openCanvasView } from './app.support'
+import {
+  createManualTable,
+  downloadProjectZip,
+  openCanvasView,
+  openManualTable,
+} from './app.support'
 
 const workbookPath = resolve(process.cwd(), 'data/sample_workbook.xlsx')
 const expectedRows: Record<string, number> = {
@@ -23,11 +28,33 @@ async function downloadWorkbook(page: Page): Promise<XLSX.WorkBook> {
   return XLSX.read(workbookBytes, { type: 'buffer' })
 }
 
-test('every sample workbook sheet retains its rows through reload and export', async ({ page }) => {
-  test.setTimeout(120_000)
+function asideTableButton(page: Page, name: string, rowCount: number) {
+  return page.locator('aside').getByRole('button', {
+    name: new RegExp(`^${name} .*${rowCount} rows`),
+  })
+}
+
+function projectHasCellPatches(
+  backend: { getProject: () => { patches?: Record<string, unknown> } | null },
+) {
+  const patches = backend.getProject()?.patches ?? {}
+  return Object.values(patches).some((value) => {
+    const tablePatches = value as { cellPatches?: Record<string, Record<string, unknown>> }
+    return Object.values(tablePatches.cellPatches ?? {})
+      .some(column => Object.keys(column).length > 0)
+  })
+}
+
+async function bootMockedApp(page: Page) {
   const backend = await installMockBackend(page)
   await page.goto('/')
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+  return backend
+}
+
+test('every sample workbook sheet retains its rows through reload and export', async ({ page }) => {
+  test.setTimeout(120_000)
+  const backend = await bootMockedApp(page)
 
   await page.locator('aside input[type="file"][accept*=".xlsx"]').setInputFiles(workbookPath)
   const sheetDialog = page.getByRole('dialog')
@@ -37,10 +64,7 @@ test('every sample workbook sheet retains its rows through reload and export', a
   await expect(sheetDialog).toBeHidden({ timeout: 30_000 })
 
   for (const [sheetName, rowCount] of Object.entries(expectedRows)) {
-    const tableButton = page.locator('aside').getByRole('button', {
-      name: new RegExp(`^${sheetName} .*${rowCount} rows`),
-    })
-    await expect(tableButton).toBeVisible()
+    await expect(asideTableButton(page, sheetName, rowCount)).toBeVisible()
   }
 
   await expect.poll(
@@ -51,9 +75,7 @@ test('every sample workbook sheet retains its rows through reload and export', a
   await page.reload()
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
   for (const [sheetName, rowCount] of Object.entries(expectedRows)) {
-    await expect(page.locator('aside').getByRole('button', {
-      name: new RegExp(`^${sheetName} .*${rowCount} rows`),
-    })).toBeVisible()
+    await expect(asideTableButton(page, sheetName, rowCount)).toBeVisible()
   }
 
   const exported = await downloadWorkbook(page)
@@ -69,19 +91,10 @@ test('every sample workbook sheet retains its rows through reload and export', a
 
 test('an edit made immediately before export is included in the workbook', async ({ page }) => {
   test.setTimeout(60_000)
-  const backend = await installMockBackend(page)
-  await page.goto('/')
-  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+  const backend = await bootMockedApp(page)
 
-  await page.locator('aside').getByRole('button', { name: 'New Table' }).click()
-  const dialog = page.getByRole('dialog')
-  await dialog.getByPlaceholder('Enter table name').fill('Immediate Export')
-  await dialog.getByRole('button', { name: 'Create Table' }).click()
-  await expect(dialog).toBeHidden()
-
-  await page.locator('aside').getByRole('button', {
-    name: /^Immediate Export .*5 rows/,
-  }).click()
+  await createManualTable(page, 'Immediate Export')
+  await openManualTable(page, 'Immediate Export')
   const firstCell = page.locator('.cursor-cell').first()
   await expect(firstCell).toBeVisible({ timeout: 10_000 })
   await firstCell.dblclick()
@@ -90,14 +103,10 @@ test('an edit made immediately before export is included in the workbook', async
   await editor.press('Enter')
   await expect(firstCell).toContainText('Exported immediately')
 
-  await expect.poll(() => {
-    const patches = backend.getProject()?.patches ?? {}
-    return Object.values(patches).some((value) => {
-      const tablePatches = value as { cellPatches?: Record<string, Record<string, unknown>> }
-      return Object.values(tablePatches.cellPatches ?? {})
-        .some(column => Object.keys(column).length > 0)
-    })
-  }, { timeout: 10_000 }).toBe(true)
+  await expect.poll(
+    () => projectHasCellPatches(backend),
+    { timeout: 10_000 },
+  ).toBe(true)
 
   await page.reload()
   await openCanvasView(page)
@@ -112,9 +121,7 @@ test('an edit made immediately before export is included in the workbook', async
 
 test('an applied cleaning suggestion survives undo, redo, reload, and export', async ({ page }) => {
   test.setTimeout(90_000)
-  const backend = await installMockBackend(page)
-  await page.goto('/')
-  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+  const backend = await bootMockedApp(page)
 
   await page.locator('aside input[type="file"][accept*=".csv"]').setInputFiles({
     name: 'cleaning-sample.csv',
@@ -130,9 +137,7 @@ test('an applied cleaning suggestion survives undo, redo, reload, and export', a
   })
   await expect(page.locator('aside').getByRole('button', { name: 'Import Data' }))
     .toBeEnabled({ timeout: 20_000 })
-  await page.locator('aside').getByRole('button', {
-    name: /^cleaning-sample .*5 rows/,
-  }).click()
+  await asideTableButton(page, 'cleaning-sample', 5).click()
   await expect(page.locator('.cursor-cell').first()).toBeVisible({ timeout: 15_000 })
 
   await page.getByRole('button', { name: 'Suggestions', exact: true }).click()
@@ -158,14 +163,10 @@ test('an applied cleaning suggestion survives undo, redo, reload, and export', a
   await expect(page.locator('.cursor-cell').first()).toHaveText('', { timeout: 20_000 })
   await expect(page.locator('.cursor-cell').nth(2)).toHaveText('Alice')
 
-  await expect.poll(() => {
-    const patches = backend.getProject()?.patches ?? {}
-    return Object.values(patches).some((value) => {
-      const tablePatches = value as { cellPatches?: Record<string, Record<string, unknown>> }
-      return Object.values(tablePatches.cellPatches ?? {})
-        .some(column => Object.keys(column).length > 0)
-    })
-  }, { timeout: 10_000 }).toBe(true)
+  await expect.poll(
+    () => projectHasCellPatches(backend),
+    { timeout: 10_000 },
+  ).toBe(true)
 
   await page.reload()
   await openCanvasView(page)

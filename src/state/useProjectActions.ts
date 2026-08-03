@@ -164,8 +164,7 @@ export function useProjectActions({
       ))
       await prepareProject(duplicate)
       activate(duplicate)
-      // The copy inherits the source's content, so it inherits whether that
-      // content has ever left this browser too.
+      // Duplicate inherits unexported-work status from the source project.
       if (hasUnexportedActivity(getStorageScope(), [source.projectId])) {
         markProjectActive(getStorageScope(), duplicate.id)
       }

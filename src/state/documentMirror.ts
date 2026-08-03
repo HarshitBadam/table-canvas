@@ -70,7 +70,6 @@ function changedTableIds(
   return changed
 }
 
-/** Replaces this tab's in-memory document with a durable snapshot. */
 export function applyDocumentSnapshot(snapshot: {
   name: string
   nodes: Record<string, ProjectNode>
@@ -213,7 +212,6 @@ function stopDocumentMirror(): void {
   session = null
 }
 
-/** Called after the editor commits a complete document to IndexedDB. */
 export function publishDocumentInvalidation(): void {
   session?.channel?.postMessage({
     type: 'document-changed',

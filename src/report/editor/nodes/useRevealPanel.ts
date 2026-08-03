@@ -1,10 +1,6 @@
 import { useEffect, type RefObject } from 'react';
 
-/**
- * Config panels render below their block. Scroll only as far as it takes to
- * bring the panel fully into view while retaining a small gap below it. Aligning
- * to the panel's end avoids leaving its footer flush with the viewport edge.
- */
+/** Scroll just far enough to bring a below-block config panel fully into view. */
 export function useRevealPanel(panelRef: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const panel = panelRef.current;

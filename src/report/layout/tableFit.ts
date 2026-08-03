@@ -1,23 +1,13 @@
 /**
- * Decides how a table should be laid out on a fixed-width page.
+ * Content-measured table layout for a fixed page width.
  *
- * Column count is a poor proxy for width: twenty integer columns fit a landscape
- * page comfortably, while eight columns of prose do not fit a portrait one. So
- * every layout decision here is driven by measured content instead, and the
- * exporters ask this module rather than carrying their own thresholds.
- *
- * The escalation is ordered by what it costs the reader: shrink the type, then
- * turn the page sideways, then split the columns across stacked bands, and only
- * then drop columns. Nothing silently shrinks past legibility — the type floor is
- * the last candidate in the list, and a table that cannot fit at that size is
- * split rather than crushed.
+ * Escalation by reader cost: shrink type, then landscape, then band columns,
+ * then omit. The type floor is the last candidate; past that the table splits
+ * rather than shrinking past legibility.
  */
 
 import { measureColumns, type ColumnMetric } from './columnMetrics'
 
-export type { ColumnMetric }
-
-/** A type size paired with the cell padding that suits it. */
 export interface FitCandidate {
   fontSize: number
   paddingX: number
@@ -25,11 +15,10 @@ export interface FitCandidate {
 }
 
 export interface TableBand {
-  /** Column indices in render order, including a repeated key column if any. */
   columns: number[]
   /** Content widths aligned with `columns`, in the same unit as `fontSize`. */
   widths: number[]
-  /** Position of the repeated key column within `columns`, or null if not added. */
+  /** Index of the repeated key column within `columns`, or null if not added. */
   repeatedKey: number | null
   /** 1-based inclusive range of the band's own columns in the original table. */
   range: [number, number]
@@ -41,27 +30,23 @@ export interface TableFitPlan {
   paddingY: number
   /** Set when a column had to be narrower than its longest word. */
   breakAnywhere: boolean
-  /** Whether the table asked for a sideways page. */
   landscape: boolean
-  /** One entry unless the table was split; bands render stacked, in order. */
   bands: TableBand[]
-  /** Columns dropped because not even banding could fit them. */
+  /** Columns dropped because banding still could not fit them. */
   omitted: number[]
   /** Set when the table exceeds its budget and the medium must scroll it. */
   overflow: boolean
 }
 
-export interface FitOptions {
-  /** Usable width of the default page or container. */
+interface FitOptions {
   portraitWidth: number
-  /** Usable width when turned sideways; omit where that isn't possible. */
+  /** Omit where landscape is unavailable (nested blocks, screen scroll). */
   landscapeWidth?: number
-  /** Whether the table may be split into bands. Screen media scroll instead. */
+  /** Screen media scroll instead of banding. */
   allowBanding: boolean
-  /** Type sizes to try, widest-first. The last entry is the floor. */
+  /** Type sizes widest-first; the last entry is the legibility floor. */
   candidates: FitCandidate[]
   maxBands?: number
-  /** Passed through to measurement; see `MeasureOptions`. */
   naturalPercentile?: number
   maxNaturalEm?: number
 }
@@ -79,12 +64,8 @@ function contentBudget(available: number, columnCount: number, paddingX: number)
 }
 
 /**
- * Divides a budget among columns, or reports that they cannot fit.
- *
- * Fixed-width columns are served their measured width first and flexible ones
- * absorb the shortfall by wrapping, which is the whole point: a date column keeps
- * its ten characters while a description column takes three lines, instead of
- * both being squeezed to the same unreadable sliver.
+ * Allocates a budget: fixed columns keep measured width; flexible ones absorb
+ * shortfall by wrapping so dates stay readable while prose takes extra lines.
  */
 function allocate(
   metrics: ColumnMetric[],
@@ -96,8 +77,7 @@ function allocate(
   const naturalTotal = sum(natural)
 
   if (naturalTotal <= budgetEm) {
-    // Spare room goes to the columns that can use it. Numbers gain nothing from
-    // a wider cell, so padding them out just to fill the line wastes the page.
+    // Spare room goes to flexible columns; padding fixed columns just wastes space.
     const slack = budgetEm - naturalTotal
     const flexible = columns.map((index, position) => (
       metrics[index].flexible ? natural[position] : 0
@@ -152,10 +132,7 @@ function splitContiguous(
 
 /**
  * Builds bands, repeating the key column so every band identifies its rows.
- *
- * Without a repeated identifier a band is a wall of values with no way to tell
- * which record each row belongs to, so a band that cannot afford the key column
- * is treated as not fitting at all.
+ * A band that cannot afford the key is treated as not fitting.
  */
 function buildBands(
   metrics: ColumnMetric[],
@@ -233,12 +210,9 @@ function overflowPlan(
 
 /**
  * Walks the escalation ladder and returns the first layout that fits.
- *
- * Order is by reader cost, not implementation convenience: staying portrait at a
- * smaller size is less disruptive than rotating the page, and rotating is less
- * disruptive than splitting a record across bands.
+ * Portrait at a smaller size beats landscape; landscape beats banding.
  */
-export function planTableFit(metrics: ColumnMetric[], options: FitOptions): TableFitPlan {
+function planTableFit(metrics: ColumnMetric[], options: FitOptions): TableFitPlan {
   const columns = metrics.map((_, index) => index)
   const candidates = options.candidates
   const floor = candidates[candidates.length - 1]
@@ -269,8 +243,7 @@ export function planTableFit(metrics: ColumnMetric[], options: FitOptions): Tabl
 
   if (!options.allowBanding) return overflowPlan(metrics, columns, floor)
 
-  // Band on the widest page available, since every extra band is another page the
-  // reader has to hold in their head.
+  // Prefer the widest page: each extra band is another page the reader holds in mind.
   const landscape = Boolean(options.landscapeWidth)
   const available = options.landscapeWidth ?? options.portraitWidth
   const maxBands = options.maxBands ?? DEFAULT_MAX_BANDS
@@ -281,9 +254,8 @@ export function planTableFit(metrics: ColumnMetric[], options: FitOptions): Tabl
     if (bands) return toPlan(metrics, bands, floor, landscape)
   }
 
-  // Past the band ceiling, reconstructing one record means flipping through too
-  // many pages to be worth it, so the table keeps its leading columns and says
-  // what it dropped. The full data ships alongside the report regardless.
+  // Past the band ceiling, keep leading columns and report what was dropped.
+  // Full data still ships alongside the report.
   for (let count = columns.length - 1; count >= 2; count--) {
     const kept = columns.slice(0, count)
     for (let bandCount = 1; bandCount <= maxBands; bandCount++) {
@@ -316,7 +288,6 @@ function singleBand(
   }]
 }
 
-/** Convenience wrapper for callers that hold rendered cell text. */
 export function fitTable(
   headers: string[],
   rows: string[][],
@@ -332,9 +303,7 @@ export function fitTable(
 }
 
 /**
- * Labels a band so a reader can tell the table was split and what they are
- * looking at. Without this the split is invisible and the band reads as the
- * whole table.
+ * Labels a band so a split is visible; without this a band reads as the whole table.
  */
 export function bandLabel(
   band: TableBand,
@@ -351,7 +320,6 @@ export function bandLabel(
   return band.repeatedKey === null ? base : `${base} · “${keyHeader}” repeated`
 }
 
-/** Note naming the columns a layout had to drop. */
 export function omittedNote(omitted: number[], headers: string[]): string | undefined {
   if (omitted.length === 0) return undefined
   const names = omitted.map((index) => headers[index]).filter(Boolean)

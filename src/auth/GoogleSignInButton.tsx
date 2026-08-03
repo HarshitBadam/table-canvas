@@ -79,8 +79,7 @@ export function GoogleSignInButton({ onCredential, busy = false }: GoogleSignInB
       use_fedcm_for_button: true,
     })
 
-    // The rendered iframe is sized once, so it has to be re-rendered whenever the
-    // panel width changes; otherwise the invisible click target drifts off the face.
+    // GIS sizes the iframe once; re-render on width changes or the invisible hit target drifts.
     let renderedWidth = 0
     const draw = () => {
       const width = Math.round(host.offsetWidth)

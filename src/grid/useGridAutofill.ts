@@ -43,6 +43,29 @@ export function useGridAutofill({
     return { startRow: rowIndex, endRow: rowIndex }
   }, [cellRangeSelection, columns])
 
+  const collectSourceValues = useCallback((
+    columnId: string,
+    startRow: number,
+    endRow: number,
+  ): CellValue[] => {
+    const sourceValues: CellValue[] = []
+    for (let index = startRow; index <= endRow; index++) {
+      const row = getRowAtIndex(index)
+      if (row) {
+        sourceValues.push(getDisplayValue(row.__rowId, columnId, row[columnId], row))
+      }
+    }
+    return sourceValues
+  }, [getDisplayValue, getRowAtIndex])
+
+  const resetAutofillState = useCallback(() => {
+    setAutofillDragging(false)
+    setAutofillEndRow(null)
+    setAutofillPreview([])
+    autofillColumnId.current = null
+    autofillSourceRange.current = null
+  }, [])
+
   const handleAutofillStart = useCallback((rowIndex: number, columnId: string) => {
     if (!isEditable) return
     if (columns.find(column => column.id === columnId)?.isComputed) return
@@ -58,7 +81,6 @@ export function useGridAutofill({
     if (!autofillDragging || !autofillColumnId.current) return
 
     const columnId = autofillColumnId.current
-
     const sourceRange = autofillSourceRange.current
     if (!sourceRange) return
     const { startRow: sourceStartRow, endRow: sourceEndRow } = sourceRange
@@ -71,28 +93,15 @@ export function useGridAutofill({
 
     setAutofillEndRow(targetRowIndex)
 
-    const sourceValues: CellValue[] = []
-    for (let i = sourceStartRow; i <= sourceEndRow; i++) {
-      const row = getRowAtIndex(i)
-      if (row) {
-        const value = getDisplayValue(row.__rowId, columnId, row[columnId], row)
-        sourceValues.push(value)
-      }
-    }
-
+    const sourceValues = collectSourceValues(columnId, sourceStartRow, sourceEndRow)
     if (sourceValues.length === 0) return
 
-    const pattern = detectPattern(sourceValues)
-    const count = targetRowIndex - sourceEndRow
-    const previewValues = generateNextValues(pattern, count)
-
-    const preview = previewValues.map((value, idx) => ({
+    const previewValues = generateNextValues(detectPattern(sourceValues), targetRowIndex - sourceEndRow)
+    setAutofillPreview(previewValues.map((value, idx) => ({
       rowIndex: sourceEndRow + idx + 1,
       value,
-    }))
-
-    setAutofillPreview(preview)
-  }, [autofillDragging, getRowAtIndex, getDisplayValue])
+    })))
+  }, [autofillDragging, collectSourceValues])
 
   const handleAutofillOneRow = useCallback((rowIndex: number, columnId: string) => {
     if (!isEditable) return
@@ -101,21 +110,15 @@ export function useGridAutofill({
     const targetRow = getRowAtIndex(sourceRange.endRow + 1)
     if (!targetRow) return
 
-    const sourceValues: CellValue[] = []
-    for (let index = sourceRange.startRow; index <= sourceRange.endRow; index++) {
-      const row = getRowAtIndex(index)
-      if (row) {
-        sourceValues.push(getDisplayValue(row.__rowId, columnId, row[columnId], row))
-      }
-    }
+    const sourceValues = collectSourceValues(columnId, sourceRange.startRow, sourceRange.endRow)
     if (sourceValues.length === 0) return
 
     const [nextValue] = generateNextValues(detectPattern(sourceValues), 1)
     saveSnapshot('Autofill')
     setCellValue(tableId, targetRow.__rowId, columnId, nextValue)
   }, [
+    collectSourceValues,
     getAutofillSourceRange,
-    getDisplayValue,
     isEditable,
     getRowAtIndex,
     saveSnapshot,
@@ -131,31 +134,19 @@ export function useGridAutofill({
     }
 
     const columnId = autofillColumnId.current
-
     const sourceRange = autofillSourceRange.current
     if (!sourceRange) {
       setAutofillDragging(false)
       setAutofillPreview([])
       return
     }
+
     const { startRow: sourceStartRow, endRow: sourceEndRow } = sourceRange
-
     const count = autofillEndRow - sourceEndRow
-
     if (count > 0) {
-      const sourceValues: CellValue[] = []
-      for (let i = sourceStartRow; i <= sourceEndRow; i++) {
-        const row = getRowAtIndex(i)
-        if (row) {
-          const value = getDisplayValue(row.__rowId, columnId, row[columnId], row)
-          sourceValues.push(value)
-        }
-      }
-
+      const sourceValues = collectSourceValues(columnId, sourceStartRow, sourceEndRow)
       if (sourceValues.length > 0) {
-        const pattern = detectPattern(sourceValues)
-        const newValues = generateNextValues(pattern, count)
-
+        const newValues = generateNextValues(detectPattern(sourceValues), count)
         saveSnapshot('Autofill')
         newValues.forEach((value, idx) => {
           const targetRow = getRowAtIndex(sourceEndRow + idx + 1)
@@ -166,20 +157,17 @@ export function useGridAutofill({
       }
     }
 
-    setAutofillDragging(false)
-    setAutofillEndRow(null)
-    setAutofillPreview([])
-    autofillColumnId.current = null
-    autofillSourceRange.current = null
-  }, [autofillDragging, autofillEndRow, getRowAtIndex, getDisplayValue, saveSnapshot, setCellValue, tableId])
-
-  const cancelAutofill = useCallback(() => {
-    setAutofillDragging(false)
-    setAutofillEndRow(null)
-    setAutofillPreview([])
-    autofillColumnId.current = null
-    autofillSourceRange.current = null
-  }, [])
+    resetAutofillState()
+  }, [
+    autofillDragging,
+    autofillEndRow,
+    collectSourceValues,
+    getRowAtIndex,
+    resetAutofillState,
+    saveSnapshot,
+    setCellValue,
+    tableId,
+  ])
 
   useEffect(() => {
     if (!autofillDragging) return
@@ -190,19 +178,19 @@ export function useGridAutofill({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        cancelAutofill()
+        resetAutofillState()
       }
     }
 
     document.addEventListener('mouseup', handleMouseUp)
     document.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('blur', cancelAutofill)
+    window.addEventListener('blur', resetAutofillState)
     return () => {
       document.removeEventListener('mouseup', handleMouseUp)
       document.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('blur', cancelAutofill)
+      window.removeEventListener('blur', resetAutofillState)
     }
-  }, [autofillDragging, cancelAutofill, handleAutofillEnd])
+  }, [autofillDragging, handleAutofillEnd, resetAutofillState])
 
   return {
     autofillDragging,
@@ -212,6 +200,5 @@ export function useGridAutofill({
     handleAutofillStart,
     handleAutofillMove,
     handleAutofillOneRow,
-    handleAutofillEnd,
   }
 }

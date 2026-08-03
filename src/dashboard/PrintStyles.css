@@ -1,12 +1,11 @@
 /**
  * Dashboard Print Styles
- * 
+ *
  * Minimal fallback for printing the dashboard with Cmd+P. Reports have a
  * dedicated "Export as PDF" action that renders its own paged document.
  */
 
 @media print {
-  /* Hide UI elements */
   aside,
   nav,
   header,
@@ -16,7 +15,6 @@
     display: none !important;
   }
 
-  /* Basic layout */
   body {
     background: white !important;
     color: black !important;
@@ -26,7 +24,7 @@
     width: 100% !important;
   }
 
-  /* Keep cards together */
+  /* Keep cards together across page breaks */
   .table-card {
     page-break-inside: avoid !important;
     border: 1px solid #ddd !important;

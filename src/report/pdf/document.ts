@@ -41,17 +41,15 @@ interface DocumentBody {
 }
 
 /**
- * Flattens the report's top-level nodes, resolving page orientation as it goes.
+ * Flattens top-level nodes while resolving page orientation.
  *
- * pdfmake only switches orientation at a page break, so a block that asked for a
- * landscape page leaves the flow landscape until the next block explicitly
- * breaks back to portrait. Doing that here — rather than emitting a separate
- * marker node — avoids a stray empty page when a wide table ends the report.
+ * pdfmake only switches orientation at a page break, so a landscape block leaves
+ * the flow landscape until the next block breaks back to portrait. Doing that
+ * here — rather than a separate marker — avoids a stray empty page when a wide
+ * table ends the report.
  *
- * A report that opens on a wide table is the other edge of the same problem: the
- * break would leave the title alone on a page of its own, which is most of what a
- * table-only report contains. Such a report opens sideways instead, so the title
- * travels with the table it belongs to.
+ * A report that opens on a wide table opens sideways so the title travels with
+ * the table instead of sitting alone on a portrait page.
  */
 function documentBody(report: Report, dataMap: EmbeddedDataMap): DocumentBody {
   const nodes = report.tiptapContent?.content ?? []
@@ -70,8 +68,8 @@ function documentBody(report: Report, dataMap: EmbeddedDataMap): DocumentBody {
       delete first.pageOrientation
       orientation = 'landscape'
     } else if (landscape && wantsLandscape && first) {
-      // The page is already sideways, so the break would only start a fresh one.
-      // Consecutive wide tables share a page and flow onto the next when full.
+      // Already landscape — a break would only start a fresh page. Consecutive
+      // wide tables share a page and flow onto the next when full.
       delete first.pageBreak
       delete first.pageOrientation
     } else if (landscape && !wantsLandscape && first) {
@@ -88,7 +86,7 @@ function documentBody(report: Report, dataMap: EmbeddedDataMap): DocumentBody {
   return { content, orientation }
 }
 
-export interface ReportDocumentOptions {
+interface ReportDocumentOptions {
   report: Report
   dataMap?: EmbeddedDataMap
   appName?: string
@@ -154,7 +152,6 @@ export function buildReportDocDefinition({
   }
 }
 
-/** Sanitised report name, matching the convention used by the other exporters. */
 export function reportPdfFilename(report: Report): string {
   const safe = (report.name || '').replace(/[^a-zA-Z0-9-_ ]/g, '_').trim().slice(0, 50)
   return `${safe || 'report'}.pdf`
