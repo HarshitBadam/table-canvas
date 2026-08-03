@@ -20,6 +20,7 @@ import { GridProvider, type GridContextValue } from './GridContext'
 import { GridViewport } from './GridViewport'
 import { GridFeedback, type GridFeedbackMessage } from './GridFeedback'
 import { DerivedTableEditDialog } from './DerivedTableEditDialog'
+import { describeEngineError } from './engineErrorPresentation'
 
 const SuggestionsPanel = lazy(() => import('@/suggestions/SuggestionsPanel').then(m => ({ default: m.SuggestionsPanel })))
 const ChartBuilder = lazy(() => import('@/charts/ChartBuilder').then(m => ({ default: m.ChartBuilder })))
@@ -232,6 +233,7 @@ export function GridView({ tableId }: GridViewProps) {
 
   const displayError = materializationError || computationError || windowed.error
   if (displayError) {
+    const presentation = describeEngineError(displayError, node.kind)
     return (
       <div className="flex flex-col h-full">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-surface">
@@ -247,15 +249,13 @@ export function GridView({ tableId }: GridViewProps) {
               </svg>
             </div>
             <h3 className="text-lg font-semibold text-text-primary mb-2">
-              {node.kind === 'derived_table' ? 'Computation Error' : 'Data Loading Error'}
+              {presentation.title}
             </h3>
             <p className="text-sm text-text-secondary mb-4">
-              {node.kind === 'derived_table'
-                ? 'This table could not be computed. Your source data and edits are unchanged.'
-                : 'This table could not be loaded. Your saved data is unchanged.'}
+              {presentation.description}
             </p>
             <details className="rounded-lg border border-error/20 bg-error-light p-3 text-left">
-              <summary className="cursor-pointer text-sm font-medium text-error-text">Technical details</summary>
+              <summary className="cursor-pointer text-sm font-medium text-error-text">Show raw error</summary>
               <code className="mt-2 block max-h-32 overflow-auto whitespace-pre-wrap break-words text-xs text-error-text">{displayError}</code>
             </details>
             <div className="mt-4 flex items-center justify-center gap-2">

@@ -40,3 +40,17 @@ const LIMITS: Record<Tier, TierLimits> = {
 export function getLimits(tier: Tier): TierLimits {
   return LIMITS[tier];
 }
+
+/**
+ * Hard technical ceiling on join/union output rows, independent of pricing
+ * tier (including 'google', which is otherwise exempt from row limits).
+ *
+ * DuckDB-Wasm runs entirely in the browser's in-memory heap (see
+ * engine/worker/engine.worker.ts, opened with `path: ':memory:'` and no
+ * temp_directory) with no ability to spill to disk. A join on a
+ * low-cardinality or duplicate-heavy key can multiply two modest tables into
+ * hundreds of millions or billions of output rows and crash the tab with an
+ * Out of Memory error. This constant exists purely to protect the browser
+ * process from that crash, not to gate features by plan.
+ */
+export const MAX_SAFE_TRANSFORM_OUTPUT_ROWS = 5_000_000;

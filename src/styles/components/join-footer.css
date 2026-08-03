@@ -90,7 +90,7 @@
 
 .join-btn-create:disabled {
   opacity: 0.4;
-  cursor: not-allowed;
+  cursor: pointer;
   box-shadow: none;
 }
 

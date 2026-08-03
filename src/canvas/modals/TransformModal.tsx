@@ -8,7 +8,7 @@ import { JoinType, type TransformDef } from '@/types'
 import { getEngine } from '@/engine/EngineAdapter'
 import { getTableData } from '@/engine/tableDataService'
 import { analyzeMatch, findBestKeys } from '@/canvas/joinUtils'
-import { checkRowCount, checkTableCount, type LimitExceeded } from '@/shared/enforce'
+import { checkRowCount, checkTableCount, checkTransformOutputSafety, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import { beginTableOperation } from '@/state/tableOperationCoordinator'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
@@ -181,27 +181,36 @@ export function TransformModal({
     setIsCreating(true)
     setCreateError(undefined)
     try {
+      // Materialize the inputs and count the SQL result before adding a target
+      // node. This is exact for both joins and appends, so an over-limit result
+      // never appears as a prolonged 0-row computing table. The safety check
+      // below runs for every tier (including tiers exempt from row limits),
+      // since it protects the browser tab from an Out of Memory crash rather
+      // than enforcing a plan limit.
+      const [left, right] = await Promise.all([
+        getTableData(sourceNodeId, 0, 1),
+        getTableData(targetNodeId, 0, 1),
+      ])
+      if (left.error || right.error) {
+        const failedTableName = left.error ? leftNode?.name : rightNode?.name
+        throw new Error(
+          `Unable to prepare ${failedTableName ?? 'an input table'}: ${left.error || right.error}`,
+        )
+      }
+      const columnIdToName = Object.fromEntries(
+        [...leftCols, ...rightCols].map(column => [column.id, column.name]),
+      )
+      const rowCount = await getEngine().countCombinedTransformRows(
+        transformDef,
+        columnIdToName,
+      )
+      const safetyCheck = checkTransformOutputSafety(rowCount)
+      if (!safetyCheck.ok) {
+        const action = operation === 'union' ? 'Appending these tables' : 'Joining these tables'
+        setCreateError(`${action} ${safetyCheck.reason}`)
+        return
+      }
       if (tier === 'guest') {
-        // Materialize the inputs and count the SQL result before adding a target
-        // node. This is exact for both joins and appends, so an over-limit guest
-        // result never appears as a prolonged 0-row computing table.
-        const [left, right] = await Promise.all([
-          getTableData(sourceNodeId, 0, 1),
-          getTableData(targetNodeId, 0, 1),
-        ])
-        if (left.error || right.error) {
-          const failedTableName = left.error ? leftNode?.name : rightNode?.name
-          throw new Error(
-            `Unable to prepare ${failedTableName ?? 'an input table'}: ${left.error || right.error}`,
-          )
-        }
-        const columnIdToName = Object.fromEntries(
-          [...leftCols, ...rightCols].map(column => [column.id, column.name]),
-        )
-        const rowCount = await getEngine().countCombinedTransformRows(
-          transformDef,
-          columnIdToName,
-        )
         const rowCheck = checkRowCount(rowCount, tier)
         if (!rowCheck.ok) {
           const action = operation === 'union' ? 'Appending these tables' : 'Joining these tables'
@@ -373,9 +382,12 @@ export function TransformModal({
             )}
 
             {createError && (
-              <p className="text-sm text-red-600" role="alert">
+              <div
+                className="rounded-lg bg-error-light px-3 py-2.5 text-sm font-medium leading-relaxed text-error-text"
+                role="alert"
+              >
                 {createError}
-              </p>
+              </div>
             )}
 
             <TransformOutputOptions

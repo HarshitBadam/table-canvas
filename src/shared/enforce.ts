@@ -1,5 +1,5 @@
 import type { Patches, ProjectNode } from '@/types'
-import { type Tier, getLimits } from './limits'
+import { type Tier, getLimits, MAX_SAFE_TRANSFORM_OUTPUT_ROWS } from './limits'
 
 interface LimitOk {
   ok: true
@@ -13,6 +13,14 @@ export interface LimitExceeded {
 }
 
 export type LimitCheck = LimitOk | LimitExceeded
+
+export interface SafetyLimitExceeded {
+  ok: false
+  reason: string
+  limit: number
+}
+
+export type SafetyCheck = LimitOk | SafetyLimitExceeded
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -41,6 +49,22 @@ export function checkRowCount(rowCount: number, tier: Tier): LimitCheck {
     reason: `Row count (${rowCount.toLocaleString()}) exceeds the ${maxRowsPerTable.toLocaleString()} row limit`,
     limit: maxRowsPerTable,
     tier,
+  }
+}
+
+/**
+ * Guards against joins/unions whose output would be too large for the
+ * browser tab's memory to hold, regardless of pricing tier. Unlike
+ * checkRowCount, this never exempts any tier — it protects against a
+ * crash, not a plan limit — so callers should treat a failure here as
+ * blocking rather than an upsell opportunity.
+ */
+export function checkTransformOutputSafety(rowCount: number): SafetyCheck {
+  if (rowCount <= MAX_SAFE_TRANSFORM_OUTPUT_ROWS) return { ok: true }
+  return {
+    ok: false,
+    reason: `would produce approximately ${rowCount.toLocaleString()} rows, which exceeds the ${MAX_SAFE_TRANSFORM_OUTPUT_ROWS.toLocaleString()}-row safety limit`,
+    limit: MAX_SAFE_TRANSFORM_OUTPUT_ROWS,
   }
 }
 
