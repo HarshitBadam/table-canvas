@@ -1,22 +1,22 @@
-export type { FormulaSuggestion } from './types'
+export type { FormulaSuggestion } from './evaluation/types'
 
 export {
   inferFormulaType,
   validateFormulaWithColumns,
-} from './evaluator'
+} from './evaluation/evaluator'
 
 export {
   getFunctionsByCategory,
-} from './functions'
+} from './functions/functions'
 
 export {
   suggestFormulasFromName,
-} from './suggestions'
+} from './suggestions/suggestions'
 
 export {
   canonicalizeFormulaReferences,
-} from './canonicalize'
+} from './evaluation/canonicalize'
 
 export {
   evaluateComputedColumns,
-} from './computedColumns'
+} from './evaluation/computedColumns'

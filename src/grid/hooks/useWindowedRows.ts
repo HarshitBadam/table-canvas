@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getEngine } from '@/engine/EngineAdapter'
-import { ensureTableMaterialized } from '@/engine/materializationService'
+import { ensureTableMaterialized } from '@/engine/materialization/materializationService'
 import type { ColumnSchema, ViewFilterConfig } from '@/types'
 import type { FilterConditionDef, SortDef, TableSlice } from '@/engine/types'
 import type { GridRow } from '../types'

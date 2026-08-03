@@ -1,0 +1,99 @@
+import { describe, expect, it } from 'vitest'
+import { createMockReport, getDB } from '@/persistence/storage/local-db/dbTestSupport'
+
+describe('storage ownership scopes', () => {
+  it('isolates projects, files, and reports with identical public IDs', async () => {
+    const db = await getDB()
+    const accountA = db.accountStorageScope('account-a')
+    const accountB = db.accountStorageScope('account-b')
+
+    db.setStorageScope(accountA)
+    await db.saveProject('same-project', 'Account A', {}, {}, {})
+    await db.saveFile(
+      'same-file',
+      'a.csv',
+      'text/csv',
+      new TextEncoder().encode('a').buffer,
+    )
+    await db.saveReport({
+      ...createMockReport('same-report', 'Report A'),
+      projectId: 'same-project',
+    })
+
+    db.setStorageScope(accountB)
+    await db.saveProject('same-project', 'Account B', {}, {}, {})
+    await db.saveFile(
+      'same-file',
+      'b.csv',
+      'text/csv',
+      new TextEncoder().encode('b').buffer,
+    )
+    await db.saveReport({
+      ...createMockReport('same-report', 'Report B'),
+      projectId: 'same-project',
+    })
+
+    expect((await db.loadProject('same-project'))?.name).toBe('Account B')
+    expect(new TextDecoder().decode(await db.loadFile('same-file') ?? undefined)).toBe('b')
+    expect((await db.loadReport('same-report'))?.name).toBe('Report B')
+
+    db.setStorageScope(accountA)
+    expect((await db.loadProject('same-project'))?.name).toBe('Account A')
+    expect(new TextDecoder().decode(await db.loadFile('same-file') ?? undefined)).toBe('a')
+    expect((await db.loadReport('same-report'))?.name).toBe('Report A')
+  })
+
+  it('quarantines legacy unscoped records from every workspace', async () => {
+    const db = await getDB()
+    const raw = await db.getDB()
+    await raw.put('projects', {
+      id: 'legacy-project',
+      name: 'Legacy guest work',
+      nodes: {},
+      edges: {},
+      patches: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+
+    db.setStorageScope(db.accountStorageScope('signed-user'))
+    expect(await db.loadProject('legacy-project')).toBeNull()
+
+    db.setStorageScope('guest:isolated-tab')
+    expect(await db.loadProject('legacy-project')).toBeNull()
+  })
+
+  it('re-keys reports when an offline account project is promoted', async () => {
+    const db = await getDB()
+    const account = db.accountStorageScope('promoted-user')
+    db.setStorageScope(account)
+    await db.saveReport({
+      ...createMockReport('report-1', 'Offline report'),
+      projectId: 'local-project',
+    })
+
+    await db.copyReportsToProject(
+      'local-project',
+      'server-project',
+      account,
+      account,
+    )
+    await db.deleteReportsForProject('local-project', account)
+
+    expect(await db.loadReportsForProject('local-project')).toEqual({})
+    expect((await db.loadReportsForProject('server-project'))['report-1']?.name)
+      .toBe('Offline report')
+  })
+
+  it('keeps guest scopes isolated from each other', async () => {
+    const db = await getDB()
+    db.setStorageScope('guest:tab-a')
+    await db.saveProject('same-project', 'Guest A', {}, {}, {})
+    db.setStorageScope('guest:tab-b')
+    await db.saveProject('same-project', 'Guest B', {}, {}, {})
+
+    expect((await db.loadProject('same-project'))?.name).toBe('Guest B')
+    db.setStorageScope('guest:tab-a')
+    expect((await db.loadProject('same-project'))?.name).toBe('Guest A')
+  })
+})

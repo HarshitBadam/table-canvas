@@ -28,7 +28,15 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/test/**/*.ts'],
+    files: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.spec.ts',
+      '**/*.spec.tsx',
+      'tests/**/*.ts',
+      'tests/**/*.tsx',
+      'server/tests/**/*.ts',
+    ],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
     },
@@ -37,11 +45,10 @@ export default tseslint.config(
     files: [
       'src/canvas/modals/TransformModal.tsx',
       'src/components/ImportButton.tsx',
-      'src/engine/materializationService.test.ts',
-      'src/engine/materializationService.ts',
-      'src/layout/ProjectSwitcher.tsx',
+      'src/engine/materialization/materializationService.ts',
+      'src/layout/project-controls/ProjectSwitcher.tsx',
       'src/report/editor/extensions/AtomicBlockNavigation.ts',
-      'src/state/stores/nodesSlice.ts',
+      'tests/unit/engine/materialization/materializationService.test.ts',
     ],
     rules: {
       // scripts/check-file-lines.mjs caps these legacy files at their current sizes.

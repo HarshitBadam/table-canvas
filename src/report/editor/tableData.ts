@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TableRow } from '@/state/dataStore';
 import { useProjectStore } from '@/state/projectStore';
 import { useNodeCacheInfo, useTableRuntimeStore } from '@/state/tableRuntimeStore';
-import { getTableData } from '@/engine/tableDataService';
+import { getTableData } from '@/engine/materialization/tableDataService';
 import type {
   AggregationType,
   TableNode as TableNodeType,

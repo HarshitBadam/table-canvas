@@ -10,11 +10,11 @@ import { useCallback, forwardRef, useImperativeHandle, useEffect, useRef, useSta
 import type { JSONContent } from '@tiptap/react';
 import type { GridClipboardData } from '@/grid/types';
 
-import { ChartNode } from './nodes/ChartNode';
-import { EmbeddedTableNode } from './nodes/EmbeddedTableNode';
-import { InlineTableNode } from './nodes/InlineTableNode';
-import { EditableTableNode } from './nodes/EditableTableNode';
-import { PasteTableHeadersModal } from './nodes/PasteTableHeadersModal';
+import { ChartNode } from './nodes/linked-data/ChartNode';
+import { EmbeddedTableNode } from './nodes/linked-data/EmbeddedTableNode';
+import { InlineTableNode } from './nodes/tables/InlineTableNode';
+import { EditableTableNode } from './nodes/tables/EditableTableNode';
+import { PasteTableHeadersModal } from './nodes/tables/PasteTableHeadersModal';
 import { ToggleNode } from './nodes/ToggleNode';
 import { CalloutNode } from './nodes/CalloutNode';
 import { SlashCommands } from './extensions/SlashCommands';

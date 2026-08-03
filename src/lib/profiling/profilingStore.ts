@@ -5,7 +5,7 @@ import type { CellValue, TableNode } from '@/types'
 import { useDataStore } from '@/state/dataStore'
 import { useProjectStore } from '@/state/projectStore'
 import { getNodeCacheInfo, useTableRuntimeStore } from '@/state/tableRuntimeStore'
-import { ensureTableMaterialized } from '@/engine/materializationService'
+import { ensureTableMaterialized } from '@/engine/materialization/materializationService'
 import { detectSemanticHints } from './semanticHints'
 
 export function getTableProfileVersionForNode(node: TableNode | undefined): string {

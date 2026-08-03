@@ -7,8 +7,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    setupFiles: ['./tests/support/setup.ts'],
+    include: ['tests/unit/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     exclude: ['**/node_modules/**', '**/.git/**', '**/*.scratch.test.ts'],
     coverage: {
       provider: 'v8',
@@ -16,8 +16,7 @@ export default defineConfig({
       reportsDirectory: './coverage',
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
-        'src/**/*.{test,spec}.{ts,tsx}',
-        'src/test/**',
+        'tests/**',
         'src/**/*.d.ts',
         'src/main.tsx',
         'src/vite-env.d.ts',
@@ -33,6 +32,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
+      '@test': resolve(__dirname, './tests/support'),
     },
   },
 })

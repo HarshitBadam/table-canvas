@@ -1,0 +1,237 @@
+import { describe, expect, it } from 'vitest'
+import request from 'supertest'
+import { Types } from 'mongoose'
+import { LIMITS } from '../../../src/config/limits.js'
+import { Project } from '../../../src/models/Project.js'
+import { User } from '../../../src/models/User.js'
+import {
+  createSampleEdge,
+  createSampleNode,
+  createTestProject,
+} from '../../support/helpers.js'
+import { setupMongoTestDB } from '../../support/setup.js'
+import { getProjectRoutesTestContext } from '../../support/projectRoutesTestSupport.js'
+
+setupMongoTestDB()
+
+describe('Projects API update and delete', () => {
+  describe('PUT /api/projects/:id', () => {
+    it('should update all fields', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+        name: 'Original',
+      })
+      const nodes = { newNode: createSampleNode('newNode') }
+      const edges = { newEdge: createSampleEdge('newEdge', 'a', 'b') }
+      const response = await request(app)
+        .put(`/api/projects/${project._id}`)
+        .send({ name: 'Updated Name', nodes, edges, expectedRevision: project.revision })
+        .expect(200)
+      expect(response.body.success).toBe(true)
+      expect(response.body.data.project.name).toBe('Updated Name')
+      expect(response.body.data.project.nodes).toEqual(nodes)
+      expect(response.body.data.project.edges).toEqual(edges)
+    })
+
+    it('should only update provided fields', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+        name: 'Original',
+        nodes: { node1: createSampleNode('node1') },
+      })
+      const response = await request(app)
+        .put(`/api/projects/${project._id}`)
+        .send({ name: 'New Name', expectedRevision: project.revision })
+        .expect(200)
+      expect(response.body.data.project.name).toBe('New Name')
+      const node = response.body.data.project.nodes.node1
+      expect(node.id).toBe('node1')
+      expect(node.kind).toBe('source_table')
+    })
+
+    it('should update timestamp', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+      })
+      const originalUpdatedAt = project.updatedAt
+      await new Promise(resolve => setTimeout(resolve, 10))
+      const response = await request(app)
+        .put(`/api/projects/${project._id}`)
+        .send({ name: 'Updated', expectedRevision: project.revision })
+        .expect(200)
+      expect(new Date(response.body.data.project.updatedAt).getTime())
+        .toBeGreaterThan(originalUpdatedAt.getTime())
+    })
+
+    it('should return 404 for non-existent project', async () => {
+      const { app } = getProjectRoutesTestContext()
+      const response = await request(app)
+        .put(`/api/projects/${new Types.ObjectId()}`)
+        .send({ name: 'Updated', expectedRevision: 0 })
+        .expect(404)
+      expect(response.body.success).toBe(false)
+    })
+
+    it('should return 404 for other users project', async () => {
+      const { app } = getProjectRoutesTestContext()
+      const project = await createTestProject({ userId: new Types.ObjectId() })
+      const response = await request(app)
+        .put(`/api/projects/${project._id}`)
+        .send({ name: 'Hijacked', expectedRevision: 0 })
+        .expect(404)
+      expect(response.body.success).toBe(false)
+    })
+
+    it('rejects stale revisions instead of overwriting newer work', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+        name: 'Original',
+      })
+      await request(app)
+        .put(`/api/projects/${project._id}`)
+        .send({ name: 'First writer', expectedRevision: project.revision })
+        .expect(200)
+      const response = await request(app)
+        .put(`/api/projects/${project._id}`)
+        .send({ name: 'Stale writer', expectedRevision: project.revision })
+        .expect(409)
+      expect(response.body.error).toContain('another session')
+      expect((await Project.findById(project._id))?.name).toBe('First writer')
+    })
+
+    it('rejects an update that exceeds the row limit', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      await User.create({
+        _id: new Types.ObjectId(mockUser.userId),
+        email: mockUser.email,
+        name: 'Guest User',
+        tier: 'guest',
+        passwordHash: 'hash',
+      })
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+      })
+      const nodes = {
+        oversized: {
+          ...createSampleNode('oversized'),
+          schema: {
+            columns: [],
+            rowCount: LIMITS.guest.maxRowsPerTable + 1,
+          },
+        },
+      }
+      const response = await request(app)
+        .put(`/api/projects/${project._id}`)
+        .send({ nodes, expectedRevision: project.revision })
+        .expect(400)
+      expect(response.body.errors.join(' ')).toContain('rows')
+    })
+  })
+
+  describe('PATCH /api/projects/:id', () => {
+    it('should partially update project', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+        name: 'Original',
+        nodes: { node1: createSampleNode('node1') },
+      })
+      const response = await request(app)
+        .patch(`/api/projects/${project._id}`)
+        .send({ name: 'Patched Name', expectedRevision: project.revision })
+        .expect(200)
+      expect(response.body.data.project.name).toBe('Patched Name')
+      expect(response.body.data.project.nodes.node1).toBeDefined()
+    })
+
+    it('should only update allowed fields', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+      })
+      const response = await request(app)
+        .patch(`/api/projects/${project._id}`)
+        .send({
+          name: 'Valid Update',
+          expectedRevision: project.revision,
+          userId: new Types.ObjectId().toString(),
+        })
+        .expect(200)
+      expect(response.body.data.project.name).toBe('Valid Update')
+    })
+  })
+
+  describe('DELETE /api/projects/:id', () => {
+    it('should permanently delete project', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+        name: 'To Delete',
+      })
+      const response = await request(app)
+        .delete(`/api/projects/${project._id}`)
+        .send({ expectedRevision: project.revision })
+        .expect(200)
+      expect(response.body.success).toBe(true)
+      expect(response.body.message).toContain('deleted')
+      expect(await Project.findById(project._id)).toBeNull()
+    })
+
+    it('should return 404 for non-existent project', async () => {
+      const { app } = getProjectRoutesTestContext()
+      const response = await request(app)
+        .delete(`/api/projects/${new Types.ObjectId()}`)
+        .send({ expectedRevision: 0 })
+        .expect(404)
+      expect(response.body.success).toBe(false)
+    })
+
+    it('should return 404 for other users project', async () => {
+      const { app } = getProjectRoutesTestContext()
+      const project = await createTestProject({ userId: new Types.ObjectId() })
+      const response = await request(app)
+        .delete(`/api/projects/${project._id}`)
+        .send({ expectedRevision: project.revision })
+        .expect(404)
+      expect(response.body.success).toBe(false)
+      expect(await Project.findById(project._id)).not.toBeNull()
+    })
+
+    it('returns 404 when the project is already gone', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+        name: 'Already Deleted',
+      })
+      await Project.findByIdAndDelete(project._id)
+
+      await request(app)
+        .delete(`/api/projects/${project._id}`)
+        .send({ expectedRevision: project.revision })
+        .expect(404)
+    })
+
+    it('rejects a stale delete after another writer updates the project', async () => {
+      const { app, mockUser } = getProjectRoutesTestContext()
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+        name: 'Concurrent project',
+      })
+      await request(app)
+        .put(`/api/projects/${project._id}`)
+        .send({ name: 'Newer version', expectedRevision: project.revision })
+        .expect(200)
+
+      await request(app)
+        .delete(`/api/projects/${project._id}`)
+        .send({ expectedRevision: project.revision })
+        .expect(409)
+
+      expect(await Project.findById(project._id)).not.toBeNull()
+    })
+  })
+})

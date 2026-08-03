@@ -1,6 +1,6 @@
 import { useProjectStore } from '@/state/projectStore'
-import { useNavigation } from './NavigationContext'
-import { ProjectSwitcher } from './ProjectSwitcher'
+import { useNavigation } from './navigation/NavigationContext'
+import { ProjectSwitcher } from './project-controls/ProjectSwitcher'
 import type { ChartNode, ProjectNode } from '@/types'
 
 export function GridHeaderContent({ selectedNode }: { selectedNode: ProjectNode }) {

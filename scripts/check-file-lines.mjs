@@ -19,12 +19,11 @@ const ignoredFiles = new Set(['npm-shrinkwrap.json', 'package-lock.json'])
 const legacyLineLimits = new Map([
   ['src/canvas/modals/TransformModal.tsx', 476],
   ['src/components/ImportButton.tsx', 700],
-  ['src/engine/materializationService.test.ts', 440],
-  ['src/engine/materializationService.ts', 452],
-  ['src/layout/ProjectSwitcher.tsx', 563],
+  ['src/engine/materialization/materializationService.ts', 452],
+  ['tests/unit/engine/materialization/materializationService.test.ts', 440],
+  ['src/layout/project-controls/ProjectSwitcher.tsx', 563],
   ['src/report/editor/extensions/AtomicBlockNavigation.ts', 525],
   ['src/report/editor/styles/table-block.css', 531],
-  ['src/state/stores/nodesSlice.ts', 436],
 ])
 
 function isCheckedFile(fileName, extensions) {
@@ -71,7 +70,7 @@ async function collectRootFiles() {
     .map((entry) => resolve(root, entry.name))
 }
 
-const sourceDirectories = ['src', 'server', 'e2e', 'scripts']
+const sourceDirectories = ['src', 'tests', 'server', 'e2e', 'scripts']
 const documentationDirectories = ['.github', 'docs']
 const sourceFiles = await Promise.all(
   sourceDirectories.map(async (directory) => {

@@ -12,10 +12,11 @@ with `VITE_AUTO_GUEST=true`.
 
 ## Storage scopes
 
-IndexedDB records are keyed by an owner scope (`guest` or `account:<user id>`).
-Records from one account are never returned while another scope is active. Records
-written by the old unscoped schema are quarantined because their owner cannot be
-proven. They remain available for an explicit recovery tool or support migration,
+IndexedDB records are keyed by an owner scope (`guest:<id>` per guest tab partition,
+or `account:<user id>`). Records from one account are never returned while another
+scope is active. Records written by the old unscoped schema (and the legacy
+`guest` partition) are quarantined or migrated because their owner cannot be
+assumed. They remain available for an explicit recovery tool or support migration,
 but are never exposed automatically to a guest or another account.
 
 ## Document ownership
@@ -138,6 +139,44 @@ handing editing to another tab.
 - Public email registration is disabled by default in production. Set
   `ENABLE_REGISTRATION=true` only when self-service registration is intended.
 - Production secrets and Google configuration are validated at startup.
+
+## Cross-tab authentication and session
+
+Implemented in `src/state/app-session/useAuthState.ts` and the storage/sync modules.
+This is separate from document write ownership ([Document ownership](#document-ownership)).
+
+**Shared across tabs (origin)**
+
+- Account auth cookies are httpOnly and origin-shared. A successful login is visible to
+  new or reloaded tabs that call `checkAuth` / `/auth/me` with credentials included.
+- Account workspace data uses the account storage scope (`account:<userId>` via
+  `accountStorageScope` in `src/persistence/storage/storageScope.ts`).
+
+**Tab-local (`sessionStorage`)**
+
+- Guest selection (`table-canvas:guest-session`) is tab-local. An existing guest tab keeps
+  its isolated guest workspace on reload even when another tab has signed into an account;
+  shared account cookies must not silently replace that guest choice.
+- Explicit sign-out sets `table-canvas:account-signed-out` in that tab only. Signing out one
+  tab clears that tab's React auth state and storage scope; it does not tear down another
+  tab's workspace. An explicit login in the same tab clears the marker.
+- Guest tabs ignore account `401` handlers so another tab's logout cannot interrupt an
+  in-progress guest session.
+
+**Broadcast between tabs (not auth state)**
+
+- There is **no** live auth-state `BroadcastChannel` propagation. Each tab decides its own
+  auth mode from cookies plus its tab-local markers on boot or user action.
+- Project catalog create/rename/delete events fan out on
+  `BroadcastChannel` (`src/persistence/sync/project/projectCatalog.ts`), with a
+  `visibilitychange` reconcile fallback in `useProjectCatalogReconcile`.
+- Open-document updates publish lightweight invalidations on
+  `BroadcastChannel` (`src/state/document/documentMirror.ts`); readers reload the durable
+  IndexedDB snapshot. `visibilitychange` also schedules a reader refresh when BroadcastChannel
+  is unavailable or a tab becomes visible again.
+- Guest storage-scope claiming uses Web Locks with a `BroadcastChannel` occupancy probe as
+  fallback (`claimGuestStorageScope`) so duplicated tabs do not share one guest partition.
+  That isolates storage; it does not sync login/logout UI state.
 
 ## Request rate limits
 

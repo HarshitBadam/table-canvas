@@ -4,9 +4,14 @@ Two layers: Vitest for unit/integration, Playwright for end-to-end.
 
 | Layer | Framework | Location |
 |-------|-----------|----------|
-| Frontend unit / integration | Vitest | `src/**/*.test.{ts,tsx}` |
-| Backend unit / integration | Vitest | `server/src/**/*.test.ts` |
+| Frontend unit / integration | Vitest | `tests/unit/**/*.{test,spec}.{ts,tsx}` |
+| Frontend test support | — | `tests/support/` (`@test/*`) |
+| Backend unit / integration | Vitest | `server/tests/unit/**/*.{test,spec}.ts` |
+| Backend test support | — | `server/tests/support/` |
 | E2E | Playwright | `e2e/**/*.spec.ts` |
+
+Tests are not colocated under `src/` or `server/src/`. Frontend suites mirror `src/` domains
+under `tests/unit/`; backend suites mirror `server/src/` under `server/tests/unit/`.
 
 ## Running
 
@@ -23,45 +28,61 @@ npm run test:persistence
 npm run test:suggestions
 ```
 
-Browser commands:
+Backend:
+
+```bash
+npm --prefix server run test
+npm --prefix server run test:coverage
+npm --prefix server run typecheck   # server/src + server/tests via tsconfig.test.json
+```
+
+Browser / E2E:
 
 ```bash
 npm run test:e2e
 npm run test:e2e:ui
 npm run test:ux
 npm run test:ux:update
+npx tsc -p e2e/tsconfig.json --noEmit
 ```
 
-Aggregate and CI commands:
+Aggregate and release checks:
 
 ```bash
 npm run test:all
 npm run test:release
 npm run test:ci
 npm run check:dead-code
+npm run lint
+npm run build
+npm --prefix server run lint
+npm --prefix server run build
+CI=true npm run test:e2e
 ```
 
-`test:coverage` writes HTML to `coverage/index.html`. `test:ux:update` updates reviewed visual baselines. `test:ci` writes JUnit output to `test-results/junit.xml`.
+`test:coverage` writes HTML to `coverage/index.html`. `test:ux:update` updates reviewed visual
+baselines. `test:ci` writes JUnit output to `test-results/junit.xml`.
+`test:release` runs lint, dead-code, frontend/backend coverage, backend typecheck, E2E, and builds.
 
-Run a single file: `npm run test:run src/engine/dependencyGraph.test.ts`.
+Run a single file: `npm run test:run tests/unit/engine/graph/dependencyGraph.test.ts`.
 
 ## What's covered
 
-**Frontend** (`src/`) tests cover engine graph and materialization behavior, formula evaluation,
-filtering, persistence/export/sync, suggestions, state lifecycle, and report embedding. Larger
-suites are split by behavior:
+**Frontend** (`tests/unit/`, mirroring `src/`) covers engine graph and materialization, formula
+evaluation, filtering, persistence/export/sync, suggestions, state lifecycle, and report
+embedding. Larger suites are split by behavior:
 
 | Area | Test files |
 |------|------|
-| Engine | `engine/dependencyGraph*.test.ts`, `engine/integration*.test.ts`, `engine/materializationService.test.ts`, `engine/worker/tableOperations.test.ts` |
-| Formula | `formula/evaluator{Core,Functions,Validation}.test.ts` |
-| Persistence | `persistence/db*.test.ts`, `persistence/exportService*.test.ts`, `persistence/sync*.test.ts` |
-| Grid | `grid/filter{Evaluation,Metadata}.test.ts`, `grid/hooks/useWindowedRows.test.ts` |
-| Suggestions | `suggestions/suggestionEngine.{analysis,classification,cleaning,detection}.test.ts` |
-| Concurrency | `state/document{Lease,Mirror}.test.ts`, `state/useDocumentCoordination.test.ts`, `persistence/projectMerge*.test.ts`, `persistence/projectSaveConflict.test.ts` |
+| Engine | `engine/graph/dependencyGraph*.test.ts`, `engine/integration*.test.ts`, `engine/materialization/materializationService.test.ts`, `engine/worker/table/tableOperations.test.ts` |
+| Formula | `formula/evaluation/evaluator{Core,Functions,Validation}.test.ts` |
+| Persistence | `persistence/storage/local-db/db*.test.ts`, `persistence/import-export/export/exportService*.test.ts`, `persistence/sync/**/*.test.ts` |
+| Grid | `grid/filtering/filter{Evaluation,Metadata}.test.ts`, `grid/hooks/useWindowedRows.test.ts` |
+| Suggestions | `suggestions/engine/suggestionEngine.{analysis,classification,cleaning,detection}.test.ts` |
+| Concurrency | `state/document/document{Lease,Mirror}.test.ts`, `state/document/useDocumentCoordination.test.ts`, `persistence/merge/projectMerge*.test.ts`, `persistence/sync/project/save/projectSaveConflict.test.ts` |
 
-**Backend** (`server/src/`) tests cover models, project/file routes, Google integration, file
-service behavior, and limit enforcement.
+**Backend** (`server/tests/unit/`, mirroring `server/src/`) covers models, project/file routes,
+Google integration, file service behavior, and limit enforcement.
 
 | Area | Test files |
 |------|------|
@@ -70,10 +91,10 @@ service behavior, and limit enforcement.
 | Models and services | `models/*.test.ts`, `services/*.test.ts`, `config/enforce.test.ts` |
 
 **E2E**: `e2e/derived-tables.{canvas,interactions,layout}.spec.ts` covers canvas rendering,
-interactions, and responsive layout. `sample-workbook.spec.ts` and `report-workflow.spec.ts`
-cover persisted import/edit/clean/report/export workflows. `tab-ownership.spec.ts` drives two real
-tabs to check mirroring, focus handover, and project independence. All specs use the deterministic
-mock API in `e2e/derived-tables.support.ts`.
+interactions, and responsive layout. `sample-workbook.spec.ts`, `report-workflow.spec.ts`,
+`data-workflows.spec.ts`, and `formula-columns.spec.ts` cover persisted import/edit/clean/report
+workflows. `tab-ownership.spec.ts` drives two real tabs for mirroring, focus handover, and project
+independence. Specs share helpers in `e2e/derived-tables.support.ts` and `e2e/app.support.ts`.
 
 `e2e/ux/` is the release-blocking UX contract: committed visual baselines, WCAG checks,
 keyboard/focus behavior, supported viewport geometry, browser-error detection, project switching,
@@ -86,14 +107,18 @@ interactions are exercised via E2E.
 
 ## Setup
 
-- **Frontend**: the `jsdom` environment is set in `vitest.config.ts`. Coverage instruments all
-  production TypeScript sources, emits text/HTML/LCOV/JSON reports, and enforces a ratchetable
-  baseline threshold. `src/test/setup.ts` imports
+- **Frontend**: the `jsdom` environment is set in `vitest.config.ts`. Discovery includes
+  `tests/unit/**/*.{test,spec}.{ts,tsx}` and excludes `**/*.scratch.test.ts` (local scratch files
+  are not part of the suite). Coverage instruments `src/**/*.{ts,tsx}`, emits text/HTML/LCOV/JSON
+  reports, and enforces a ratchetable baseline threshold. `tests/support/setup.ts` imports
   `@testing-library/jest-dom` and enables Immer's MapSet plugin. Persistence tests import
   `fake-indexeddb/auto` directly (for example, `dbProjectFile.test.ts` and
-  `exportServiceHappy.test.ts`) to run against an in-memory IndexedDB.
-- **Backend** (`server/src/test/setup.ts`): in-memory MongoDB via `mongodb-memory-server`, exposed
-  as `setupMongoTestDB()` which test files import and call directly.
+  `exportServiceHappy.test.ts`) to run against an in-memory IndexedDB. Shared tab fakes live in
+  `tests/support/fakeTabEnvironment.ts` and are imported via `@test/fakeTabEnvironment`.
+- **Backend** (`server/tests/support/setup.ts`): in-memory MongoDB via `mongodb-memory-server`,
+  exposed as `setupMongoTestDB()` which test files import and call directly. Backend Vitest
+  discovers `server/tests/unit/**/*.{test,spec}.ts`. Backend test TypeScript is checked with
+  `npm --prefix server run typecheck` (`server/tsconfig.test.json`).
 
 Reset Zustand state in `beforeEach` with `useProjectStore.setState({...})` when a test touches
 the store.
@@ -103,8 +128,9 @@ the store.
 GitHub Actions workflows live in `.github/workflows/`:
 
 - **`ci.yml`**: runs on push/PR to `main` and `develop`. Jobs: lint, typecheck (`tsc --noEmit`),
-  dependency audit, unit tests (with coverage), E2E, build, backend checks, dead-code analysis,
-  and the production Compose smoke test. A final gate job fails if any of them fail.
+  dependency audit, unit tests (with coverage), E2E, build, backend checks (lint, typecheck,
+  build, coverage, dead-code), and the production Compose smoke test. A final gate job fails if
+  any of them fail.
 - **`test-suites.yml`**: manual (`workflow_dispatch`); run a single suite (engine, formula,
   persistence, suggestions, or e2e) on demand.
 - **`release.yml`**: runs on `v*` tags and repeats the full frontend/backend release checks and

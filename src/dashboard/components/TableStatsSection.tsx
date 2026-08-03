@@ -3,7 +3,7 @@ import { useProfilingStore } from '@/lib/profiling'
 import type { TableQualityMetrics } from '../dashboardHelpers'
 import type { TableSchema } from '@/types'
 import { useProjectStore } from '@/state/projectStore'
-import { useNavigation } from '@/layout/NavigationContext'
+import { useNavigation } from '@/layout/navigation/NavigationContext'
 import { ColumnList } from './ColumnList'
 
 interface TableStatsSectionProps {

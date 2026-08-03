@@ -8,7 +8,7 @@ import type {
   SortDef,
 } from '../types'
 import type { CellValue, TransformDef } from '@/types'
-import { loadTable, getSlice, getFilteredSlice, updateCell, insertRow, deleteRow, getDistinctValues, getAggregation, getProfile, dropTable } from './tableOperations'
+import { loadTable, getSlice, getFilteredSlice, updateCell, insertRow, deleteRow, getDistinctValues, getAggregation, getProfile, dropTable } from './table/tableOperations'
 import { countCombinedTransformRows, executeTransform } from './transforms'
 import { WorkerRequestScheduler } from './requestScheduler'
 

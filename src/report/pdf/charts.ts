@@ -2,8 +2,8 @@ import type { Content } from 'pdfmake/interfaces'
 import {
   buildReportChartVector,
   type ReportChartLegendItem,
-} from '@/persistence/reportHtmlChart'
-import type { EmbeddedDataMap } from '@/persistence/reportHtmlGenerator'
+} from '@/persistence/report-export/reportHtmlChart'
+import type { EmbeddedDataMap } from '@/persistence/report-export/reportHtmlGenerator'
 import { boxed, placeholder } from './boxes'
 import { MUTED, RULE } from './theme'
 

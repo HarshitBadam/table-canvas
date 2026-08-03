@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useProjectStore } from '@/state/projectStore'
-import { useWorkspaceLease } from '@/state/useWorkspaceLease'
-import { useNodeDeletion } from '@/components/nodeDeletionContext'
+import { useWorkspaceLease } from '@/state/document/useWorkspaceLease'
+import { useNodeDeletion } from '@/canvas/node-deletion/nodeDeletionContext'
 
 /**
  * Deleting the selected node, which is the one keyboard action that only means

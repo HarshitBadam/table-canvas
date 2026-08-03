@@ -3,19 +3,19 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import { useDataStore, TableRow } from '@/state/dataStore'
 import { useAppAuth } from '@/state/AppContext'
-import { useWorkspaceLease } from '@/state/useWorkspaceLease'
+import { useWorkspaceLease } from '@/state/document/useWorkspaceLease'
 import { generateId } from '@/lib/utils'
 import { ColumnType, ColumnSchema, TableSchema } from '@/types'
 import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
-import { loadTableIntoEngine } from '@/engine/loadTableIntoEngine'
+import { loadTableIntoEngine } from '@/engine/materialization/loadTableIntoEngine'
 import { getVisibleFocusableElement, isVisibleElement } from '@/components/useDialogFocus'
 import {
   beginHistoryTransaction,
   commitHistoryTransaction,
   rollbackHistoryTransaction,
-} from '@/state/historyTransaction'
+} from '@/state/runtime/historyTransaction'
 import { ColumnTypeDropdown } from './ColumnTypeDropdown'
 
 interface NewTableModalProps {

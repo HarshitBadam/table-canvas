@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { CellValue, ChartConfig, ColumnSchema } from '@/types'
 import { getEngine } from '@/engine/EngineAdapter'
-import { ensureTableMaterialized } from '@/engine/materializationService'
-import { COUNT_VALUE_KEY } from './chartShared'
+import { ensureTableMaterialized } from '@/engine/materialization/materializationService'
+import { COUNT_VALUE_KEY } from './renderers/chartShared'
 
 export interface ChartDataResult {
   data: Record<string, CellValue>[]
