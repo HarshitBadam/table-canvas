@@ -7,7 +7,8 @@ import {
   computeSchemaFingerprint,
   getEngineTableRowCount,
 } from './cacheUtils'
-import type { CacheInfo, DerivedTableNode } from '@/types'
+import { checkTransformOutputSafety } from '@/shared/enforce'
+import type { CacheInfo, DerivedTableNode, TransformDef } from '@/types'
 import {
   effectiveTableSchema,
   getNodeCacheInfo,
@@ -160,6 +161,33 @@ export async function computeDerivedTable(
     idToName.forEach((name, id) => {
       columnIdToName[id] = name
     })
+
+    const transformDef = snapshot.node.plan.transformDef
+    if (transformDef.type === 'join' || transformDef.type === 'union') {
+      // Defense-in-depth beyond the TransformModal pre-check: upstream data can
+      // change after this join/union was created (edits, imports, undo), so a
+      // combination that was safe at creation time can later fan out into a
+      // browser-crashing row count. Estimate before materializing so we fail
+      // with a clear message instead of an engine Out of Memory crash.
+      const estimatedRows = await engine.countCombinedTransformRows(
+        transformDef as Extract<TransformDef, { type: 'join' | 'union' }>,
+        columnIdToName,
+      )
+      if (!derivedGenerationIsCurrent(tableId, snapshot.generation, scope)) {
+        return { status: 'loading', tableId }
+      }
+      const safetyCheck = checkTransformOutputSafety(estimatedRows)
+      if (!safetyCheck.ok) {
+        const action = transformDef.type === 'union' ? 'Appending these tables' : 'Joining these tables'
+        const message = `${action} ${safetyCheck.reason}`
+        updateNodeCacheInfo(tableId, {
+          isDirty: true,
+          isComputing: false,
+          error: message,
+        })
+        return { status: 'error', tableId, error: message }
+      }
+    }
 
     const result = await engine.executeTransform(
       snapshot.node.plan.transformDef,
