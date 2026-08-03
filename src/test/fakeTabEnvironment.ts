@@ -53,6 +53,12 @@ export class FakeLockManager {
     },
     callback: (lock: FakeLock | null) => Promise<unknown>,
   ): Promise<unknown> {
+    if (options.ifAvailable && options.signal) {
+      return Promise.reject(new DOMException(
+        "The 'signal' and 'ifAvailable' options cannot be used together.",
+        'NotSupportedError',
+      ))
+    }
     const mode: LockMode = options.mode ?? 'exclusive'
     const clientId = `client-${nextClientId++}`
     return new Promise((resolve, reject) => {

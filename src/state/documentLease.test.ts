@@ -67,6 +67,18 @@ describe('documentLease', () => {
     tab.stopDocumentLease()
   })
 
+  it('uses browser-compatible options for the immediate lock probe', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const tab = await openTab()
+
+    tab.startDocumentLease({ key: KEY })
+    await settleTabs()
+
+    expect(tab.getLeaseState().role).toBe('owner')
+    expect(consoleError).not.toHaveBeenCalled()
+    tab.stopDocumentLease()
+  })
+
   it('promotes the queued reader when the owner goes away', async () => {
     const owner = await openTab()
     const ownerPromoted = vi.fn(async () => undefined)
@@ -219,5 +231,11 @@ describe('documentLease', () => {
     const tab = await openTab()
     expect(await tab.canDeleteDocument(KEY, false)).toBe(true)
     expect(await tab.canDeleteDocument(KEY, true)).toBe(true)
+  })
+
+  it('treats omitted lock snapshot lists as empty when probing deletes', async () => {
+    const tab = await openTab()
+    vi.spyOn(locks, 'query').mockImplementation(async () => ({} as never))
+    expect(await tab.canDeleteDocument(KEY, false)).toBe(true)
   })
 })

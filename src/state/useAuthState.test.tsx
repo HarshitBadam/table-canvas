@@ -6,7 +6,6 @@ const authApi = vi.hoisted(() => ({
   checkAuth: vi.fn(),
   login: vi.fn(),
   loginWithGoogle: vi.fn(),
-  logout: vi.fn(),
 }))
 
 vi.mock('@/api/auth.api', () => authApi)

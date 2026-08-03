@@ -125,7 +125,9 @@ async function acquire(active: LeaseSession): Promise<void> {
     let acquiredImmediately = false
     await locks.request(
       documentLeaseName(active.key),
-      { mode: 'exclusive', ifAvailable: true, signal: active.abort.signal },
+      // `ifAvailable` requests settle immediately and Web Locks forbids pairing
+      // that option with `signal`. The queued request below remains abortable.
+      { mode: 'exclusive', ifAvailable: true },
       async lock => {
         if (!lock) return
         acquiredImmediately = true
@@ -209,11 +211,13 @@ export async function canDeleteDocument(
   try {
     if (typeof locks.query === 'function') {
       const snapshot = await locks.query()
+      const held = snapshot.held ?? []
+      const pending = snapshot.pending ?? []
       const openName = documentOpenLockName(key)
       const leaseName = documentLeaseName(key)
-      const openHeld = snapshot.held.filter(lock => lock.name === openName).length
-      const writeHeld = snapshot.held.some(lock => lock.name === leaseName)
-      const writePending = snapshot.pending.some(lock => lock.name === leaseName)
+      const openHeld = held.filter(lock => lock.name === openName).length
+      const writeHeld = held.some(lock => lock.name === leaseName)
+      const writePending = pending.some(lock => lock.name === leaseName)
 
       if (isActiveDocument) {
         // This tab contributes one shared presence holder. Any additional holder
