@@ -9,6 +9,7 @@ import { useNavigation } from './NavigationContext'
 import { activeSidebarNodeId, WORKSPACE_NAV_ITEMS, type ViewMode } from './viewNavigation'
 import type { ProjectNode, TableNode, ChartNode } from '@/types'
 import { useDialogFocus } from '@/components/useDialogFocus'
+import { BrandMark } from '@/components/BrandMark'
 import { SidebarNodeItem } from './SidebarNodeItem'
 
 interface SidebarProps {
@@ -82,9 +83,7 @@ export function Sidebar({
         <div className="flex h-16 items-center border-b border-border px-4">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="w-9 h-9 rounded bg-accent-green flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
+              <BrandMark className="w-5 h-5 text-white" />
             </div>
             <span className="truncate font-bold text-base text-text-primary">Table Canvas</span>
           </div>

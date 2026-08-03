@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '@/state/AppContext'
 import { ApiError } from '@/api/client'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { BrandMark } from '@/components/BrandMark'
 import { LegalDocumentsDialog } from './LegalDocumentsDialog'
 import { GoogleSignInButton, type GoogleCredentialResponse } from './GoogleSignInButton'
 
@@ -66,7 +67,7 @@ export function LoginPage() {
       <main className="login-stack">
         <div className="login-brand">
           <span className="login-mark-frame">
-            <TableCanvasMark />
+            <BrandMark className="login-mark" />
           </span>
           Table Canvas
         </div>
@@ -151,25 +152,5 @@ export function LoginPage() {
         onOpenChange={(open) => !open && setLegalDocument(null)}
       />
     </div>
-  )
-}
-
-function TableCanvasMark() {
-  return (
-    <svg
-      className="login-mark"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-      />
-    </svg>
   )
 }
