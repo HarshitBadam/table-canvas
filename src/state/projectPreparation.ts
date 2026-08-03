@@ -3,6 +3,7 @@ import { loadReportsForProject } from '@/persistence/reportStorage'
 import { useReportStore } from '@/report/reportStore'
 import { useDataStore } from './dataStore'
 import { useProjectStore } from './projectStore'
+import { useTableRuntimeStore } from './tableRuntimeStore'
 import { withoutRuntimeNodeState } from './transientProjectState'
 import {
   clearProjectRuntime,
@@ -44,6 +45,15 @@ export async function prepareProjectState(project: ProjectWithSync): Promise<voi
       selectedNodeId: null,
       history: { past: [], future: [] },
     })
+    // The runtime cache was just reset above, so nothing in this tab's DuckDB
+    // instance backs these tables yet. Mark them dirty so canvas/sidebar nodes
+    // reflect that honestly (instead of looking "ready" off the persisted
+    // schema alone) and the existing background refresh loop materializes
+    // them automatically.
+    const tableIds = Object.values(nodes)
+      .filter(node => node.kind === 'source_table' || node.kind === 'derived_table')
+      .map(node => node.id)
+    useTableRuntimeStore.getState().markNodesDirty(tableIds)
     retainHistoryFileRefs(getStorageScope(), [])
     const selectedReportId = Object.values(reports)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.id ?? null
