@@ -19,7 +19,7 @@ export function ColumnTypeDropdown({ value, onChange, ariaLabel }: ColumnTypeDro
     <Select.Root value={value} onValueChange={(nextValue) => onChange(nextValue as ColumnType)}>
       <Select.Trigger
         aria-label={ariaLabel}
-        className="flex min-w-24 items-center justify-between gap-2 rounded-md bg-surface px-3 py-2 text-xs font-semibold text-text-secondary shadow-sm outline-none transition-[background-color,box-shadow] hover:bg-surface-tertiary focus-visible:ring-2 focus-visible:ring-accent-green/30"
+        className="flex min-w-24 items-center justify-between gap-2 rounded-md bg-surface px-3 py-2 text-xs font-semibold text-text-primary shadow-sm outline-none transition-[background-color,box-shadow] hover:bg-surface-tertiary focus-visible:ring-2 focus-visible:ring-accent-green/30"
       >
         <Select.Value />
         <Select.Icon className="text-text-tertiary">

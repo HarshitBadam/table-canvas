@@ -52,7 +52,9 @@ test('formula columns can be created, edited, deleted, and reloaded', async ({ p
   await expect(page.getByText('Saving...')).toBeHidden({ timeout: 20_000 })
 
   await page.reload()
-  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator('aside').getByRole('button', {
+    name: /^Formula Regression\b/,
+  })).toBeVisible({ timeout: 20_000 })
   await page.locator('aside').getByRole('button', {
     name: /^Formula Regression\b/,
   }).click()

@@ -2,7 +2,11 @@
 
   .btn {
     @apply inline-flex items-center justify-center px-3 py-1.5 text-sm font-medium rounded transition-colors;
-    @apply disabled:pointer-events-none disabled:opacity-50;
+    @apply disabled:pointer-events-none disabled:cursor-not-allowed;
+  }
+
+  .btn:disabled:not(.btn-primary):not(.btn-danger) {
+    opacity: 0.5;
   }
 
   .btn-primary {
@@ -12,6 +16,13 @@
 
   .btn-primary:hover {
     background-color: var(--color-accent-hover);
+  }
+
+  /* Keep solid contrast when disabled — opacity washes white-on-green below AA. */
+  .btn-primary:disabled {
+    background-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-surface-tertiary));
+    color: #ffffff;
+    opacity: 1;
   }
 
   .btn-secondary {

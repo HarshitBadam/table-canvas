@@ -90,7 +90,7 @@ test('a mirroring dashboard tab shows edits from the editing tab live', async ({
   // A read-only tab left open on the dashboard is the case that used to clobber the
   // editing tab; now it just watches.
   await mirror.locator('aside').getByRole('button', { name: 'Dashboard' }).click()
-  await expect(dashboardSummary(mirror)).toContainText('1 Tables', { timeout: 20_000 })
+  await expect(dashboardSummary(mirror)).toContainText(/1\s*Tables/, { timeout: 20_000 })
 
   // Editing follows attention, so the tab being worked in has to be the front one; the
   // dashboard stays open behind it.
@@ -100,7 +100,7 @@ test('a mirroring dashboard tab shows edits from the editing tab live', async ({
   await createManualTable(page, 'Live Table')
 
   await expect(sidebarTable(mirror, 'Live Table')).toBeAttached({ timeout: 20_000 })
-  await expect(dashboardSummary(mirror)).toContainText('2 Tables', { timeout: 20_000 })
+  await expect(dashboardSummary(mirror)).toContainText(/2\s*Tables/, { timeout: 20_000 })
   await mirror.close()
 })
 
@@ -135,6 +135,7 @@ test('editing follows focus once the other tab has saved', async ({ page }) => {
   await mirror.reload()
   await expect(mirror.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
   await expect(sidebarTable(mirror, 'Last Minute Table')).toBeAttached({ timeout: 20_000 })
+  await expect(mirror.getByText(MIRROR_NOTICE)).toHaveCount(0, { timeout: 20_000 })
   await expect(mirror.locator('aside').getByRole('button', { name: 'New Table' }))
     .toBeEnabled({ timeout: 20_000 })
 
@@ -155,8 +156,8 @@ test('two tabs on different projects are both editable', async ({ page }) => {
 
   await second.bringToFront()
   await second.getByRole('button', { name: 'Current project' }).click()
-  await second.getByRole('menuitem', { name: 'New project' }).click()
-  const dialog = second.getByRole('dialog')
+  await second.getByRole('menuitem', { name: /Create project/ }).click()
+  const dialog = second.getByRole('dialog', { name: /Create.*project/i })
   await dialog.getByLabel('Project name').fill('Second Project')
   await dialog.getByRole('button', { name: 'Create project' }).click()
   await expect(dialog).toBeHidden({ timeout: 30_000 })

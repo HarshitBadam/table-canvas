@@ -5,6 +5,7 @@ import {
   connectTables,
   downloadProjectZip,
   importCsv,
+  openCanvasView,
 } from './app.support'
 
 async function readExportedWorkbook(page: Parameters<typeof downloadProjectZip>[0]) {
@@ -26,7 +27,7 @@ test.describe('Data import and export integrity', () => {
       'C-003,李雷,,999999.125',
     ])
 
-    await page.locator('aside').getByRole('button', { name: /^Edge Values 3 rows/ }).click()
+    await page.locator('aside').getByRole('button', { name: /^Edge Values .*3 rows/ }).click()
     await expect(page.getByText('3 rows × 4 columns')).toBeVisible()
     await expect(page.getByRole('gridcell')).toHaveCount(12)
     await expect(page.getByRole('gridcell', { name: 'Contact, row 1: Ada, Lovelace' })).toBeVisible()
@@ -35,17 +36,17 @@ test.describe('Data import and export integrity', () => {
     await expect(page.getByRole('gridcell', { name: 'Note, row 3: empty' })).toBeVisible()
 
     await page.reload()
-    await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
-    await page.locator('aside').getByRole('button', { name: /^Edge Values 3 rows/ }).click()
+    await expect(page.locator('aside').getByRole('button', { name: /^Edge Values .*3 rows/ }))
+      .toBeVisible({ timeout: 20_000 })
+    await page.locator('aside').getByRole('button', { name: /^Edge Values .*3 rows/ }).click()
     await expect(page.getByRole('gridcell', { name: 'Contact, row 1: Ada, Lovelace' })).toBeVisible()
     await expect(page.getByRole('gridcell', { name: 'Note, row 3: empty' })).toBeVisible()
-    await page.getByRole('button', { name: 'Back to Canvas' }).click()
+    await openCanvasView(page)
     const { zip, workbook } = await readExportedWorkbook(page)
 
     expect(Object.keys(zip.files).sort()).toEqual([
       'data.xlsx',
       'project.tablecanvas.json',
-      'reports/',
     ])
     expect(workbook.SheetNames).toEqual(['Edge Values'])
     expect(XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets['Edge Values'], {
@@ -100,22 +101,21 @@ test.describe('Join correctness', () => {
     await dialog.getByRole('option', { name: /ID/ }).click()
     await dialog.getByRole('button', { name: 'Join Orders match column' }).click()
     await dialog.getByRole('option', { name: /ID/ }).click()
-    await expect(dialog.getByText(/67% match - 2 rows/)).toBeVisible()
-    await dialog.getByText('Output options', { exact: true }).click()
-    await dialog.getByLabel('Table Name').fill('Matched Orders')
+    await expect(dialog.getByText(/67% match across all 3 rows/)).toBeVisible()
+    await dialog.getByLabel('New Table Name').fill('Matched Orders')
     await dialog.getByRole('button', { name: 'Create joined table' }).click()
     await expect(dialog).toBeHidden({ timeout: 20_000 })
 
     await page.reload()
     await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
-    await page.locator('aside').getByRole('button', { name: /^Matched Orders 2 rows/ }).click()
+    await page.locator('aside').getByRole('button', { name: /^Matched Orders .*2 rows/ }).click()
     await expect(page.getByText('2 rows × 3 columns')).toBeVisible({ timeout: 20_000 })
     await expect(page.getByRole('gridcell').filter({ hasText: 'Grace' })).toHaveCount(2)
     await expect(page.getByRole('gridcell').filter({ hasText: 'A-10' })).toHaveCount(1)
     await expect(page.getByRole('gridcell').filter({ hasText: 'A-11' })).toHaveCount(1)
     await expect(page.getByRole('gridcell').filter({ hasText: /Ada|Linus|A-12/ })).toHaveCount(0)
 
-    await page.getByRole('button', { name: 'Back to Canvas' }).click()
+    await openCanvasView(page)
     const { workbook } = await readExportedWorkbook(page)
     expect(XLSX.utils.sheet_to_json<Record<string, unknown>>(
       workbook.Sheets['Matched Orders'],
@@ -139,7 +139,7 @@ test.describe('Suggestions panel state', () => {
       'Linus,40',
       'Margaret,50',
     ])
-    await page.locator('aside').getByRole('button', { name: /^Suggestion Review 5 rows/ }).click()
+    await page.locator('aside').getByRole('button', { name: /^Suggestion Review .*5 rows/ }).click()
     await expect(page.getByRole('gridcell').first()).toBeVisible({ timeout: 20_000 })
 
     await page.getByRole('button', { name: 'Suggestions', exact: true }).click()

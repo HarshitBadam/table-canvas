@@ -14,8 +14,18 @@ interface MockProject {
   updatedAt: string
 }
 
+interface MockFile {
+  id: string
+  filename: string
+  contentType: string
+  size: number
+  uploadDate: string
+  buffer: Buffer
+}
+
 export interface MockBackendState {
   projects: Map<string, MockProject>
+  files: Map<string, MockFile>
   projectNumber: number
   fileNumber: number
   pendingProjectUpdates: number
@@ -31,10 +41,49 @@ interface MockBackendOptions {
 export function createMockBackendState(): MockBackendState {
   return {
     projects: new Map<string, MockProject>(),
+    files: new Map<string, MockFile>(),
     projectNumber: 0,
     fileNumber: 0,
     pendingProjectUpdates: 0,
   }
+}
+
+/** Pulls the `file` field's raw bytes and filename out of a multipart/form-data body. */
+function extractUploadedFilePart(
+  request: import('@playwright/test').Request,
+): { filename: string; buffer: Buffer } | null {
+  const body = request.postDataBuffer()
+  const contentType = request.headers()['content-type']
+  const boundaryMatch = contentType?.match(/boundary=(?:"([^"]+)"|([^;]+))/)
+  const boundary = boundaryMatch ? (boundaryMatch[1] ?? boundaryMatch[2]) : null
+  if (!body || !boundary) return null
+
+  const delimiter = Buffer.from(`--${boundary}`)
+  const parts: Buffer[] = []
+  let searchFrom = 0
+  while (true) {
+    const start = body.indexOf(delimiter, searchFrom)
+    if (start === -1) break
+    const next = body.indexOf(delimiter, start + delimiter.length)
+    if (next === -1) break
+    parts.push(body.subarray(start + delimiter.length, next))
+    searchFrom = next
+  }
+
+  for (const part of parts) {
+    const headerEnd = part.indexOf('\r\n\r\n')
+    if (headerEnd === -1) continue
+    const headers = part.subarray(0, headerEnd).toString('latin1')
+    if (!/name="file"/.test(headers)) continue
+    const filenameMatch = headers.match(/filename="([^"]*)"/)
+    if (!filenameMatch) continue
+    let content = part.subarray(headerEnd + 4)
+    if (content.subarray(-2).toString('latin1') === '\r\n') {
+      content = content.subarray(0, -2)
+    }
+    return { filename: filenameMatch[1], buffer: content }
+  }
+  return null
 }
 
 async function fulfillJson(route: Route, data: unknown, status = 200) {
@@ -160,15 +209,50 @@ export async function installMockBackend(
     }
     if (path === '/api/files/upload' && request.method() === 'POST') {
       state.fileNumber += 1
+      const uploadedPart = extractUploadedFilePart(request)
+      const filename = uploadedPart?.filename ?? 'sample_workbook.xlsx'
+      const buffer = uploadedPart?.buffer ?? readFileSync(workbookPath)
+      const file: MockFile = {
+        id: `sample-file-${state.fileNumber}`,
+        filename,
+        contentType: filename.endsWith('.csv') ? 'text/csv'
+          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        size: buffer.byteLength,
+        uploadDate: new Date().toISOString(),
+        buffer,
+      }
+      state.files.set(file.id, file)
       await fulfillJson(route, {
         file: {
-          id: `sample-file-${state.fileNumber}`,
-          filename: 'sample_workbook.xlsx',
-          contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          size: readFileSync(workbookPath).byteLength,
-          uploadDate: new Date().toISOString(),
+          id: file.id,
+          filename: file.filename,
+          contentType: file.contentType,
+          size: file.size,
+          uploadDate: file.uploadDate,
         },
       }, 201)
+      return
+    }
+    if (path === '/api/files' && request.method() === 'GET') {
+      await fulfillJson(route, {
+        files: [...state.files.values()].map(({ buffer, ...meta }) => meta),
+      })
+      return
+    }
+    const fileMatch = path.match(/^\/api\/files\/([^/]+)$/)
+    const requestedFileId = fileMatch ? decodeURIComponent(fileMatch[1]) : null
+    if (requestedFileId && request.method() === 'GET') {
+      const file = state.files.get(requestedFileId)
+      if (!file) {
+        await fulfillJson(route, null, 404)
+        return
+      }
+      await route.fulfill({ status: 200, contentType: file.contentType, body: file.buffer })
+      return
+    }
+    if (requestedFileId && request.method() === 'DELETE') {
+      state.files.delete(requestedFileId)
+      await fulfillJson(route, {})
       return
     }
 

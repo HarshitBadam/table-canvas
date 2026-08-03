@@ -20,7 +20,7 @@ interface TransformTypeControlsProps {
   canUnion: boolean
   joinType: JoinType
   onJoinTypeChange: (joinType: JoinType) => void
-  initialFocusRef?: RefObject<HTMLButtonElement | null>
+  initialFocusRef?: RefObject<HTMLButtonElement>
 }
 
 export function TransformTypeControls({

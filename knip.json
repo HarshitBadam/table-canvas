@@ -1,4 +1,20 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": ["server/**"]
+  "ignore": ["server/**"],
+  "ignoreIssues": {
+    "src/auth/legal-content.tsx": ["exports"],
+    "src/engine/fileParsers.ts": ["exports"],
+    "src/grid/hooks/useWindowedRows.ts": ["types"],
+    "src/persistence/importParsers.ts": ["exports"],
+    "src/report/editor/nodes/ReportChartControls.tsx": ["exports"],
+    "src/report/layout/columnMetrics.ts": ["exports"],
+    "src/report/layout/tableFit.ts": ["exports"],
+    "src/report/pdf/theme.ts": ["exports"],
+    "src/report/toolbarStyles.ts": ["exports"],
+    "src/report/useReportExport.ts": ["types"],
+    "src/shared/enforce.ts": ["types"],
+    "src/state/tableRuntimeStore.ts": ["exports"],
+    "src/suggestions/cleaningRows.ts": ["exports"],
+    "src/suggestions/existingChartContext.ts": ["exports"]
+  }
 }

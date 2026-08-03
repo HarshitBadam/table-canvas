@@ -95,14 +95,15 @@ describe('SuggestionsPanel list and navigation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Chart one: Expand details' }))
     const detail = screen.getByRole('region', { name: /Chart one/i })
-    expect(detail).toHaveClass('border-t')
+    expect(detail).toHaveClass('pl-9')
     expect(within(detail).getByText('Preview')).toBeVisible()
 
     const rationale = within(detail).getByRole('button', { name: 'Why this suggestion?' })
-    expect(rationale).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(rationale)
     expect(rationale).toHaveAttribute('aria-expanded', 'true')
     expect(within(detail).getByText('The category repeats across rows')).toBeVisible()
+    fireEvent.click(rationale)
+    expect(rationale).toHaveAttribute('aria-expanded', 'false')
+    expect(within(detail).queryByText('The category repeats across rows')).not.toBeInTheDocument()
   })
 
   it('keeps toast View in the dialog Tab order and supports keyboard activation', async () => {

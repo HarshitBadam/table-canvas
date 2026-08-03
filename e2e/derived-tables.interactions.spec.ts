@@ -45,7 +45,7 @@ test.describe('Canvas interaction behavior', () => {
     await node.click()
     await expect(node).toHaveClass(/selected/)
 
-    const exportButton = page.getByRole('button', { name: 'Export', exact: true })
+    const exportButton = page.getByRole('button', { name: 'Import or export project' })
     await exportButton.click()
     const menu = page.getByRole('menu', { name: 'Project actions' })
     await expect(menu).toBeVisible()

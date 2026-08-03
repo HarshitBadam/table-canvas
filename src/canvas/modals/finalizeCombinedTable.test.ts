@@ -55,7 +55,7 @@ describe('finalizeCombinedTable', () => {
     mocks.ensureTableMaterialized.mockResolvedValue({
       status: 'computed',
       tableId: 'joined',
-      rowCount: 500_001,
+      rowCount: 5_000_001,
     })
     const generation = beginTableOperation('joined', 'waiting')
     await finalizeCombinedTable('joined', generation, 'google', ['left', 'right'])

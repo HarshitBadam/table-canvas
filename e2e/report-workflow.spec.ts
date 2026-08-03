@@ -26,16 +26,19 @@ test('report text and linked tables survive reload and project export', async ({
   await page.keyboard.press('End')
   await page.keyboard.type('Quarterly review note')
   await expect(editor).toContainText('Quarterly review note')
-  await expect(page.getByText('Saved', { exact: true })).toBeVisible({ timeout: 10_000 })
+  // Debounced report save (~100ms) must flush before reload.
+  await page.waitForTimeout(500)
 
   await page.reload()
-  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator('aside')).toBeAttached({ timeout: 20_000 })
   await page.locator('aside').getByRole('button', { name: 'Report', exact: true }).click()
   await expect(page.locator('.tiptap-editor-content')).toContainText(
     'Quarterly review note',
+    { timeout: 20_000 },
   )
 
   await page.locator('aside').getByRole('button', { name: 'Canvas', exact: true }).click()
+  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
   const zip = await downloadProjectZip(page)
   const reportPath = Object.keys(zip.files).find(
     path => path.startsWith('reports/') && path.endsWith('.html'),

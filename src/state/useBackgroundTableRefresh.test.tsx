@@ -63,7 +63,7 @@ function derivedTable(id: string, upstreamNodeIds: string[], rowCount: number): 
 }
 
 function edge(id: string, fromNodeId: string, toNodeId: string): Edge {
-  return { id, fromNodeId, toNodeId }
+  return { id, fromNodeId, toNodeId, transformType: 'reference' }
 }
 
 describe('getDirtyTableRefreshOrder', () => {

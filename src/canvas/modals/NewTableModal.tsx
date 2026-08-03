@@ -373,7 +373,7 @@ export function NewTableModal({ isOpen, onClose }: NewTableModalProps) {
                 type="button"
                 onClick={() => void handleCreate()}
                 disabled={!canEdit || isCreating || !tableName.trim() || columns.length === 0 || Boolean(columnError)}
-                className="canvas-touch-target rounded-lg bg-accent-green px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-green/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+                className="canvas-touch-target rounded-lg bg-accent-green px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-green-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-[color-mix(in_srgb,var(--color-accent)_55%,var(--color-surface-tertiary))] disabled:text-white"
               >
                 {isCreating ? 'Creating…' : 'Create Table'}
               </button>

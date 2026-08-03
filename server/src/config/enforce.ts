@@ -49,18 +49,6 @@ export function checkRowCount(rowCount: number, tier: Tier): LimitCheck {
   };
 }
 
-export function checkTableCount(currentTableCount: number, tier: Tier): LimitCheck {
-  if (tier === 'google') return { ok: true };
-  const { maxTablesPerProject } = getLimits(tier);
-  if (currentTableCount < maxTablesPerProject) return { ok: true };
-  return {
-    ok: false,
-    reason: `This project already has ${currentTableCount} tables (limit: ${maxTablesPerProject})`,
-    limit: maxTablesPerProject,
-    tier,
-  };
-}
-
 export function checkProjectCount(currentProjectCount: number, tier: Tier): LimitCheck {
   if (tier === 'google') return { ok: true };
   const { maxProjects } = getLimits(tier);

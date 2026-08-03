@@ -89,7 +89,9 @@
 }
 
 .join-btn-create:disabled {
-  opacity: 0.4;
+  background: color-mix(in srgb, var(--color-accent) 55%, var(--color-surface-tertiary));
+  color: #fff;
+  opacity: 1;
   cursor: default;
   box-shadow: none;
 }

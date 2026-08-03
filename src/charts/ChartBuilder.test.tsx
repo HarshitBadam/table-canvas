@@ -15,8 +15,8 @@ describe('ChartBuilder', () => {
   it('uses keyboard-focusable controls and linear field mapping', () => {
     render(<ChartBuilder isOpen sourceTableId={tableId} onClose={vi.fn()} />)
 
-    expect(screen.getByRole('group', { name: 'Chart type' })).toBeVisible()
-    expect(screen.getByRole('group', { name: 'Summarize values' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Chart type' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Summarize values' })).toBeVisible()
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
     const bar = screen.getByRole('radio', { name: 'Bar' })
     const line = screen.getByRole('radio', { name: 'Line' })
