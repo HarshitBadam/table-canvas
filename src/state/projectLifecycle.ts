@@ -1,7 +1,7 @@
 import { getEngine } from '@/engine'
 import { dropEngineTables } from '@/engine/engineTableCleanup'
 import { invalidateMaterializations } from '@/engine/materializationCoordinator'
-import { createProjectWithSync, fetchProjects, loadProjectWithSync } from '@/persistence/syncService'
+import { fetchProjects, loadProjectWithSync } from '@/persistence/syncService'
 import type { ProjectNode } from '@/types'
 import { useDataStore } from './dataStore'
 import { clearAllTableOperations } from './tableOperationCoordinator'
@@ -41,17 +41,7 @@ function mostRecentlyUpdated(
 export async function loadOrCreateProject(requestedProjectId?: string | null) {
   const projects = await fetchProjects()
   if (projects.length === 0) {
-    const project = await createProjectWithSync('Untitled Project')
-    const now = new Date()
-    return {
-      project,
-      projectList: [{
-        id: project.id,
-        name: project.name,
-        createdAt: now,
-        updatedAt: now,
-      }],
-    }
+    return { project: null, projectList: projects }
   }
 
   const requested = requestedProjectId

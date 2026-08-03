@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Report } from './types'
-import {
-  GUEST_STORAGE_SCOPE,
-  setStorageScope,
-} from '@/persistence/storageScope'
+import { setStorageScope } from '@/persistence/storageScope'
+
+const GUEST_SCOPE = 'guest:test-tab'
 
 const database = vi.hoisted(() => ({
   saveReport: vi.fn<(report: Report, scope?: string) => Promise<void>>(),
@@ -33,7 +32,7 @@ function report(id: string, projectId?: string): Report {
 beforeEach(() => {
   vi.useFakeTimers()
   vi.clearAllMocks()
-  setStorageScope(GUEST_STORAGE_SCOPE)
+  setStorageScope(GUEST_SCOPE)
   database.saveReport.mockResolvedValue()
   database.deleteReport.mockResolvedValue()
   database.loadAllReports.mockResolvedValue({})
@@ -73,7 +72,7 @@ describe('report store persistence lifecycle', () => {
     await vi.advanceTimersByTimeAsync(600)
 
     expect(database.saveReport).not.toHaveBeenCalled()
-    expect(database.deleteReport).toHaveBeenCalledWith(id, GUEST_STORAGE_SCOPE)
+    expect(database.deleteReport).toHaveBeenCalledWith(id, GUEST_SCOPE)
     expect(useReportStore.getState().reports[id]).toBeUndefined()
   })
 
@@ -103,7 +102,7 @@ describe('report store persistence lifecycle', () => {
     expect(database.saveReport).toHaveBeenCalledTimes(1)
     expect(database.saveReport).toHaveBeenCalledWith(
       expect.objectContaining({ id, name: 'Final name', projectId: 'project-1' }),
-      GUEST_STORAGE_SCOPE,
+      GUEST_SCOPE,
     )
   })
 

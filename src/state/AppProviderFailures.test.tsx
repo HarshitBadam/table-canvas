@@ -62,7 +62,7 @@ vi.mock('@/persistence/syncService', () => ({
   saveProjectWithSync: mocks.saveProject,
   setProjectSyncErrorHandler: vi.fn(),
   setCloudSyncEnabled: vi.fn(),
-  syncLocalProjectsToBackend: vi.fn().mockResolvedValue([]),
+  syncOfflineAccountProjects: vi.fn().mockResolvedValue([]),
 }))
 vi.mock('./projectLifecycle', () => ({
   clearProjectRuntime: mocks.clearRuntime,

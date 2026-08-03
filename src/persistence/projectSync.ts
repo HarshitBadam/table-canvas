@@ -27,9 +27,10 @@ import {
 import type { Report } from '@/report/types'
 import { replaceReportsForProject } from './reportStorage'
 import {
+  cancelQueuedProjectDelete,
   clearProjectSyncOperation,
+  deleteProjectSnapshot,
   enqueueProjectDelete,
-  finalizeProjectDelete,
   getProjectSyncOperation,
   listProjectSyncOperations,
 } from './projectSyncQueue'
@@ -38,10 +39,14 @@ import {
   dropProjectSyncBase,
   remoteProjectSnapshot,
 } from './projectSyncBase'
+import {
+  publishCatalogChanged,
+  publishProjectDeleted,
+} from './projectCatalog'
 export {
   isRetryableRemoteDeferral,
 } from './projectCreateReconciliation'
-export { syncLocalProjectsToBackend } from './localProjectPromotion'
+export { syncOfflineAccountProjects } from './localProjectPromotion'
 export { importProjectWithSync } from './projectImportSync'
 export {
   flushProjectSaveWithSync, saveProjectWithSync,
@@ -143,9 +148,9 @@ export async function flushAllProjectSavesWithSync(): Promise<ProjectSyncConflic
   const conflicts = await flushAllQueuedProjectSavesWithSync(scope)
   for (const conflict of conflicts) {
     if (conflict.operation === 'delete') {
-      await clearProjectSyncOperation(conflict.projectId, scope)
+      await cancelQueuedProjectDelete(conflict.projectId, scope)
       reportProjectSyncError(
-        'A project changed in the cloud and was not deleted. The newer version was restored.',
+        'A project changed in the cloud and was not deleted. The newer version was kept.',
       )
     }
     await loadProjectWithSync(conflict.projectId)
@@ -164,9 +169,10 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
         return null
       } catch (error) {
         if (error instanceof ApiError && error.statusCode === 409) {
-          await clearProjectSyncOperation(projectId, scope)
+          await cancelQueuedProjectDelete(projectId, scope)
+          publishCatalogChanged(scope)
           reportProjectSyncError(
-            'This project changed in the cloud and was not deleted. The newer version was restored.',
+            'This project changed in the cloud and was not deleted. The newer version was kept.',
           )
         } else if (isRetryableRemoteDeferral(error)) {
           return null
@@ -314,16 +320,9 @@ export async function deleteProjectWithSync(projectId: string): Promise<void> {
   const scope = getStorageScope()
   const localProject = await loadProjectLocal(projectId)
   if (projectId.startsWith('local_') || !isCloudStorageScope()) {
-    const deletion = await enqueueProjectDelete(
-      projectId,
-      localProject?.revision ?? 0,
-      scope,
-    )
-    const deletedNodes = await finalizeProjectDelete(
-      projectId,
-      deletion.generation,
-      scope,
-    )
+    const deletedNodes = await deleteProjectSnapshot(projectId, scope)
+    await clearProjectSyncOperation(projectId, scope)
+    publishProjectDeleted(projectId, scope)
     if (!deletedNodes) return
     await dropProjectSyncBase(projectId, scope)
     await deleteUnreferencedLocalFiles(deletedNodes, scope)
@@ -335,15 +334,23 @@ export async function deleteProjectWithSync(projectId: string): Promise<void> {
     localProject?.revision ?? 0,
     scope,
   )
+  publishProjectDeleted(projectId, scope)
   if (isNetworkOnline()) {
     try {
       await flushProjectSaveWithSync(projectId, scope)
+      return
     } catch (error) {
-      if (isRetryableRemoteDeferral(error)) return
-      await clearProjectSyncOperation(projectId, scope)
-      throw error
+      if (!isRetryableRemoteDeferral(error)) {
+        await cancelQueuedProjectDelete(projectId, scope)
+        publishCatalogChanged(scope)
+        throw error
+      }
     }
   }
+  const deletedNodes = await deleteProjectSnapshot(projectId, scope)
+  await dropProjectSyncBase(projectId, scope)
+  publishCatalogChanged(scope)
+  if (deletedNodes) await deleteUnreferencedLocalFiles(deletedNodes, scope)
 }
 
 function createLocalId(prefix: 'local'): string {

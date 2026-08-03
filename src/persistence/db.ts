@@ -4,8 +4,9 @@ export type { ProjectSyncOperation } from './dbCore'
 export type { SerializedPatches } from './patchSerialization'
 export {
   accountStorageScope,
+  claimGuestStorageScope,
   getStorageScope,
-  GUEST_STORAGE_SCOPE,
+  isGuestStorageScope,
   setStorageScope,
 } from './storageScope'
 
@@ -34,7 +35,9 @@ export {
 
 export {
   acknowledgeProjectSave,
+  cancelQueuedProjectDelete,
   clearProjectSyncOperation,
+  deleteProjectSnapshot,
   enqueueProjectDelete,
   enqueueProjectSave,
   finalizeProjectDelete,

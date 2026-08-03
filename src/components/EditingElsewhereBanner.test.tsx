@@ -1,23 +1,17 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LeaseState } from '@/state/documentLease'
 import { EditingElsewhereBanner } from './EditingElsewhereBanner'
 
-const requestWriteLease = vi.fn()
-let leaseState: LeaseState = {
-  role: 'owner',
-  requesting: false,
-  refused: false,
-  unreachable: false,
-}
+let leaseState: LeaseState = { role: 'owner' }
 const listeners = new Set<() => void>()
 
-function setLeaseState(next: Partial<LeaseState>): void {
-  leaseState = { ...leaseState, ...next }
-  act(() => {
-    for (const listener of listeners) listener()
-  })
-}
+vi.mock('@/state/useWorkspaceLease', () => ({
+  useWorkspaceLease: () => ({
+    ...leaseState,
+    canEdit: leaseState.role === 'owner',
+  }),
+}))
 
 vi.mock('@/state/documentLease', () => ({
   getLeaseState: () => leaseState,
@@ -25,22 +19,11 @@ vi.mock('@/state/documentLease', () => ({
     listeners.add(listener)
     return () => listeners.delete(listener)
   },
-  requestWriteLease: () => requestWriteLease(),
 }))
 
 beforeEach(() => {
-  leaseState = {
-    role: 'owner',
-    requesting: false,
-    refused: false,
-    unreachable: false,
-  }
+  leaseState = { role: 'owner' }
   listeners.clear()
-  requestWriteLease.mockClear()
-})
-
-afterEach(() => {
-  vi.useRealTimers()
 })
 
 describe('EditingElsewhereBanner', () => {
@@ -49,85 +32,27 @@ describe('EditingElsewhereBanner', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
-  it('offers to move editing here while mirroring', () => {
-    leaseState = {
-      role: 'mirror',
-      requesting: false,
-      refused: false,
-      unreachable: false,
-    }
+  it('shows a static read-only notice while mirroring', () => {
+    leaseState = { role: 'mirror' }
     render(<EditingElsewhereBanner />)
 
     const banner = screen.getByRole('status')
-    expect(banner).toHaveAttribute('aria-live', 'polite')
-    expect(banner).toHaveTextContent('Viewing live. Editing is active in another tab.')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit here' }))
-    expect(requestWriteLease).toHaveBeenCalledTimes(1)
+    expect(banner).toHaveAttribute('aria-live', 'off')
+    expect(banner).toHaveTextContent('Read-only · Editing in another tab')
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('stays quiet for a handover that finishes quickly', () => {
-    vi.useFakeTimers()
-    leaseState = {
-      role: 'mirror',
-      requesting: false,
-      refused: false,
-      unreachable: false,
-    }
+  it('never offers Edit here, takeover, or retry controls', () => {
+    leaseState = { role: 'mirror' }
     render(<EditingElsewhereBanner />)
 
-    setLeaseState({ requesting: true })
-    act(() => {
-      vi.advanceTimersByTime(200)
-    })
-    expect(screen.getByRole('status')).toHaveTextContent('Viewing live.')
-
-    act(() => {
-      vi.advanceTimersByTime(150)
-    })
-    expect(screen.getByRole('status')).toHaveTextContent('Moving editing to this tab…')
-  })
-
-  it('explains a refused handover and offers to retry', () => {
-    leaseState = {
-      role: 'mirror',
-      requesting: false,
-      refused: true,
-      unreachable: false,
+    for (const name of ['Edit here', 'Try again', 'Take over']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
     }
-    render(<EditingElsewhereBanner />)
-
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'The other tab could not save its changes, so editing stayed there.',
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(requestWriteLease).toHaveBeenCalledTimes(1)
-  })
-
-  it('explains when the other tab never answers and offers to retry', () => {
-    leaseState = {
-      role: 'mirror',
-      requesting: false,
-      refused: false,
-      unreachable: true,
-    }
-    render(<EditingElsewhereBanner />)
-
-    expect(screen.getByRole('status')).toHaveTextContent(
-      "Couldn't reach the other tab. Switch to it or close it, then try again.",
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(requestWriteLease).toHaveBeenCalledTimes(1)
   })
 
   it('never names the mechanism in user-facing copy', () => {
-    leaseState = {
-      role: 'mirror',
-      requesting: false,
-      refused: false,
-      unreachable: false,
-    }
+    leaseState = { role: 'mirror' }
     const { container } = render(<EditingElsewhereBanner />)
 
     const copy = container.textContent?.toLowerCase() ?? ''

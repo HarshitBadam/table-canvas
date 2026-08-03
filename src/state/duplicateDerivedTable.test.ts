@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addFilter, addSource, resetStore } from '@/engine/integrationTestUtils'
 import {
   accountStorageScope,
-  GUEST_STORAGE_SCOPE,
   setStorageScope,
 } from '@/persistence/storageScope'
+
+const GUEST_SCOPE = 'guest:test-tab'
 import { useProjectStore } from './projectStore'
 import {
   getNodeCacheInfo,
@@ -60,7 +61,7 @@ async function settleDuplicate(tableId: string): Promise<void> {
 beforeEach(() => {
   resetStore()
   vi.clearAllMocks()
-  setStorageScope(GUEST_STORAGE_SCOPE)
+  setStorageScope(GUEST_SCOPE)
   mocks.isNetworkOnline.mockReturnValue(true)
   mocks.ensureTableMaterialized.mockImplementation(async (tableId: string) => ({
     status: 'computed',
@@ -81,7 +82,7 @@ beforeEach(() => {
 
 afterEach(() => {
   setDocumentWriteGuard(null)
-  setStorageScope(GUEST_STORAGE_SCOPE)
+  setStorageScope(GUEST_SCOPE)
 })
 
 describe('duplicateDerivedTable', () => {

@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   getProjectSyncOperation: vi.fn(), listProjectSyncOperations: vi.fn(),
   acknowledgeProjectSave: vi.fn(), finalizeProjectDelete: vi.fn(),
   clearProjectSyncOperation: vi.fn(),
+  cancelQueuedProjectDelete: vi.fn(),
+  deleteProjectSnapshot: vi.fn(),
 }))
 
 vi.mock('@/api/projects.api', () => ({
@@ -33,6 +35,8 @@ vi.mock('./projectSyncQueue', () => ({
   acknowledgeProjectSave: (...args: unknown[]) => mocks.acknowledgeProjectSave(...args),
   finalizeProjectDelete: (...args: unknown[]) => mocks.finalizeProjectDelete(...args),
   clearProjectSyncOperation: (...args: unknown[]) => mocks.clearProjectSyncOperation(...args),
+  cancelQueuedProjectDelete: (...args: unknown[]) => mocks.cancelQueuedProjectDelete(...args),
+  deleteProjectSnapshot: (...args: unknown[]) => mocks.deleteProjectSnapshot(...args),
 }))
 
 vi.mock('./db', () => ({
@@ -118,6 +122,10 @@ beforeEach(() => {
   mocks.clearProjectSyncOperation.mockImplementation((id: string) => {
     mocks.operations.delete(id)
   })
+  mocks.cancelQueuedProjectDelete.mockImplementation((id: string) => {
+    mocks.operations.delete(id)
+  })
+  mocks.deleteProjectSnapshot.mockResolvedValue({})
   mocks.updateProject.mockImplementation((id: string, data: { expectedRevision?: number }) => ({
     ...createMockProject(id, 'Updated'),
     revision: (data.expectedRevision ?? 0) + 1,

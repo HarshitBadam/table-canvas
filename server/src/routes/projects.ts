@@ -13,7 +13,6 @@ import { User } from '../models/User.js';
 import type { Tier } from '../config/limits.js';
 import {
   createProjectWithinCapacity,
-  restoreProjectWithinCapacity,
 } from '../services/projectCapacity.js';
 import { validateProjectTierLimits } from '../services/projectPayloadLimits.js';
 import { createApiRateLimit } from '../middleware/apiRateLimit.js';
@@ -285,7 +284,7 @@ router.patch(
 );
 
 // ============================================================================
-// DELETE /api/projects/:id - Soft delete project
+// DELETE /api/projects/:id - Permanently delete project
 // ============================================================================
 
 router.delete(
@@ -304,18 +303,13 @@ router.delete(
     const revisionFilter = revision === 0
       ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] }
       : { revision };
-    const project = await Project.findOneAndUpdate(
+    const project = await Project.findOneAndDelete(
       {
         _id: new Types.ObjectId(projectId),
         userId: new Types.ObjectId(userId),
         deletedAt: null,
         ...revisionFilter,
       },
-      {
-        $set: { deletedAt: new Date(), quotaSlot: null },
-        $inc: { revision: 1 },
-      },
-      { new: true },
     );
 
     if (!project) {
@@ -324,65 +318,14 @@ router.delete(
         userId: new Types.ObjectId(userId),
       });
       if (!existing) throw new NotFoundError('Project');
-      if (!existing.isDeleted()) {
-        throw new ConflictError(
-          'Project changed in another session. Reload before deleting it.',
-        );
-      }
+      throw new ConflictError(
+        'Project changed in another session. Reload before deleting it.',
+      );
     }
 
     const response: ApiResponse = {
       success: true,
       message: 'Project deleted successfully',
-    };
-
-    res.json(response);
-  })
-);
-
-// ============================================================================
-// POST /api/projects/:id/restore - Restore soft-deleted project
-// ============================================================================
-
-router.post(
-  '/:id/restore',
-  projectWriteLimiter,
-  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const userId = req.user!.userId;
-    const projectId = req.params.id;
-
-    // Validate ObjectId format
-    if (!Types.ObjectId.isValid(projectId)) {
-      throw new ValidationError(['Invalid project ID format']);
-    }
-
-    // Find project including deleted ones
-    const project = await Project.findOne({
-      _id: new Types.ObjectId(projectId),
-      userId: new Types.ObjectId(userId),
-      deletedAt: { $ne: null },
-    });
-
-    if (!project) {
-      throw new NotFoundError('Deleted project');
-    }
-
-    const userDoc = await User.findById(userId);
-    const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
-    const revision = expectedRevision(req.body.expectedRevision);
-    const restored = await restoreProjectWithinCapacity(
-      project,
-      userId,
-      tier,
-      revision,
-    );
-
-    const response: ApiResponse<{ project: IProjectPublic }> = {
-      success: true,
-      data: {
-        project: restored.toPublic(),
-      },
-      message: 'Project restored successfully',
     };
 
     res.json(response);

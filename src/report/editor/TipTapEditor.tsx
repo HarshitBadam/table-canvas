@@ -281,8 +281,8 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editor, reportId]);
 
-    // `useEditor` deliberately keeps the editor's own editable flag when it re-applies
-    // options, so handover has to switch it explicitly.
+    // `useEditor` deliberately keeps its own editable flag when options are re-applied,
+    // so lease changes must update it explicitly.
     useEffect(() => {
       if (!editor || editor.isEditable === editable) return;
       editor.setEditable(editable);

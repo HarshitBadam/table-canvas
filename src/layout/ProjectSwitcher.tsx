@@ -3,8 +3,14 @@ import { createPortal } from 'react-dom'
 import { useApp } from '@/state/AppContext'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { checkProjectCount } from '@/shared/enforce'
-import { CreateProjectDialog, DeleteProjectDialog } from './ProjectDialogs'
+import {
+  CreateProjectDialog,
+  DeleteProjectDialog,
+  ProjectOpenElsewhereDialog,
+} from './ProjectDialogs'
 import { ProjectSwitcherActions } from './ProjectSwitcherActions'
+import { getStorageScope, scopedStorageKey } from '@/persistence/storageScope'
+import { canDeleteDocument } from '@/state/documentLease'
 interface MenuPosition {
   left: number
   top: number
@@ -42,6 +48,7 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteBlockedOpen, setDeleteBlockedOpen] = useState(false)
   const [name, setName] = useState('')
   const [renameName, setRenameName] = useState('')
   const [actionProjectId, setActionProjectId] = useState<string | null>(null)
@@ -228,7 +235,17 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
       setDeleteOpen(false)
       requestAnimationFrame(() => triggerRef.current?.focus())
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not delete project')
+      if (
+        typeof cause === 'object'
+        && cause !== null
+        && 'code' in cause
+        && cause.code === 'open-elsewhere'
+      ) {
+        setDeleteOpen(false)
+        setDeleteBlockedOpen(true)
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Could not delete project')
+      }
     } finally {
       deleteLockRef.current = false
       setIsDeleting(false)
@@ -491,8 +508,16 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
                   setProjectActionsOpen(false)
                   setError(null)
                   setMenuOpen(false)
-                  setDeleteOpen(true)
-                }} className="flex min-h-9 w-full items-center rounded-md px-2.5 text-left text-sm text-text-primary transition-colors hover:bg-surface-secondary focus-visible:bg-surface-secondary focus-visible:outline-none disabled:cursor-not-allowed disabled:text-text-tertiary disabled:hover:bg-transparent" disabled={projects.length <= 1 || isProjectOperationPending} title={projects.length <= 1 ? 'The last project cannot be deleted' : undefined} {...editBlocked}>
+                  const targetId = actionProjectId
+                  if (!targetId) return
+                  void canDeleteDocument(
+                    scopedStorageKey(getStorageScope(), targetId),
+                    targetId === projectId,
+                  ).then(allowed => {
+                    if (allowed) setDeleteOpen(true)
+                    else setDeleteBlockedOpen(true)
+                  })
+                }} className="flex min-h-9 w-full items-center rounded-md px-2.5 text-left text-sm text-text-primary transition-colors hover:bg-surface-secondary focus-visible:bg-surface-secondary focus-visible:outline-none disabled:cursor-not-allowed disabled:text-text-tertiary disabled:hover:bg-transparent" disabled={isProjectOperationPending}>
                   Delete
                 </button>
               </div>,
@@ -555,6 +580,10 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
                 requestAnimationFrame(() => triggerRef.current?.focus())
               }
             }}
+          />
+          <ProjectOpenElsewhereDialog
+            open={deleteBlockedOpen}
+            onOpenChange={setDeleteBlockedOpen}
           />
         </>
       )}

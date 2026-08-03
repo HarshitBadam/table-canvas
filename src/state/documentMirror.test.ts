@@ -1,28 +1,37 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import 'fake-indexeddb/auto'
+import { IDBFactory } from 'fake-indexeddb'
 import type { SourceTableNode } from '@/types'
 import {
   FakeBroadcastChannel,
   resetChannelBus,
   settleTabs,
 } from '@/test/fakeTabEnvironment'
+import type { DocumentIdentity } from './documentIdentity'
 
-const KEY = 'guest::project-1'
+const IDENTITY: DocumentIdentity = {
+  scope: 'guest',
+  projectId: 'project-1',
+  key: 'guest\u001fproject-1',
+}
 
 interface Tab {
+  db: typeof import('@/persistence/db')
   mirror: typeof import('./documentMirror')
   projectStore: typeof import('./projectStore')
   runtimeStore: typeof import('./tableRuntimeStore')
 }
 
-/** Each tab is its own module registry, so the stores are per tab like real tabs. */
+/** Each tab has its own stores and coordination module, like separate pages. */
 async function openTab(): Promise<Tab> {
   vi.resetModules()
-  const [mirror, projectStore, runtimeStore] = await Promise.all([
+  const [db, mirror, projectStore, runtimeStore] = await Promise.all([
+    import('@/persistence/db'),
     import('./documentMirror'),
     import('./projectStore'),
     import('./tableRuntimeStore'),
   ])
-  return { mirror, projectStore, runtimeStore }
+  return { db, mirror, projectStore, runtimeStore }
 }
 
 function tableNode(id: string, updatedAt: string): SourceTableNode {
@@ -38,9 +47,9 @@ function tableNode(id: string, updatedAt: string): SourceTableNode {
   } as unknown as SourceTableNode
 }
 
-function seedDocument(tab: Tab, updatedAt: string): void {
+function seedMemory(tab: Tab, updatedAt: string): void {
   tab.projectStore.useProjectStore.setState({
-    projectId: 'project-1',
+    projectId: IDENTITY.projectId,
     projectName: 'Quarterly numbers',
     nodes: { 'table-1': tableNode('table-1', updatedAt) },
     edges: {},
@@ -48,7 +57,23 @@ function seedDocument(tab: Tab, updatedAt: string): void {
   })
 }
 
+async function persistDocument(
+  tab: Tab,
+  nodes: Record<string, SourceTableNode>,
+): Promise<void> {
+  await tab.db.saveProject(
+    IDENTITY.projectId,
+    'Quarterly numbers',
+    nodes,
+    {},
+    {},
+    undefined,
+    IDENTITY.scope,
+  )
+}
+
 beforeEach(() => {
+  globalThis.indexedDB = new IDBFactory()
   resetChannelBus()
   vi.stubGlobal('BroadcastChannel', FakeBroadcastChannel)
 })
@@ -57,25 +82,25 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('documentMirror', () => {
-  it('publishes the owner document to other tabs on the same document', async () => {
+describe('documentMirror durable invalidation', () => {
+  it('reloads the committed IndexedDB snapshot instead of a message payload', async () => {
     const owner = await openTab()
-    const stopOwner = owner.mirror.startDocumentMirror(KEY)
-    seedDocument(owner, '2026-01-02T00:00:00.000Z')
-
+    const stopOwner = owner.mirror.startDocumentMirror(IDENTITY)
     const follower = await openTab()
-    const stopFollower = follower.mirror.startDocumentMirror(KEY)
-    seedDocument(follower, '2026-01-01T00:00:00.000Z')
+    const stopFollower = follower.mirror.startDocumentMirror(IDENTITY)
+    seedMemory(follower, '2026-01-01T00:00:00.000Z')
+    follower.projectStore.useProjectStore.setState({ selectedNodeId: 'table-1' })
 
-    owner.mirror.publishDocumentSnapshot()
+    await persistDocument(owner, {
+      'table-1': tableNode('table-1', '2026-01-02T00:00:00.000Z'),
+    })
+    owner.mirror.publishDocumentInvalidation()
     await settleTabs()
 
     const mirrored = follower.projectStore.useProjectStore.getState()
-    expect(mirrored.projectName).toBe('Quarterly numbers')
     expect(mirrored.nodes['table-1']?.updatedAt).toBe('2026-01-02T00:00:00.000Z')
-    // Another tab's edits must not be undoable here.
+    expect(mirrored.selectedNodeId).toBe('table-1')
     expect(mirrored.history).toEqual({ past: [], future: [] })
-    // The mirrored table has to be recomputed against the new data.
     expect(
       follower.runtimeStore.useTableRuntimeStore.getState().cacheInfo['table-1']?.isDirty,
     ).toBe(true)
@@ -84,142 +109,76 @@ describe('documentMirror', () => {
     stopFollower()
   })
 
-  it('ignores its own publishes so a save cannot bounce back', async () => {
+  it('ignores its own invalidation so a save cannot clear editor history', async () => {
     const owner = await openTab()
-    const stopOwner = owner.mirror.startDocumentMirror(KEY)
-    seedDocument(owner, '2026-01-02T00:00:00.000Z')
+    const stopOwner = owner.mirror.startDocumentMirror(IDENTITY)
+    seedMemory(owner, '2026-01-02T00:00:00.000Z')
     owner.projectStore.useProjectStore.setState({
       history: { past: [{ label: 'Edit cell' }], future: [] } as never,
     })
+    await persistDocument(owner, {
+      'table-1': tableNode('table-1', '2026-01-02T00:00:00.000Z'),
+    })
 
-    owner.mirror.publishDocumentSnapshot()
+    owner.mirror.publishDocumentInvalidation()
     await settleTabs()
 
-    // Applying an own snapshot would have cleared the undo stack.
     expect(owner.projectStore.useProjectStore.getState().history.past).toHaveLength(1)
     stopOwner()
   })
 
-  it('does not publish incomplete pending imports to mirrors', async () => {
+  it('never exposes an incomplete pending import to a reader', async () => {
     const owner = await openTab()
-    const stopOwner = owner.mirror.startDocumentMirror(KEY)
-    owner.projectStore.useProjectStore.setState({
-      projectId: 'project-1',
-      projectName: 'Importing',
-      nodes: {
-        'table-ready': tableNode('table-ready', '2026-01-02T00:00:00.000Z'),
-        'table-pending': {
-          ...tableNode('table-pending', '2026-01-02T00:00:00.000Z'),
-          plan: {
-            fileRef: 'pending:abc',
-            fileName: 'pending.csv',
-            fileType: 'csv',
-            inferredSchemaVersion: 1,
-          },
-        } as SourceTableNode,
+    const stopOwner = owner.mirror.startDocumentMirror(IDENTITY)
+    const follower = await openTab()
+    const stopFollower = follower.mirror.startDocumentMirror(IDENTITY)
+    seedMemory(follower, '2026-01-01T00:00:00.000Z')
+
+    const pending = {
+      ...tableNode('table-pending', '2026-01-02T00:00:00.000Z'),
+      plan: {
+        fileRef: 'pending:abc',
+        fileName: 'pending.csv',
+        fileType: 'csv',
+        inferredSchemaVersion: 1,
       },
-      edges: {},
-      patches: {},
+    } as SourceTableNode
+    await persistDocument(owner, {
+      'table-ready': tableNode('table-ready', '2026-01-02T00:00:00.000Z'),
+      'table-pending': pending,
     })
 
-    const follower = await openTab()
-    const stopFollower = follower.mirror.startDocumentMirror(KEY)
-    seedDocument(follower, '2026-01-01T00:00:00.000Z')
-
-    owner.mirror.publishDocumentSnapshot()
+    owner.mirror.publishDocumentInvalidation()
     await settleTabs()
 
     const mirrored = follower.projectStore.useProjectStore.getState()
     expect(mirrored.nodes['table-ready']).toBeDefined()
     expect(mirrored.nodes['table-pending']).toBeUndefined()
-
     stopOwner()
     stopFollower()
   })
 
-  it('does not reach tabs on a different document', async () => {
+  it('does not reach a different document or a stopped reader', async () => {
     const owner = await openTab()
-    const stopOwner = owner.mirror.startDocumentMirror(KEY)
-    seedDocument(owner, '2026-01-02T00:00:00.000Z')
-
-    const otherProject = await openTab()
-    const stopOther = otherProject.mirror.startDocumentMirror('guest::project-2')
-    seedDocument(otherProject, '2026-01-01T00:00:00.000Z')
-
-    owner.mirror.publishDocumentSnapshot()
-    await settleTabs()
-
-    expect(
-      otherProject.projectStore.useProjectStore.getState().nodes['table-1']?.updatedAt,
-    ).toBe('2026-01-01T00:00:00.000Z')
-
-    stopOwner()
+    const stopOwner = owner.mirror.startDocumentMirror(IDENTITY)
+    const other = await openTab()
+    const stopOther = other.mirror.startDocumentMirror({
+      scope: 'guest',
+      projectId: 'project-2',
+      key: 'guest\u001fproject-2',
+    })
+    seedMemory(other, '2026-01-01T00:00:00.000Z')
     stopOther()
-  })
+    await persistDocument(owner, {
+      'table-1': tableNode('table-1', '2026-01-02T00:00:00.000Z'),
+    })
 
-  it('stops applying snapshots once the mirror is torn down', async () => {
-    const owner = await openTab()
-    const stopOwner = owner.mirror.startDocumentMirror(KEY)
-    seedDocument(owner, '2026-01-02T00:00:00.000Z')
-
-    const follower = await openTab()
-    const stopFollower = follower.mirror.startDocumentMirror(KEY)
-    seedDocument(follower, '2026-01-01T00:00:00.000Z')
-    stopFollower()
-
-    owner.mirror.publishDocumentSnapshot()
+    owner.mirror.publishDocumentInvalidation()
     await settleTabs()
 
     expect(
-      follower.projectStore.useProjectStore.getState().nodes['table-1']?.updatedAt,
+      other.projectStore.useProjectStore.getState().nodes['table-1']?.updatedAt,
     ).toBe('2026-01-01T00:00:00.000Z')
     stopOwner()
-  })
-
-  it('revives patch sets and drops nodes the owner deleted', async () => {
-    const owner = await openTab()
-    const stopOwner = owner.mirror.startDocumentMirror(KEY)
-    owner.projectStore.useProjectStore.setState({
-      projectId: 'project-1',
-      projectName: 'Quarterly numbers',
-      nodes: { 'table-1': tableNode('table-1', '2026-01-02T00:00:00.000Z') },
-      edges: {},
-      patches: {
-        'table-1': {
-          cellPatches: { 'row-1': { 'column-1': 'edited' } },
-          insertedRows: [],
-          deletedRows: new Set(['row-9']),
-          highlightedCells: new Set(['row-1:column-1']),
-        },
-      },
-    })
-
-    const follower = await openTab()
-    const stopFollower = follower.mirror.startDocumentMirror(KEY)
-    seedDocument(follower, '2026-01-01T00:00:00.000Z')
-    follower.projectStore.useProjectStore.setState({
-      nodes: {
-        'table-1': tableNode('table-1', '2026-01-01T00:00:00.000Z'),
-        'table-2': tableNode('table-2', '2026-01-01T00:00:00.000Z'),
-      },
-    })
-    follower.runtimeStore.useTableRuntimeStore.getState().updateCacheInfo('table-2', {
-      lastRowCount: 5,
-    })
-
-    owner.mirror.publishDocumentSnapshot()
-    await settleTabs()
-
-    const mirrored = follower.projectStore.useProjectStore.getState()
-    expect(mirrored.nodes['table-2']).toBeUndefined()
-    expect(mirrored.patches['table-1']?.deletedRows).toBeInstanceOf(Set)
-    expect(mirrored.patches['table-1']?.deletedRows.has('row-9')).toBe(true)
-    expect(mirrored.patches['table-1']?.highlightedCells?.has('row-1:column-1')).toBe(true)
-    expect(
-      follower.runtimeStore.useTableRuntimeStore.getState().cacheInfo['table-2'],
-    ).toBeUndefined()
-
-    stopOwner()
-    stopFollower()
   })
 })

@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   getProjectSyncOperation: vi.fn(),
   finalizeProjectDelete: vi.fn(),
   clearProjectSyncOperation: vi.fn(),
+  cancelQueuedProjectDelete: vi.fn(),
+  deleteProjectSnapshot: vi.fn(),
   operations: new Map<string, Record<string, unknown>>(),
 }))
 
@@ -50,6 +52,12 @@ vi.mock('./projectSyncQueue', () => ({
   clearProjectSyncOperation: (...args: unknown[]) => (
     mocks.clearProjectSyncOperation(...args)
   ),
+  cancelQueuedProjectDelete: (...args: unknown[]) => (
+    mocks.cancelQueuedProjectDelete(...args)
+  ),
+  deleteProjectSnapshot: (...args: unknown[]) => (
+    mocks.deleteProjectSnapshot(...args)
+  ),
 }))
 
 vi.mock('./db', () => ({
@@ -79,7 +87,7 @@ vi.mock('./reportStorage', () => ({
 import {
   deleteProjectWithSync,
   importProjectWithSync,
-  syncLocalProjectsToBackend,
+  syncOfflineAccountProjects,
 } from './syncService'
 import { accountStorageScope, setStorageScope } from './storageScope'
 
@@ -114,6 +122,7 @@ beforeEach(() => {
   mocks.clearProjectSyncOperation.mockImplementation((id: string) => {
     mocks.operations.delete(id)
   })
+  mocks.deleteProjectSnapshot.mockResolvedValue({})
   mocks.updateProject.mockImplementation((
     id: string,
     data: { expectedRevision?: number },
@@ -221,10 +230,10 @@ describe('importProjectWithSync', () => {
   })
 })
 
-describe('syncLocalProjectsToBackend', () => {
-  it('promotes an offline project before deleting the guest source', async () => {
+describe('syncOfflineAccountProjects', () => {
+  it('promotes offline account projects without touching guest scopes', async () => {
     mocks.listProjectsLocal.mockImplementation((scope?: string) => Promise.resolve(
-      scope === 'guest'
+      scope === accountScope
         ? [{
             id: 'local_123',
             name: 'Offline project',
@@ -245,17 +254,17 @@ describe('syncLocalProjectsToBackend', () => {
       createMockProject('server_123', 'Offline project'),
     )
 
-    await syncLocalProjectsToBackend()
+    await syncOfflineAccountProjects()
 
     expect(mocks.createProject).toHaveBeenCalledWith(
       { name: 'Offline project' },
-      'promote:guest:local_123',
+      `promote:${accountScope}:local_123`,
     )
     expect(mocks.updateProject).toHaveBeenCalledWith(
       'server_123',
       expect.objectContaining({ name: 'Offline project' }),
     )
-    expect(mocks.deleteProjectLocal).toHaveBeenCalledWith('local_123', 'guest')
+    expect(mocks.deleteProjectLocal).toHaveBeenCalledWith('local_123', accountScope)
     expect(mocks.saveProjectLocal).toHaveBeenCalledWith(
       'server_123',
       'Offline project',
@@ -265,18 +274,30 @@ describe('syncLocalProjectsToBackend', () => {
       expect.objectContaining({ revision: 1 }),
       accountScope,
     )
-    expect(mocks.updateProject.mock.invocationCallOrder[0])
-      .toBeLessThan(mocks.deleteProjectLocal.mock.invocationCallOrder[0])
     expect(mocks.copyReportsToProject).toHaveBeenCalledWith(
       'local_123',
       'server_123',
-      'guest',
+      accountScope,
       accountScope,
     )
     expect(mocks.deleteReportsForProject).toHaveBeenCalledWith(
       'local_123',
-      'guest',
+      accountScope,
     )
+  })
+
+  it('skips promotion while the active scope is a guest workspace', async () => {
+    setStorageScope('guest:tab-a')
+    mocks.listProjectsLocal.mockResolvedValue([{
+      id: 'local_123',
+      name: 'Guest project',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    }])
+
+    await syncOfflineAccountProjects()
+
+    expect(mocks.createProject).not.toHaveBeenCalled()
+    expect(mocks.listProjectsLocal).not.toHaveBeenCalled()
   })
 })
 
@@ -292,18 +313,15 @@ describe('deleteProjectWithSync', () => {
     expect(mocks.finalizeProjectDelete).toHaveBeenCalled()
   })
 
-  it('does not call the backend for local-only projects', async () => {
+  it('hard-deletes local-only projects without calling the backend', async () => {
     await deleteProjectWithSync('local_123')
-    expect(mocks.enqueueProjectDelete).toHaveBeenCalledWith(
-      'local_123',
-      0,
-      accountScope,
-    )
-    expect(mocks.finalizeProjectDelete).toHaveBeenCalled()
+    expect(mocks.deleteProjectSnapshot).toHaveBeenCalledWith('local_123', accountScope)
+    expect(mocks.clearProjectSyncOperation).toHaveBeenCalledWith('local_123', accountScope)
+    expect(mocks.enqueueProjectDelete).not.toHaveBeenCalled()
     expect(mocks.deleteProject).not.toHaveBeenCalled()
   })
 
-  it('preserves the local project if backend deletion fails', async () => {
+  it('cancels a queued delete when the backend rejects it', async () => {
     mocks.loadProjectLocal.mockResolvedValue({
       id: 'proj_123',
       name: 'Project',
@@ -317,8 +335,8 @@ describe('deleteProjectWithSync', () => {
     mocks.deleteProject.mockRejectedValue(new Error('Server error'))
 
     await expect(deleteProjectWithSync('proj_123')).rejects.toThrow('Server error')
-    expect(mocks.deleteProjectLocal).not.toHaveBeenCalled()
-    expect(mocks.clearProjectSyncOperation).toHaveBeenCalledWith(
+    expect(mocks.deleteProjectSnapshot).not.toHaveBeenCalled()
+    expect(mocks.cancelQueuedProjectDelete).toHaveBeenCalledWith(
       'proj_123',
       accountScope,
     )

@@ -18,16 +18,11 @@ export interface IProjectDocument extends Omit<IProject, '_id'>, Document {
     createdAt: Date;
     updatedAt: Date;
   };
-  softDelete(): Promise<IProjectDocument>;
-  restore(): Promise<IProjectDocument>;
-  isDeleted(): boolean;
 }
 
 interface IProjectModel extends Model<IProjectDocument> {
   findByUser(userId: string | Types.ObjectId): Promise<IProjectDocument[]>;
   findByIdAndUser(projectId: string, userId: string): Promise<IProjectDocument | null>;
-  findWithDeleted(filter?: mongoose.FilterQuery<IProjectDocument>): Promise<IProjectDocument[]>;
-  findByUserWithDeleted(userId: string | Types.ObjectId): Promise<IProjectDocument[]>;
 }
 
 const ProjectSchema = new Schema<IProjectDocument, IProjectModel>(
@@ -159,22 +154,6 @@ ProjectSchema.methods.toPublic = function () {
   };
 };
 
-ProjectSchema.methods.softDelete = async function (): Promise<IProjectDocument> {
-  this.deletedAt = new Date();
-  this.revision = (this.revision ?? 0) + 1;
-  return this.save();
-};
-
-ProjectSchema.methods.restore = async function (): Promise<IProjectDocument> {
-  this.deletedAt = null;
-  this.revision = (this.revision ?? 0) + 1;
-  return this.save();
-};
-
-ProjectSchema.methods.isDeleted = function (): boolean {
-  return this.deletedAt !== null;
-};
-
 ProjectSchema.statics.findByUser = function (userId: string | Types.ObjectId) {
   return this.find({ 
     userId,
@@ -193,20 +172,6 @@ ProjectSchema.statics.findByIdAndUser = function (
     userId: new Types.ObjectId(userId),
     deletedAt: null,
   });
-};
-
-ProjectSchema.statics.findWithDeleted = function (
-  filter: mongoose.FilterQuery<IProjectDocument> = {}
-) {
-  return this.find(filter).sort({ updatedAt: -1 });
-};
-
-ProjectSchema.statics.findByUserWithDeleted = function (
-  userId: string | Types.ObjectId
-) {
-  return this.find({ userId })
-    .select('_id name updatedAt createdAt deletedAt')
-    .sort({ updatedAt: -1 });
 };
 
 ProjectSchema.pre('save', function (next) {

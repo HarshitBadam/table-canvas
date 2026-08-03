@@ -145,4 +145,45 @@ describe('durable project sync queue', () => {
     expect(await db.loadReportsForProject('project-1')).toEqual({})
     expect(await db.getProjectSyncOperation('project-1')).toBeNull()
   })
+
+  it('rejects autosaves once a delete is queued for the project', async () => {
+    const db = await getDB()
+    const scope = db.accountStorageScope('delete-queued-user')
+    db.setStorageScope(scope)
+    await db.saveProject('project-1', 'Delete me', {}, {}, {}, { revision: 2 })
+    const deletion = await db.enqueueProjectDelete('project-1', 2)
+
+    await expect(db.saveProjectAndEnqueue(
+      'project-1',
+      'Ghost copy',
+      {},
+      {},
+      {},
+      {},
+    )).rejects.toThrow(/deleted in another tab/i)
+    expect(await db.getProjectSyncOperation('project-1')).toMatchObject({
+      operation: 'delete',
+      generation: deletion.generation,
+    })
+  })
+
+  it('removes the durable snapshot while an offline delete remains queued', async () => {
+    const db = await getDB()
+    const scope = db.accountStorageScope('delete-snapshot-user')
+    db.setStorageScope(scope)
+    await db.saveProject('project-1', 'Delete me', {}, {}, {}, { revision: 2 })
+    await db.saveReport({
+      ...createMockReport('report-1', 'Delete me'),
+      projectId: 'project-1',
+    })
+    await db.enqueueProjectDelete('project-1', 2)
+
+    await db.deleteProjectSnapshot('project-1')
+
+    expect(await db.loadProject('project-1')).toBeNull()
+    expect(await db.loadReportsForProject('project-1')).toEqual({})
+    expect(await db.getProjectSyncOperation('project-1')).toMatchObject({
+      operation: 'delete',
+    })
+  })
 })

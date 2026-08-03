@@ -64,9 +64,10 @@ import {
 } from './syncService'
 import {
   accountStorageScope,
-  GUEST_STORAGE_SCOPE,
   setStorageScope,
 } from './storageScope'
+
+const GUEST_SCOPE = 'guest:test-tab'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -89,7 +90,7 @@ const {
 
 describe('uploadFileWithSync', () => {
   it('keeps explicit guest work local even when the backend is reachable', async () => {
-    setStorageScope(GUEST_STORAGE_SCOPE)
+    setStorageScope(GUEST_SCOPE)
     const file = createMockFile('a,b\n1,2', 'guest.csv', 'text/csv')
 
     const uploaded = await uploadFileWithSync(file)

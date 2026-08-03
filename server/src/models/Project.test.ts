@@ -125,40 +125,8 @@ describe('Project Model', () => {
     });
   });
 
-  describe('soft delete', () => {
-    it('should set deletedAt on softDelete()', async () => {
-      const project = await createTestProject();
-      expect(project.deletedAt).toBeNull();
-
-      await project.softDelete();
-
-      expect(project.deletedAt).toBeInstanceOf(Date);
-      expect(project.isDeleted()).toBe(true);
-    });
-
-    it('should clear deletedAt on restore()', async () => {
-      const project = await createTestProject({ deleted: true });
-      expect(project.deletedAt).toBeInstanceOf(Date);
-
-      await project.restore();
-
-      expect(project.deletedAt).toBeNull();
-      expect(project.isDeleted()).toBe(false);
-    });
-
-    it('should return true for isDeleted() when deleted', async () => {
-      const project = await createTestProject({ deleted: true });
-
-      expect(project.isDeleted()).toBe(true);
-    });
-
-    it('should return false for isDeleted() when not deleted', async () => {
-      const project = await createTestProject();
-
-      expect(project.isDeleted()).toBe(false);
-    });
-
-    it('should exclude deleted projects from findByUser()', async () => {
+  describe('active project queries', () => {
+    it('should exclude deletedAt-marked rows from findByUser()', async () => {
       const userId = createMockUserId();
 
       await createTestProject({ userId, name: 'Active 1' });
@@ -173,7 +141,7 @@ describe('Project Model', () => {
       expect(projects.every((p) => !p.deletedAt)).toBe(true);
     });
 
-    it('should exclude deleted projects from findByIdAndUser()', async () => {
+    it('should exclude deletedAt-marked rows from findByIdAndUser()', async () => {
       const userId = createMockUserId();
       const project = await createTestProject({ userId, deleted: true });
 
@@ -282,30 +250,17 @@ describe('Project Model', () => {
     });
   });
 
-  describe('findWithDeleted', () => {
-    it('should include deleted projects', async () => {
+  describe('hard delete', () => {
+    it('removes the document so list helpers cannot see it', async () => {
       const userId = createMockUserId();
+      const active = await createTestProject({ userId, name: 'Active' });
+      const doomed = await createTestProject({ userId, name: 'Doomed' });
 
-      await createTestProject({ userId, name: 'Active' });
-      await createTestProject({ userId, name: 'Deleted', deleted: true });
+      await Project.findByIdAndDelete(doomed._id);
 
-      const all = await Project.findWithDeleted({ userId });
-
-      expect(all).toHaveLength(2);
-    });
-  });
-
-  describe('findByUserWithDeleted', () => {
-    it('should include deleted projects for user', async () => {
-      const userId = createMockUserId();
-
-      await createTestProject({ userId, name: 'Active' });
-      await createTestProject({ userId, name: 'Deleted', deleted: true });
-
-      const projects = await Project.findByUserWithDeleted(userId);
-
-      expect(projects).toHaveLength(2);
-      expect(projects.some((p) => p.deletedAt !== null)).toBe(true);
+      expect(await Project.findByUser(userId)).toHaveLength(1);
+      expect(await Project.findById(doomed._id)).toBeNull();
+      expect(await Project.findById(active._id)).not.toBeNull();
     });
   });
 

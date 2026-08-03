@@ -68,7 +68,7 @@ vi.mock('@/persistence/syncService', () => ({
   saveProjectWithSync,
   setProjectSyncErrorHandler: vi.fn(),
   setCloudSyncEnabled: vi.fn(),
-  syncLocalProjectsToBackend: vi.fn().mockResolvedValue([]),
+  syncOfflineAccountProjects: vi.fn().mockResolvedValue([]),
 }))
 vi.mock('./projectLifecycle', () => ({
   clearProjectRuntime,
@@ -349,7 +349,7 @@ describe('AppProvider project lifecycle', () => {
     })
   })
 
-  it('leaves report cleanup to atomic project deletion finalization', async () => {
+  it('clears the active workspace instead of auto-selecting a replacement', async () => {
     const current = project('current-project', 'Current')
     const next = project('next-project', 'Next')
     loadOrCreateProject.mockResolvedValueOnce({
@@ -365,11 +365,13 @@ describe('AppProvider project lifecycle', () => {
       expect(deleteProjectWithSync).toHaveBeenCalledWith('current-project')
     })
     expect(deleteReportsForProject).not.toHaveBeenCalled()
-    expect(screen.getByTestId('project')).toHaveTextContent('next-project')
-    expect(screen.getByTestId('store-project')).toHaveTextContent('next-project')
+    // Deletion is terminal and explicit: no other project is silently loaded in
+    // its place. The workspace goes empty until the user creates or opens one.
+    expect(screen.getByTestId('project')).toHaveTextContent('')
+    expect(screen.getByTestId('store-project')).toHaveTextContent('')
   })
 
-  it('restores reports and active stores when local project deletion fails', async () => {
+  it('keeps the active project when a local deletion fails', async () => {
     const current = project('current-project', 'Current')
     const next = project('next-project', 'Next')
     loadOrCreateProject.mockResolvedValueOnce({
@@ -384,7 +386,6 @@ describe('AppProvider project lifecycle', () => {
 
     await waitFor(() => expect(deleteProjectWithSync).toHaveBeenCalledWith('current-project'))
     expect(saveAllReports).not.toHaveBeenCalled()
-    expect(loadReportsForProject).toHaveBeenCalledWith('current-project')
     expect(screen.getByTestId('project')).toHaveTextContent('current-project')
     expect(screen.getByTestId('store-project')).toHaveTextContent('current-project')
   })

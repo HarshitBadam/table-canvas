@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectNode } from '@/types'
 import {
   accountStorageScope,
-  GUEST_STORAGE_SCOPE,
   setStorageScope,
 } from './storageScope'
+
+const GUEST_SCOPE = 'guest:test-tab'
 
 const mocks = vi.hoisted(() => ({
   deleteFileWithSync: vi.fn(),
@@ -74,9 +75,9 @@ describe('history file cleanup', () => {
   })
 
   it('does not delete a guest file referenced by another local project', async () => {
-    setStorageScope(GUEST_STORAGE_SCOPE)
-    queueHistoryFileCleanup(GUEST_STORAGE_SCOPE, ['shared-local-file'])
-    retainHistoryFileRefs(GUEST_STORAGE_SCOPE, [])
+    setStorageScope(GUEST_SCOPE)
+    queueHistoryFileCleanup(GUEST_SCOPE, ['shared-local-file'])
+    retainHistoryFileRefs(GUEST_SCOPE, [])
     mocks.listProjects.mockResolvedValue([{ id: 'other-project' }])
     mocks.loadProject.mockResolvedValue({
       id: 'other-project',
@@ -85,7 +86,7 @@ describe('history file cleanup', () => {
       },
     })
 
-    await flushHistoryFileCleanup({}, GUEST_STORAGE_SCOPE)
+    await flushHistoryFileCleanup({}, GUEST_SCOPE)
 
     expect(mocks.deleteFileWithSync).not.toHaveBeenCalled()
   })

@@ -7,7 +7,7 @@ import {
   type MockBackendState,
 } from './derived-tables.support'
 
-const MIRROR_NOTICE = 'Viewing live. Editing is active in another tab.'
+const MIRROR_NOTICE = 'Read-only · Editing in another tab'
 
 async function bootTab(page: Page, state: MockBackendState) {
   await installMockBackend(page, { state })
@@ -19,9 +19,7 @@ async function openSecondTab(page: Page, state: MockBackendState) {
   const second = await page.context().newPage()
   await installMockBackend(second, { state })
   await second.goto('/')
-  // The workspace keeps editing where it is until a tab holds focus, so put the first
-  // tab back in front before the second one finishes booting.
-  await page.bringToFront()
+  // Ownership is decided purely by which tab holds the Web Lock, never by focus.
   await expect(second.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
   return second
 }
@@ -46,14 +44,13 @@ test('the second tab on a project mirrors it and never gets walled', async ({ pa
   const mirror = await openSecondTab(page, state)
 
   await expect(mirror.getByText(MIRROR_NOTICE)).toBeVisible({ timeout: 20_000 })
-  // Both tabs keep the workspace: nothing is ever walled off.
   await expect(mirror.locator('.react-flow')).toBeVisible()
   await expect(page.locator('.react-flow')).toBeVisible()
   await expect(mirror.getByRole('heading', {
     name: 'Table Canvas is open in another tab',
   })).toHaveCount(0)
+  await expect(mirror.getByRole('button', { name: 'Edit here' })).toHaveCount(0)
 
-  // Mutating controls are disabled with an explanation, not hidden.
   const newTable = mirror.locator('aside').getByRole('button', { name: 'New Table' })
   await expect(newTable).toBeVisible()
   await expect(newTable).toBeDisabled()
@@ -63,8 +60,7 @@ test('the second tab on a project mirrors it and never gets walled', async ({ pa
 
   await mirror.close()
 
-  // The tab left on its own keeps the document and is never walled, including after a
-  // reload that has to reclaim a lock the closed tab used to hold.
+  // Closing the reader naturally leaves the owner editing; a reload reclaims the lock.
   await expect(page.getByText(MIRROR_NOTICE)).toHaveCount(0, { timeout: 20_000 })
   await page.reload()
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
@@ -87,13 +83,14 @@ test('a mirroring dashboard tab shows edits from the editing tab live', async ({
   await expect(mirror.getByText(MIRROR_NOTICE)).toBeVisible({ timeout: 20_000 })
   await expect(sidebarTable(mirror, 'First Table')).toBeAttached()
 
-  // A read-only tab left open on the dashboard is the case that used to clobber the
-  // editing tab; now it just watches.
+  // Focus never claims editing; the reader stays statically read-only.
+  await mirror.bringToFront()
   await mirror.locator('aside').getByRole('button', { name: 'Dashboard' }).click()
   await expect(dashboardSummary(mirror)).toContainText(/1\s*Tables/, { timeout: 20_000 })
+  await expect(mirror.getByText(MIRROR_NOTICE)).toBeVisible()
+  await expect(mirror.locator('aside').getByRole('button', { name: 'New Table' }))
+    .toBeDisabled()
 
-  // Editing follows attention, so the tab being worked in has to be the front one; the
-  // dashboard stays open behind it.
   await page.bringToFront()
   await expect(page.locator('aside').getByRole('button', { name: 'New Table' }))
     .toBeEnabled({ timeout: 20_000 })
@@ -104,45 +101,28 @@ test('a mirroring dashboard tab shows edits from the editing tab live', async ({
   await mirror.close()
 })
 
-test('editing follows focus once the other tab has saved', async ({ page }) => {
+test('closing the owner promotes the queued reader after durable adoption', async ({ page }) => {
   test.setTimeout(90_000)
   const state = createMockBackendState()
   await bootTab(page, state)
-  await createManualTable(page, 'Handover Table')
+  await createManualTable(page, 'Owned Table')
 
   const mirror = await openSecondTab(page, state)
   await expect(mirror.getByText(MIRROR_NOTICE)).toBeVisible({ timeout: 20_000 })
 
-  // Made in the tab that is about to lose the document, so the handover has a save to
-  // flush before it releases.
-  await createManualTable(page, 'Last Minute Table')
-  await mirror.bringToFront()
+  await createManualTable(page, 'Final Owner Edit')
+  await expect(sidebarTable(mirror, 'Final Owner Edit')).toBeAttached({ timeout: 20_000 })
 
-  // Editing moves here, so the notice goes away and the controls come back.
+  await page.close()
+
   await expect(mirror.getByText(MIRROR_NOTICE)).toHaveCount(0, { timeout: 20_000 })
   await expect(mirror.locator('aside').getByRole('button', { name: 'New Table' }))
     .toBeEnabled({ timeout: 20_000 })
-  // The tab that gave up editing keeps the workspace as a live mirror.
-  await expect(page.getByText(MIRROR_NOTICE)).toBeVisible({ timeout: 20_000 })
-  await expect(page.locator('.react-flow')).toBeVisible()
+  await expect(sidebarTable(mirror, 'Owned Table')).toBeAttached()
+  await expect(sidebarTable(mirror, 'Final Owner Edit')).toBeAttached()
 
-  // Whatever the first tab had is still there, so the handover flushed first.
-  await expect(sidebarTable(mirror, 'Handover Table')).toBeAttached()
-  await expect(sidebarTable(mirror, 'Last Minute Table')).toBeAttached({ timeout: 20_000 })
-
-  // Reloading reads the document back from storage rather than the mirror channel, so
-  // the pre-handover edit has to have been written, not just broadcast.
-  await mirror.reload()
-  await expect(mirror.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
-  await expect(sidebarTable(mirror, 'Last Minute Table')).toBeAttached({ timeout: 20_000 })
-  await expect(mirror.getByText(MIRROR_NOTICE)).toHaveCount(0, { timeout: 20_000 })
-  await expect(mirror.locator('aside').getByRole('button', { name: 'New Table' }))
-    .toBeEnabled({ timeout: 20_000 })
-
-  await createManualTable(mirror, 'Second Tab Table')
-  await expect(sidebarTable(page, 'Second Tab Table')).toBeAttached({ timeout: 20_000 })
-
-  await mirror.close()
+  await createManualTable(mirror, 'Promoted Tab Table')
+  await expect(sidebarTable(mirror, 'Promoted Tab Table')).toBeAttached({ timeout: 20_000 })
 })
 
 test('two tabs on different projects are both editable', async ({ page }) => {
@@ -162,7 +142,6 @@ test('two tabs on different projects are both editable', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Create project' }).click()
   await expect(dialog).toBeHidden({ timeout: 30_000 })
 
-  // Different documents, so neither tab waits on the other.
   await expect(second.getByText(MIRROR_NOTICE)).toHaveCount(0, { timeout: 20_000 })
   await expect(page.getByText(MIRROR_NOTICE)).toHaveCount(0, { timeout: 20_000 })
   await expect(second.locator('aside').getByRole('button', { name: 'New Table' }))

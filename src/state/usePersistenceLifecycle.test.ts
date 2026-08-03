@@ -4,7 +4,7 @@ const sync = vi.hoisted(() => ({
   fetchProjects: vi.fn(),
   flushAllProjectSavesWithSync: vi.fn(),
   loadProjectWithSync: vi.fn(),
-  syncLocalProjectsToBackend: vi.fn(),
+  syncOfflineAccountProjects: vi.fn(),
 }))
 const flushReportSaves = vi.hoisted(() => vi.fn())
 const projectState = vi.hoisted(() => ({ projectId: 'project-1' as string | null }))
@@ -28,7 +28,7 @@ describe('reconnect persistence recovery', () => {
     projectState.projectId = 'project-1'
     flushReportSaves.mockResolvedValue(undefined)
     sync.fetchProjects.mockResolvedValue([])
-    sync.syncLocalProjectsToBackend.mockResolvedValue([])
+    sync.syncOfflineAccountProjects.mockResolvedValue([])
     sync.flushAllProjectSavesWithSync.mockResolvedValue([])
   })
 

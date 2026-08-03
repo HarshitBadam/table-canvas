@@ -5,8 +5,12 @@ import type { ProjectExportState } from './useProjectExport'
 import { AppHeader } from './AppHeader'
 
 vi.mock('@/state/AppContext', () => ({
-  useApp: () => ({ isSaving: false }),
-  useAppAuth: () => ({ user: null, logout: vi.fn() }),
+  useApp: () => ({ isSaving: false, projects: [] }),
+  useAppAuth: () => ({ user: null, logout: vi.fn(), leaveGuest: vi.fn() }),
+}))
+vi.mock('@/state/useWorkspaceLease', () => ({
+  EDITING_ELSEWHERE_TOOLTIP: 'Editing is active in another tab.',
+  useWorkspaceLease: () => ({ role: 'owner', canEdit: true }),
 }))
 vi.mock('./ProjectSwitcher', () => ({ ProjectSwitcher: () => <span>Project</span> }))
 
