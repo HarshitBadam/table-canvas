@@ -210,13 +210,22 @@ export function TransformModal({
           `Unable to prepare ${failedTableName ?? 'an input table'}: ${left.error || right.error}`,
         )
       }
-      const columnIdToName = Object.fromEntries(
-        [...leftCols, ...rightCols].map(column => [column.id, column.name]),
-      )
-      const rowCount = await getEngine().countCombinedTransformRows(
-        transformDef,
-        columnIdToName,
-      )
+      // A union's output size is just the sum of its inputs, which we already
+      // know exactly from the match-preview fetch above - no need to pay for
+      // another engine round trip to count it. A join's output size depends on
+      // how many keys match, so it still has to be computed by the engine.
+      let rowCount: number
+      if (operation === 'union') {
+        rowCount = leftTotalRows + rightTotalRows
+      } else {
+        const columnIdToName = Object.fromEntries(
+          [...leftCols, ...rightCols].map(column => [column.id, column.name]),
+        )
+        rowCount = await getEngine().countCombinedTransformRows(
+          transformDef,
+          columnIdToName,
+        )
+      }
       const safetyCheck = checkTransformOutputSafety(rowCount)
       if (!safetyCheck.ok) {
         const action = operation === 'union' ? 'Appending these tables' : 'Joining these tables'
@@ -256,7 +265,7 @@ export function TransformModal({
       creatingRef.current = false
       setIsCreating(false)
     }
-  }, [leftKey, rightKey, operation, canUnion, selected, outputName, leftNode, rightNode, sourceNodeId, targetNodeId, joinType, leftCols, rightCols, allCols, addDerivedTable, onClose, onDismiss, nodes, user])
+  }, [leftKey, rightKey, operation, canUnion, selected, outputName, leftNode, rightNode, sourceNodeId, targetNodeId, joinType, leftCols, rightCols, allCols, addDerivedTable, onClose, onDismiss, nodes, user, leftTotalRows, rightTotalRows])
   const leftOpts = useMemo(
     () => leftCols.map(c => ({ value: c.id, label: c.name, type: c.type })),
     [leftCols],
