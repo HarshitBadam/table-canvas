@@ -11,7 +11,7 @@ beforeEach(() => {
 })
 
 describe('loadCleaningPreview', () => {
-  it('returns a bounded preview and policy flag for oversized tables', async () => {
+  it('returns a bounded preview for large tables', async () => {
     getTableData.mockResolvedValue({
       rows: [{ __rowId: '1', value: 'sample' }],
       totalRows: 100_001,
@@ -21,7 +21,6 @@ describe('loadCleaningPreview', () => {
       rows: [{ __rowId: '1', value: 'sample' }],
       totalRows: 100_001,
       isTruncated: true,
-      isPolicyLimited: true,
     })
     expect(getTableData).toHaveBeenCalledWith('table', 0, 1_000)
   })
@@ -69,16 +68,14 @@ describe('loadCleaningRows', () => {
     expect(getTableData).toHaveBeenNthCalledWith(2, 'table', 0, 2)
   })
 
-  it('rejects oversized tables before requesting all rows', async () => {
-    getTableData.mockResolvedValue({
-      rows: [],
-      totalRows: 100_001,
-    })
+  it('loads large tables without an in-memory row limit', async () => {
+    const completeRows = [{ __rowId: '1', value: 'sample' }]
+    getTableData
+      .mockResolvedValueOnce({ rows: [], totalRows: 100_001 })
+      .mockResolvedValueOnce({ rows: completeRows, totalRows: 100_001 })
 
-    await expect(loadCleaningRows('table')).rejects.toThrow(
-      'limited to 100,000 rows',
-    )
-    expect(getTableData).toHaveBeenCalledTimes(1)
-    expect(getTableData).toHaveBeenCalledWith('table', 0, 0)
+    await expect(loadCleaningRows('table')).resolves.toEqual(completeRows)
+    expect(getTableData).toHaveBeenNthCalledWith(1, 'table', 0, 0)
+    expect(getTableData).toHaveBeenNthCalledWith(2, 'table', 0, 100_001)
   })
 })

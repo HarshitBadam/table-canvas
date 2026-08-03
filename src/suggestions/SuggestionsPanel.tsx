@@ -108,6 +108,7 @@ export function SuggestionsPanel({
             <SuggestionsPanelHeader
               tableName={node?.name || 'Table'}
               selectedColumnName={selectedColumnName}
+              onClose={onClose}
             />
 
             <CategoryTabs
@@ -202,13 +203,6 @@ export function SuggestionsPanel({
                 onDismiss={() => setToast(null)}
               />
             )}
-            <div className="border-t border-border-subtle bg-surface-secondary/40 p-4">
-              <Dialog.Close asChild>
-                <button type="button" className="btn btn-ghost w-full">
-                  Close
-                </button>
-              </Dialog.Close>
-            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
