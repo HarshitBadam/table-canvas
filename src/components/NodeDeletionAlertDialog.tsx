@@ -82,7 +82,7 @@ export function NodeDeletionProvider({ children }: { children: ReactNode }) {
             </Dialog.Description>
             <div className="mt-5 flex justify-end gap-2">
               <Dialog.Close asChild>
-                <button type="button" className="btn btn-secondary" disabled={isDeleting}>
+                <button type="button" className="btn btn-ghost" disabled={isDeleting}>
                   Cancel
                 </button>
               </Dialog.Close>
