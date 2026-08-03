@@ -5,7 +5,13 @@ import { TableRow } from '@/state/dataStore'
 import { computeSuggestionEffect } from './computeEffects'
 import { useCleaningApply } from './useCleaningApply'
 import { loadCleaningPreview } from './cleaningRows'
-import type { Suggestion } from '@/types'
+import type { CellValue, Suggestion } from '@/types'
+
+// Keep long values (e.g. typo fixes on free-text/blob columns) from blowing out the row.
+function truncateForDisplay(value: string, maxLength = 40): string {
+  if (value.length <= maxLength) return value
+  return `${value.slice(0, maxLength)}…`
+}
 
 interface CleaningPanelProps {
   suggestions: Suggestion[]
@@ -89,6 +95,19 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       return values.reduce((a, b) => a + b, 0) / values.length
     }
 
+    // Mapping-based operations (typo fixes, case normalization) know their
+    // "from → to" example from the mapping alone, independent of whether the
+    // loaded preview rows happen to contain a matching value. Falling back to
+    // this keeps the example visible even when the preview sample misses it.
+    const getMappingExample = (
+      operation: NonNullable<Suggestion['context']['cleaningOperation']>,
+    ): { oldValue: CellValue; newValue: CellValue } | undefined => {
+      if (operation.type !== 'replace_typos' && operation.type !== 'normalize_case') return undefined
+      const [from, to] = Object.entries(operation.mappings)[0] ?? []
+      if (from === undefined) return undefined
+      return { oldValue: from, newValue: to }
+    }
+
     const result = deduplicatedSuggestions
       .filter(s => s.category === 'cleaning' && s.context.cleaningOperation)
       .map(suggestion => {
@@ -99,7 +118,8 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
             ? getNumericFillValue(columnId, operation.strategy)
             : undefined
         const effect = computeSuggestionEffect(suggestion, rows, numericFillValue)
-        return { suggestion, ...effect }
+        const example = effect.changes[0] ?? (operation ? getMappingExample(operation) : undefined)
+        return { suggestion, ...effect, example }
       })
       .filter(s => {
         if (s.operationType === 'review' && s.highlights.length > 0) {
@@ -236,7 +256,7 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {suggestionsWithEffects.map(({ suggestion, changes, highlights, operationType }) => {
+        {suggestionsWithEffects.map(({ suggestion, changes, highlights, operationType, example }) => {
           const isSelected = selectedIds.has(suggestion.id)
           const count = operationType === 'review' ? highlights.length : changes.length
           
@@ -253,8 +273,8 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
                 onChange={() => toggleSelection(suggestion.id)}
                 className="sr-only"
               />
-              <div className={`flex gap-3 ${changes.length > 0 ? 'items-start' : 'items-center'}`}>
-                <div aria-hidden="true" className={`${changes.length > 0 ? 'mt-0.5' : ''} flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
+              <div className={`flex gap-3 ${example ? 'items-start' : 'items-center'}`}>
+                <div aria-hidden="true" className={`${example ? 'mt-0.5' : ''} flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
                   isSelected 
                     ? 'bg-accent-green text-white' 
                     : 'bg-surface-tertiary text-text-tertiary'
@@ -270,11 +290,11 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
                       {previewIsTruncated ? `${count}+` : count}
                     </span>
                   </div>
-                  {changes.length > 0 && (
+                  {example && (
                     <div className="mt-1.5 text-xs leading-5 text-text-secondary">
-                      e.g. <code className="rounded bg-surface-tertiary px-1 py-px text-error-text">{String(changes[0].oldValue)}</code>
+                      e.g. <code className="rounded bg-surface-tertiary px-1 py-px text-error-text">{truncateForDisplay(String(example.oldValue))}</code>
                       {' → '}
-                      <code className="rounded bg-surface-tertiary px-1 py-px text-success-dark">{changes[0].newValue === null ? '∅ empty' : String(changes[0].newValue)}</code>
+                      <code className="rounded bg-surface-tertiary px-1 py-px text-success-dark">{example.newValue === null ? '∅ empty' : truncateForDisplay(String(example.newValue))}</code>
                     </div>
                   )}
                 </div>

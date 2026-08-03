@@ -154,6 +154,13 @@ registerRule({
 });
 
 
+// Truncate independently so a single long value can never swallow the whole
+// "from → to" pairing (each side stays visible no matter how long the other is).
+function truncateForDisplay(value: string, maxLength = 24): string {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength)}…`;
+}
+
 registerRule({
   id: 'detect_typos',
   category: 'cleaning',
@@ -176,7 +183,10 @@ registerRule({
       mappings[t.from] = t.to;
     }
     
-    const examples = typos.slice(0, 2).map(t => `"${t.from}" → "${t.to}"`).join(', ');
+    const examples = typos
+      .slice(0, 2)
+      .map(t => `"${truncateForDisplay(t.from)}" → "${truncateForDisplay(t.to)}"`)
+      .join(', ');
     
     return {
       id: createSuggestionId('detect_typos', ctx.tableId, meta.column?.id),
@@ -193,7 +203,9 @@ registerRule({
       },
       why: [
         `Found similar values that may be typos`,
-        ...typos.slice(0, 2).map(t => `"${t.from}" (${t.fromCount}x) similar to "${t.to}" (${t.toCount}x)`),
+        ...typos.slice(0, 2).map(t =>
+          `"${truncateForDisplay(t.from)}" (${t.fromCount}x) similar to "${truncateForDisplay(t.to)}" (${t.toCount}x)`,
+        ),
       ],
       impact: {
         kind: 'derivedTable',

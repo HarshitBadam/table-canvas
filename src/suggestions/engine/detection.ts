@@ -185,6 +185,25 @@ export interface TypoMatch {
   toCount: number;
 }
 
+// A real typo is 1-2 character edits, full stop, regardless of how long the word is.
+// Scaling the allowed distance by string length lets long, unrelated strings match.
+const MAX_TYPO_DISTANCE = 2;
+
+// Two values only look like "correct value + rare mistake" if one is much rarer
+// than the other. Without this, two roughly-equally-common values (which are far
+// more likely to be genuinely distinct) get flagged just as easily as a real typo.
+const MAX_MINORITY_FREQUENCY_RATIO = 0.2;
+
+// Typo-correction assumes natural-language-ish tokens (adjacent-key slips, dropped
+// letters, transpositions). Low-diversity strings (e.g. "xxxxxxxxxx", "aaaaaaaaaa")
+// aren't text with a typo in them - edit distance on them is meaningless noise.
+const MIN_UNIQUE_CHAR_RATIO = 0.3;
+
+function hasEnoughCharDiversity(str: string): boolean {
+  const uniqueChars = new Set(str).size;
+  return uniqueChars / str.length >= MIN_UNIQUE_CHAR_RATIO;
+}
+
 export function findTypos(topValues: Array<{ value: unknown; count: number }>): TypoMatch[] {
   const results: TypoMatch[] = [];
   const strings = topValues
@@ -196,13 +215,22 @@ export function findTypos(topValues: Array<{ value: unknown; count: number }>): 
       const a = strings[i].str.toLowerCase();
       const b = strings[j].str.toLowerCase();
       
+      // Purely whitespace-driven differences (leading/trailing padding) are the
+      // trim_whitespace rule's job. Without this, a padded value looks like a
+      // cheap 1-2 char edit and gets double-flagged as a "typo" too.
+      if (a.trim() === b.trim()) continue;
+      
       if (Math.abs(a.length - b.length) > 2) continue;
       if (a.length < 3 || b.length < 3) continue;
+      if (!hasEnoughCharDiversity(a) || !hasEnoughCharDiversity(b)) continue;
+      
+      const minorityCount = Math.min(strings[i].count, strings[j].count);
+      const majorityCount = Math.max(strings[i].count, strings[j].count);
+      if (minorityCount > majorityCount * MAX_MINORITY_FREQUENCY_RATIO) continue;
       
       const distance = levenshteinDistance(a, b);
-      const threshold = Math.max(1, Math.floor(Math.min(a.length, b.length) * 0.25));
       
-      if (distance > 0 && distance <= threshold) {
+      if (distance > 0 && distance <= MAX_TYPO_DISTANCE) {
         if (strings[i].count >= strings[j].count) {
           results.push({
             from: strings[j].str,
