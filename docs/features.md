@@ -2,10 +2,7 @@
 
 ## Layout
 
-The app shell (`src/layout/`) is a sidebar plus a main view area. The sidebar lists tables and
-charts and has buttons to switch between Canvas, Dashboard, and Report views. The main area swaps
-between five views: canvas, grid, chart, dashboard, and report. Double-clicking a table node
-opens the grid; clicking a chart node opens the chart editor.
+The app shell (`src/layout/`) is a sidebar plus a main view area. The sidebar lists tables and charts and has buttons to switch between Canvas, Dashboard, and Report views. The main area swaps between five views: canvas, grid, chart, dashboard, and report. Double-clicking a table node opens the grid; clicking a chart node opens the chart editor.
 
 ## Canvas
 
@@ -13,11 +10,8 @@ A node-based editor (ReactFlow) where you build pipelines by connecting tables.
 
 ### Node types
 
-- **Source tables**: created by importing a CSV/Excel file or via "New Table". Show file name,
-  row count, and column count. Support in-place cell editing; edits are stored as patches,
-  separate from the original data.
-- **Derived tables**: created by connecting nodes and choosing a transform. Show the transform
-  type and source. Recompute automatically when upstream data changes. Read-only.
+- **Source tables**: created by importing a CSV/Excel file or via "New Table". Show file name, row count, and column count. Support in-place cell editing; edits are stored as patches, separate from the original data.
+- **Derived tables**: created by connecting nodes and choosing a transform. Show the transform type and source. Recompute automatically when upstream data changes. Read-only.
 - **Charts**: visualizations bound to a source table.
 
 ### Interactions
@@ -34,8 +28,7 @@ A node-based editor (ReactFlow) where you build pipelines by connecting tables.
 
 ### Auto-arrange
 
-Uses Dagre to lay out nodes by depth in the dependency graph, either left-to-right or
-top-to-bottom.
+Uses Dagre to lay out nodes by depth in the dependency graph, either left-to-right or top-to-bottom.
 
 ### Cycle prevention
 
@@ -48,8 +41,7 @@ A virtualized spreadsheet for viewing and editing table data.
 - Virtual scrolling (only visible rows are rendered), so large tables stay responsive
 - Column resize, cell and range selection, copy (Cmd/Ctrl+C), drag-to-autofill
 - Column filtering panel
-- Editing (source tables only): double-click a cell, Enter to confirm, Escape to cancel, Tab to
-  move on. Changes are stored as patches.
+- Editing (source tables only): double-click a cell, Enter to confirm, Escape to cancel, Tab to move on. Changes are stored as patches.
 
 ### Formula columns
 
@@ -76,13 +68,9 @@ Operators: `+`, `-`, `*`, `/`, `%`, `^`, `=`, `<>`, `>`, `<`, `>=`, `<=`, `AND`,
 
 Opened from the transform modal when you connect nodes. Six types:
 
-- **Filter**: keep rows matching conditions, combined with AND or OR. Operators include equals,
-  not equals, contains / not contains, starts/ends with, greater/less than, greater/less-or-equal, between,
-  is null / is not null.
-- **Group & Summarize**: group by columns and aggregate with SUM, AVG, MIN, MAX, COUNT, or
-  COUNT DISTINCT.
-- **Join**: combine two tables on key columns. Inner, left, right, or full. You can pick which
-  columns to keep and how to disambiguate names.
+- **Filter**: keep rows matching conditions, combined with AND or OR. Operators include equals, not equals, contains / not contains, starts/ends with, greater/less than, greater/less-or-equal, between, is null / is not null.
+- **Group & Summarize**: group by columns and aggregate with SUM, AVG, MIN, MAX, COUNT, or COUNT DISTINCT.
+- **Join**: combine two tables on key columns. Inner, left, right, or full. You can pick which columns to keep and how to disambiguate names.
 - **Select**: project a subset of columns and/or rename them.
 - **Calculated column**: add a column from a formula expression (same engine as formula columns).
 - **Union**: stack rows from multiple tables.
@@ -91,14 +79,11 @@ No pivot or standalone sort transform.
 
 ## Charts
 
-Created from the suggestions panel or by adding a chart node bound to a table. Types: **bar,
-line, pie, scatter**. Configure the X/Y columns, aggregation, and optional grouping. Charts update
-when their source data changes.
+Created from the suggestions panel or by adding a chart node bound to a table. Types: **bar, line, pie, scatter**. Configure the X/Y columns, aggregation, and optional grouping. Charts update when their source data changes.
 
 ## Suggestions engine
 
-Analyzes table profiles and recommends transforms, charts, and cleaning actions
-(`src/suggestions/`).
+Analyzes table profiles and recommends transforms, charts, and cleaning actions (`src/suggestions/`).
 
 **Categories**
 
@@ -129,34 +114,20 @@ Empty until you import data.
 
 Notion-style rich-text documents (TipTap) that embed live tables and charts (`src/report/`).
 
-- **Editing**: headings, bold/italic/underline, lists, code blocks, quotes, callouts, toggles,
-  horizontal rules, plus a slash (`/`) command menu for inserting blocks.
-- **Embedded blocks**: embedded table (references a project table, stays in sync), inline/editable
-  table (static, manually entered), and chart.
-- **Export**: reports are written as HTML into the project ZIP. "Export as PDF" serialises the same
-  stored content into a paged document and prints it through the browser, so text, tables and charts
-  stay vector and selectable.
+- **Editing**: headings, bold/italic/underline, lists, code blocks, quotes, callouts, toggles, horizontal rules, plus a slash (`/`) command menu for inserting blocks.
+- **Embedded blocks**: embedded table (references a project table, stays in sync), inline/editable table (static, manually entered), and chart.
+- **Export**: reports are written as HTML into the project ZIP. "Export as PDF" serialises the same stored content into a paged document and prints it through the browser, so text, tables and charts stay vector and selectable.
 
 ## Persistence
 
-- **Local (IndexedDB)**: projects auto-save: graph (nodes/edges/patches), imported files,
-  cached results, and reports. Everything lives locally by default. Records are keyed by
-  storage scope (`guest:<id>` or `account:<userId>`).
-- **Server sync**: when connected to the backend, the project graph (nodes, edges, patches)
-  and its reports sync to MongoDB on save. Files are stored in GridFS and fetched on load.
-- **Concurrency**: one tab writes a project at a time and other tabs mirror it live;
-  editing follows focus. Conflicting saves from another device merge on the client
-  (see [Reliability](reliability.md)).
-- **Cross-tab auth**: account cookies are origin-shared for new/reloaded tabs; guest choice
-  and explicit sign-out are tab-local so one tab's login or logout does not silently replace
-  another tab's workspace. Catalog and document updates use `BroadcastChannel` (auth React
-  state is not broadcast). See
-  [Cross-tab authentication and session](reliability.md#cross-tab-authentication-and-session).
+- **Local (IndexedDB)**: projects auto-save: graph (nodes/edges/patches), imported files, cached results, and reports. Everything lives locally by default. Records are keyed by storage scope (`guest:<id>` or `account:<userId>`).
+- **Server sync**: when connected to the backend, the project graph (nodes, edges, patches) and its reports sync to MongoDB on save. Files are stored in GridFS and fetched on load.
+- **Concurrency**: one tab writes a project at a time and other tabs mirror it live; editing follows focus. Conflicting saves from another device merge on the client (see [Reliability](reliability.md)).
+- **Cross-tab auth**: account cookies are origin-shared for new/reloaded tabs; guest choice and explicit sign-out are tab-local so one tab's login or logout does not silently replace another tab's workspace. Catalog and document updates use `BroadcastChannel` (auth React state is not broadcast). See [Cross-tab authentication and session](reliability.md#cross-tab-authentication-and-session).
 
 ## Export
 
-- **Project** (`.tablecanvas.zip`): `project.tablecanvas.json` (full state with base64-encoded
-  source files), `data.xlsx` (every table as a sheet), and `reports/*.html`. Self-contained.
+- **Project** (`.tablecanvas.zip`): `project.tablecanvas.json` (full state with base64-encoded source files), `data.xlsx` (every table as a sheet), and `reports/*.html`. Self-contained.
 - **Data**: all tables are included as sheets in `data.xlsx` inside the project ZIP.
 
 ## Keyboard shortcuts

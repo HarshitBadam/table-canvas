@@ -1,7 +1,6 @@
 # API Reference
 
-REST API for the **optional** backend. The app runs fully in local mode without it; these
-endpoints only matter when you're running the server for auth and cross-device sync.
+REST API for the **optional** backend. The app runs fully in local mode without it; these endpoints only matter when you're running the server for auth and cross-device sync.
 
 Base URL: `http://localhost:5173/api`
 

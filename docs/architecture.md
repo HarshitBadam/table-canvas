@@ -1,7 +1,6 @@
 # Architecture
 
-Computation happens client-side in DuckDB-WASM. The optional server only handles auth and
-persistence. If the server isn't reachable, the app runs entirely in the browser (local mode).
+Computation happens client-side in DuckDB-WASM. The optional server only handles auth and persistence. If the server isn't reachable, the app runs entirely in the browser (local mode).
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -48,8 +47,7 @@ Tests are separated from production sources:
 
 ## The DAG
 
-A project is a directed acyclic graph. Nodes are tables and charts; edges are transforms that
-turn upstream tables into downstream ones.
+A project is a directed acyclic graph. Nodes are tables and charts; edges are transforms that turn upstream tables into downstream ones.
 
 ### Node types
 
@@ -74,14 +72,11 @@ interface Edge {
 
 ### Cycle detection
 
-Before an edge is created, the graph is checked for cycles with a reachability test
-(`src/engine/graph/dependencyGraph.ts`). A self-loop, or a target that can already reach the source,
-is rejected and the connection is blocked.
+Before an edge is created, the graph is checked for cycles with a reachability test (`src/engine/graph/dependencyGraph.ts`). A self-loop, or a target that can already reach the source, is rejected and the connection is blocked.
 
 ### Computation order
 
-`getComputationOrder` does a topological sort so upstream tables are materialized before the
-tables that depend on them.
+`getComputationOrder` does a topological sort so upstream tables are materialized before the tables that depend on them.
 
 ## State management
 
@@ -104,29 +99,21 @@ Other stores:
 - **`suggestionsStore`** (`src/suggestions/panel/state/`): analysis/cleaning suggestions
 - **`reportStore`** (`src/report/`): report documents
 
-`AppProvider` (`src/state/app-session/AppProvider.tsx`, exported through `src/state/AppContext.ts`) ties it
-together: it boots the engine, checks auth, loads or creates a project, materializes tables, and
-auto-saves when the graph changes.
+`AppProvider` (`src/state/app-session/AppProvider.tsx`, exported through `src/state/AppContext.ts`) ties it together: it boots the engine, checks auth, loads or creates a project, materializes tables, and auto-saves when the graph changes.
 
 ### Dirty propagation
 
-Editing a source cell updates its patches and marks the node plus every downstream descendant
-dirty (`cacheInfo.isDirty = true`). Dirty tables are recomputed the next time they're needed.
+Editing a source cell updates its patches and marks the node plus every downstream descendant dirty (`cacheInfo.isDirty = true`). Dirty tables are recomputed the next time they're needed.
 
 ### Cross-tab session vs document coordination
 
-Auth cookies are origin-shared; guest choice and explicit sign-out markers are tab-local
-(`sessionStorage`). Auth React state is **not** broadcast between tabs. Within a storage scope,
-open-document invalidations and project-catalog changes use `BroadcastChannel`, with
-`visibilitychange` refreshes as a fallback. Full contract:
-[Reliability — Cross-tab authentication and session](reliability.md#cross-tab-authentication-and-session).
+Auth cookies are origin-shared; guest choice and explicit sign-out markers are tab-local (`sessionStorage`). Auth React state is **not** broadcast between tabs. Within a storage scope, open-document invalidations and project-catalog changes use `BroadcastChannel`, with `visibilitychange` refreshes as a fallback. Full contract: [Reliability — Cross-tab authentication and session](reliability.md#cross-tab-authentication-and-session).
 
 ## Computation engine
 
 ### Web Worker
 
-DuckDB-WASM runs in a dedicated worker (`src/engine/worker/`) so SQL execution never blocks the
-UI thread. The main thread talks to it over a small RPC layer (`src/engine/worker/rpc.ts`).
+DuckDB-WASM runs in a dedicated worker (`src/engine/worker/`) so SQL execution never blocks the UI thread. The main thread talks to it over a small RPC layer (`src/engine/worker/rpc.ts`).
 
 ```
 Main thread                Worker thread
@@ -161,22 +148,17 @@ If a hash matches the cached one, the cached result is reused; otherwise it reco
 
 ## Profiling
 
-When a table is opened, the profiler (`src/lib/profiling/`) computes per-column statistics in
-two phases: phase 1 is fast (counts, null rate, basic types) and phase 2 fills in the heavier
-stats asynchronously. Profiles also get semantic hints (e.g. "looks like an email/date column").
-These feed the grid's column stats, the dashboard, and the suggestion engine.
+When a table is opened, the profiler (`src/lib/profiling/`) computes per-column statistics in two phases: phase 1 is fast (counts, null rate, basic types) and phase 2 fills in the heavier stats asynchronously. Profiles also get semantic hints (e.g. "looks like an email/date column"). These feed the grid's column stats, the dashboard, and the suggestion engine.
 
 ## Transforms
 
-Six transform types (`TransformType` in `src/types/transform.types.ts`). Each has its own
-definition shape:
+Six transform types (`TransformType` in `src/types/transform.types.ts`). Each has its own definition shape:
 
 ### filter
 ```typescript
 { type: 'filter', sourceTableId, conditions: FilterCondition[], logic: 'and' | 'or' }
 ```
-Operators: equals, not_equals, contains, not_contains, starts_with, ends_with, greater_than,
-less_than, greater_equal, less_equal, between, is_null, is_not_null.
+Operators: equals, not_equals, contains, not_contains, starts_with, ends_with, greater_than, less_than, greater_equal, less_equal, between, is_null, is_not_null.
 
 ### group_summarize
 ```typescript
@@ -226,9 +208,7 @@ Client persistence is organized under `src/persistence/`:
 
 ### IndexedDB
 
-Development uses the clean `table-canvas-v2` database with a single schema version. Earlier
-development databases are intentionally not migrated. Records are keyed by owner scope
-(`guest:<id>` or `account:<userId>`).
+Development uses the clean `table-canvas-v2` database with a single schema version. Earlier development databases are intentionally not migrated. Records are keyed by owner scope (`guest:<id>` or `account:<userId>`).
 
 ```typescript
 interface TableCanvasDB {
@@ -251,20 +231,9 @@ interface TableCanvasDB {
 
 ### Server sync
 
-When the backend is available, `syncService`
-(`src/persistence/sync/session/syncService.ts`) saves local changes through the API to MongoDB and
-loads them back on startup. Saves carry the revision they were based on and the server applies
-them only if it still matches, so a save built on stale data is rejected rather than allowed to
-overwrite newer work. A rejection is resolved on the client by `projectMerge`, which merges the
-last acknowledged base, the local payload, and the current server state entity by entity, and
-retries the save against the fresh revision. Only an unmergeable conflict falls back to keeping
-the local work as a separate conflict copy. When the backend is unreachable, all of this is
-skipped and the app stays purely local.
+When the backend is available, `syncService` (`src/persistence/sync/session/syncService.ts`) saves local changes through the API to MongoDB and loads them back on startup. Saves carry the revision they were based on and the server applies them only if it still matches, so a save built on stale data is rejected rather than allowed to overwrite newer work. A rejection is resolved on the client by `projectMerge`, which merges the last acknowledged base, the local payload, and the current server state entity by entity, and retries the save against the fresh revision. Only an unmergeable conflict falls back to keeping the local work as a separate conflict copy. When the backend is unreachable, all of this is skipped and the app stays purely local.
 
-Within one browser, `documentLease` gives a single tab the right to write a given project while
-`documentMirror` invalidates readers over `BroadcastChannel` (readers reload from IndexedDB).
-`projectCatalog` fans out create/rename/delete within a storage scope the same way. See
-[Reliability](reliability.md) for the ownership and merge contract in full.
+Within one browser, `documentLease` gives a single tab the right to write a given project while `documentMirror` invalidates readers over `BroadcastChannel` (readers reload from IndexedDB). `projectCatalog` fans out create/rename/delete within a storage scope the same way. See [Reliability](reliability.md) for the ownership and merge contract in full.
 
 ## Reports
 
@@ -287,8 +256,7 @@ Optional backend under `server/src/`:
 | `middleware/` | Auth, CSRF, rate limits, errors |
 | `config/`, `observability/`, `types/` | Env/enforce, Sentry, shared types |
 
-Backend tests: `server/tests/unit/` and `server/tests/support/`. Typecheck covers both with
-`npm --prefix server run typecheck` (`server/tsconfig.test.json`).
+Backend tests: `server/tests/unit/` and `server/tests/support/`. Typecheck covers both with `npm --prefix server run typecheck` (`server/tsconfig.test.json`).
 
 ## Export
 
@@ -304,6 +272,4 @@ All tables are included as individual sheets in `data.xlsx` inside the ZIP.
 
 ## Error boundaries
 
-Each major view (Canvas, Grid, Charts, Dashboard, Reports) is wrapped in
-`ErrorBoundary` (`src/observability/ErrorBoundary.tsx`), so a render error in one area
-shows a recovery UI instead of taking down the whole app.
+Each major view (Canvas, Grid, Charts, Dashboard, Reports) is wrapped in `ErrorBoundary` (`src/observability/ErrorBoundary.tsx`), so a render error in one area shows a recovery UI instead of taking down the whole app.
