@@ -7,12 +7,26 @@
 interface FakeLock {
   name: string
   mode: LockMode
+  clientId: string
+}
+
+interface HeldLock {
+  name: string
+  mode: LockMode
+  clientId: string
+  release: () => void
 }
 
 interface QueuedRequest {
+  name: string
+  mode: LockMode
+  clientId: string
+  ifAvailable: boolean
   grant: () => void
   reject: (error: Error) => void
 }
+
+let nextClientId = 1
 
 function abortError(): Error {
   const error = new Error('The lock request was aborted.')
@@ -20,8 +34,14 @@ function abortError(): Error {
   return error
 }
 
+function canGrant(held: HeldLock[], mode: LockMode): boolean {
+  if (held.length === 0) return true
+  if (mode === 'shared') return held.every(lock => lock.mode === 'shared')
+  return false
+}
+
 export class FakeLockManager {
-  private readonly held = new Set<string>()
+  private readonly held = new Map<string, HeldLock[]>()
   private readonly queues = new Map<string, QueuedRequest[]>()
 
   request(
@@ -33,18 +53,40 @@ export class FakeLockManager {
     },
     callback: (lock: FakeLock | null) => Promise<unknown>,
   ): Promise<unknown> {
+    const mode: LockMode = options.mode ?? 'exclusive'
+    const clientId = `client-${nextClientId++}`
     return new Promise((resolve, reject) => {
       const run = () => {
-        this.held.add(name)
-        void Promise.resolve(callback({ name, mode: options.mode ?? 'exclusive' }))
+        let releaseHeld: (() => void) | null = null
+        const entry: HeldLock = {
+          name,
+          mode,
+          clientId,
+          release: () => {
+            releaseHeld?.()
+          },
+        }
+        const bucket = this.held.get(name) ?? []
+        bucket.push(entry)
+        this.held.set(name, bucket)
+
+        releaseHeld = () => {
+          const current = this.held.get(name) ?? []
+          const index = current.indexOf(entry)
+          if (index >= 0) current.splice(index, 1)
+          if (current.length === 0) this.held.delete(name)
+          this.drain(name)
+        }
+
+        void Promise.resolve(callback({ name, mode, clientId }))
           .then(resolve, reject)
           .finally(() => {
-            this.held.delete(name)
-            this.queues.get(name)?.shift()?.grant()
+            entry.release()
           })
       }
 
-      if (!this.held.has(name)) {
+      const held = this.held.get(name) ?? []
+      if (canGrant(held, mode)) {
         run()
         return
       }
@@ -54,7 +96,14 @@ export class FakeLockManager {
         return
       }
 
-      const queued: QueuedRequest = { grant: run, reject }
+      const queued: QueuedRequest = {
+        name,
+        mode,
+        clientId,
+        ifAvailable: false,
+        grant: run,
+        reject,
+      }
       const queue = this.queues.get(name) ?? []
       queue.push(queued)
       this.queues.set(name, queue)
@@ -69,9 +118,44 @@ export class FakeLockManager {
     })
   }
 
+  async query(): Promise<{
+    held: Array<{ name: string; mode: LockMode; clientId: string }>
+    pending: Array<{ name: string; mode: LockMode; clientId: string }>
+  }> {
+    const held = [...this.held.values()].flat().map(lock => ({
+      name: lock.name,
+      mode: lock.mode,
+      clientId: lock.clientId,
+    }))
+    const pending = [...this.queues.values()].flat().map(request => ({
+      name: request.name,
+      mode: request.mode,
+      clientId: request.clientId,
+    }))
+    return { held, pending }
+  }
+
   /** True while some tab holds the lock. */
   isHeld(name: string): boolean {
-    return this.held.has(name)
+    return (this.held.get(name)?.length ?? 0) > 0
+  }
+
+  holderCount(name: string): number {
+    return this.held.get(name)?.length ?? 0
+  }
+
+  private drain(name: string): void {
+    const queue = this.queues.get(name)
+    if (!queue || queue.length === 0) return
+    while (queue.length > 0) {
+      const held = this.held.get(name) ?? []
+      const next = queue[0]
+      if (!canGrant(held, next.mode)) break
+      queue.shift()
+      next.grant()
+      // After granting a shared lock, keep draining additional shared waiters.
+      if (next.mode === 'exclusive') break
+    }
   }
 }
 

@@ -67,6 +67,9 @@ export function isGuestStorageScope(scope: string): boolean {
 
 type GuestLockOutcome = 'acquired' | 'busy' | 'aborted'
 
+/** Guest login must never hang forever waiting on a stuck Web Locks callback. */
+const GUEST_LOCK_CLAIM_TIMEOUT_MS = 2_500
+
 /**
  * Requests the guest scope lock and resolves the moment the Web Locks callback
  * actually fires — with 'acquired' or 'busy' — instead of guessing based on
@@ -77,51 +80,106 @@ type GuestLockOutcome = 'acquired' | 'busy' | 'aborted'
  */
 function requestGuestScopeLock(name: string, signal: AbortSignal): Promise<GuestLockOutcome> {
   return new Promise<GuestLockOutcome>(resolve => {
-    const request = navigator.locks.request(
-      name,
-      { mode: 'exclusive', ifAvailable: true, signal },
-      async lock => {
-        if (!lock) {
-          resolve('busy')
-          return
-        }
-        resolve('acquired')
-        await new Promise<void>(release => {
-          guestScopeLockRelease = release
-        })
-      },
-    )
-    request.catch(error => {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        resolve('aborted')
+    let settled = false
+    const finish = (outcome: GuestLockOutcome) => {
+      if (settled) return
+      settled = true
+      resolve(outcome)
+    }
+
+    if (signal.aborted) {
+      finish('aborted')
+      return
+    }
+
+    let request: Promise<unknown>
+    try {
+      request = navigator.locks.request(
+        name,
+        { mode: 'exclusive', ifAvailable: true, signal },
+        async lock => {
+          if (!lock) {
+            finish('busy')
+            return
+          }
+          finish('acquired')
+          await new Promise<void>(release => {
+            guestScopeLockRelease = release
+          })
+        },
+      )
+    } catch (error) {
+      console.warn('[storageScope] Guest scope lock request threw:', error)
+      finish('aborted')
+      return
+    }
+
+    void request.catch(error => {
+      // Any rejection must settle the claim promise. Leaving it pending freezes
+      // the login button on "Opening…".
+      if (
+        (error instanceof DOMException && error.name === 'AbortError')
+        || (error as { name?: string })?.name === 'AbortError'
+      ) {
+        finish('aborted')
+        return
       }
+      console.warn('[storageScope] Guest scope lock request failed:', error)
+      finish('aborted')
     })
   })
 }
 
-async function claimGuestScopeWithLocks(initialScope: string): Promise<string | null> {
+interface GuestScopeLockResult {
+  /** The last scope name tried, whether or not it was ever acquired. */
+  scope: string
+  acquired: boolean
+}
+
+async function claimGuestScopeWithLocks(initialScope: string): Promise<GuestScopeLockResult> {
   const locks = navigator.locks
-  if (!locks) return null
+  if (!locks) return { scope: initialScope, acquired: false }
 
   let scope = initialScope
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const abort = new AbortController()
     guestScopeClaimAbort = abort
-    const outcome = await requestGuestScopeLock(`${GUEST_SCOPE_LOCK_PREFIX}${scope}`, abort.signal)
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const outcome = await new Promise<GuestLockOutcome>(resolve => {
+      let settled = false
+      const finish = (value: GuestLockOutcome) => {
+        if (settled) return
+        settled = true
+        if (timer) clearTimeout(timer)
+        resolve(value)
+      }
+      timer = setTimeout(() => {
+        abort.abort()
+        finish('aborted')
+      }, GUEST_LOCK_CLAIM_TIMEOUT_MS)
+      void requestGuestScopeLock(`${GUEST_SCOPE_LOCK_PREFIX}${scope}`, abort.signal)
+        .then(finish)
+    })
     if (outcome === 'acquired') {
-      return scope
+      guestScopeClaimAbort = null
+      return { scope, acquired: true }
     }
     if (outcome === 'aborted') {
-      // The claim was cancelled out from under us; fall back to the
-      // BroadcastChannel path rather than continuing to mint scopes.
+      // Timed out or cancelled; fall back to BroadcastChannel rather than
+      // minting further scopes against a stuck lock manager. Hand back the
+      // scope tried so far rather than the original — it was already
+      // contended, which is why the caller is falling back in the first place.
       guestScopeClaimAbort = null
-      return null
+      return { scope, acquired: false }
     }
     guestScopeClaimAbort = null
     scope = `${GUEST_SCOPE_PREFIX}${randomId()}`
     persistGuestScope(scope)
   }
-  return scope
+  // Exhausted retries without holding a lock — let BroadcastChannel isolate,
+  // continuing from the last (still-unverified) scope, not the first one we
+  // already know was contended.
+  return { scope, acquired: false }
 }
 
 async function claimGuestScopeWithBroadcast(initialScope: string): Promise<string> {
@@ -168,14 +226,23 @@ export async function claimGuestStorageScope(): Promise<string> {
   releaseGuestStorageScopeClaim()
 
   let scope = readGuestScope()
-  const locked = await claimGuestScopeWithLocks(scope)
-  if (locked !== null) {
-    activeStorageScope = locked
-    return locked
+  try {
+    const result = await claimGuestScopeWithLocks(scope)
+    scope = result.scope
+    if (result.acquired) {
+      activeStorageScope = scope
+      return scope
+    }
+  } catch (error) {
+    console.warn('[storageScope] Guest Web Lock claim failed; using BroadcastChannel:', error)
   }
 
   if (typeof BroadcastChannel !== 'undefined') {
     scope = await claimGuestScopeWithBroadcast(scope)
+  } else {
+    // Last resort: mint an isolated in-memory scope for this page lifetime.
+    scope = `${GUEST_SCOPE_PREFIX}${randomId()}`
+    persistGuestScope(scope)
   }
   activeStorageScope = scope
   return scope
@@ -191,8 +258,26 @@ export function releaseGuestStorageScopeClaim(): void {
   guestScopeClaimAbort = null
 }
 
+/**
+ * After logout / leave-guest / auth expiry, drop any account partition so stray
+ * persistence cannot keep reading or writing the previous user's IndexedDB keys.
+ * Does not hold a guest scope lock — the next continue-as-guest claim will.
+ */
+export function resetLoggedOutStorageScope(): void {
+  releaseGuestStorageScopeClaim()
+  activeStorageScope = readGuestScope()
+}
+
 const KEY_SEPARATOR = '\u001f'
+
+/** Pre-per-tab guest partition. Records under this owner are migrated once. */
+export const LEGACY_GUEST_STORAGE_SCOPE = 'guest'
 
 export function scopedStorageKey(scope: string, entityId: string): string {
   return `${scope}${KEY_SEPARATOR}${entityId}`
+}
+
+export function entityIdFromScopedKey(scopedKey: string): string {
+  const separator = scopedKey.indexOf(KEY_SEPARATOR)
+  return separator === -1 ? scopedKey : scopedKey.slice(separator + 1)
 }

@@ -1,4 +1,4 @@
-import { openDB, IDBPDatabase, type DBSchema } from 'idb'
+import { openDB, deleteDB, IDBPDatabase, type DBSchema } from 'idb'
 import type { ProjectNode, Edge } from '@/types'
 import type { Report } from '@/report/types'
 import type { SerializedPatches } from './patchSerialization'
@@ -91,11 +91,26 @@ const DB_NAME = 'table-canvas-v2'
 const DB_VERSION = 3
 
 let dbInstance: IDBPDatabase<TableCanvasDB> | null = null
+let dbOpenPromise: Promise<IDBPDatabase<TableCanvasDB>> | null = null
 
-export async function getDB(): Promise<IDBPDatabase<TableCanvasDB>> {
-  if (dbInstance) return dbInstance
+/** Long enough for a normal open/upgrade; short enough to fail fast if another
+ *  tab is holding a connection open and never releases it. */
+const DB_OPERATION_TIMEOUT_MS = 8_000
 
-  dbInstance = await openDB<TableCanvasDB>(DB_NAME, DB_VERSION, {
+function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), DB_OPERATION_TIMEOUT_MS)
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer)
+  })
+}
+
+function openTableCanvasDB(): Promise<IDBPDatabase<TableCanvasDB>> {
+  return openDB<TableCanvasDB>(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion, _newVersion, transaction) {
       if (oldVersion < 1) {
         const projectStore = db.createObjectStore('projects', { keyPath: 'id' })
@@ -120,7 +135,72 @@ export async function getDB(): Promise<IDBPDatabase<TableCanvasDB>> {
         baseStore.createIndex('by-owner', 'ownerId')
       }
     },
+    // Another tab wants to upgrade or delete this database. Release our
+    // connection immediately instead of silently blocking that tab (and, via
+    // deleteDB's own blocking wait, ourselves) forever.
+    blocking() {
+      dbInstance?.close()
+      dbInstance = null
+    },
+    blocked(currentVersion, blockedVersion) {
+      console.warn(
+        `[db] Open blocked by another tab holding version ${currentVersion} `
+        + `(wanted ${blockedVersion}). Waiting for it to release the connection.`,
+      )
+    },
   })
+}
 
-  return dbInstance
+async function resetTableCanvasDB(): Promise<void> {
+  dbInstance?.close()
+  dbInstance = null
+  await withTimeout(
+    deleteDB(DB_NAME, {
+      blocked() {
+        console.warn('[db] Reset blocked by another open tab; waiting for it to close.')
+      },
+    }),
+    'Local database reset timed out. Close other Table Canvas tabs and try again.',
+  )
+}
+
+async function openWithRecovery(): Promise<IDBPDatabase<TableCanvasDB>> {
+  try {
+    return await withTimeout(
+      openTableCanvasDB(),
+      'Local database did not open in time. Close other Table Canvas tabs and try again.',
+    )
+  } catch (error) {
+    // The browser can hold an on-disk copy of this database at a version newer
+    // than DB_VERSION (e.g. left over from a local build that briefly used a
+    // higher schema version, or a stale WebKit version record). That makes
+    // every open attempt fail forever with a VersionError. Recover by
+    // dropping the stale database instead of leaving the app permanently
+    // stuck before it can even reach the login screen.
+    if (error instanceof DOMException && error.name === 'VersionError') {
+      console.warn('[db] Local database version is newer than expected; resetting it.', error)
+      await resetTableCanvasDB()
+      return withTimeout(
+        openTableCanvasDB(),
+        'Local database did not open in time after reset. Close other Table Canvas tabs and try again.',
+      )
+    }
+    throw error
+  }
+}
+
+export async function getDB(): Promise<IDBPDatabase<TableCanvasDB>> {
+  if (dbInstance) return dbInstance
+  if (!dbOpenPromise) {
+    dbOpenPromise = openWithRecovery()
+      .then(db => {
+        dbInstance = db
+        return db
+      })
+      .catch(error => {
+        dbOpenPromise = null
+        throw error
+      })
+  }
+  return dbOpenPromise
 }

@@ -22,6 +22,11 @@ import { useProjectStore } from './projectStore'
 import type { AppProviderState, ProjectImportData } from './appContextValue'
 import { publishCatalogChanged } from '@/persistence/projectCatalog'
 import { getStorageScope, scopedStorageKey } from '@/persistence/storageScope'
+import {
+  clearProjectActivity,
+  hasUnexportedActivity,
+  markProjectActive,
+} from '@/layout/projectActivity'
 import { canDeleteDocument } from './documentLease'
 import {
   cloneProjectContents,
@@ -159,6 +164,11 @@ export function useProjectActions({
       ))
       await prepareProject(duplicate)
       activate(duplicate)
+      // The copy inherits the source's content, so it inherits whether that
+      // content has ever left this browser too.
+      if (hasUnexportedActivity(getStorageScope(), [source.projectId])) {
+        markProjectActive(getStorageScope(), duplicate.id)
+      }
       publishCatalogChanged()
     } catch (error) {
       if (duplicateId) {
@@ -203,6 +213,7 @@ export function useProjectActions({
         await useReportStore.getState().flushSaves()
       }
       await deleteProjectWithSync(projectId)
+      clearProjectActivity(getStorageScope(), projectId)
       if (isActive) await clearActiveWorkspace()
       setState(previous => ({
         ...previous,

@@ -13,6 +13,8 @@ import type { ChartNode, ProjectNode } from '@/types'
 import type { ViewMode } from './viewNavigation'
 import type { ProjectExportState } from './useProjectExport'
 import { GuestSignInDialog } from './ProjectDialogs'
+import { hasUnexportedActivity } from './projectActivity'
+import { getStorageScope } from '@/persistence/storageScope'
 
 interface AppHeaderProps {
   viewMode: ViewMode
@@ -302,7 +304,11 @@ export function AppHeader({
           <button
             type="button"
             onClick={() => {
-              if (projects.length > 0) setGuestSignInOpen(true)
+              const hasWork = hasUnexportedActivity(
+                getStorageScope(),
+                projects.map(project => project.id),
+              )
+              if (hasWork) setGuestSignInOpen(true)
               else continueToSignIn()
             }}
             className="flex h-12 min-w-11 shrink-0 items-center gap-2.5 rounded-md px-1.5 transition-colors hover:bg-surface-secondary md:px-2"

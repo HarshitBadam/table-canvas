@@ -1,17 +1,18 @@
 import { useState, useCallback, useEffect } from 'react'
 import {
   checkAuth,
-  logout as apiLogout,
   login as apiLogin,
   loginWithGoogle as apiLoginWithGoogle,
   LoginCredentials,
   User,
 } from '@/api/auth.api'
 import { setAuthErrorHandler, API_BASE_URL } from '@/api/client'
+import { migrateLegacyGuestData } from '@/persistence/legacyGuestMigration'
 import {
   accountStorageScope,
   claimGuestStorageScope,
   releaseGuestStorageScopeClaim,
+  resetLoggedOutStorageScope,
   setStorageScope,
 } from '@/persistence/storageScope'
 
@@ -24,6 +25,7 @@ const LOCAL_USER: User = {
 }
 
 const GUEST_SESSION_KEY = 'table-canvas:guest-session'
+const ACCOUNT_SIGNED_OUT_KEY = 'table-canvas:account-signed-out'
 
 function hasGuestSession(): boolean {
   try {
@@ -45,12 +47,36 @@ function setGuestSession(active: boolean): void {
   }
 }
 
+function hasTabLocalAccountSignOut(): boolean {
+  try {
+    return sessionStorage.getItem(ACCOUNT_SIGNED_OUT_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+function setTabLocalAccountSignOut(active: boolean): void {
+  try {
+    if (active) {
+      sessionStorage.setItem(ACCOUNT_SIGNED_OUT_KEY, 'true')
+    } else {
+      sessionStorage.removeItem(ACCOUNT_SIGNED_OUT_KEY)
+    }
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
+
 export function useAuthState() {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   const handleAuthError = useCallback(() => {
-    setGuestSession(false)
+    // Guest tabs do not use account cookies. A 401 from another tab's logout
+    // (or a background account request) must not tear down an isolated guest
+    // workspace mid-session or mid "Continue as guest".
+    if (hasGuestSession()) return
+    resetLoggedOutStorageScope()
     setUser(null)
     setIsAuthenticated(false)
   }, [])
@@ -62,6 +88,7 @@ export function useAuthState() {
 
   const performLogin = useCallback(async (credentials: LoginCredentials) => {
     const { user } = await apiLogin(credentials)
+    setTabLocalAccountSignOut(false)
     setGuestSession(false)
     releaseGuestStorageScopeClaim()
     setStorageScope(accountStorageScope(user.id))
@@ -72,6 +99,7 @@ export function useAuthState() {
 
   const performGoogleLogin = useCallback(async (credential: string) => {
     const { user } = await apiLoginWithGoogle(credential)
+    setTabLocalAccountSignOut(false)
     setGuestSession(false)
     releaseGuestStorageScopeClaim()
     setStorageScope(accountStorageScope(user.id))
@@ -81,16 +109,14 @@ export function useAuthState() {
   }, [])
 
   const performLogout = useCallback(async () => {
-    try {
-      await apiLogout()
-    } finally {
-      // Ending the local session must not depend on network availability. The
-      // server-side refresh token will be revoked on a successful request or expire.
-      setGuestSession(false)
-      releaseGuestStorageScopeClaim()
-      setUser(null)
-      setIsAuthenticated(false)
-    }
+    // Account cookies are shared by every tab on this origin. Calling the server
+    // logout endpoint here would revoke and clear the session used by all of them.
+    // Keep "Sign out" local to this tab; an explicit login clears this marker.
+    setTabLocalAccountSignOut(true)
+    setGuestSession(false)
+    resetLoggedOutStorageScope()
+    setUser(null)
+    setIsAuthenticated(false)
   }, [])
 
   /**
@@ -102,6 +128,13 @@ export function useAuthState() {
     user: User | null
     shouldContinue: boolean
   }> => {
+    if (hasTabLocalAccountSignOut() && !hasGuestSession()) {
+      resetLoggedOutStorageScope()
+      setUser(null)
+      setIsAuthenticated(false)
+      return { user: null, shouldContinue: false }
+    }
+
     // A guest choice belongs to this tab. Shared account cookies created by another
     // tab must not silently replace its isolated guest workspace on reload.
     let authedUser = hasGuestSession() ? LOCAL_USER : await checkAuth()
@@ -121,6 +154,7 @@ export function useAuthState() {
         backendReachable = true
 
         if (response.status === 401) {
+          resetLoggedOutStorageScope()
           setUser(null)
           setIsAuthenticated(false)
           return { user: null, shouldContinue: false }
@@ -134,12 +168,14 @@ export function useAuthState() {
         const allowAutomaticLocalMode = import.meta.env.DEV
           || import.meta.env.VITE_AUTO_GUEST === 'true'
         if (!allowAutomaticLocalMode) {
+          resetLoggedOutStorageScope()
           setUser(null)
           setIsAuthenticated(false)
           return { user: null, shouldContinue: false }
         }
         authedUser = LOCAL_USER
       } else {
+        resetLoggedOutStorageScope()
         setUser(null)
         setIsAuthenticated(false)
         return { user: null, shouldContinue: false }
@@ -147,7 +183,9 @@ export function useAuthState() {
     }
 
     if (authedUser.tier === 'guest') {
-      await claimGuestStorageScope()
+      const scope = await claimGuestStorageScope()
+      // Fire-and-forget: IndexedDB must never gate reaching the workspace.
+      void migrateLegacyGuestData(scope)
     } else {
       releaseGuestStorageScopeClaim()
       setStorageScope(accountStorageScope(authedUser.id))
@@ -159,7 +197,9 @@ export function useAuthState() {
 
   const continueAsGuest = useCallback(async (): Promise<User> => {
     setGuestSession(true)
-    await claimGuestStorageScope()
+    const scope = await claimGuestStorageScope()
+    // Fire-and-forget: IndexedDB must never gate reaching the workspace.
+    void migrateLegacyGuestData(scope)
     setUser(LOCAL_USER)
     setIsAuthenticated(true)
     return LOCAL_USER
@@ -167,7 +207,7 @@ export function useAuthState() {
 
   const leaveGuest = useCallback(() => {
     setGuestSession(false)
-    releaseGuestStorageScopeClaim()
+    resetLoggedOutStorageScope()
     setUser(null)
     setIsAuthenticated(false)
   }, [])

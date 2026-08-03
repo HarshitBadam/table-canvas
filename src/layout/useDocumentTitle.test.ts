@@ -82,4 +82,18 @@ describe('useDocumentTitle', () => {
     }))
     expect(document.title).toBe('Sheet1 | Table Canvas')
   })
+
+  it('resets to the bare app name on unmount, so a signed-out tab is never stuck on a stale project title', () => {
+    const { unmount } = renderHook(() => useDocumentTitle({
+      projectName: 'MyBudget',
+      viewMode: 'canvas',
+      nodeName: null,
+      reportName: null,
+    }))
+    expect(document.title).toBe('MyBudget | Table Canvas')
+
+    unmount()
+
+    expect(document.title).toBe('Table Canvas')
+  })
 })

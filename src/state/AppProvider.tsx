@@ -30,8 +30,10 @@ import { requestedDocumentProjectId, useDocumentSession } from './useDocumentSes
 import { useDocumentCoordination } from './useDocumentCoordination'
 import { useProjectAutosave } from './useProjectAutosave'
 import { useBackgroundTableRefresh } from './useBackgroundTableRefresh'
+import { useProjectActivityTracking } from './useProjectActivityTracking'
 import { getStorageScope } from '@/persistence/storageScope'
 import { clearWorkspaceViews } from '@/layout/workspaceViewPersistence'
+import { clearAllProjectActivity } from '@/layout/projectActivity'
 import {
   bindProjectCatalog,
   publishCatalogChanged,
@@ -106,6 +108,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState,
   })
   useBackgroundTableRefresh(state.phase === 'ready' && state.engineReady)
+  useProjectActivityTracking()
   const setPhase = useCallback((phase: AppPhase, error?: string) => {
     setState(previous => ({
       ...previous,
@@ -141,8 +144,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     projectId: state.projectId,
     authToken: `${user?.id ?? 'none'}:${user?.tier ?? 'none'}`,
   })
+  // Bind presence/lease as soon as a project id exists — not only after phase
+  // becomes ready — so a peer tab cannot delete during the load window.
   useDocumentCoordination({
-    identity: state.phase === 'ready' ? documentIdentity : null,
+    identity: documentIdentity,
   })
   usePersistenceLifecycle({
     user,
@@ -165,33 +170,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (!state.isAuthenticated || state.phase !== 'ready') return
+    // Wait until boot/login has finished loading a project. Running reconcile
+    // while phase is still briefly 'ready' before postLoginSetup flips it to
+    // loading_project races getDB() against the login path.
+    if (!state.isAuthenticated || state.phase !== 'ready' || !initialized.current) return
+    // Skip the first ready paint that happens before initialize() finishes —
+    // initialize sets ready only after the first project load.
+    if (!state.engineReady) return
     const scope = getStorageScope()
     const stopBinding = bindProjectCatalog(scope)
     let stopped = false
     let generation = 0
 
-    const reconcileCatalog = async (_event?: ProjectCatalogEvent) => {
+    const reconcileCatalog = async (event?: ProjectCatalogEvent) => {
       const requestGeneration = ++generation
       try {
         const projects = await fetchProjects()
         if (stopped || requestGeneration !== generation) return
-        const activeProjectId = useProjectStore.getState().projectId
-        if (
+        const storeProjectId = useProjectStore.getState().projectId
+        const activeProjectId = storeProjectId || null
+        const deletedActive = Boolean(
           activeProjectId
-          && !projects.some(project => project.id === activeProjectId)
-        ) {
+          && (
+            (event?.type === 'project-deleted' && event.projectId === activeProjectId)
+            || !projects.some(project => project.id === activeProjectId)
+          ),
+        )
+        if (deletedActive) {
           setState(previous => ({
             ...previous,
             projectId: null,
+            projectName: 'Untitled Project',
             projects,
             isProjectOperationPending: true,
+            syncError: 'This project was deleted in another tab.',
           }))
           await clearActiveWorkspace()
           if (stopped || requestGeneration !== generation) return
           setState(previous => ({
             ...previous,
             projectId: null,
+            projectName: 'Untitled Project',
             projects,
             isProjectOperationPending: false,
           }))
@@ -219,6 +238,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [
     clearActiveWorkspace,
+    state.engineReady,
     state.isAuthenticated,
     state.phase,
     user?.id,
@@ -312,20 +332,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPhase('ready')
   }, [clearActiveWorkspace, prepareProject, setPhase])
 
+  // postLoginSetup flips the phase to 'loading_project'. If it throws, the phase
+  // must be put back into a rendered state (rather than left stuck showing the
+  // full-screen loader forever) so the caller's own error handling can recover.
+  const runPostLoginSetup = useCallback(async (tier: Tier) => {
+    try {
+      await postLoginSetup(tier)
+    } catch (error) {
+      setState(previous => ({
+        ...previous,
+        syncError: formatApiErrorMessage(error, 'Could not load your project'),
+      }))
+      setPhase('ready')
+      throw error
+    }
+  }, [postLoginSetup, setPhase])
+
+  const beginLoginSetup = useCallback(async (enter: () => Promise<{ tier: Tier }>) => {
+    // Leave phase 'ready' before auth flips isAuthenticated, otherwise the
+    // catalog reconcile effect races getDB() against post-login project load.
+    setPhase('loading_project')
+    try {
+      const loggedInUser = await enter()
+      await runPostLoginSetup(loggedInUser.tier)
+    } catch (error) {
+      setPhase('ready')
+      throw error
+    }
+  }, [runPostLoginSetup, setPhase])
+
   const login = useCallback(async (credentials: LoginCredentials) => {
-    const loggedInUser = await performLogin(credentials)
-    await postLoginSetup(loggedInUser.tier)
-  }, [performLogin, postLoginSetup])
+    await beginLoginSetup(() => performLogin(credentials))
+  }, [beginLoginSetup, performLogin])
 
   const googleLogin = useCallback(async (credential: string) => {
-    const loggedInUser = await performGoogleLogin(credential)
-    await postLoginSetup(loggedInUser.tier)
-  }, [performGoogleLogin, postLoginSetup])
+    await beginLoginSetup(() => performGoogleLogin(credential))
+  }, [beginLoginSetup, performGoogleLogin])
 
   const continueAsGuest = useCallback(async () => {
-    const guest = await setGuestAuth()
-    await postLoginSetup(guest.tier)
-  }, [postLoginSetup, setGuestAuth])
+    await beginLoginSetup(() => setGuestAuth())
+  }, [beginLoginSetup, setGuestAuth])
 
   const leaveGuest = useCallback(async () => {
     if (user?.tier !== 'guest') return
@@ -338,6 +384,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.warn('[AppContext] Guest workspace save did not finish before exit:', error)
     } finally {
       clearWorkspaceViews(getStorageScope())
+      clearAllProjectActivity(getStorageScope())
       clearGuestAuth()
       await resetWorkspace()
     }
@@ -355,6 +402,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.warn('[AppContext] Local save did not finish before sign out:', error)
     }
     clearWorkspaceViews(getStorageScope())
+    clearAllProjectActivity(getStorageScope())
     try {
       await performLogout()
     } catch (error) {

@@ -9,9 +9,11 @@ vi.mock('@/engine/materializationService', () => ({
 vi.mock('@/persistence/syncService', () => ({
   fetchProjects: vi.fn(),
   loadProjectWithSync: vi.fn(),
+  createProjectWithSync: vi.fn(),
 }))
 
 import {
+  createProjectWithSync,
   fetchProjects,
   loadProjectWithSync,
 } from '@/persistence/syncService'
@@ -20,6 +22,7 @@ import { hasProjectTables, loadOrCreateProject } from './projectLifecycle'
 beforeEach(() => {
   vi.mocked(fetchProjects).mockReset()
   vi.mocked(loadProjectWithSync).mockReset()
+  vi.mocked(createProjectWithSync).mockReset()
 })
 
 describe('hasProjectTables', () => {
@@ -46,12 +49,24 @@ describe('loadOrCreateProject', () => {
     patches: {},
   }
 
-  it('treats an empty project list as a valid workspace state', async () => {
+  it('creates an Untitled Project so a fresh guest or account never lands on an empty prompt', async () => {
     vi.mocked(fetchProjects).mockResolvedValue([])
+    const created = {
+      id: 'project-new',
+      name: 'Untitled Project',
+      nodes: {},
+      edges: {},
+      patches: {},
+    }
+    vi.mocked(createProjectWithSync).mockResolvedValue(created)
 
     const result = await loadOrCreateProject()
 
-    expect(result).toEqual({ project: null, projectList: [] })
+    expect(createProjectWithSync).toHaveBeenCalledWith('Untitled Project')
+    expect(result.project).toEqual(created)
+    expect(result.projectList).toEqual([
+      expect.objectContaining({ id: 'project-new', name: 'Untitled Project' }),
+    ])
   })
 
   it('does not create a replacement when a listed project fails to load', async () => {

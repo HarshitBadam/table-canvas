@@ -3,6 +3,8 @@ import { useProjectStore } from '@/state/projectStore'
 import { useApp } from '@/state/AppContext'
 import { saveProjectWithSync } from '@/persistence/syncService'
 import { useReportStore } from '@/report/reportStore'
+import { getStorageScope } from '@/persistence/storageScope'
+import { markProjectExported } from '@/layout/projectActivity'
 
 export interface ProjectExportState {
   isExporting: boolean
@@ -81,6 +83,9 @@ export function useProjectExport(onImportComplete: () => void): ProjectExportSta
       await exportAndDownloadProject(projectId, projectName || 'project', {
         includeExcel: true,
       })
+      // The exported file now carries this project's current state, so nothing
+      // in it is exclusive to this browser anymore.
+      markProjectExported(getStorageScope(), projectId)
     } catch (err) {
       console.error('[Export] Failed:', err)
       setExportError(err instanceof Error ? err.message : 'Export failed')
