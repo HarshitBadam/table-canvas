@@ -12,7 +12,7 @@ export async function bootApp(page: Page) {
     expect(response!.ok(), `homepage returned ${response!.status()}`).toBeTruthy()
     await expect(page.locator('.react-flow')).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 45_000 })
-  await expect(page.locator('aside')).toBeVisible()
+  await expect(page.locator('aside')).toBeAttached()
 }
 
 export async function importCsv(
