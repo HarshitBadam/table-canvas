@@ -312,8 +312,16 @@ async function waitForRelatedTableOperations(tableId: string): Promise<void> {
     await waitForTableOperation(tableId)
     return
   }
+  // getComputationOrder includes tableId itself (by design, for materializeTableInternal's
+  // use below, which also needs to recompute the target). Waiting on tableId's own gate
+  // here would deadlock: that gate is only released by completeTableOperation/
+  // failTableOperation, which run strictly after this function's caller
+  // (ensureTableMaterialized) resolves — e.g. a freshly created join/union table has its
+  // gate opened with beginTableOperation(id, 'waiting') right before ensureTableMaterialized
+  // is called on that same id. Only wait on the upstream tables it actually depends on.
   const order = getComputationOrder(tableId, projectStore.nodes, projectStore.edges)
   for (const relatedId of order) {
+    if (relatedId === tableId) continue
     await waitForTableOperation(relatedId)
   }
 }
