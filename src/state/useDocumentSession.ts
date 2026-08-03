@@ -36,7 +36,14 @@ export function useDocumentSession({
   )
 
   useEffect(() => {
-    if (!identity) return
+    if (!identity) {
+      // Active project was cleared (deleted elsewhere, empty workspace). Leave
+      // the stale /p/:id URL so refresh does not try to reopen a missing project.
+      if (documentProjectIdFromPath(location.pathname)) {
+        navigate('/', { replace: true })
+      }
+      return
+    }
     const path = documentProjectPath(identity.projectId)
     if (location.pathname === path || location.pathname.startsWith(`${path}/`)) return
     navigate(path, { replace: true })

@@ -1,7 +1,7 @@
 import { getEngine } from '@/engine'
 import { dropEngineTables } from '@/engine/engineTableCleanup'
 import { invalidateMaterializations } from '@/engine/materializationCoordinator'
-import { fetchProjects, loadProjectWithSync } from '@/persistence/syncService'
+import { createProjectWithSync, fetchProjects, loadProjectWithSync } from '@/persistence/syncService'
 import type { ProjectNode } from '@/types'
 import { useDataStore } from './dataStore'
 import { clearAllTableOperations } from './tableOperationCoordinator'
@@ -41,7 +41,20 @@ function mostRecentlyUpdated(
 export async function loadOrCreateProject(requestedProjectId?: string | null) {
   const projects = await fetchProjects()
   if (projects.length === 0) {
-    return { project: null, projectList: projects }
+    // First entry (fresh guest, new account, or the initial boot before any
+    // project exists) must land in a real, usable workspace — not an empty
+    // "create your first project" prompt the user has to click through.
+    const project = await createProjectWithSync('Untitled Project')
+    const now = new Date()
+    return {
+      project,
+      projectList: [{
+        id: project.id,
+        name: project.name,
+        createdAt: now,
+        updatedAt: now,
+      }],
+    }
   }
 
   const requested = requestedProjectId

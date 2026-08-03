@@ -21,6 +21,10 @@ function leaseName(key: string): string {
   return `table-canvas:doc-lease:${key}`
 }
 
+function openName(key: string): string {
+  return `table-canvas:doc-open:${key}`
+}
+
 let locks: FakeLockManager
 
 beforeEach(() => {
@@ -158,7 +162,27 @@ describe('documentLease', () => {
     tab.stopDocumentLease()
   })
 
-  it('allows deleting the active document only while this tab owns it', async () => {
+  it('holds shared open presence for every tab on the document', async () => {
+    const owner = await openTab()
+    owner.startDocumentLease({ key: KEY })
+    await settleTabs()
+    expect(locks.holderCount(openName(KEY))).toBe(1)
+
+    const follower = await openTab()
+    follower.startDocumentLease({ key: KEY })
+    await settleTabs()
+    expect(locks.holderCount(openName(KEY))).toBe(2)
+
+    owner.stopDocumentLease()
+    await settleTabs()
+    expect(locks.holderCount(openName(KEY))).toBe(1)
+
+    follower.stopDocumentLease()
+    await settleTabs()
+    expect(locks.holderCount(openName(KEY))).toBe(0)
+  })
+
+  it('allows deleting the active document only while no other tab has it open', async () => {
     const owner = await openTab()
     owner.startDocumentLease({ key: KEY })
     await settleTabs()
@@ -167,30 +191,33 @@ describe('documentLease', () => {
     const follower = await openTab()
     follower.startDocumentLease({ key: KEY })
     await settleTabs()
+    expect(await owner.canDeleteDocument(KEY, true)).toBe(false)
     expect(await follower.canDeleteDocument(KEY, true)).toBe(false)
 
     owner.stopDocumentLease()
     follower.stopDocumentLease()
   })
 
-  it('probes inactive documents with ifAvailable and releases immediately', async () => {
+  it('blocks deleting a project that is open in another tab', async () => {
     const owner = await openTab()
     owner.startDocumentLease({ key: KEY })
     await settleTabs()
 
     const other = await openTab()
     expect(await other.canDeleteDocument(KEY, false)).toBe(false)
-    expect(locks.isHeld(leaseName(KEY))).toBe(true)
+    expect(locks.isHeld(openName(KEY))).toBe(true)
 
     expect(await other.canDeleteDocument(OTHER_SCOPE_KEY, false)).toBe(true)
-    expect(locks.isHeld(leaseName(OTHER_SCOPE_KEY))).toBe(false)
+    expect(locks.isHeld(openName(OTHER_SCOPE_KEY))).toBe(false)
 
     owner.stopDocumentLease()
   })
 
-  it('allows deletion when Web Locks are unavailable', async () => {
+  it('assumes a single tab and allows deletion when Web Locks are unavailable', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true })
     const tab = await openTab()
     expect(await tab.canDeleteDocument(KEY, false)).toBe(true)
+    expect(await tab.canDeleteDocument(KEY, true)).toBe(true)
   })
 })

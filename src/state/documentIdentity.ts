@@ -29,6 +29,15 @@ export function documentLeaseName(key: string): string {
   return `table-canvas:doc-lease:${key}`
 }
 
+/**
+ * Shared lock held by every tab that has the document open (owner or mirror).
+ * Delete probes take an exclusive lock on this name with `ifAvailable` so any
+ * open tab — not only the write owner — blocks deletion.
+ */
+export function documentOpenLockName(key: string): string {
+  return `table-canvas:doc-open:${key}`
+}
+
 export function documentMirrorChannel(key: string): string {
   return `table-canvas:doc-mirror:${key}`
 }

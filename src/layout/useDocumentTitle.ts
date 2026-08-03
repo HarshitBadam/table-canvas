@@ -32,5 +32,11 @@ export function useDocumentTitle({ projectName, viewMode, nodeName, reportName }
 
     segments.push(BASE_TITLE)
     document.title = segments.join(' | ')
+
+    // Cross-tab sign-out (or any other reason MainApp unmounts) must not leave
+    // the browser tab showing a stale project name after the workspace is gone.
+    return () => {
+      document.title = BASE_TITLE
+    }
   }, [projectName, viewMode, nodeName, reportName])
 }
