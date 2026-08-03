@@ -3,10 +3,13 @@ import { expect, test } from '../e2e.fixture'
 import { bootApp } from '../app.support'
 
 type LongTaskWindow = Window & { __longTasks: number[] }
+type TelemetryWindow = Window & {
+  __tableCanvasTelemetry?: Array<{ type: string; name?: string }>
+}
 
 async function installLongTaskRecorder(page: Page) {
   await page.addInitScript(() => {
-    const target = window as LongTaskWindow
+    const target = window as unknown as LongTaskWindow
     target.__longTasks = []
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) target.__longTasks.push(entry.duration)
@@ -16,14 +19,14 @@ async function installLongTaskRecorder(page: Page) {
 
 async function resetLongTasks(page: Page) {
   await page.evaluate(() => {
-    (window as LongTaskWindow).__longTasks = []
+    (window as unknown as LongTaskWindow).__longTasks = []
   })
 }
 
 async function expectLongTasksWithinBudget(page: Page) {
   await page.waitForTimeout(250)
   const durations = await page.evaluate(
-    () => (window as LongTaskWindow).__longTasks ?? [],
+    () => (window as unknown as LongTaskWindow).__longTasks ?? [],
   )
   const maxDuration = durations.length > 0 ? Math.max(...durations) : 0
   expect(maxDuration, `Longest main-thread task was ${maxDuration.toFixed(1)}ms`).toBeLessThan(250)
@@ -38,9 +41,9 @@ test.describe('Performance budgets', () => {
     await bootApp(page)
 
     await expect.poll(() => page.evaluate(() => (
-      window.__tableCanvasTelemetry
-        ?.filter(event => event.type === 'web-vital')
-        .map(event => event.name) ?? []
+      (window as unknown as TelemetryWindow).__tableCanvasTelemetry
+        ?.filter((event) => event.type === 'web-vital')
+        .map((event) => event.name) ?? []
     )), { timeout: 10_000 }).toEqual(expect.arrayContaining(['FCP', 'TTFB']))
   })
 
