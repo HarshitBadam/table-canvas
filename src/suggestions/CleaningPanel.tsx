@@ -4,10 +4,7 @@ import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspa
 import { TableRow } from '@/state/dataStore'
 import { computeSuggestionEffect } from './computeEffects'
 import { useCleaningApply } from './useCleaningApply'
-import {
-  loadCleaningPreview,
-  MAX_IN_MEMORY_CLEANING_ROWS,
-} from './cleaningRows'
+import { loadCleaningPreview } from './cleaningRows'
 import type { Suggestion } from '@/types'
 
 interface CleaningPanelProps {
@@ -29,7 +26,6 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
   const [rowsError, setRowsError] = useState<string | null>(null)
   const [totalRows, setTotalRows] = useState(0)
   const [previewIsTruncated, setPreviewIsTruncated] = useState(false)
-  const [isPolicyLimited, setIsPolicyLimited] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
   const refreshKey = node?.updatedAt
 
@@ -43,14 +39,12 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         setRows(preview.rows)
         setTotalRows(preview.totalRows)
         setPreviewIsTruncated(preview.isTruncated)
-        setIsPolicyLimited(preview.isPolicyLimited)
       })
       .catch((cause) => {
         if (!cancelled) {
           setRows([])
           setTotalRows(0)
           setPreviewIsTruncated(false)
-          setIsPolicyLimited(false)
           setRowsError(cause instanceof Error ? cause.message : 'Could not load table rows for cleaning.')
         }
       })
@@ -220,17 +214,6 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
 
   return (
     <div className="flex flex-col h-full">
-      {isPolicyLimited && (
-        <div className="border-b border-yellow-300 bg-yellow-50 px-4 py-3 dark:border-yellow-900 dark:bg-yellow-950/30" role="note">
-          <p className="text-xs font-medium text-text-primary">
-            Preview only for this large table
-          </p>
-          <p className="mt-1 text-xs text-text-secondary">
-            This table has {totalRows.toLocaleString()} rows. Applying in-place cleaning is limited
-            to {MAX_IN_MEMORY_CLEANING_ROWS.toLocaleString()} rows to protect browser memory.
-          </p>
-        </div>
-      )}
       <div className="flex items-center justify-between border-b border-border-subtle bg-surface-secondary/40 px-4 py-3">
         <span className="text-xs font-medium text-text-tertiary">
           {suggestionsWithEffects.length} issue{suggestionsWithEffects.length !== 1 ? 's' : ''}
@@ -304,14 +287,8 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       <div className="p-3 border-t border-border">
         <button
           onClick={handleApply}
-          disabled={selectedCount === 0 || isApplying || !canEdit || isPolicyLimited}
-          title={
-            !canEdit
-              ? EDITING_ELSEWHERE_TOOLTIP
-              : isPolicyLimited
-                ? `In-place cleaning is limited to ${MAX_IN_MEMORY_CLEANING_ROWS.toLocaleString()} rows.`
-                : undefined
-          }
+          disabled={selectedCount === 0 || isApplying || !canEdit}
+          title={!canEdit ? EDITING_ELSEWHERE_TOOLTIP : undefined}
           className="w-full btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isApplying ? 'Applying...' : `Apply ${selectedCount} fix${selectedCount !== 1 ? 'es' : ''}`}
