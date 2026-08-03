@@ -20,6 +20,9 @@ import {
 import type { Tier } from '@/shared/limits'
 import { useProjectStore } from './projectStore'
 import type { AppProviderState, ProjectImportData } from './appContextValue'
+import { publishCatalogChanged } from '@/persistence/projectCatalog'
+import { getStorageScope, scopedStorageKey } from '@/persistence/storageScope'
+import { canDeleteDocument } from './documentLease'
 import {
   cloneProjectContents,
   nextDuplicateName,
@@ -33,6 +36,7 @@ interface Options {
   tier: Tier
   flushProjectSave: () => Promise<void>
   prepareProject: (project: ProjectWithSync) => Promise<void>
+  clearActiveWorkspace: () => Promise<void>
   setProjectLimitViolation: (violation: LimitExceeded | null) => void
 }
 
@@ -42,6 +46,7 @@ export function useProjectActions({
   tier,
   flushProjectSave,
   prepareProject,
+  clearActiveWorkspace,
   setProjectLimitViolation,
 }: Options) {
   const operationInFlight = useRef(false)
@@ -98,6 +103,7 @@ export function useProjectActions({
       createdId = project.id
       await prepareProject(project)
       activate(project)
+      publishCatalogChanged()
     } catch (error) {
       if (createdId) {
         await deleteProjectWithSync(createdId).catch(() => undefined)
@@ -153,6 +159,7 @@ export function useProjectActions({
       ))
       await prepareProject(duplicate)
       activate(duplicate)
+      publishCatalogChanged()
     } catch (error) {
       if (duplicateId) {
         await deleteReportsForProject(duplicateId).catch(() => undefined)
@@ -177,62 +184,38 @@ export function useProjectActions({
   ])
 
   const deleteProject = useCallback(async (projectId: string) => run(async () => {
-    if (state.projects.length <= 1) {
-      throw new ProjectActionError('last-project', 'The last project cannot be deleted.')
-    }
     const index = state.projects.findIndex(project => project.id === projectId)
     if (index < 0) throw new ProjectActionError('not-found', 'Project not found.')
     const isActive = projectId === state.projectId
-    const replacementSummary = isActive
-      ? state.projects[index + 1] ?? state.projects[index - 1]
-      : null
-    const current = useProjectStore.getState()
-    const original: ProjectWithSync = {
-      id: current.projectId,
-      name: current.projectName,
-      nodes: structuredClone(current.nodes),
-      edges: structuredClone(current.edges),
-      patches: structuredClone(current.patches),
-    }
-    let replacementPrepared = false
     try {
-      let replacement: ProjectWithSync | null = null
-      if (replacementSummary) {
+      const canDelete = await canDeleteDocument(
+        scopedStorageKey(getStorageScope(), projectId),
+        isActive,
+      )
+      if (!canDelete) {
+        throw new ProjectActionError(
+          'open-elsewhere',
+          'This project is open in another tab and can’t be deleted right now.',
+        )
+      }
+      if (isActive) {
         await flushProjectSave()
         await useReportStore.getState().flushSaves()
-        replacement = await loadProjectWithSync(replacementSummary.id)
-        if (!replacement) {
-          throw new ProjectActionError('not-found', 'The replacement project could not be loaded.')
-        }
-        await prepareProject(replacement)
-        replacementPrepared = true
       }
       await deleteProjectWithSync(projectId)
+      if (isActive) await clearActiveWorkspace()
       setState(previous => ({
         ...previous,
-        projectId: replacement?.id ?? previous.projectId,
-        projectName: replacement?.name ?? previous.projectName,
+        projectId: isActive ? null : previous.projectId,
+        projectName: isActive ? 'Untitled Project' : previous.projectName,
         projects: previous.projects.filter(project => project.id !== projectId),
       }))
     } catch (error) {
-      const restorationFailures: unknown[] = []
-      if (replacementPrepared) {
-        await prepareProject(original).catch(restoreError => {
-          restorationFailures.push(restoreError)
-        })
-      }
-      if (restorationFailures.length > 0) {
-        throw new ProjectActionError(
-          'persistence',
-          'Delete failed and the previous project could not be fully restored.',
-          { failure: error, restorationFailures },
-        )
-      }
       throw toProjectActionError(error, 'Could not delete project')
     }
   }), [
+    clearActiveWorkspace,
     flushProjectSave,
-    prepareProject,
     run,
     setState,
     state.projectId,
@@ -260,6 +243,7 @@ export function useProjectActions({
       }
       await prepareProject(imported)
       activate(imported)
+      publishCatalogChanged()
     } catch (error) {
       if (importedId) {
         await deleteReportsForProject(importedId).catch(() => undefined)

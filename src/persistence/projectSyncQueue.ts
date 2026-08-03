@@ -38,6 +38,11 @@ export async function saveProjectAndEnqueue(
     projectStore.get(id),
     syncStore.get(id),
   ])
+  if (existingOperation?.operation === 'delete') {
+    tx.abort()
+    await tx.done.catch(() => undefined)
+    throw new Error(`Project "${projectId}" was deleted in another tab.`)
+  }
   const now = new Date().toISOString()
   const persistedNodes = withoutRuntimeNodeState(nodes)
   const serializedPatches = serializePatches(patches)
@@ -86,7 +91,13 @@ export async function enqueueProjectSave(
 ): Promise<ProjectSyncOperation> {
   const db = await getDB()
   const id = scopedStorageKey(scope, projectId)
-  const existing = await db.get('projectSync', id)
+  const tx = db.transaction('projectSync', 'readwrite')
+  const existing = await tx.store.get(id)
+  if (existing?.operation === 'delete') {
+    tx.abort()
+    await tx.done.catch(() => undefined)
+    throw new Error(`Project "${projectId}" was deleted in another tab.`)
+  }
   const operation: ProjectSyncOperation = {
     id,
     entityId: projectId,
@@ -98,7 +109,8 @@ export async function enqueueProjectSave(
     updatedAt: new Date().toISOString(),
     payload,
   }
-  await db.put('projectSync', operation)
+  await tx.store.put(operation)
+  await tx.done
   return operation
 }
 
@@ -158,19 +170,39 @@ export async function enqueueProjectDelete(
 ): Promise<ProjectSyncOperation> {
   const db = await getDB()
   const id = scopedStorageKey(scope, projectId)
-  const existing = await db.get('projectSync', id)
+  const tx = db.transaction('projectSync', 'readwrite')
+  const syncStore = tx.objectStore('projectSync')
+  const existing = await syncStore.get(id)
+  const generation = (existing?.generation ?? 0) + 1
+  const now = new Date().toISOString()
   const operation: ProjectSyncOperation = {
     id,
     entityId: projectId,
     ownerId: scope,
     projectId,
-    generation: (existing?.generation ?? 0) + 1,
+    generation,
     expectedRevision: existing?.expectedRevision ?? expectedRevision,
     operation: 'delete',
-    updatedAt: new Date().toISOString(),
+    updatedAt: now,
   }
-  await db.put('projectSync', operation)
+  await syncStore.put(operation)
+  await tx.done
   return operation
+}
+
+/** Cancels a queued delete after the server rejects it as stale. */
+export async function cancelQueuedProjectDelete(
+  projectId: string,
+  scope = getStorageScope(),
+): Promise<void> {
+  const db = await getDB()
+  const id = scopedStorageKey(scope, projectId)
+  const tx = db.transaction('projectSync', 'readwrite')
+  const operation = await tx.store.get(id)
+  if (operation?.operation === 'delete') {
+    await tx.store.delete(id)
+  }
+  await tx.done
 }
 
 export async function getProjectSyncOperation(
@@ -220,6 +252,24 @@ export async function acknowledgeProjectSave(
   await tx.done
 }
 
+/** Removes durable project content while leaving an offline delete queued. */
+export async function deleteProjectSnapshot(
+  projectId: string,
+  scope = getStorageScope(),
+): Promise<Record<string, ProjectNode> | null> {
+  const db = await getDB()
+  const id = scopedStorageKey(scope, projectId)
+  const tx = db.transaction(['projects', 'reports'], 'readwrite')
+  const projectStore = tx.objectStore('projects')
+  const project = await projectStore.get(id)
+  const reports = await tx.objectStore('reports').index('by-owner-project')
+    .getAll([scope, projectId])
+  await Promise.all(reports.map(report => tx.objectStore('reports').delete(report.id)))
+  await projectStore.delete(id)
+  await tx.done
+  return project?.nodes ?? null
+}
+
 export async function finalizeProjectDelete(
   projectId: string,
   generation: number,
@@ -227,7 +277,10 @@ export async function finalizeProjectDelete(
 ): Promise<Record<string, ProjectNode> | null> {
   const db = await getDB()
   const id = scopedStorageKey(scope, projectId)
-  const tx = db.transaction(['projects', 'reports', 'projectSync'], 'readwrite')
+  const tx = db.transaction(
+    ['projects', 'reports', 'projectSync'],
+    'readwrite',
+  )
   const syncStore = tx.objectStore('projectSync')
   const current = await syncStore.get(id)
   if (

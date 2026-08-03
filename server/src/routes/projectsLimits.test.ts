@@ -131,21 +131,19 @@ describe('Projects API limits', () => {
       .expect(409)
   })
 
-  it('allows Google users to restore projects beyond the former capacity', async () => {
+  it('rejects restore routes because deletion is permanent', async () => {
     const { app, mockUser } = getProjectRoutesTestContext()
     const userId = new Types.ObjectId(mockUser.userId)
     await createGoogleUser(userId, mockUser.email)
-    await createTestProjects(userId, LIMITS.google.maxProjects)
-    const deleted = await createTestProject({
+    const project = await createTestProject({
       userId,
-      name: 'Deleted legacy project',
-      deleted: true,
+      name: 'Active project',
     })
 
     await request(app)
-      .post(`/api/projects/${deleted._id.toString()}/restore`)
-      .send({ expectedRevision: deleted.revision })
-      .expect(200)
+      .post(`/api/projects/${project._id.toString()}/restore`)
+      .send({ expectedRevision: project.revision })
+      .expect(404)
   })
 })
 

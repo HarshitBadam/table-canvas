@@ -10,6 +10,7 @@ export type ProjectActionErrorCode =
   | 'limit'
   | 'network'
   | 'not-found'
+  | 'open-elsewhere'
   | 'persistence'
   | 'validation'
 

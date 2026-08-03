@@ -123,8 +123,8 @@ describe('ProjectSwitcher project actions', () => {
     openProjectActions()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
 
-    expect(screen.getByRole('heading', { name: 'Delete “Quarterly plan”?' })).toBeVisible()
-    expect(screen.getByText(/permanently removes the project and its reports/i)).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Delete “Quarterly plan”?' })).toBeVisible()
+    expect(screen.getByText(/permanently deletes the project and its reports/i)).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Delete project' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Delete failed')
 
@@ -133,13 +133,15 @@ describe('ProjectSwitcher project actions', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('disables deletion for the last project', () => {
+  it('allows deleting the last project into an empty workspace', async () => {
     renderSwitcher({
       projects: [
         { id: 'project-1', name: 'Quarterly plan', createdAt: new Date(), updatedAt: new Date() },
       ],
     })
     openProjectActions()
-    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
+    expect(await screen.findByRole('heading', { name: 'Delete “Quarterly plan”?' })).toBeVisible()
   })
 })

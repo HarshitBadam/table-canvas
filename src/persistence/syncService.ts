@@ -9,7 +9,7 @@ export {
   saveProjectWithSync,
   setProjectMergeHandler,
   setProjectSyncErrorHandler,
-  syncLocalProjectsToBackend,
+  syncOfflineAccountProjects,
 } from './projectSync'
 export type { ProjectMergeEvent } from './projectSync'
 export {

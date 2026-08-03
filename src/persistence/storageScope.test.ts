@@ -59,30 +59,41 @@ describe('storage ownership scopes', () => {
     db.setStorageScope(db.accountStorageScope('signed-user'))
     expect(await db.loadProject('legacy-project')).toBeNull()
 
-    db.setStorageScope(db.GUEST_STORAGE_SCOPE)
+    db.setStorageScope('guest:isolated-tab')
     expect(await db.loadProject('legacy-project')).toBeNull()
   })
 
-  it('re-keys reports when a guest project is promoted', async () => {
+  it('re-keys reports when an offline account project is promoted', async () => {
     const db = await getDB()
     const account = db.accountStorageScope('promoted-user')
-    db.setStorageScope(db.GUEST_STORAGE_SCOPE)
+    db.setStorageScope(account)
     await db.saveReport({
-      ...createMockReport('report-1', 'Guest report'),
+      ...createMockReport('report-1', 'Offline report'),
       projectId: 'local-project',
     })
 
     await db.copyReportsToProject(
       'local-project',
       'server-project',
-      db.GUEST_STORAGE_SCOPE,
+      account,
       account,
     )
-    await db.deleteReportsForProject('local-project', db.GUEST_STORAGE_SCOPE)
+    await db.deleteReportsForProject('local-project', account)
 
     expect(await db.loadReportsForProject('local-project')).toEqual({})
-    db.setStorageScope(account)
     expect((await db.loadReportsForProject('server-project'))['report-1']?.name)
-      .toBe('Guest report')
+      .toBe('Offline report')
+  })
+
+  it('keeps guest scopes isolated from each other', async () => {
+    const db = await getDB()
+    db.setStorageScope('guest:tab-a')
+    await db.saveProject('same-project', 'Guest A', {}, {}, {})
+    db.setStorageScope('guest:tab-b')
+    await db.saveProject('same-project', 'Guest B', {}, {}, {})
+
+    expect((await db.loadProject('same-project'))?.name).toBe('Guest B')
+    db.setStorageScope('guest:tab-a')
+    expect((await db.loadProject('same-project'))?.name).toBe('Guest A')
   })
 })

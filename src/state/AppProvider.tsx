@@ -5,7 +5,7 @@ import {
   fetchProjects,
   flushAllProjectSavesWithSync,
   setProjectSyncErrorHandler,
-  syncLocalProjectsToBackend,
+  syncOfflineAccountProjects,
 } from '@/persistence/syncService'
 import { getDependentNodeIds } from '@/engine/workflowGraph'
 import { dropEngineTables } from '@/engine/engineTableCleanup'
@@ -32,6 +32,32 @@ import { useProjectAutosave } from './useProjectAutosave'
 import { useBackgroundTableRefresh } from './useBackgroundTableRefresh'
 import { getStorageScope } from '@/persistence/storageScope'
 import { clearWorkspaceViews } from '@/layout/workspaceViewPersistence'
+import {
+  bindProjectCatalog,
+  publishCatalogChanged,
+  subscribeProjectCatalog,
+  type ProjectCatalogEvent,
+} from '@/persistence/projectCatalog'
+
+const LOCAL_EXIT_TIMEOUT_MS = 3_000
+
+async function within<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('Local save timed out.')),
+          milliseconds,
+        )
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 const PHASE_MESSAGES: Record<AppPhase, string> = {
   idle: 'Starting...',
   initializing_engine: 'Starting data engine...',
@@ -89,14 +115,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
   const prepareProject = useCallback(prepareProjectState, [])
-  const resetWorkspace = useCallback(async () => {
+  const clearActiveWorkspace = useCallback(async () => {
     await clearProjectRuntime(useProjectStore.getState().nodes)
-    setState(previous => ({
-      ...previous,
-      projectId: null,
-      projectName: 'Untitled Project',
-      projects: [],
-    }))
     useProjectStore.setState({
       projectId: '',
       projectName: 'Untitled Project',
@@ -108,15 +128,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     useDataStore.setState({ tableData: {} })
     useReportStore.getState().reset()
   }, [])
+  const resetWorkspace = useCallback(async () => {
+    await clearActiveWorkspace()
+    setState(previous => ({
+      ...previous,
+      projectId: null,
+      projectName: 'Untitled Project',
+      projects: [],
+    }))
+  }, [clearActiveWorkspace])
   const documentIdentity = useDocumentSession({
     projectId: state.projectId,
     authToken: `${user?.id ?? 'none'}:${user?.tier ?? 'none'}`,
   })
-  // Handover only needs local durability. Waiting on remote sync used to refuse
-  // editing whenever the network hiccuped, even though IndexedDB was fine.
   useDocumentCoordination({
     identity: state.phase === 'ready' ? documentIdentity : null,
-    flush: flushLocalProjectSave,
   })
   usePersistenceLifecycle({
     user,
@@ -137,6 +163,67 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
     return () => setProjectSyncErrorHandler?.(null)
   }, [])
+
+  useEffect(() => {
+    if (!state.isAuthenticated || state.phase !== 'ready') return
+    const scope = getStorageScope()
+    const stopBinding = bindProjectCatalog(scope)
+    let stopped = false
+    let generation = 0
+
+    const reconcileCatalog = async (_event?: ProjectCatalogEvent) => {
+      const requestGeneration = ++generation
+      try {
+        const projects = await fetchProjects()
+        if (stopped || requestGeneration !== generation) return
+        const activeProjectId = useProjectStore.getState().projectId
+        if (
+          activeProjectId
+          && !projects.some(project => project.id === activeProjectId)
+        ) {
+          setState(previous => ({
+            ...previous,
+            projectId: null,
+            projects,
+            isProjectOperationPending: true,
+          }))
+          await clearActiveWorkspace()
+          if (stopped || requestGeneration !== generation) return
+          setState(previous => ({
+            ...previous,
+            projectId: null,
+            projects,
+            isProjectOperationPending: false,
+          }))
+          return
+        }
+        setState(previous => ({ ...previous, projects }))
+      } catch (error) {
+        console.error('[AppContext] Failed to reconcile the project catalog:', error)
+      }
+    }
+
+    const unsubscribe = subscribeProjectCatalog(event => {
+      void reconcileCatalog(event)
+    })
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void reconcileCatalog()
+    }
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      stopped = true
+      generation += 1
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      unsubscribe()
+      stopBinding()
+    }
+  }, [
+    clearActiveWorkspace,
+    state.isAuthenticated,
+    state.phase,
+    user?.id,
+  ])
+
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
@@ -164,7 +251,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }))
         if (authResult.user.tier !== 'guest') {
           try {
-            await syncLocalProjectsToBackend()
+            await syncOfflineAccountProjects()
             await flushAllProjectSavesWithSync()
           } catch (error) {
             console.error('[AppContext] Startup project sync failed:', error)
@@ -179,19 +266,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const { project, projectList } = await loadOrCreateProject(
           requestedDocumentProjectId(),
         )
-        await prepareProject(project)
+        if (project) await prepareProject(project)
         setState(previous => ({
           ...previous,
-          projectId: project.id,
-          projectName: project.name,
-          projects: projectList.length > 0
-            ? projectList
-            : [{
-                id: project.id,
-                name: project.name,
-                updatedAt: new Date(),
-                createdAt: new Date(),
-              }],
+          projectId: project?.id ?? null,
+          projectName: project?.name ?? 'Untitled Project',
+          projects: projectList,
         }))
         setPhase('ready')
       } catch (error) {
@@ -207,7 +287,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     clearWorkspaceViews(getStorageScope())
     if (tier !== 'guest') {
       try {
-        await syncLocalProjectsToBackend()
+        await syncOfflineAccountProjects()
         await flushAllProjectSavesWithSync()
       } catch (error) {
         console.error('[AppContext] Post-login project sync failed:', error)
@@ -218,22 +298,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     const { project, projectList } = await loadOrCreateProject()
-    await prepareProject(project)
+    if (project) {
+      await prepareProject(project)
+    } else {
+      await clearActiveWorkspace()
+    }
     setState(previous => ({
       ...previous,
-      projectId: project.id,
-      projectName: project.name,
-      projects: projectList.length > 0
-        ? projectList
-        : [{
-            id: project.id,
-            name: project.name,
-            updatedAt: new Date(),
-            createdAt: new Date(),
-          }],
+      projectId: project?.id ?? null,
+      projectName: project?.name ?? 'Untitled Project',
+      projects: projectList,
     }))
     setPhase('ready')
-  }, [prepareProject, setPhase])
+  }, [clearActiveWorkspace, prepareProject, setPhase])
 
   const login = useCallback(async (credentials: LoginCredentials) => {
     const loggedInUser = await performLogin(credentials)
@@ -246,45 +323,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [performGoogleLogin, postLoginSetup])
 
   const continueAsGuest = useCallback(async () => {
-    const guest = setGuestAuth()
+    const guest = await setGuestAuth()
     await postLoginSetup(guest.tier)
   }, [postLoginSetup, setGuestAuth])
 
   const leaveGuest = useCallback(async () => {
     if (user?.tier !== 'guest') return
     try {
-      await flushProjectSave()
-      await useReportStore.getState().flushSaves()
+      await within(Promise.all([
+        flushLocalProjectSave(),
+        useReportStore.getState().flushSaves(),
+      ]), LOCAL_EXIT_TIMEOUT_MS)
+    } catch (error) {
+      console.warn('[AppContext] Guest workspace save did not finish before exit:', error)
+    } finally {
       clearWorkspaceViews(getStorageScope())
       clearGuestAuth()
       await resetWorkspace()
-    } catch (error) {
-      setState(previous => ({
-        ...previous,
-        syncError: error instanceof Error
-          ? `Could not safely close the guest workspace: ${error.message}`
-          : 'Could not safely close the guest workspace.',
-      }))
-      throw error
     }
-  }, [clearGuestAuth, flushProjectSave, resetWorkspace, user?.tier])
+  }, [clearGuestAuth, flushLocalProjectSave, resetWorkspace, user?.tier])
 
   const logout = useCallback(async () => {
     try {
-      await flushProjectSave()
-      await useReportStore.getState().flushSaves()
-      clearWorkspaceViews(getStorageScope())
-      await performLogout()
-      await resetWorkspace()
+      await within(Promise.all([
+        flushLocalProjectSave(),
+        useReportStore.getState().flushSaves(),
+      ]), LOCAL_EXIT_TIMEOUT_MS)
     } catch (error) {
-      setState(previous => ({
-        ...previous,
-        syncError: error instanceof Error
-          ? `Sign out failed: ${error.message}`
-          : 'Sign out failed. Try again while connected.',
-      }))
+      // Account-scoped IndexedDB and its outbox remain isolated for the next
+      // sign-in. A persistence failure must never trap the user in the session.
+      console.warn('[AppContext] Local save did not finish before sign out:', error)
     }
-  }, [flushProjectSave, performLogout, resetWorkspace])
+    clearWorkspaceViews(getStorageScope())
+    try {
+      await performLogout()
+    } catch (error) {
+      // performLogout clears local auth state in a finally block. A failed revoke
+      // can be retried only by the server and must not block local sign-out.
+      console.warn('[AppContext] Remote session revoke failed during sign out:', error)
+    } finally {
+      await resetWorkspace()
+    }
+  }, [flushLocalProjectSave, performLogout, resetWorkspace])
 
   const {
     createNewProject,
@@ -298,6 +378,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     tier: user?.tier ?? 'guest',
     flushProjectSave,
     prepareProject,
+    clearActiveWorkspace,
     setProjectLimitViolation,
   })
 
@@ -315,7 +396,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           : project
       )),
     }))
-  }, [state.projectId])
+    void flushLocalProjectSave()
+      .then(() => publishCatalogChanged())
+      .catch(error => {
+        console.error('[AppContext] Failed to persist project rename:', error)
+      })
+  }, [flushLocalProjectSave, state.projectId])
 
   const refreshProjects = useCallback(async () => {
     try {

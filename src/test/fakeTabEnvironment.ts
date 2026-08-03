@@ -26,7 +26,11 @@ export class FakeLockManager {
 
   request(
     name: string,
-    options: { mode?: LockMode; signal?: AbortSignal | null },
+    options: {
+      mode?: LockMode
+      ifAvailable?: boolean
+      signal?: AbortSignal | null
+    },
     callback: (lock: FakeLock | null) => Promise<unknown>,
   ): Promise<unknown> {
     return new Promise((resolve, reject) => {
@@ -45,6 +49,11 @@ export class FakeLockManager {
         return
       }
 
+      if (options.ifAvailable) {
+        void Promise.resolve(callback(null)).then(resolve, reject)
+        return
+      }
+
       const queued: QueuedRequest = { grant: run, reject }
       const queue = this.queues.get(name) ?? []
       queue.push(queued)
@@ -60,7 +69,7 @@ export class FakeLockManager {
     })
   }
 
-  /** True while some tab holds the lock, for assertions about handover. */
+  /** True while some tab holds the lock. */
   isHeld(name: string): boolean {
     return this.held.has(name)
   }

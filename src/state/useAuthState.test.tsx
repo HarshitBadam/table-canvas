@@ -15,14 +15,29 @@ vi.mock('@/api/client', () => ({
   setAuthErrorHandler: vi.fn(),
 }))
 
+function stubWebStorage() {
+  const values = new Map<string, string>()
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value) },
+    removeItem: (key: string) => { values.delete(key) },
+  } satisfies Partial<Storage>
+  vi.stubGlobal('sessionStorage', storage)
+  vi.stubGlobal('localStorage', {
+    getItem: () => null,
+    setItem: () => undefined,
+    removeItem: () => undefined,
+  } satisfies Partial<Storage>)
+  return values
+}
+
 describe('useAuthState guest sessions', () => {
   beforeEach(() => {
-    const values = new Map<string, string>()
-    vi.stubGlobal('localStorage', {
-      getItem: (key: string) => values.get(key) ?? null,
-      setItem: (key: string, value: string) => values.set(key, value),
-      removeItem: (key: string) => values.delete(key),
-    } satisfies Partial<Storage>)
+    stubWebStorage()
+    Object.defineProperty(navigator, 'locks', {
+      value: undefined,
+      configurable: true,
+    })
     vi.clearAllMocks()
     authApi.checkAuth.mockResolvedValue(null)
   })
@@ -34,8 +49,8 @@ describe('useAuthState guest sessions', () => {
   it('restores an explicitly started guest session after remounting', async () => {
     const firstMount = renderHook(() => useAuthState())
 
-    act(() => {
-      firstMount.result.current.continueAsGuest()
+    await act(async () => {
+      await firstMount.result.current.continueAsGuest()
     })
     firstMount.unmount()
 
@@ -49,16 +64,48 @@ describe('useAuthState guest sessions', () => {
     })
 
     expect(secondMount.result.current.isAuthenticated).toBe(true)
+    expect(globalThis.localStorage.getItem('table-canvas:guest-session')).toBeNull()
   })
 
-  it('removes the persisted guest session when leaving', () => {
+  it('keeps the guest choice in sessionStorage, not localStorage', async () => {
+    const session = stubWebStorage()
     const { result } = renderHook(() => useAuthState())
 
-    act(() => {
-      result.current.continueAsGuest()
+    await act(async () => {
+      await result.current.continueAsGuest()
+    })
+
+    expect(session.get('table-canvas:guest-session')).toBe('true')
+    expect(globalThis.localStorage.getItem('table-canvas:guest-session')).toBeNull()
+  })
+
+  it('removes the guest session when leaving', async () => {
+    const session = stubWebStorage()
+    const { result } = renderHook(() => useAuthState())
+
+    await act(async () => {
+      await result.current.continueAsGuest()
       result.current.leaveGuest()
     })
 
-    expect(globalThis.localStorage.getItem('table-canvas:guest-session')).toBeNull()
+    expect(session.get('table-canvas:guest-session')).toBeUndefined()
+  })
+
+  it('does not let an account cookie replace an active guest tab', async () => {
+    authApi.checkAuth.mockResolvedValue({
+      id: 'account-user',
+      email: 'user@example.com',
+      tier: 'google',
+    })
+    const { result } = renderHook(() => useAuthState())
+
+    await act(async () => {
+      await result.current.continueAsGuest()
+    })
+    await act(async () => {
+      const authResult = await result.current.performCheckAuth()
+      expect(authResult.user).toMatchObject({ id: 'local-user', tier: 'guest' })
+    })
+    expect(authApi.checkAuth).not.toHaveBeenCalled()
   })
 })

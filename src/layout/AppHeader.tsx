@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useProjectStore } from '@/state/projectStore'
 import { useApp, useAppAuth } from '@/state/AppContext'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { EditingElsewhereBanner } from '@/components/EditingElsewhereBanner'
 import { focusMenuItem } from '@/lib/focusMenuItem'
 import { AccountMenu } from './AccountMenu'
 import { useNavigation } from './NavigationContext'
@@ -11,6 +12,7 @@ import { ProjectSwitcher } from './ProjectSwitcher'
 import type { ChartNode, ProjectNode } from '@/types'
 import type { ViewMode } from './viewNavigation'
 import type { ProjectExportState } from './useProjectExport'
+import { GuestSignInDialog } from './ProjectDialogs'
 
 interface AppHeaderProps {
   viewMode: ViewMode
@@ -26,7 +28,8 @@ export function AppHeader({
   onOpenNavigation,
 }: AppHeaderProps) {
   const { user, leaveGuest } = useAppAuth()
-  const { isSaving } = useApp()
+  const { isSaving, projects } = useApp()
+  const [guestSignInOpen, setGuestSignInOpen] = useState(false)
   const { canEdit } = useWorkspaceLease()
   const canUndo = useProjectStore(
     state => !state.history.transaction && state.history.past.length > 0,
@@ -111,6 +114,10 @@ export function AppHeader({
   }, [handleImportClick, restoreExportTriggerFocus])
 
   const isBusy = isExporting || isImporting
+  const continueToSignIn = useCallback(() => {
+    setGuestSignInOpen(false)
+    void leaveGuest().catch(() => undefined)
+  }, [leaveGuest])
 
   return (
     <header className="safe-area-top flex min-h-16 shrink-0 items-center gap-2 border-b border-border bg-surface px-2 sm:gap-3 sm:px-3">
@@ -275,6 +282,8 @@ export function AppHeader({
         </div>
       )}
 
+      <EditingElsewhereBanner />
+
       {user?.id !== 'local-user' && (
         <>
           <div
@@ -293,8 +302,8 @@ export function AppHeader({
           <button
             type="button"
             onClick={() => {
-              void leaveGuest()
-                .catch(() => undefined)
+              if (projects.length > 0) setGuestSignInOpen(true)
+              else continueToSignIn()
             }}
             className="flex h-12 min-w-11 shrink-0 items-center gap-2.5 rounded-md px-1.5 transition-colors hover:bg-surface-secondary md:px-2"
             aria-label="Sign in to sync"
@@ -313,6 +322,11 @@ export function AppHeader({
               <span className="block text-sm font-semibold text-accent-text">Sign in to sync</span>
             </span>
           </button>
+          <GuestSignInDialog
+            open={guestSignInOpen}
+            onOpenChange={setGuestSignInOpen}
+            onContinue={continueToSignIn}
+          />
         </>
       )}
     </header>

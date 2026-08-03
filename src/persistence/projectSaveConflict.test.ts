@@ -228,6 +228,30 @@ describe('save conflicts resolved by merging', () => {
   })
 })
 
+describe('saves against a project deleted elsewhere', () => {
+  it('preserves a conflict copy and clears the phantom original on a 404', async () => {
+    const local = snapshot({ node_1: node('node_1') })
+    const { db, scope, syncBase, sync, ApiError } = await queueSave(
+      'deleted-elsewhere-user',
+      local,
+      4,
+      snapshot({}),
+    )
+    api.updateProject.mockRejectedValue(new ApiError('Project not found', 404))
+
+    await expect(sync.flushProjectSaveWithSync('project-1', scope))
+      .rejects.toMatchObject({ statusCode: 404 })
+
+    expect(api.updateProject).toHaveBeenCalledTimes(1)
+    expect(await conflictCopyName(db, scope)).toBe('Quarterly (conflict copy)')
+    expect(await db.getProjectSyncOperation('project-1', scope)).toBeNull()
+    expect(await db.loadProject('project-1', scope)).toBeNull()
+    expect(await syncBase.getProjectSyncBase('project-1', scope)).toBeNull()
+    const remaining = await db.listProjects(scope)
+    expect(remaining.some(project => project.id === 'project-1')).toBe(false)
+  })
+})
+
 describe('rate limited saves', () => {
   it('waits for the advertised delay and retries the same payload', async () => {
     const local = snapshot({ node_1: node('node_1') })

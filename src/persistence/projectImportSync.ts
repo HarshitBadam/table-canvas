@@ -42,7 +42,7 @@ export async function importProjectWithSync(
   await replaceReportsForProject(result.id, reports, scope)
   if (isNetworkOnline() && isCloudStorageScope()) {
     try {
-      const promotion = await promoteLocalProject(result.id, scope, scope)
+      const promotion = await promoteLocalProject(result.id, scope)
       if (promotion) {
         const promoted = await loadProjectLocal(
           promotion.destinationProjectId,

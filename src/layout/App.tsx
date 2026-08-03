@@ -17,9 +17,10 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { StorageWarningBanner } from '@/persistence/StorageWarningBanner'
-import { EditingElsewhereBanner } from '@/components/EditingElsewhereBanner'
 import { MergeNoticeBanner } from '@/components/MergeNoticeBanner'
 import { NodeDeletionProvider } from '@/components/NodeDeletionAlertDialog'
+import { EmptyWorkspace } from './EmptyWorkspace'
+import { useDocumentTitle } from './useDocumentTitle'
 
 const GridView = lazy(() => import('@/grid/GridView').then(m => ({ default: m.GridView })))
 const ChartView = lazy(() => import('@/charts/ChartView').then(m => ({ default: m.ChartView })))
@@ -73,7 +74,13 @@ export default function App() {
 }
 
 function MainApp() {
-  const { projectLimitViolation, setProjectLimitViolation, syncError } = useApp()
+  const {
+    projectId,
+    projectName,
+    projectLimitViolation,
+    setProjectLimitViolation,
+    syncError,
+  } = useApp()
   const { activeView, setActiveView } = useWorkspaceViewPersistence()
   const [navigationOpen, setNavigationOpen] = useState(false)
 
@@ -90,6 +97,13 @@ function MainApp() {
   const reportId = selectedReportId || Object.keys(reports)[0] || null
 
   useHistoryShortcuts(activeView)
+
+  useDocumentTitle({
+    projectName: projectId ? projectName : null,
+    viewMode: activeView,
+    nodeName: selectedNode?.name ?? null,
+    reportName: reportId ? reports[reportId]?.name ?? null : null,
+  })
 
   useEffect(() => {
     setNavigationOpen(false)
@@ -148,7 +162,6 @@ function MainApp() {
     <NavigationProvider value={navigationValue}>
       <NodeDeletionProvider>
         <StorageWarningBanner />
-        <EditingElsewhereBanner />
         <MergeNoticeBanner />
         {syncError && (
           <div
@@ -181,7 +194,7 @@ function MainApp() {
             />
 
           <div className="min-h-0 flex-1 overflow-hidden">
-            <Suspense fallback={
+            {!projectId ? <EmptyWorkspace /> : <Suspense fallback={
               <div className="flex h-full items-center justify-center" role="status" aria-label="Loading view">
                 <LoadingSpinner />
               </div>
@@ -211,14 +224,16 @@ function MainApp() {
                   <ReportView reportId={reportId} onOpenTable={handleOpenTable} />
                 </ErrorBoundary>
               )}
-            </Suspense>
+            </Suspense>}
           </div>
-          <MobileBottomNav
-            viewMode={activeView}
-            onOpenCanvas={handleBackToCanvas}
-            onOpenDashboard={handleOpenDashboard}
-            onOpenReport={handleOpenReport}
-          />
+          {projectId && (
+            <MobileBottomNav
+              viewMode={activeView}
+              onOpenCanvas={handleBackToCanvas}
+              onOpenDashboard={handleOpenDashboard}
+              onOpenReport={handleOpenReport}
+            />
+          )}
           </main>
         </div>
 

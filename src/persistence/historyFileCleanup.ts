@@ -3,7 +3,7 @@ import { listProjects, loadProject } from './db'
 import { deleteFileWithSync } from './fileSync'
 import {
   getStorageScope,
-  GUEST_STORAGE_SCOPE,
+  isGuestStorageScope,
 } from './storageScope'
 import { isNetworkOnline } from './syncState'
 
@@ -37,7 +37,7 @@ export async function flushHistoryFileCleanup(
   if (scope !== getStorageScope()) return
   const candidates = candidatesByScope.get(scope)
   if (!candidates?.size) return
-  if (scope !== GUEST_STORAGE_SCOPE && !isNetworkOnline()) return
+  if (!isGuestStorageScope(scope) && !isNetworkOnline()) return
 
   const retained = new Set([
     ...fileRefsInNodes(liveNodes),
@@ -46,7 +46,7 @@ export async function flushHistoryFileCleanup(
   for (const fileId of [...candidates]) {
     if (retained.has(fileId)) continue
     if (
-      scope === GUEST_STORAGE_SCOPE
+      isGuestStorageScope(scope)
       && await isReferencedByLocalProject(fileId, scope)
     ) {
       candidates.delete(fileId)
@@ -55,7 +55,7 @@ export async function flushHistoryFileCleanup(
     try {
       await deleteFileWithSync(
         fileId,
-        scope === GUEST_STORAGE_SCOPE ? undefined : { strictRemote: true },
+        isGuestStorageScope(scope) ? undefined : { strictRemote: true },
       )
       candidates.delete(fileId)
     } catch (error) {

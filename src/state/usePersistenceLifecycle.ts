@@ -3,7 +3,7 @@ import {
   fetchProjects,
   flushAllProjectSavesWithSync,
   loadProjectWithSync,
-  syncLocalProjectsToBackend,
+  syncOfflineAccountProjects,
 } from '@/persistence/syncService'
 import { useReportStore } from '@/report/reportStore'
 import type { User } from '@/api/auth.api'
@@ -68,7 +68,7 @@ export async function synchronizeAfterReconnect({
     await saveLatestProject()
     await useReportStore.getState().flushSaves()
     const activeId = useProjectStore.getState().projectId
-    const promotions = await syncLocalProjectsToBackend()
+    const promotions = await syncOfflineAccountProjects()
     const conflicts = await flushAllProjectSavesWithSync()
     const activePromotion = promotions.find(
       promotion => promotion.sourceProjectId === activeId,

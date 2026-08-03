@@ -104,7 +104,7 @@ export function DeleteProjectDialog({
             Delete “{projectName}”?
           </Dialog.Title>
           <Dialog.Description className="mt-2 text-sm text-text-secondary">
-            This permanently removes the project and its reports from this device and your synced account. Shared source files are kept for other projects.
+            This permanently deletes the project and its reports. This action cannot be undone. Shared source files are kept for other projects.
           </Dialog.Description>
           {error && (
             <div className="mt-3 rounded-lg border border-error/20 bg-error/5 p-3" role="alert">
@@ -126,6 +126,73 @@ export function DeleteProjectDialog({
               className="btn btn-danger"
             >
               {isDeleting ? 'Deleting…' : error ? 'Try again' : 'Delete project'}
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  )
+}
+
+interface ProjectOpenElsewhereDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+export function ProjectOpenElsewhereDialog({
+  open,
+  onOpenChange,
+}: ProjectOpenElsewhereDialogProps) {
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/40 motion-safe:animate-fade-in" />
+        <Dialog.Content className="fixed inset-0 z-modal m-auto h-fit w-[min(26rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-5 shadow-2xl motion-safe:animate-scale-in">
+          <Dialog.Title className="text-base font-semibold text-text-primary">
+            Project is open elsewhere
+          </Dialog.Title>
+          <Dialog.Description className="mt-2 text-sm text-text-secondary">
+            This project is open in another tab and can’t be deleted right now.
+          </Dialog.Description>
+          <div className="mt-5 flex justify-end">
+            <Dialog.Close asChild>
+              <button type="button" className="btn btn-primary">OK</button>
+            </Dialog.Close>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  )
+}
+
+interface GuestSignInDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onContinue: () => void
+}
+
+export function GuestSignInDialog({
+  open,
+  onOpenChange,
+  onContinue,
+}: GuestSignInDialogProps) {
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-modal-backdrop bg-black/40 motion-safe:animate-fade-in" />
+        <Dialog.Content className="fixed inset-0 z-modal m-auto h-fit w-[min(26rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-5 shadow-2xl motion-safe:animate-scale-in">
+          <Dialog.Title className="text-base font-semibold text-text-primary">
+            Sign in without guest projects?
+          </Dialog.Title>
+          <Dialog.Description className="mt-2 text-sm text-text-secondary">
+            Guest projects will not carry into your account. Export anything you want to keep, then import it after signing in.
+          </Dialog.Description>
+          <div className="mt-5 flex justify-end gap-2">
+            <Dialog.Close asChild>
+              <button type="button" className="btn btn-ghost">Cancel</button>
+            </Dialog.Close>
+            <button type="button" onClick={onContinue} className="btn btn-danger">
+              Continue to sign in
             </button>
           </div>
         </Dialog.Content>

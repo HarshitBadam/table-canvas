@@ -8,7 +8,7 @@ import {
 import { isRetryableRemoteDeferral } from '@/persistence/projectSync'
 import { useReportStore } from '@/report/reportStore'
 import { holdsWriteLease } from './documentLease'
-import { publishDocumentSnapshot } from './documentMirror'
+import { publishDocumentInvalidation } from './documentMirror'
 import { useProjectStore } from './projectStore'
 import {
   hasPendingImportedTables,
@@ -50,7 +50,7 @@ interface AutosaveOptions {
 export interface ProjectAutosave {
   /** Writes the document to IndexedDB (and enqueues remote sync) then mirrors it. */
   saveLatestProject: () => Promise<void>
-  /** Local durability only — used for import completion and tab handover. */
+  /** Local durability only — used for import completion and bounded session exit. */
   flushLocalProjectSave: () => Promise<void>
   /** Saves completed imports while omitting any other imports that are still pending. */
   flushImportProjectSave: () => Promise<void>
@@ -135,7 +135,7 @@ export function useProjectAutosave({
           )
           // Only once it is durable, so a failed write retries without waiting.
           savedTopology.current = topology
-          publishDocumentSnapshot()
+          publishDocumentInvalidation()
         } while (savePending.current)
       } finally {
         if (!debounceTimer.current) markSaving(false)

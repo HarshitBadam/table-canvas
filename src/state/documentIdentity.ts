@@ -33,11 +33,6 @@ export function documentMirrorChannel(key: string): string {
   return `table-canvas:doc-mirror:${key}`
 }
 
-/** Separate from the mirror channel: a tab must not hear its own mirror publishes. */
-export function documentLeaseChannel(key: string): string {
-  return `table-canvas:doc-lease:${key}`
-}
-
 export function documentProjectPath(projectId: string): string {
   return `${PROJECT_PATH_PREFIX}${encodeURIComponent(projectId)}`
 }

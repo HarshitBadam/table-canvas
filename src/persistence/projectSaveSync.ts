@@ -7,13 +7,14 @@ import { isNetworkOnline } from './syncState'
 import { withoutRuntimeNodeState } from '@/state/transientProjectState'
 import {
   getStorageScope,
-  GUEST_STORAGE_SCOPE,
+  isGuestStorageScope,
   scopedStorageKey,
 } from './storageScope'
 import type { Report } from '@/report/types'
 import {
   acknowledgeProjectSave,
   clearProjectSyncOperation,
+  deleteProjectSnapshot,
   finalizeProjectDelete,
   getProjectSyncOperation,
   listProjectSyncOperations,
@@ -34,6 +35,7 @@ import {
 import { deleteUnreferencedLocalFiles } from './fileGarbageCollection'
 import { loadReportsForProject } from './reportStorage'
 import { flushHistoryFileCleanup } from './historyFileCleanup'
+import { publishProjectDeleted } from './projectCatalog'
 
 export {
   reportProjectSyncError,
@@ -94,6 +96,17 @@ async function flushQueuedSave(
       if (!recovery) {
         if (error instanceof ApiError && error.statusCode === 409) {
           await preserveConflictCopy(projectId, payload, scope)
+        } else if (error instanceof ApiError && error.statusCode === 404) {
+          // The project was permanently deleted elsewhere. Preserve the queued
+          // edits as a conflict copy, then reconcile the now-phantom original so
+          // it stops lingering in the local project list.
+          await preserveConflictCopy(projectId, payload, scope)
+          await deleteProjectSnapshot(projectId, scope)
+          await dropProjectSyncBase(projectId, scope)
+          publishProjectDeleted(projectId, scope)
+          reportProjectSyncError(
+            'This project was deleted elsewhere. Your unsynced work was preserved as a conflict copy.',
+          )
         }
         throw error
       }
@@ -119,6 +132,7 @@ async function flushQueuedDelete(
     scope,
   )
   if (!deletedNodes) return
+  publishProjectDeleted(projectId, scope)
   await dropProjectSyncBase(projectId, scope)
   await deleteUnreferencedLocalFiles(deletedNodes, scope)
 }
@@ -149,7 +163,7 @@ export async function flushProjectSaveWithSync(
   saveTimeouts.delete(key)
   if (
     !isNetworkOnline()
-    || scope === GUEST_STORAGE_SCOPE
+    || isGuestStorageScope(scope)
     || scope !== getStorageScope()
     || projectId.startsWith('local_')
   ) return
@@ -175,7 +189,7 @@ export async function saveProjectWithSync(
 ): Promise<void> {
   const scope = getStorageScope()
   const persistedNodes = withoutRuntimeNodeState(nodes)
-  if (scope === GUEST_STORAGE_SCOPE || projectId.startsWith('local_')) {
+  if (isGuestStorageScope(scope) || projectId.startsWith('local_')) {
     await saveProjectLocal(projectId, name, persistedNodes, edges, patches, undefined, scope)
     await flushHistoryFileCleanup(persistedNodes, scope)
     return

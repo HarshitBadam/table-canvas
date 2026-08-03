@@ -1,40 +1,20 @@
 import { act, renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { LeaseState } from './documentLease'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const lease = vi.hoisted(() => {
-  const listeners = new Set<() => void>()
-  return {
-    state: {
-      role: 'owner',
-      requesting: false,
-      refused: false,
-      unreachable: false,
-    } as LeaseState,
-    listeners,
-    set(next: Partial<LeaseState>) {
-      lease.state = { ...lease.state, ...next }
-      for (const listener of listeners) listener()
-    },
-    requestWriteLease: vi.fn(),
-    startDocumentLease: vi.fn(() => () => {}),
-    holdsWriteLease: vi.fn(() => true),
-  }
-})
+const coordination = vi.hoisted(() => ({
+  startDocumentLease: vi.fn(() => () => {}),
+  startDocumentMirror: vi.fn(() => () => {}),
+  stopLease: vi.fn(),
+  stopMirror: vi.fn(),
+}))
 
 vi.mock('./documentLease', () => ({
-  getLeaseState: () => lease.state,
-  holdsWriteLease: lease.holdsWriteLease,
-  requestWriteLease: lease.requestWriteLease,
-  startDocumentLease: lease.startDocumentLease,
-  subscribeLease: (listener: () => void) => {
-    lease.listeners.add(listener)
-    return () => lease.listeners.delete(listener)
-  },
+  holdsWriteLease: vi.fn(() => true),
+  startDocumentLease: coordination.startDocumentLease,
 }))
 vi.mock('./documentMirror', () => ({
   applyDocumentSnapshot: vi.fn(),
-  startDocumentMirror: vi.fn(() => () => {}),
+  startDocumentMirror: coordination.startDocumentMirror,
 }))
 vi.mock('./transientProjectState', () => ({ setDocumentWriteGuard: vi.fn() }))
 vi.mock('@/persistence/db', () => ({ loadProject: vi.fn().mockResolvedValue(null) }))
@@ -42,103 +22,53 @@ vi.mock('@/persistence/patchSerialization', () => ({ deserializePatches: vi.fn((
 vi.mock('@/persistence/reportStorage', () => ({
   loadReportsForProject: vi.fn().mockResolvedValue({}),
 }))
-vi.mock('@/report/reportStore', () => ({
-  useReportStore: { getState: () => ({ flushSaves: vi.fn() }) },
-}))
 
 import { useDocumentCoordination } from './useDocumentCoordination'
 
-const IDENTITY = { scope: 'guest', projectId: 'project-1', key: 'guest\u001fproject-1' }
-
-function mount() {
-  return renderHook(() => useDocumentCoordination({
-    identity: IDENTITY,
-    flush: async () => {},
-  }))
+const IDENTITY = {
+  scope: 'guest:tab-a',
+  projectId: 'project-1',
+  key: 'guest:tab-a\u001fproject-1',
 }
 
-function focusTab(focused: boolean) {
-  vi.spyOn(document, 'hasFocus').mockReturnValue(focused)
-}
-
-async function waitForHandoverWindow() {
-  await act(async () => {
-    vi.advanceTimersByTime(1_000)
-  })
-}
-
-describe('editing follows the tab in front', () => {
+describe('explicit document coordination', () => {
   beforeEach(() => {
-    vi.useFakeTimers()
-    lease.state = {
-      role: 'owner',
-      requesting: false,
-      refused: false,
-      unreachable: false,
-    }
-    lease.listeners.clear()
-    lease.requestWriteLease.mockClear()
-    focusTab(true)
+    coordination.startDocumentLease.mockClear()
+    coordination.startDocumentMirror.mockClear()
+    coordination.stopLease.mockClear()
+    coordination.stopMirror.mockClear()
+    coordination.startDocumentLease.mockImplementation(() => coordination.stopLease)
+    coordination.startDocumentMirror.mockImplementation(() => coordination.stopMirror)
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-    vi.restoreAllMocks()
-  })
+  it('binds the durable reader and write lease to the same identity', () => {
+    const { unmount } = renderHook(() => useDocumentCoordination({
+      identity: IDENTITY,
+    }))
 
-  it('leaves editing alone while this tab already owns the document', async () => {
-    mount()
-    await waitForHandoverWindow()
-    expect(lease.requestWriteLease).not.toHaveBeenCalled()
-  })
-
-  it('asks for editing when another tab takes the document from under it', async () => {
-    mount()
-    act(() => lease.set({ role: 'mirror' }))
-    await waitForHandoverWindow()
-    expect(lease.requestWriteLease).toHaveBeenCalledTimes(1)
-  })
-
-  it('leaves editing where it is while this tab is in the background', async () => {
-    focusTab(false)
-    mount()
-    act(() => lease.set({ role: 'mirror' }))
-    await waitForHandoverWindow()
-    expect(lease.requestWriteLease).not.toHaveBeenCalled()
-  })
-
-  it('waits for the reader once the other tab has refused to hand over', async () => {
-    mount()
-    act(() => lease.set({ role: 'mirror', refused: true }))
-    await waitForHandoverWindow()
-    expect(lease.requestWriteLease).not.toHaveBeenCalled()
-  })
-
-  it('waits for the reader once the other tab is unreachable', async () => {
-    mount()
-    act(() => lease.set({ role: 'mirror', unreachable: true }))
-    await waitForHandoverWindow()
-    expect(lease.requestWriteLease).not.toHaveBeenCalled()
-  })
-
-  it('asks once when focus returns to a tab that is only mirroring', async () => {
-    lease.state = {
-      role: 'mirror',
-      requesting: false,
-      refused: false,
-      unreachable: false,
-    }
-    mount()
-    act(() => window.dispatchEvent(new Event('focus')))
-    await waitForHandoverWindow()
-    expect(lease.requestWriteLease).toHaveBeenCalledTimes(1)
-  })
-
-  it('stops asking after the hook is torn down', async () => {
-    const { unmount } = mount()
+    expect(coordination.startDocumentMirror).toHaveBeenCalledWith(IDENTITY)
+    expect(coordination.startDocumentLease).toHaveBeenCalledWith(
+      expect.objectContaining({ key: IDENTITY.key }),
+    )
+    const leaseOptions = coordination.startDocumentLease.mock.calls.at(0)?.at(0) as {
+      flush?: unknown
+    } | undefined
+    expect(leaseOptions).not.toHaveProperty('flush')
     unmount()
-    act(() => lease.set({ role: 'mirror' }))
-    await waitForHandoverWindow()
-    expect(lease.requestWriteLease).not.toHaveBeenCalled()
+    expect(coordination.stopMirror).toHaveBeenCalledOnce()
+    expect(coordination.stopLease).toHaveBeenCalledOnce()
+  })
+
+  it('never treats focus or visibility as editing intent', () => {
+    renderHook(() => useDocumentCoordination({
+      identity: IDENTITY,
+    }))
+
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+
+    expect(coordination.startDocumentLease).toHaveBeenCalledTimes(1)
   })
 })

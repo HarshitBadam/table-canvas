@@ -10,7 +10,8 @@ import {
 import { setAuthErrorHandler, API_BASE_URL } from '@/api/client'
 import {
   accountStorageScope,
-  GUEST_STORAGE_SCOPE,
+  claimGuestStorageScope,
+  releaseGuestStorageScopeClaim,
   setStorageScope,
 } from '@/persistence/storageScope'
 
@@ -26,7 +27,7 @@ const GUEST_SESSION_KEY = 'table-canvas:guest-session'
 
 function hasGuestSession(): boolean {
   try {
-    return localStorage.getItem(GUEST_SESSION_KEY) === 'true'
+    return sessionStorage.getItem(GUEST_SESSION_KEY) === 'true'
   } catch {
     return false
   }
@@ -35,9 +36,9 @@ function hasGuestSession(): boolean {
 function setGuestSession(active: boolean): void {
   try {
     if (active) {
-      localStorage.setItem(GUEST_SESSION_KEY, 'true')
+      sessionStorage.setItem(GUEST_SESSION_KEY, 'true')
     } else {
-      localStorage.removeItem(GUEST_SESSION_KEY)
+      sessionStorage.removeItem(GUEST_SESSION_KEY)
     }
   } catch {
     // Storage can be unavailable in private or restricted browser contexts.
@@ -62,6 +63,7 @@ export function useAuthState() {
   const performLogin = useCallback(async (credentials: LoginCredentials) => {
     const { user } = await apiLogin(credentials)
     setGuestSession(false)
+    releaseGuestStorageScopeClaim()
     setStorageScope(accountStorageScope(user.id))
     setUser(user)
     setIsAuthenticated(true)
@@ -71,6 +73,7 @@ export function useAuthState() {
   const performGoogleLogin = useCallback(async (credential: string) => {
     const { user } = await apiLoginWithGoogle(credential)
     setGuestSession(false)
+    releaseGuestStorageScopeClaim()
     setStorageScope(accountStorageScope(user.id))
     setUser(user)
     setIsAuthenticated(true)
@@ -78,11 +81,16 @@ export function useAuthState() {
   }, [])
 
   const performLogout = useCallback(async () => {
-    await apiLogout()
-    setGuestSession(false)
-    setStorageScope(GUEST_STORAGE_SCOPE)
-    setUser(null)
-    setIsAuthenticated(false)
+    try {
+      await apiLogout()
+    } finally {
+      // Ending the local session must not depend on network availability. The
+      // server-side refresh token will be revoked on a successful request or expire.
+      setGuestSession(false)
+      releaseGuestStorageScopeClaim()
+      setUser(null)
+      setIsAuthenticated(false)
+    }
   }, [])
 
   /**
@@ -94,11 +102,9 @@ export function useAuthState() {
     user: User | null
     shouldContinue: boolean
   }> => {
-    let authedUser = await checkAuth()
-
-    if (!authedUser && hasGuestSession()) {
-      authedUser = LOCAL_USER
-    }
+    // A guest choice belongs to this tab. Shared account cookies created by another
+    // tab must not silently replace its isolated guest workspace on reload.
+    let authedUser = hasGuestSession() ? LOCAL_USER : await checkAuth()
 
     if (!authedUser) {
       let backendReachable = false
@@ -140,19 +146,20 @@ export function useAuthState() {
       }
     }
 
-    setStorageScope(
-      authedUser.tier === 'guest'
-        ? GUEST_STORAGE_SCOPE
-        : accountStorageScope(authedUser.id),
-    )
+    if (authedUser.tier === 'guest') {
+      await claimGuestStorageScope()
+    } else {
+      releaseGuestStorageScopeClaim()
+      setStorageScope(accountStorageScope(authedUser.id))
+    }
     setUser(authedUser)
     setIsAuthenticated(true)
     return { user: authedUser, shouldContinue: true }
   }, [])
 
-  const continueAsGuest = useCallback((): User => {
+  const continueAsGuest = useCallback(async (): Promise<User> => {
     setGuestSession(true)
-    setStorageScope(GUEST_STORAGE_SCOPE)
+    await claimGuestStorageScope()
     setUser(LOCAL_USER)
     setIsAuthenticated(true)
     return LOCAL_USER
@@ -160,7 +167,7 @@ export function useAuthState() {
 
   const leaveGuest = useCallback(() => {
     setGuestSession(false)
-    setStorageScope(GUEST_STORAGE_SCOPE)
+    releaseGuestStorageScopeClaim()
     setUser(null)
     setIsAuthenticated(false)
   }, [])
