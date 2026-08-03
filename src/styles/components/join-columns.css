@@ -41,7 +41,7 @@
 
 .join-col-item.disabled {
   opacity: 0.5;
-  cursor: not-allowed;
+  cursor: pointer;
 }
 
 .join-col-item:focus-visible {
