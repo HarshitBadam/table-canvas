@@ -147,7 +147,7 @@
   background: var(--color-surface-secondary);
   border: 1px solid transparent;
   border-radius: 8px;
-  cursor: pointer;
+  cursor: default;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 

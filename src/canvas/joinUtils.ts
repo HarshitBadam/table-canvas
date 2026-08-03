@@ -2,7 +2,12 @@ import type { ColumnSchema, CellValue } from '@/types'
 
 /**
  * Computes match statistics between two data sets joined on specified key columns.
- * Returns the number of matching rows and the match rate as a percentage.
+ *
+ * `leftData`/`rightData` are typically just a preview sample (the modal fetches
+ * up to 1,000 rows per side), not the full tables, so this only estimates match
+ * quality - it never claims to describe the actual join output. Callers should
+ * present `sampleSize` alongside `rate` so the sampled nature of the number is
+ * clear, especially for tables much larger than the sample.
  */
 export function analyzeMatch(
   leftData: Record<string, CellValue>[],
@@ -11,14 +16,15 @@ export function analyzeMatch(
   rightKey: string
 ) {
   if (!leftKey || !rightKey || !leftData.length || !rightData.length) {
-    return { rows: 0, rate: 0 }
+    return { matchedRows: 0, sampleSize: 0, rate: 0 }
   }
   const leftVals = leftData.map(r => r[leftKey]).filter(v => v != null)
   const rightSet = new Set(rightData.map(r => r[rightKey]).filter(v => v != null).map(String))
-  const matches = leftVals.filter(v => rightSet.has(String(v))).length
+  const matchedRows = leftVals.filter(v => rightSet.has(String(v))).length
   return {
-    rows: matches || leftData.length,
-    rate: leftVals.length ? Math.round((matches / leftVals.length) * 100) : 0
+    matchedRows,
+    sampleSize: leftVals.length,
+    rate: leftVals.length ? Math.round((matchedRows / leftVals.length) * 100) : 0
   }
 }
 

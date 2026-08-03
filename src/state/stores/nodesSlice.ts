@@ -20,6 +20,36 @@ import { invalidateMaterializations } from '@/engine/materializationCoordinator'
 import { applyNodeUpdate, isTableRename, markRenameDependentsDirty } from './nodesRename'
 import { cancelTableOperation } from '@/state/tableOperationCoordinator'
 
+// Mirrors the canvas's collapsed node footprint (NODE_WIDTH in
+// canvas/canvasConstants.ts, collapsed height in canvas/autoLayout.ts).
+// Duplicated here rather than imported so state stores stay free of a
+// dependency on the canvas layer; keep the two in sync if either changes.
+const DERIVED_NODE_WIDTH = 340
+const DERIVED_NODE_HEIGHT = 180
+const DERIVED_NODE_GAP = 40
+
+/**
+ * Nudges a new derived table straight down, in fixed increments, until it no
+ * longer overlaps an existing node. Without this, combining the same pair of
+ * tables twice (e.g. an append, then a join, of the same two parents) placed
+ * both results at the identical averaged position, stacking the new node
+ * exactly on top of the old one - so clicking the new table actually opened
+ * whichever one rendered on top instead.
+ */
+function findFreePosition(desired: Position, existingPositions: Position[]): Position {
+  const overlaps = (candidate: Position) =>
+    existingPositions.some(p =>
+      Math.abs(p.x - candidate.x) < DERIVED_NODE_WIDTH
+      && Math.abs(p.y - candidate.y) < DERIVED_NODE_HEIGHT,
+    )
+
+  let candidate = desired
+  while (overlaps(candidate)) {
+    candidate = { x: candidate.x, y: candidate.y + DERIVED_NODE_HEIGHT + DERIVED_NODE_GAP }
+  }
+  return candidate
+}
+
 export const createNodesSlice: StateCreator<
   ProjectStoreState,
   [['zustand/immer', never]],
@@ -230,12 +260,18 @@ export const createNodesSlice: StateCreator<
       ? upstreamPositions.reduce((sum, p) => sum + p.y, 0) / upstreamPositions.length
       : 100
 
+    const resolvedPosition = position
+      || findFreePosition(
+        { x: avgX, y: avgY },
+        Object.values(state.nodes).map(n => n.ui.position),
+      )
+
     const newTable: DerivedTableNode = {
       id,
       kind: 'derived_table',
       name,
       ui: {
-        position: position || { x: avgX, y: avgY },
+        position: resolvedPosition,
       },
       schema,
       plan: {

@@ -241,29 +241,62 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
 
       </div>
 
+      {/*
+        computeSmartEdges (edgeRouter.ts) picks whichever of left/right/top/bottom
+        best matches each node's relative position, independently for the source
+        end and the target end of an edge. Upstream and downstream tables can end
+        up on any side of each other depending on manual dragging or auto-layout
+        direction, so every side needs both a source and a target handle sharing
+        that side's id - otherwise a computed handle id can point at a handle of
+        the wrong type (or none at all), and React Flow silently drops the edge.
+      */}
       <Handle
         type="target"
         position={Position.Left}
         id="left"
         className="table-handle table-handle-left"
       />
-      
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="left"
+        className="table-handle table-handle-left"
+      />
+
       <Handle
         type="source"
         position={Position.Right}
         id="right"
         className="table-handle table-handle-right"
       />
-      
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="right"
+        className="table-handle table-handle-right"
+      />
+
       <Handle
         type="target"
         position={Position.Top}
         id="top"
         className="table-handle table-handle-top"
       />
-      
       <Handle
         type="source"
+        position={Position.Top}
+        id="top"
+        className="table-handle table-handle-top"
+      />
+
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="bottom"
+        className="table-handle table-handle-bottom"
+      />
+      <Handle
+        type="target"
         position={Position.Bottom}
         id="bottom"
         className="table-handle table-handle-bottom"

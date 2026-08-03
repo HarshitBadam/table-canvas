@@ -25,7 +25,7 @@
   background: var(--color-surface-secondary);
   border: 1px solid transparent;
   border-radius: 8px;
-  cursor: pointer;
+  cursor: default;
   text-align: left;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
@@ -41,7 +41,7 @@
 
 .join-col-item.disabled {
   opacity: 0.5;
-  cursor: pointer;
+  cursor: default;
 }
 
 .join-col-item:focus-visible {
