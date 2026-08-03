@@ -55,6 +55,7 @@ export async function stageImportedTable({
       throw new Error('The pending imported table no longer exists.')
     }
     useProjectStore.getState().updateNode(existingTableId, {
+      name,
       schema,
       plan: {
         fileRef,

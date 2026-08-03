@@ -21,7 +21,7 @@ import {
   isDataFile,
   reservePendingImport,
 } from '@/persistence/importLifecycle'
-import { discardFiles, getTableCount } from '@/persistence/importUtils'
+import { discardFiles, getImportProcessingOrder, getTableCount } from '@/persistence/importUtils'
 import { stageImportedTable } from '@/persistence/stageImportedTable'
 import type { ParsedTableData } from '@/engine/fileParsers'
 import { uploadFileWithSync } from '@/persistence/syncService'
@@ -36,6 +36,8 @@ type PendingImportItem =
       selected: boolean
       file: File
       tableData: ParsedTableData
+      /** Which source file this item came from; shared by every sheet of one workbook. */
+      sourceKey: string
     }
   | {
       id: string
@@ -48,6 +50,8 @@ type PendingImportItem =
       sheetName: string
       workbook: WorkBook
       buffer: ArrayBuffer
+      /** Which source file this item came from; shared by every sheet of one workbook. */
+      sourceKey: string
     }
 
 type SelectionMode = 'sheets' | 'tables'
@@ -173,6 +177,7 @@ export function ImportButton() {
 
     const items: PendingImportItem[] = []
     for (const [fileIndex, file] of files.entries()) {
+      const sourceKey = `file:${fileIndex}:${file.name}`
       const extension = fileExtension(file.name)
       if (extension === 'csv') {
         const tableData = await inspectCSVFile(file)
@@ -186,6 +191,7 @@ export function ImportButton() {
           selected: true,
           file,
           tableData,
+          sourceKey,
         })
         continue
       }
@@ -205,6 +211,7 @@ export function ImportButton() {
             sheetName: sheet.name,
             workbook,
             buffer,
+            sourceKey,
           })
         }
       }
@@ -375,6 +382,7 @@ export function ImportButton() {
               sheetName: sheet.name,
               workbook,
               buffer,
+              sourceKey: `file:0:${file.name}`,
             })),
             'sheets',
           )
@@ -395,7 +403,10 @@ export function ImportButton() {
   }
 
   const handleImportSelectedItems = async () => {
-    const selectedItems = pendingItems.filter((item) => item.selected)
+    // Import happens one item at a time below. Blocks (all sheets of one workbook, or
+    // a standalone CSV) are reordered by total size and their own items by size too,
+    // but items from different files are never interleaved with each other.
+    const selectedItems = getImportProcessingOrder(pendingItems.filter((item) => item.selected))
     if (selectedItems.length === 0) return
 
     setIsImporting(true)
@@ -466,9 +477,14 @@ export function ImportButton() {
         // Reserve before uploading. Uploading is asynchronous and, without an active
         // operation, another focused tab can legitimately take ownership in between.
         requireImportOwnership()
-        const pendingImport = reservePendingImport({
-          name: item.kind === 'csv' ? item.file.name : item.sourceFileName,
-        })
+        const pendingImport = reservePendingImport(
+          { name: item.kind === 'csv' ? item.file.name : item.sourceFileName },
+          // item.tableName is the sheet name for workbook sheets and the file's base
+          // name for CSVs — the same name that gets staged below. Passing it here
+          // keeps the placeholder node's name correct from the moment it appears on
+          // the canvas, instead of relying on staging to correct a wrong reservation.
+          { name: item.tableName },
+        )
         reservedImports.push(pendingImport)
 
         if (item.kind === 'csv') {

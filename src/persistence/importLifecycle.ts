@@ -19,8 +19,13 @@ export function isDataFile(file: File): boolean {
 
 export function reservePendingImport(
   file: Pick<File, 'name'>,
+  // For multi-file imports the reserved table's display name can differ from the
+  // source file (e.g. one workbook file yields several sheets/tables). Callers that
+  // already know the final table name should pass it explicitly instead of letting
+  // it be derived from the file name, which is only correct for a 1:1 file->table import.
+  options?: { name?: string },
 ): { tableId: string; generation: number } {
-  const name = fileBaseName(file.name)
+  const name = options?.name ?? fileBaseName(file.name)
   // Snapshot the pre-import project so undo can remove a failed/incomplete reserve.
   useProjectStore.getState().saveSnapshot(`Import table ${name}`)
   const tableId = useProjectStore.getState().addSourceTable({
