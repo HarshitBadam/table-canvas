@@ -15,7 +15,6 @@ export function useCanvasKeyboard() {
   const { requestNodeDeletion, deletionPending } = useNodeDeletion()
 
   useEffect(() => {
-    if (!canEdit) return
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target instanceof HTMLElement ? e.target : null
       const isEditing = Boolean(
@@ -24,7 +23,8 @@ export function useCanvasKeyboard() {
       const isInDialog = Boolean(target?.closest('[role="dialog"], [role="alertdialog"]'))
 
       if (
-        (e.key === 'Delete' || e.key === 'Backspace')
+        canEdit
+        && (e.key === 'Delete' || e.key === 'Backspace')
         && !isEditing
         && !isInDialog
         && !deletionPending
@@ -33,6 +33,18 @@ export function useCanvasKeyboard() {
           e.preventDefault()
           requestNodeDeletion(selectedNodeId)
         }
+      }
+
+      // The canvas has no text to select, so Cmd/Ctrl+A should not trigger the
+      // browser's native "select all", which highlights every node's text with
+      // the global ::selection color and looks like every table got selected.
+      if (
+        (e.key === 'a' || e.key === 'A')
+        && (e.metaKey || e.ctrlKey)
+        && !isEditing
+        && !isInDialog
+      ) {
+        e.preventDefault()
       }
     }
 
