@@ -40,7 +40,7 @@ export function markProjectActive(scope: string, projectId: string): void {
   }
 }
 
-export function isProjectActive(scope: string, projectId: string): boolean {
+function isProjectActive(scope: string, projectId: string): boolean {
   const storage = activityStorage()
   if (!storage) return false
   try {

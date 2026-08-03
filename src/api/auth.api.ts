@@ -33,10 +33,6 @@ export async function loginWithGoogle(credential: string): Promise<AuthResponse>
   });
 }
 
-export async function logout(): Promise<void> {
-  await api.post('/auth/logout', undefined, { skipAuth: true });
-}
-
 /**
  * Get the current authenticated user
  * Uses skipAuth to prevent automatic token refresh loop

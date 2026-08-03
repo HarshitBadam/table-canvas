@@ -4,9 +4,15 @@ import { installMockBackend } from './derived-tables.support'
 
 export async function bootApp(page: Page) {
   await installMockBackend(page)
-  await page.goto('/')
-  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
-  await expect(page.locator('aside')).toBeAttached()
+  // Preview can briefly 404 while workers start in parallel; retry until the
+  // canvas is actually mounted instead of treating the first navigation as final.
+  await expect(async () => {
+    const response = await page.goto('/', { waitUntil: 'domcontentloaded' })
+    expect(response, 'homepage must respond').toBeTruthy()
+    expect(response!.ok(), `homepage returned ${response!.status()}`).toBeTruthy()
+    await expect(page.locator('.react-flow')).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 45_000 })
+  await expect(page.locator('aside')).toBeVisible()
 }
 
 export async function importCsv(

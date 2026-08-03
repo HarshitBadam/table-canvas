@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useApp } from '@/state/AppContext'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
 import { checkProjectCount } from '@/shared/enforce'
@@ -8,9 +7,8 @@ import {
   DeleteProjectDialog,
   ProjectOpenElsewhereDialog,
 } from './ProjectDialogs'
-import { ProjectSwitcherActions } from './ProjectSwitcherActions'
-import { getStorageScope, scopedStorageKey } from '@/persistence/storageScope'
-import { canDeleteDocument } from '@/state/documentLease'
+import { ProjectSwitcherMenu } from './ProjectSwitcherMenu'
+
 interface MenuPosition {
   left: number
   top: number
@@ -70,6 +68,7 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
   const editBlocked = canEdit ? {} : { disabled: true, title: EDITING_ELSEWHERE_TOOLTIP }
   const pendingProject = projects.find(project => project.id === pendingProjectId)
   const displayedProjectName = pendingProject?.name ?? projectName
+  const tier = user?.tier ?? 'guest'
 
   const updateMenuPosition = useCallback(() => {
     const trigger = triggerRef.current
@@ -158,14 +157,14 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
         typeof cause === 'object' && cause !== null && 'code' in cause
           && cause.code === 'limit'
       if (limitError) {
-        const capacity = checkProjectCount(projects.length, user?.tier ?? 'guest')
+        const capacity = checkProjectCount(projects.length, tier)
         setProjectLimitViolation(
           capacity.ok
             ? {
                 ok: false,
                 reason: cause instanceof Error ? cause.message : 'Project limit reached',
                 limit: projects.length,
-                tier: user?.tier ?? 'guest',
+                tier,
               }
             : capacity,
         )
@@ -183,7 +182,7 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
 
   const handleDuplicate = async () => {
     if (duplicateLockRef.current) return
-    const capacity = checkProjectCount(projects.length, user?.tier ?? 'guest')
+    const capacity = checkProjectCount(projects.length, tier)
     if (!capacity.ok) {
       setMenuOpen(false)
       setProjectActionsOpen(false)
@@ -201,7 +200,7 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
         typeof cause === 'object' && cause !== null && 'code' in cause
           && cause.code === 'limit'
       if (limitError) {
-        const updatedCapacity = checkProjectCount(projects.length, user?.tier ?? 'guest')
+        const updatedCapacity = checkProjectCount(projects.length, tier)
         setMenuOpen(false)
         setProjectActionsOpen(false)
         setProjectLimitViolation(
@@ -210,7 +209,7 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
                 ok: false,
                 reason: cause instanceof Error ? cause.message : 'Project limit reached',
                 limit: projects.length,
-                tier: user?.tier ?? 'guest',
+                tier,
               }
             : updatedCapacity,
         )
@@ -320,6 +319,54 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
     }
   }
 
+  const selectProject = (nextProjectId: string) => {
+    setMenuActionError(null)
+    setPendingProjectId(nextProjectId)
+    setMenuOpen(false)
+    setProjectActionsOpen(false)
+    setIsRenaming(false)
+    void loadProject(nextProjectId)
+      .catch(cause => {
+        setPendingProjectId(null)
+        setMenuActionError(
+          cause instanceof Error ? cause.message : 'Could not switch projects',
+        )
+      })
+      .finally(() => {
+        setPendingProjectId(current => (
+          current === nextProjectId ? null : current
+        ))
+      })
+  }
+
+  const toggleProjectActions = (
+    project: { id: string; name: string },
+    rect: DOMRect,
+  ) => {
+    if (projectActionsOpen && actionProjectId === project.id) {
+      setProjectActionsOpen(false)
+      return
+    }
+    const actionMenuWidth = 176
+    const actionMenuHeight = 132
+    const gutter = 12
+    const outwardLeft = rect.right
+    const opensOutward = outwardLeft + actionMenuWidth <= window.innerWidth - gutter
+    const alignedLeft = opensOutward
+      ? outwardLeft
+      : Math.max(gutter, rect.left - actionMenuWidth)
+    setActionProjectId(project.id)
+    setActionProjectName(project.name)
+    setProjectActionsPosition({
+      left: alignedLeft,
+      top: Math.min(
+        Math.max(gutter, rect.top),
+        window.innerHeight - actionMenuHeight - gutter,
+      ),
+    })
+    setProjectActionsOpen(true)
+  }
+
   return (
     <div className="w-[min(10rem,32vw)] min-w-0 shrink-0 lg:w-[min(18rem,52vw)]">
       <div ref={switcherRef} className="min-w-0">
@@ -362,189 +409,49 @@ export function ProjectSwitcher({ mode = 'full' }: ProjectSwitcherProps) {
           </svg>
         </button>
 
-        {menuOpen && menuPosition && createPortal(
-          <div
-            ref={menuRef}
-            style={menuPosition}
-            onKeyDown={handleMenuKeyDown}
-            className="fixed z-popover overflow-hidden rounded-xl border border-border bg-surface shadow-lg motion-safe:animate-scale-in"
-          >
-            <div className="flex items-center justify-between gap-2 border-b border-border-subtle px-3 py-2">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-tertiary">Projects</span>
-              {mode === 'full' && (
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false)
-                    const capacity = checkProjectCount(projects.length, user?.tier ?? 'guest')
-                    if (!capacity.ok) {
-                      setProjectLimitViolation(capacity)
-                      return
-                    }
-                    setError(null)
-                    setCreateOpen(true)
-                  }}
-                  className="-mr-1 rounded-md px-1.5 py-1 text-xs font-semibold text-accent-text outline-none transition-colors hover:bg-accent-green/10 focus-visible:ring-2 focus-visible:ring-accent-green"
-                >
-                  + Create project
-                </button>
-              )}
-            </div>
-            <div
-              role="listbox"
-              aria-label="Projects"
-              className="max-h-64 overflow-y-auto overflow-x-hidden"
-            >
-              {projects.map(project => {
-                const active = project.id === (pendingProjectId ?? projectId)
-                return (
-                  <div
-                    key={project.id}
-                    className={`group/project-row relative transition-colors ${active ? 'bg-accent-green/10' : 'hover:bg-surface-secondary focus-within:bg-surface-secondary'}`}
-                  >
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      onClick={() => {
-                        if (active) return
-                        setMenuActionError(null)
-                        setPendingProjectId(project.id)
-                        setMenuOpen(false)
-                        setProjectActionsOpen(false)
-                        setIsRenaming(false)
-                        void loadProject(project.id)
-                          .catch(cause => {
-                            setPendingProjectId(null)
-                            setMenuActionError(
-                              cause instanceof Error ? cause.message : 'Could not switch projects',
-                            )
-                          })
-                          .finally(() => {
-                            setPendingProjectId(current => (
-                              current === project.id ? null : current
-                            ))
-                          })
-                      }}
-                      className={`flex min-h-10 w-full min-w-0 items-center py-2 pl-3 pr-10 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-green ${active ? 'text-accent-text' : 'text-text-primary'}`}
-                    >
-                      <span className={`min-w-0 flex-1 truncate ${active ? 'font-semibold' : 'font-medium'}`}>
-                        {project.name}
-                      </span>
-                    </button>
-                    {mode === 'full' && (
-                      <button
-                        type="button"
-                        aria-label={`Actions for ${project.name}`}
-                        aria-haspopup="menu"
-                        aria-expanded={projectActionsOpen && actionProjectId === project.id}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          if (projectActionsOpen && actionProjectId === project.id) {
-                            setProjectActionsOpen(false)
-                            return
-                          }
-                          const rect = event.currentTarget.getBoundingClientRect()
-                          setActionProjectId(project.id)
-                          setActionProjectName(project.name)
-                          const actionMenuWidth = 176
-                          const actionMenuHeight = 132
-                          const gutter = 12
-                          const outwardLeft = rect.right
-                          const opensOutward = outwardLeft + actionMenuWidth <= window.innerWidth - gutter
-                          const alignedLeft = opensOutward
-                            ? outwardLeft
-                            : Math.max(gutter, rect.left - actionMenuWidth)
-                          setProjectActionsPosition({
-                            left: alignedLeft,
-                            top: Math.min(
-                              Math.max(gutter, rect.top),
-                              window.innerHeight - actionMenuHeight - gutter,
-                            ),
-                          })
-                          setProjectActionsOpen(true)
-                        }}
-                        className={`absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md outline-none transition-[opacity,color] hover:text-text-primary focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent-green group-hover/project-row:opacity-100 ${
-                          projectActionsOpen && actionProjectId === project.id
-                            ? 'text-text-primary opacity-100'
-                            : 'text-text-tertiary opacity-0'
-                        }`}
-                      >
-                        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                          <circle cx="4" cy="10" r="1.25" />
-                          <circle cx="10" cy="10" r="1.25" />
-                          <circle cx="16" cy="10" r="1.25" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            {mode === 'full' && projectActionsOpen && projectActionsPosition && createPortal(
-              <div
-                ref={actionMenuRef}
-                role="menu"
-                aria-label={`Actions for ${actionProjectName}`}
-                style={projectActionsPosition}
-                className="fixed z-popover w-44 overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-lg motion-safe:animate-scale-in"
-              >
-                <button type="button" role="menuitem" onClick={() => {
-                  void openRenameForProject().catch(cause => {
-                    setMenuActionError(cause instanceof Error ? cause.message : 'Could not open rename')
-                  })
-                }} className="flex min-h-9 w-full items-center rounded-md px-2.5 text-left text-sm text-text-primary transition-colors hover:bg-surface-secondary focus-visible:bg-surface-secondary focus-visible:outline-none disabled:cursor-not-allowed disabled:text-text-tertiary" {...editBlocked}>
-                  Rename
-                </button>
-                <button type="button" role="menuitem" onClick={() => {
-                  void duplicateProjectFromActions().catch(cause => {
-                    setMenuActionError(cause instanceof Error ? cause.message : 'Could not duplicate project')
-                  })
-                }} className="flex min-h-9 w-full items-center rounded-md px-2.5 text-left text-sm text-text-primary transition-colors hover:bg-surface-secondary focus-visible:bg-surface-secondary focus-visible:outline-none disabled:cursor-not-allowed disabled:text-text-tertiary" disabled={isDuplicating || isProjectOperationPending} {...editBlocked}>
-                  {isDuplicating ? 'Duplicating…' : 'Duplicate'}
-                </button>
-                <button type="button" role="menuitem" onClick={() => {
-                  setProjectActionsOpen(false)
-                  setError(null)
-                  setMenuOpen(false)
-                  const targetId = actionProjectId
-                  if (!targetId) return
-                  void canDeleteDocument(
-                    scopedStorageKey(getStorageScope(), targetId),
-                    targetId === projectId,
-                  ).then(allowed => {
-                    if (allowed) setDeleteOpen(true)
-                    else setDeleteBlockedOpen(true)
-                  })
-                }} className="flex min-h-9 w-full items-center rounded-md px-2.5 text-left text-sm text-text-primary transition-colors hover:bg-surface-secondary focus-visible:bg-surface-secondary focus-visible:outline-none disabled:cursor-not-allowed disabled:text-text-tertiary disabled:hover:bg-transparent" disabled={isProjectOperationPending}>
-                  Delete
-                </button>
-              </div>,
-              document.body,
-            )}
-            {menuActionError && (
-              <p className="border-t border-border-subtle px-3 py-2 text-xs text-error-text" role="alert">
-                {menuActionError}
-              </p>
-            )}
-
-            {mode === 'full' && isRenaming && (
-              <ProjectSwitcherActions
-                isRenaming={isRenaming}
-                renameName={renameName}
-                projectName={projectName}
-                onRenameNameChange={setRenameName}
-                onRenameStart={() => {
-                  setRenameName(projectName)
-                  setIsRenaming(true)
-                }}
-                onRenameCancel={() => setIsRenaming(false)}
-                onRenameSubmit={handleRename}
-              />
-            )}
-          </div>
-          , document.body)}
+        {menuOpen && menuPosition && (
+          <ProjectSwitcherMenu
+            mode={mode}
+            menuRef={menuRef}
+            actionMenuRef={actionMenuRef}
+            menuPosition={menuPosition}
+            projects={projects}
+            projectId={projectId}
+            projectName={projectName}
+            pendingProjectId={pendingProjectId}
+            tier={tier}
+            canEditProps={editBlocked}
+            isDuplicating={isDuplicating}
+            isProjectOperationPending={isProjectOperationPending}
+            projectActionsOpen={projectActionsOpen}
+            projectActionsPosition={projectActionsPosition}
+            actionProjectId={actionProjectId}
+            actionProjectName={actionProjectName}
+            isRenaming={isRenaming}
+            renameName={renameName}
+            menuActionError={menuActionError}
+            onMenuKeyDown={handleMenuKeyDown}
+            onSelectProject={selectProject}
+            onToggleProjectActions={toggleProjectActions}
+            onRenameFromActions={openRenameForProject}
+            onDuplicateFromActions={duplicateProjectFromActions}
+            onRenameNameChange={setRenameName}
+            onRenameStart={() => {
+              setRenameName(projectName)
+              setIsRenaming(true)
+            }}
+            onRenameCancel={() => setIsRenaming(false)}
+            onRenameSubmit={handleRename}
+            setProjectLimitViolation={setProjectLimitViolation}
+            setMenuOpen={setMenuOpen}
+            setError={setError}
+            setCreateOpen={setCreateOpen}
+            setDeleteOpen={setDeleteOpen}
+            setDeleteBlockedOpen={setDeleteBlockedOpen}
+            setProjectActionsOpen={setProjectActionsOpen}
+            setMenuActionError={setMenuActionError}
+          />
+        )}
       </div>
 
       {mode === 'full' && (
