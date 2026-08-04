@@ -27,8 +27,13 @@ describe('enforce helpers', () => {
       }
     })
 
-    it('allows arbitrarily large files for google tier', () => {
-      expect(checkFileSize(Number.MAX_SAFE_INTEGER, 'google')).toEqual({ ok: true })
+    it('rejects files over the google 20 MB limit', () => {
+      const result = checkFileSize(20 * 1024 * 1024 + 1, 'google')
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.tier).toBe('google')
+        expect(result.limit).toBe(20 * 1024 * 1024)
+      }
     })
   })
 

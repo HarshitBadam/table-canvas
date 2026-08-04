@@ -99,6 +99,7 @@ beforeEach(() => {
   mocks.listProjectsLocal.mockResolvedValue([])
   mocks.loadProjectLocal.mockResolvedValue(null)
   mocks.loadReportsForProject.mockResolvedValue({})
+  mocks.getProject.mockResolvedValue(createMockProject('proj_123', 'Project'))
   mocks.enqueueProjectDelete.mockImplementation((
     id: string,
     expectedRevision: number,
@@ -319,6 +320,32 @@ describe('deleteProjectWithSync', () => {
     expect(mocks.clearProjectSyncOperation).toHaveBeenCalledWith('local_123', accountScope)
     expect(mocks.enqueueProjectDelete).not.toHaveBeenCalled()
     expect(mocks.deleteProject).not.toHaveBeenCalled()
+  })
+
+  it('uses the current server revision when the local project is stale', async () => {
+    mocks.loadProjectLocal.mockResolvedValue({
+      id: 'proj_123',
+      name: 'Project',
+      nodes: {},
+      edges: {},
+      patches: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      revision: 2,
+    })
+    mocks.getProject.mockResolvedValue({
+      ...createMockProject('proj_123', 'Project'),
+      revision: 5,
+    })
+
+    await deleteProjectWithSync('proj_123')
+
+    expect(mocks.enqueueProjectDelete).toHaveBeenCalledWith(
+      'proj_123',
+      5,
+      accountScope,
+    )
+    expect(mocks.deleteProject).toHaveBeenCalledWith('proj_123', 5)
   })
 
   it('cancels a queued delete when the backend rejects it', async () => {

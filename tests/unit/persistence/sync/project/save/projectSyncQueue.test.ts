@@ -58,6 +58,24 @@ describe('durable project sync queue', () => {
     expect((await db.listProjectSyncOperations(accountB))[0].payload?.name).toBe('B')
   })
 
+  it('uses a fresh revision when a delete replaces a queued save', async () => {
+    const db = await getDB()
+    const scope = db.accountStorageScope('delete-after-save-user')
+    db.setStorageScope(scope)
+    await db.enqueueProjectSave(
+      'project-1',
+      { name: 'Pending save', nodes: {}, edges: {}, patches: {}, reports: {} },
+      2,
+    )
+
+    const deletion = await db.enqueueProjectDelete('project-1', 5)
+
+    expect(deletion).toMatchObject({
+      operation: 'delete',
+      expectedRevision: 5,
+    })
+  })
+
   it('replaces a queued payload, its revision and the local project together', async () => {
     const db = await getDB()
     const queue = await import('@/persistence/sync/project/save/projectSyncQueue')

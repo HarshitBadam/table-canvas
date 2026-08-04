@@ -297,15 +297,21 @@ export function SidebarNodeItem({
 
 function TableDimensions({ node, selected }: { node: TableNode; selected: boolean }) {
   const cacheInfo = useNodeCacheInfo(node.id)
+  const textColor = selected
+    ? node.kind === 'derived_table' ? 'text-node-derived-border' : 'text-node-source-border'
+    : 'text-text-tertiary'
+  if (isTableUpdating(cacheInfo) && (!node.schema || node.schema.columns.length === 0)) {
+    return (
+      <span className={`mt-0.5 block text-xs ${textColor}`}>
+        Importing…
+      </span>
+    )
+  }
   if (!node.schema) return null
   const columns = node.schema.columns.length
   const rows = cacheInfo?.lastRowCount ?? node.schema.rowCount ?? 0
   return (
-    <span className={`mt-0.5 flex flex-wrap gap-x-1 text-xs tabular-nums ${
-      selected
-        ? node.kind === 'derived_table' ? 'text-node-derived-border' : 'text-node-source-border'
-        : 'text-text-tertiary'
-    }`}>
+    <span className={`mt-0.5 flex flex-wrap gap-x-1 text-xs tabular-nums ${textColor}`}>
       <span className="whitespace-nowrap">{columns.toLocaleString()} columns</span>
       <span className="whitespace-nowrap">{rows.toLocaleString()} rows</span>
     </span>

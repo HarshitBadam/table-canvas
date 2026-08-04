@@ -23,6 +23,7 @@ export function UpgradePrompt({
 
   const isGuest = violation.tier === 'guest'
   const reason = violation.reason.toLowerCase()
+  const isHardFileLimit = !isGuest && reason.includes('file size')
   const limitContext = reason.includes('row')
     ? 'You’ve reached this project’s row limit.'
     : reason.includes('project')
@@ -63,7 +64,11 @@ export function UpgradePrompt({
         >
           <div className="px-5 pb-4 pt-5">
             <Dialog.Title className="text-base font-semibold leading-5 text-text-primary">
-              {isGuest ? 'Sign in to keep working' : 'Free plan limit reached'}
+              {isGuest
+                ? 'Sign in to keep working'
+                : isHardFileLimit
+                  ? 'File is too large'
+                  : 'Free plan limit reached'}
             </Dialog.Title>
             <Dialog.Description className="mt-1 text-[13px] font-[450] leading-[18px] text-text-secondary">
               {isGuest ? `${limitContext} Sign in to continue.` : violation.reason}
@@ -86,7 +91,9 @@ export function UpgradePrompt({
               </ul>
             ) : (
               <p className="text-sm leading-6 text-text-secondary">
-                You can continue by removing work you no longer need. Expanded plans are not available yet.
+                {isHardFileLimit
+                  ? 'Choose a file no larger than 20 MB and try again.'
+                  : 'You can continue by removing work you no longer need. Expanded plans are not available yet.'}
               </p>
             )}
             {signInError && (

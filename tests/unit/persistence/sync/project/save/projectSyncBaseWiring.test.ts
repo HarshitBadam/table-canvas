@@ -105,6 +105,7 @@ describe('merge base capture', () => {
       patches: {},
       reports: {},
     }, scope)
+    api.getProject.mockResolvedValue(remoteProject('Cloud project', 7))
     api.deleteProject.mockResolvedValue(undefined)
 
     await sync.deleteProjectWithSync('project-1')

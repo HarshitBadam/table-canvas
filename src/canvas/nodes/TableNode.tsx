@@ -99,14 +99,6 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
     data.onSetViewMode(data.id, mode)
   }, [data])
 
-  // A pending node is an internal reservation, not a visual state. Fast imports
-  // finish before it is revealed; larger imports appear once their columns exist.
-  if (
-    updating
-    && (!showUpdatingChrome || (isSource && !hasColumns))
-    && !cacheInfo?.error
-  ) return null
-
   return (
     <div
       className="relative"
