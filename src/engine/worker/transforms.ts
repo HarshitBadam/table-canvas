@@ -7,8 +7,8 @@ import {
   mapDuckDBTypeToApp,
   getCleanColumnName,
   quoteIdentifier,
-} from './sqlHelpers'
-import { getTableSchema } from './tableOperations'
+} from './table/sqlHelpers'
+import { getTableSchema } from './table/tableOperations'
 import { INTERNAL_ROW_ID_COLUMN } from '../internalColumns'
 
 async function buildJoinColumnSelection(

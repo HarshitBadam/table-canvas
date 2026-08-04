@@ -16,8 +16,8 @@ import {
   saveReport as saveReportDB,
   deleteReport as deleteReportDB,
   loadAllReports,
-} from '@/persistence/db';
-import { getStorageScope, scopedStorageKey } from '@/persistence/storageScope';
+} from '@/persistence/storage/local-db/db';
+import { getStorageScope, scopedStorageKey } from '@/persistence/storage/storageScope';
 import type {
   Report,
   ReportStoreState,

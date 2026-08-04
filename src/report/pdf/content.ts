@@ -1,6 +1,6 @@
 import type { JSONContent } from '@tiptap/core'
 import type { Content } from 'pdfmake/interfaces'
-import type { EmbeddedDataMap } from '@/persistence/reportHtmlGenerator'
+import type { EmbeddedDataMap } from '@/persistence/report-export/reportHtmlGenerator'
 import { boxed, horizontalRule } from './boxes'
 import { chartBlocks } from './charts'
 import { inlineContent, plainText } from './inline'

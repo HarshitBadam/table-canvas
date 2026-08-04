@@ -8,7 +8,7 @@ import type { SuggestionCommand, CommandResult, CommandExecutionOptions } from '
 import { CreateDerivedTableCommand, ApplyPatchCommand } from './tableCommands'
 import { CreateChartCommand } from './chartCommand'
 import { HighlightCellsCommand, LaunchRecipeCommand } from './utilityCommands'
-import { useSuggestionsStore } from '../suggestionsStore'
+import { useSuggestionsStore } from '../panel/state/suggestionsStore'
 
 function createCommand(
   suggestion: Suggestion,

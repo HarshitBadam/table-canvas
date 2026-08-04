@@ -1,6 +1,6 @@
 import { api } from './client';
 import type { ProjectNode, Edge } from '@/types';
-import type { SerializedPatches } from '@/persistence/patchSerialization';
+import type { SerializedPatches } from '@/persistence/storage/local-db/patchSerialization';
 import type { Report } from '@/report/types';
 
 export interface ProjectSummary {

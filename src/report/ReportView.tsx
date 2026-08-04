@@ -1,9 +1,9 @@
 import { useCallback, useRef, useEffect, useMemo, useState } from 'react';
-import { useWorkspaceLease } from '@/state/useWorkspaceLease';
+import { useWorkspaceLease } from '@/state/document/useWorkspaceLease';
 import { useReportStore } from './reportStore';
 import { setActiveReportEditor } from './activeReportEditor';
 import { TipTapEditor, type TipTapEditorHandle } from './editor/TipTapEditor';
-import { ReportToolbar } from './ReportToolbar';
+import { ReportToolbar } from './toolbar/ReportToolbar';
 import type { Editor, JSONContent } from '@tiptap/react';
 import type { Report, ReportTemplateId } from './types';
 

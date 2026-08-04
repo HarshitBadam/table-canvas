@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { LoadingSpinner } from '@/layout/LoadingSpinner'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import * as Dialog from '@radix-ui/react-dialog'
 import type { WorkBook } from 'xlsx'
@@ -9,9 +9,9 @@ import {
   completeTableOperation,
   isTableOperationCurrent,
   updateTableOperation,
-} from '@/state/tableOperationCoordinator'
-import { holdsWriteLease } from '@/state/documentLease'
-import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
+} from '@/state/runtime/tableOperationCoordinator'
+import { holdsWriteLease } from '@/state/document/documentLease'
+import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/document/useWorkspaceLease'
 import { checkFileSize, checkRowCount, checkTableCount, type LimitExceeded } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import {
@@ -20,11 +20,11 @@ import {
   fileExtension,
   isDataFile,
   reservePendingImport,
-} from '@/persistence/importLifecycle'
-import { discardFiles, getImportProcessingOrder, getTableCount } from '@/persistence/importUtils'
-import { stageImportedTable } from '@/persistence/stageImportedTable'
-import type { ParsedTableData } from '@/engine/fileParsers'
-import { uploadFileWithSync } from '@/persistence/syncService'
+} from '@/persistence/import-export/import/importLifecycle'
+import { discardFiles, getImportProcessingOrder, getTableCount } from '@/persistence/import-export/import/importUtils'
+import { stageImportedTable } from '@/persistence/import-export/import/stageImportedTable'
+import type { ParsedTableData } from '@/engine/parsing/fileParsers'
+import { uploadFileWithSync } from '@/persistence/sync/session/syncService'
 
 interface PendingImportBase {
   id: string
@@ -106,7 +106,7 @@ export function ImportButton() {
     }
 
     // Validate before reserving a canvas node so rejected imports never linger as 0-row tables.
-    const { inspectCSVFile } = await import('@/persistence/importParsers')
+    const { inspectCSVFile } = await import('@/persistence/import-export/import/importParsers')
     const { schema, rows } = await inspectCSVFile(file)
     const rowCheck = checkRowCount(schema.rowCount ?? rows.length, tier)
     if (!rowCheck.ok) {
@@ -167,7 +167,7 @@ export function ImportButton() {
   }
 
   const buildPendingItemsFromFiles = async (files: File[]): Promise<PendingImportItem[]> => {
-    const { inspectCSVFile, inspectExcelFile } = await import('@/persistence/importParsers')
+    const { inspectCSVFile, inspectExcelFile } = await import('@/persistence/import-export/import/importParsers')
 
     const items: PendingImportItem[] = []
     for (const [fileIndex, file] of files.entries()) {
@@ -268,7 +268,7 @@ export function ImportButton() {
       setIsImporting(true)
       setImportError(null)
       try {
-        const { parseImportFile } = await import('@/persistence/exportImport')
+        const { parseImportFile } = await import('@/persistence/import-export/import/exportImport')
         const parsed = await parseImportFile(file)
         await importProject({
           name: parsed.name,
@@ -317,8 +317,8 @@ export function ImportButton() {
       } else if (extension === 'xlsx' || extension === 'xls') {
         // Validate before reserving a canvas node so rejected imports never linger as 0-row tables.
         const [{ inspectExcelFile }, { parseWorkbookSheet }] = await Promise.all([
-          import('@/persistence/importParsers'),
-          import('@/engine/fileParsers'),
+          import('@/persistence/import-export/import/importParsers'),
+          import('@/engine/parsing/fileParsers'),
         ])
         const { workbook, buffer, sheets } = await inspectExcelFile(file)
         if (sheets.length === 1) {
@@ -411,8 +411,8 @@ export function ImportButton() {
         { importSheetAndPersist },
         { parseWorkbookSheet },
       ] = await Promise.all([
-        import('@/persistence/importParsers'),
-        import('@/engine/fileParsers'),
+        import('@/persistence/import-export/import/importParsers'),
+        import('@/engine/parsing/fileParsers'),
       ])
 
       const nodes = useProjectStore.getState().nodes

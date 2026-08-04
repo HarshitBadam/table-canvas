@@ -1,5 +1,5 @@
 import { getEngine } from '@/engine/EngineAdapter'
-import { ensureTableMaterialized } from '@/engine/materializationService'
+import { ensureTableMaterialized } from '@/engine/materialization/materializationService'
 import { checkRowCount, checkTransformOutputSafety } from '@/shared/enforce'
 import type { Tier } from '@/shared/limits'
 import {
@@ -8,7 +8,7 @@ import {
   isTableOperationCurrent,
   updateTableOperation,
   waitForTableOperation,
-} from '@/state/tableOperationCoordinator'
+} from '@/state/runtime/tableOperationCoordinator'
 
 export async function finalizeCombinedTable(
   tableId: string,

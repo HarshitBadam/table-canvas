@@ -1,0 +1,315 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useGridContext } from './useGridContext'
+import { focusMenuItem } from '@/lib/focusMenuItem'
+
+export type { ContextMenuState } from '../types'
+
+export function GridContextMenu() {
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState({ left: 0, top: 0 })
+  const {
+    contextMenu,
+    getRowAtIndex,
+    cellRangeSelection,
+    highlightedCells,
+    columns,
+    onInsertRowAbove,
+    onInsertRowBelow,
+    onDeleteRow,
+    onInsertColumnLeft,
+    onInsertColumnRight,
+    onInsertRowAtBeginning,
+    onInsertColumnAtBeginning,
+    toggleHighlightForSelection,
+    onToggleCellHighlight,
+    onCreateChart,
+    onEditFormulaColumn,
+    onDeleteFormulaColumn,
+    closeContextMenu,
+    tableId,
+  } = useGridContext()
+
+  useEffect(() => {
+    if (contextMenu) {
+      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+    }
+  }, [contextMenu])
+
+  useLayoutEffect(() => {
+    if (!contextMenu || !menuRef.current) return
+
+    const updatePosition = () => {
+      const menu = menuRef.current
+      if (!menu) return
+      const margin = 8
+      const rect = menu.getBoundingClientRect()
+      setPosition({
+        left: Math.max(margin, Math.min(contextMenu.x, window.innerWidth - rect.width - margin)),
+        top: Math.max(margin, Math.min(contextMenu.y, window.innerHeight - rect.height - margin)),
+      })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    return () => window.removeEventListener('resize', updatePosition)
+  }, [contextMenu])
+
+  if (!contextMenu) return null
+
+  const highlightColumnId =
+    contextMenu.type === 'cell' && contextMenu.rowIndex !== undefined
+      ? contextMenu.columnId
+      : undefined
+  const highlightRow =
+    highlightColumnId !== undefined && contextMenu.rowIndex !== undefined
+      ? getRowAtIndex(contextMenu.rowIndex)
+      : null
+  const highlightCellKey =
+    highlightRow && highlightColumnId ? `${highlightRow.__rowId}:${highlightColumnId}` : ''
+  const isCurrentlyHighlighted = highlightCellKey
+    ? (highlightedCells?.has(highlightCellKey) ?? false)
+    : false
+
+  return (
+    <div
+      ref={menuRef}
+      role="menu"
+      aria-label="Grid actions"
+      className="fixed z-popover min-w-[180px] overflow-hidden rounded-lg border border-border bg-surface shadow-xl"
+      style={position}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          const targetRow = contextMenu.rowIndex
+          const targetColumn = contextMenu.columnId
+          const targetType = contextMenu.type
+          closeContextMenu()
+          requestAnimationFrame(() => {
+            if (targetRow !== undefined && targetColumn) {
+              const columnIndex = columns.findIndex(column => column.id === targetColumn)
+              document.querySelector<HTMLElement>(
+                `[role="gridcell"][aria-rowindex="${targetRow + 2}"][aria-colindex="${columnIndex + 2}"]`
+              )?.focus()
+            } else if (targetColumn) {
+              const columnIndex = columns.findIndex(column => column.id === targetColumn)
+              document.querySelector<HTMLElement>(
+                `[role="columnheader"][aria-colindex="${columnIndex + 2}"]`
+              )?.focus()
+            } else if (targetType === 'row' && targetRow !== undefined) {
+              document.querySelector<HTMLElement>(
+                `[role="row"][aria-rowindex="${targetRow + 2}"] [role="rowheader"]`
+              )?.focus()
+            } else {
+              document.querySelector<HTMLElement>('[role="gridcell"][aria-selected="true"]')?.focus()
+            }
+          })
+          return
+        }
+        focusMenuItem(event, event.currentTarget)
+      }}
+    >
+      {(contextMenu.type === 'cell' || contextMenu.type === 'row') && (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onInsertRowAbove}
+            className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+            </svg>
+            Insert Row Above
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onInsertRowBelow}
+            className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+            Insert Row Below
+          </button>
+          <div className="border-t border-border" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onDeleteRow}
+            className="w-full px-3 py-2 text-sm text-left hover:bg-red-50 text-red-600 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete Row
+          </button>
+        </>
+      )}
+
+      {highlightColumnId && (
+        <>
+          <div className="border-t border-border" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              if (cellRangeSelection) {
+                toggleHighlightForSelection()
+              } else if (highlightRow) {
+                onToggleCellHighlight(tableId, highlightRow.__rowId, highlightColumnId)
+              }
+              closeContextMenu()
+            }}
+            className={`w-full px-3 py-2 text-sm text-left flex items-center gap-2 ${
+              isCurrentlyHighlighted
+                ? 'hover:bg-surface-secondary text-text-secondary'
+                : 'text-accent-text hover:bg-accent-green/10'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {isCurrentlyHighlighted ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              )}
+            </svg>
+            {cellRangeSelection
+              ? 'Toggle Highlight (Ctrl+Shift+H)'
+              : isCurrentlyHighlighted ? 'Remove Highlight' : 'Highlight Cell'
+            }
+          </button>
+        </>
+      )}
+
+      {contextMenu.type === 'header' && (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onInsertRowAtBeginning}
+            className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Insert Row at Beginning
+          </button>
+        </>
+      )}
+
+      {contextMenu.type === 'corner' && (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onInsertRowAtBeginning}
+            className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Insert Row at Beginning
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onInsertColumnAtBeginning}
+            className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Insert Column at Beginning
+          </button>
+        </>
+      )}
+
+      {contextMenu.type === 'index' && (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onInsertColumnAtBeginning}
+            className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Insert Column at Beginning
+          </button>
+        </>
+      )}
+
+      {(contextMenu.type === 'cell' || contextMenu.type === 'column') && contextMenu.columnId && (
+        <>
+          {contextMenu.type === 'cell' && <div className="border-t border-border" />}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onInsertColumnLeft}
+            className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Insert Column Left
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onInsertColumnRight}
+            className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+            Insert Column Right
+          </button>
+          <div className="border-t border-border" />
+          {columns.find(column => column.id === contextMenu.columnId)?.isComputed && (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => onEditFormulaColumn(contextMenu.columnId!)}
+                className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
+              >
+                <span className="w-4 text-center font-mono text-node-derived-text" aria-hidden="true">fx</span>
+                Edit Formula
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => onDeleteFormulaColumn(contextMenu.columnId!)}
+                className="w-full px-3 py-2 text-sm text-left hover:bg-red-50 text-red-600 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete Formula Column
+              </button>
+              <div className="border-t border-border" />
+            </>
+          )}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onCreateChart(contextMenu.columnId!)
+              closeContextMenu()
+            }}
+            className="w-full px-3 py-2 text-sm text-left hover:bg-surface-secondary flex items-center gap-2"
+          >
+            <svg className="w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Create Chart
+          </button>
+        </>
+      )}
+    </div>
+  )
+}

@@ -212,6 +212,9 @@ jobs:
       - name: Lint backend
         run: npm --prefix server run lint
 
+      - name: Typecheck backend (src + tests)
+        run: npm --prefix server run typecheck
+
       - name: Build backend
         run: npm --prefix server run build
 

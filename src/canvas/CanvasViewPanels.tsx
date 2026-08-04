@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Panel } from 'reactflow'
 import { ImportButton } from '@/components/ImportButton'
 import { BrandMark } from '@/components/BrandMark'
-import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/useWorkspaceLease'
+import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/document/useWorkspaceLease'
 import type { LayoutDirection } from './autoLayout'
 
 interface AutoArrangePanelProps {

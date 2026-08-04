@@ -62,7 +62,7 @@ export function getColumnRules(): SuggestionRule[] {
 }
 
 
-import { generateTableVersionHash } from '../suggestionsStore';
+import { generateTableVersionHash } from '../panel/state/suggestionsStore';
 
 /** Deterministic ID ensures the same suggestion keeps the same ID across regenerations. */
 export function createSuggestionId(ruleId: string, tableId: string, columnId?: string, extra?: string): string {

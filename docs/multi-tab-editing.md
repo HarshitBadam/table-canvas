@@ -25,7 +25,7 @@ Four corrections from the implementation audit apply to everything below.
    that fail rather than merges that resolve wrongly. Accepted: fixing it needs a
    server-authoritative clock. Reports are exempt — the losing version survives as
    a "(recovered)" copy.
-4. **The cycle check is new code.** `src/engine/workflowGraph.ts` had no cycle
+4. **The cycle check is new code.** `src/engine/graph/workflowGraph.ts` had no cycle
    helper; `hasEdgeCycle` and `removeCyclicEdges` were added beside
    `getDependentNodeIds` for the edge merge.
 
@@ -59,20 +59,20 @@ entirely, yet all of them are blocked.
 ## What the code does today
 
 - IndexedDB `table-canvas-v2`, records keyed `scope\u001fentityId` where scope is
-  `guest` or `account:<userId>` (`src/persistence/storageScope.ts:27`).
+  `guest` or `account:<userId>` (`src/persistence/storage/storageScope.ts:27`).
 - DuckDB-WASM runs per tab, opened as `:memory:`
   (`src/engine/worker/engine.worker.ts:44`). Nothing is shared between tabs, and
   each tab rebuilds tables from imported files plus patches.
 - Saves are whole-snapshot: `saveProjectWithSync` writes the entire
   `{name, nodes, edges, patches, reports}` payload and enqueues a sync operation
-  carrying `expectedRevision` (`src/persistence/projectSaveSync.ts:100`).
+  carrying `expectedRevision` (`src/persistence/sync/project/save/projectSaveSync.ts:100`).
 - The server does compare-and-swap on `revision` and returns 409 to a stale
   writer (`server/src/routes/projects.ts:80`). The client turns a 409 into a
-  `local_*` conflict copy (`src/persistence/projectSync.ts:191`).
+  `local_*` conflict copy (`src/persistence/sync/project/projectSync.ts:191`).
 - Autosave fires on every change to `nodes`, `edges`, `patches`, or `projectName`
-  with no debounce (`src/state/AppProvider.tsx:214`).
+  with no debounce (`src/state/app-session/AppProvider.tsx:214`).
 - One project is loaded at a time, chosen as `projects[0]`
-  (`src/state/projectLifecycle.ts:82`). There is no project id in the route
+  (`src/state/project/projectLifecycle.ts:82`). There is no project id in the route
   (`src/layout/App.tsx:56`), so a tab cannot express which project it wants.
 - Undo/redo is local snapshot history (`src/state/stores/historySlice.ts`).
 
@@ -95,7 +95,7 @@ the failure mode is invisible.
 **The watcher is not read-only today.** Materialization writes `cacheInfo`
 (`isDirty`, `dataRevision`, `lastRowCount`) into nodes, and the autosave effect
 fires on any `nodes` change. `withoutTransientComputeState` strips only
-`isComputing` (`src/state/transientProjectState.ts:4`). So a tab that merely
+`isComputing` (`src/state/document/transientProjectState.ts:4`). So a tab that merely
 opens a dashboard still mutates the document and writes a full snapshot. No
 design where one tab "just watches" is sound until this is fixed.
 
@@ -157,7 +157,7 @@ intent. Handover is invisible when fast.
 documents. No lock, no mirroring, no blocking between them.
 
 **D4. Reports are part of the project document.** This matches the code, which
-already ships `reports` in the sync payload (`src/state/AppProvider.tsx:95`).
+already ships `reports` in the sync payload (`src/state/app-session/AppProvider.tsx:95`).
 `docs/features.md:143` claims reports are local-only and must be corrected.
 
 **D5. Web Locks unavailable means single-tab assumption.** Writes are allowed, a
@@ -227,7 +227,7 @@ user on two devices is unchanged: server revisions plus conflict copies.
 
 ## UX specification
 
-Reuse the banner pattern in `src/persistence/StorageWarningBanner.tsx` (in flow,
+Reuse the banner pattern in `src/persistence/storage/StorageWarningBanner.tsx` (in flow,
 above the header, `role="status"`, `aria-live="polite"`) and the tokens in
 `DESIGN.md`. Motion: 150ms ease-out fade, instant under
 `prefers-reduced-motion: reduce`.
@@ -268,35 +268,35 @@ Delete first, so the new model is not layered on the old one:
 
 Then, by layer:
 
-**L0.** Add `src/state/documentIdentity.ts` exporting
+**L0.** Add `src/state/document/documentIdentity.ts` exporting
 `documentKey(scope, projectId)` built on `scopedStorageKey`. Add the
 `/p/:projectId` route in `src/layout/App.tsx`; make `loadOrCreateProject` in
-`src/state/projectLifecycle.ts` honour a requested id and fall back to most
+`src/state/project/projectLifecycle.ts` honour a requested id and fall back to most
 recent. Redirect `/` to the resolved id with `replace`.
 
 **L1.** Add `src/state/tableRuntimeStore.ts` for per-tab derived state. Move
-`cacheInfo` reads/writes in `src/engine/materializationService.ts`,
-`src/state/stores/nodesSlice.ts`, and the dashboard hooks onto it. Delete
+`cacheInfo` reads/writes in `src/engine/materialization/materializationService.ts`,
+`src/state/stores/nodes/nodesSlice.ts`, and the dashboard hooks onto it. Delete
 `withoutTransientComputeState` once nothing transient remains in the document.
 Add drag coalescing in the canvas node change handler.
 
-**L2.** Add `src/state/documentLease.ts`: `claimWriteLease`,
+**L2.** Add `src/state/document/documentLease.ts`: `claimWriteLease`,
 `requestWriteLeaseHandover`, `releaseWriteLease`, `holdsWriteLease`,
 `subscribeToDocumentLease`, and `setHandoverFlush`. Keep the settled-release
 promise so `releaseWriteLease` awaits the real release. Bind it with
-`useSyncExternalStore` in `src/state/useWorkspaceLease.ts`. Register the flush
+`useSyncExternalStore` in `src/state/document/useWorkspaceLease.ts`. Register the flush
 handler where `setBeforeTabRelease` was registered
-(`src/state/usePersistenceLifecycle.ts:30`). Gate `saveLatestProject` and
-`flushProjectSave` in `src/state/AppProvider.tsx` on `holdsWriteLease` as
+(`src/state/app-session/persistence/usePersistenceLifecycle.ts:30`). Gate `saveLatestProject` and
+`flushProjectSave` in `src/state/app-session/AppProvider.tsx` on `holdsWriteLease` as
 defence in depth. Expose `canEdit` on `AppContextValue`. Add the focus listener
 with the 400ms debounce.
 
-**L3.** Add `src/state/documentMirror.ts` for publish/subscribe over
+**L3.** Add `src/state/document/documentMirror.ts` for publish/subscribe over
 `BroadcastChannel`. The owner publishes after each successful IndexedDB write;
 followers apply into `useProjectStore` and `useReportStore` and trigger
 re-materialization. Guard against echo with a tab id.
 
-**UI.** Add `src/components/EditingElsewhereBanner.tsx` rendering states 2–4,
+**UI.** Add `src/layout/EditingElsewhereBanner.tsx` rendering states 2–4,
 placed beside `<StorageWarningBanner />` in `MainApp`. Thread `canEdit` into
 mutating affordances; start with the canvas toolbar, grid cell editing, the
 transform and new-table modals, and the report editor.
@@ -316,7 +316,7 @@ Keep every file under 400 physical lines (`scripts/check-file-lines.mjs`).
 - **Materialization loops.** A follower applying a mirrored change must not
   produce a change that it re-publishes.
 - **Engine isolation.** Each tab's DuckDB is independent and table names are not
-  project-prefixed (`src/engine/worker/sqlHelpers.ts:3`). Safe today only
+  project-prefixed (`src/engine/worker/table/sqlHelpers.ts:3`). Safe today only
   because a project switch drops all tables; do not load two projects into one
   tab.
 

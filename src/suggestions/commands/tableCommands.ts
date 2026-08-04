@@ -6,10 +6,10 @@ import type {
   TransformDef,
   CleaningOperation,
 } from '@/types'
-import { PLACEHOLDER_VALUES } from '../cleaningConstants'
+import { PLACEHOLDER_VALUES } from '../cleaning/cleaningConstants'
 import type { SuggestionCommand, CommandResult, CommandExecutionOptions } from './types'
 import { showToast } from './types'
-import { getTransformSourceTableIds } from '@/engine/workflowGraph'
+import { getTransformSourceTableIds } from '@/engine/graph/workflowGraph'
 
 export class CreateDerivedTableCommand implements SuggestionCommand {
   private suggestion: Suggestion

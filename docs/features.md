@@ -140,12 +140,18 @@ Notion-style rich-text documents (TipTap) that embed live tables and charts (`sr
 ## Persistence
 
 - **Local (IndexedDB)**: projects auto-save: graph (nodes/edges/patches), imported files,
-  cached results, and reports. Everything lives locally by default.
+  cached results, and reports. Everything lives locally by default. Records are keyed by
+  storage scope (`guest:<id>` or `account:<userId>`).
 - **Server sync**: when connected to the backend, the project graph (nodes, edges, patches)
   and its reports sync to MongoDB on save. Files are stored in GridFS and fetched on load.
 - **Concurrency**: one tab writes a project at a time and other tabs mirror it live;
   editing follows focus. Conflicting saves from another device merge on the client
   (see [Reliability](reliability.md)).
+- **Cross-tab auth**: account cookies are origin-shared for new/reloaded tabs; guest choice
+  and explicit sign-out are tab-local so one tab's login or logout does not silently replace
+  another tab's workspace. Catalog and document updates use `BroadcastChannel` (auth React
+  state is not broadcast). See
+  [Cross-tab authentication and session](reliability.md#cross-tab-authentication-and-session).
 
 ## Export
 

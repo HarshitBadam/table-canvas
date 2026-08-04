@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { setProjectMergeHandler, type ProjectMergeEvent } from '@/persistence/syncService'
+import { setProjectMergeHandler, type ProjectMergeEvent } from '@/persistence/sync/session/syncService'
 
 /** Long enough to read, short enough to stop being clutter. */
 const NOTICE_TIMEOUT_MS = 12_000

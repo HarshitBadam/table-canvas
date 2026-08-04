@@ -1,6 +1,6 @@
 import { ColumnSchema, ColumnProfile } from '@/types';
-import { isPlaceholder } from '../cleaningConstants';
-import { EPOCH_MS_MIN, EPOCH_MS_MAX } from '@/charts/chartShared';
+import { isPlaceholder } from '../cleaning/cleaningConstants';
+import { EPOCH_MS_MIN, EPOCH_MS_MAX } from '@/charts/renderers/chartShared';
 
 
 export function hasLeadingTrailingWhitespace(value: unknown): boolean {

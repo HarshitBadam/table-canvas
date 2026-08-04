@@ -4,7 +4,7 @@ import type {
   PageOrientation,
   TDocumentDefinitions,
 } from 'pdfmake/interfaces'
-import type { EmbeddedDataMap } from '@/persistence/reportHtmlGenerator'
+import type { EmbeddedDataMap } from '@/persistence/report-export/reportHtmlGenerator'
 import type { Report } from '@/report/types'
 import { nodeBlocks } from './content'
 import {

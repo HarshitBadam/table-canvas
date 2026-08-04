@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { LoadingSpinner } from '@/layout/LoadingSpinner'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
 import { RECIPE_CONFIGS } from './recipeConfigs'

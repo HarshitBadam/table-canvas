@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type { ViewMode } from './viewNavigation'
+import type { ViewMode } from './navigation/viewNavigation'
 
 const BASE_TITLE = 'Table Canvas'
 

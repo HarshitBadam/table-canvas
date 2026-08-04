@@ -98,7 +98,7 @@ The build emits all three DuckDB WASM variants for compatibility, but clients fe
 
 ### 1. Startup waits for project-wide serial materialization
 
-- **Location:** `src/state/projectLifecycle.ts:20-50`, `src/state/AppProvider.tsx:146-201`
+- **Location:** `src/state/project/projectLifecycle.ts:20-50`, `src/state/app-session/AppProvider.tsx:146-201`
 - **Category:** Performance
 - **Impact:** Existing projects wait for every source and derived table to materialize before the application enters the ready phase. Startup time grows with the sum of table materialization times.
 - **Recommendation:** Render the project shell/canvas before all tables finish. Materialize source tables concurrently where safe and derived tables by dependency order, or lazily materialize on first use.
@@ -106,7 +106,7 @@ The build emits all three DuckDB WASM variants for compatibility, but clients fe
 
 ### 2. Large imports clone the full dataset across the worker boundary
 
-- **Location:** `src/engine/EngineAdapter.ts:60-109`, `src/engine/worker/tableWriteOperations.ts:13-30`
+- **Location:** `src/engine/EngineAdapter.ts:60-109`, `src/engine/worker/table/tableWriteOperations.ts:13-30`
 - **Category:** Performance
 - **Impact:** The main thread preprocesses the complete row array, then structured-clones the full request to the worker before worker-side batching begins. Large imports can create memory spikes and main-thread stalls.
 - **Recommendation:** Stream batches through RPC, use transferable buffers/Arrow, or parse and load directly inside the worker.
@@ -123,7 +123,7 @@ The build emits all three DuckDB WASM variants for compatibility, but clients fe
 
 ### 4. Report menu and custom picker focus behavior is incomplete
 
-- **Location:** `src/report/ReportToolbar.tsx:277-320`, `src/report/editor/nodes/DimensionPicker.tsx:23-55`, `src/report/editor/nodes/TablePickerModal.tsx`
+- **Location:** `src/report/toolbar/ReportToolbar.tsx:277-320`, `src/report/editor/nodes/tables/DimensionPicker.tsx:23-55`, `src/report/editor/nodes/linked-data/TablePickerModal.tsx`
 - **Category:** Accessibility
 - **Impact:** The Insert menu lacks Arrow/Home/End navigation and Escape refocus behavior. Custom report pickers do not consistently trap and restore focus.
 - **Standard:** WCAG 2.1.1, WCAG 2.4.3, WAI-ARIA menu/dialog patterns
@@ -134,25 +134,25 @@ The build emits all three DuckDB WASM variants for compatibility, but clients fe
 
 ### 1. Grid virtualizes rows but not columns
 
-- **Location:** `src/grid/GridViewport.tsx:78-104`
+- **Location:** `src/grid/view/GridViewport.tsx:78-104`
 - **Impact:** Every visible row renders every column. A 50-column table with roughly 35 mounted rows creates about 1,750 cells even when most columns are outside the horizontal viewport.
 - **Recommendation:** Add horizontal virtualization with a small overscan window.
 
 ### 2. Grid interaction state has a broad render blast radius
 
-- **Location:** `src/grid/GridContext.tsx`, `src/grid/GridCell.tsx`, `src/grid/useColumnResize.ts`
+- **Location:** `src/grid/view/GridContext.tsx`, `src/grid/view/GridCell.tsx`, `src/grid/view/useColumnResize.ts`
 - **Impact:** Selection, resize, autofill, editing, and data state share a large context. Resize and selection pointer updates can rerender all visible cells.
 - **Recommendation:** Split context by update frequency, memoize cells with narrow props, and use `requestAnimationFrame` for resize previews.
 
 ### 3. Filter statistics are calculated while the panel is closed
 
-- **Location:** `src/grid/FilterPanel.tsx:47-66`
+- **Location:** `src/grid/filtering/controls/FilterPanel.tsx:47-66`
 - **Impact:** Unique-value counts are computed before the closed-panel early return, scanning rows × columns unnecessarily.
 - **Recommendation:** Guard the calculation with `isOpen` or query distinct counts through the engine.
 
 ### 4. Autosave follows every graph mutation
 
-- **Location:** `src/state/AppProvider.tsx:210-222`
+- **Location:** `src/state/app-session/AppProvider.tsx:210-222`
 - **Impact:** Changes to nodes, edges, patches, or project name trigger saving, including position updates during graph interaction.
 - **Recommendation:** Debounce saves and commit drag positions on drag end.
 
@@ -169,13 +169,13 @@ The build emits all three DuckDB WASM variants for compatibility, but clients fe
 
 ### 6. ChartView and FormulaColumnModal bypass semantic primitives
 
-- **Location:** `src/charts/ChartView.tsx`, `src/grid/FormulaColumnModal.tsx`, `src/grid/FilterInputs.tsx`, `src/grid/EnumMultiSelect.tsx`
+- **Location:** `src/charts/ChartView.tsx`, `src/grid/formula-column/FormulaColumnModal.tsx`, `src/grid/filtering/controls/FilterInputs.tsx`, `src/grid/filtering/controls/EnumMultiSelect.tsx`
 - **Impact:** Raw gray/emerald Tailwind classes create a different visual vocabulary from NewTableModal, ChartBuilder, Sidebar, and the polished FilterPanel.
 - **Recommendation:** Adopt `bg-surface*`, `text-text-*`, `border-border`, `.input`, and `.btn-*`.
 
 ### 7. Several pointer targets remain below 44px
 
-- **Location:** `src/report/ReportToolbar.tsx:143-152,263-290`, `src/grid/GridCell.tsx:219-237`, `src/grid/ColumnHeader.tsx:115-127`
+- **Location:** `src/report/toolbar/ReportToolbar.tsx:143-152,263-290`, `src/grid/view/GridCell.tsx:219-237`, `src/grid/view/ColumnHeader.tsx:115-127`
 - **Impact:** Report controls are 40px on mobile; the autofill handle is visually and interactively 12px; the column filter control is icon-sized.
 - **Standard:** WCAG 2.5.8 Target Size
 - **Recommendation:** Keep compact visuals but add 44px coarse-pointer hit areas.
@@ -196,7 +196,7 @@ The build emits all three DuckDB WASM variants for compatibility, but clients fe
 
 ### 2. Secondary decorative treatments remain
 
-- **Location:** `src/report/editor/nodes/ChartNodeView.tsx`, `src/dashboard/components/LineageMiniMap.tsx`, chart tooltip styling
+- **Location:** `src/report/editor/nodes/linked-data/ChartNodeView.tsx`, `src/dashboard/components/LineageMiniMap.tsx`, chart tooltip styling
 - **Impact:** Gradient/glass styling and multi-color decorative edges remain at the product’s edges, although the core canvas, dashboard, and report start surfaces are restrained.
 - **Recommendation:** Use flat token surfaces and functional edge colors during the final polish.
 

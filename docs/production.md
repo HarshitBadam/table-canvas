@@ -112,8 +112,11 @@ npm --prefix server ci
 npm run lint
 npm run check:dead-code
 npm run test:coverage
+npm --prefix server run lint
+npm --prefix server run typecheck
 npm --prefix server run test:coverage
 npm run test:e2e
+npx tsc -p e2e/tsconfig.json --noEmit
 npm run build
 npm --prefix server run build
 npm audit --omit=dev

@@ -1,7 +1,7 @@
 import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, EdgesSliceState } from './types'
 import { generateId } from '@/lib/utils'
-import { wouldCreateCycle as checkCycle } from '@/engine/dependencyGraph'
+import { wouldCreateCycle as checkCycle } from '@/engine/graph/dependencyGraph'
 
 export const createEdgesSlice: StateCreator<
   ProjectStoreState,

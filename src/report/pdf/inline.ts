@@ -1,6 +1,6 @@
 import type { JSONContent } from '@tiptap/core'
 import type { Content, ContentText, Decoration } from 'pdfmake/interfaces'
-import { safeLink } from '@/persistence/reportHtmlUtils'
+import { safeLink } from '@/persistence/report-export/reportHtmlUtils'
 import { BRAND, HIGHLIGHT_FILL, SUBTLE_FILL } from './theme'
 
 /**

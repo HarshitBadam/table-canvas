@@ -1,5 +1,5 @@
 import type { Content } from 'pdfmake/interfaces'
-import type { EmbeddedDataMap } from '@/persistence/reportHtmlGenerator'
+import type { EmbeddedDataMap } from '@/persistence/report-export/reportHtmlGenerator'
 import { placeholder } from './boxes'
 import { tableBlocks, truncationNote } from './tables'
 

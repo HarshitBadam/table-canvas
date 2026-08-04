@@ -11,8 +11,8 @@ import type {
 import type { TransformDef, CellValue, TableSchema, Patches, ColumnSchema } from '@/types'
 import EngineWorker from './worker/engine.worker?worker'
 import { INTERNAL_ROW_ID_COLUMN } from './internalColumns'
-import { evaluateComputedColumns } from '@/formula/computedColumns'
-import { extractColumnReferences } from '@/formula/parser'
+import { evaluateComputedColumns } from '@/formula/evaluation/computedColumns'
+import { extractColumnReferences } from '@/formula/evaluation/parser'
 
 let engineInstance: EngineAdapter | null = null
 

@@ -2,17 +2,17 @@ import type { StateCreator } from 'zustand'
 import type { ProjectStoreState, HistorySliceState, HistoryEntry } from './types'
 import type { Edge, Patches, ProjectNode, TableNode } from '@/types'
 import { useDataStore } from '@/state/dataStore'
-import { invalidateMaterializations } from '@/engine/materializationCoordinator'
-import { cancelTableOperation } from '@/state/tableOperationCoordinator'
+import { invalidateMaterializations } from '@/engine/materialization/materializationCoordinator'
+import { cancelTableOperation } from '@/state/runtime/tableOperationCoordinator'
 import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
-import { computePatchesVersion } from '@/engine/cacheUtils'
-import { getDependentNodeIds } from '@/engine/workflowGraph'
-import { getStorageScope } from '@/persistence/storageScope'
+import { computePatchesVersion } from '@/engine/materialization/cacheUtils'
+import { getDependentNodeIds } from '@/engine/graph/workflowGraph'
+import { getStorageScope } from '@/persistence/storage/storageScope'
 import {
   fileRefsInNodes,
   queueHistoryFileCleanup,
   retainHistoryFileRefs,
-} from '@/persistence/historyFileCleanup'
+} from '@/persistence/sync/files/historyFileCleanup'
 
 const MAX_UNDO_HISTORY = 50
 const MAX_HISTORY_BYTES = 20 * 1024 * 1024
@@ -307,7 +307,7 @@ function restore(
     useDataStore.getState().clearTableData(id)
   }
   if (reconciliation.removed.length && typeof Worker !== 'undefined') {
-    void import('@/engine/engineTableCleanup')
+    void import('@/engine/materialization/engineTableCleanup')
       .then(({ dropEngineTables }) => dropEngineTables(reconciliation.removed, { onlyIfDeleted: true }))
       .catch(error => console.error('[history] Failed to drop removed engine tables:', error))
   }

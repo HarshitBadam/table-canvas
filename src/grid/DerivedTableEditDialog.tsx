@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
-import { useNavigation } from '@/layout/NavigationContext'
-import { duplicateDerivedTable } from '@/state/duplicateDerivedTable'
+import { useNavigation } from '@/layout/navigation/NavigationContext'
+import { duplicateDerivedTable } from '@/state/project/duplicateDerivedTable'
 import { useAppAuth } from '@/state/AppContext'
 import type { LimitExceeded } from '@/shared/enforce'
 
