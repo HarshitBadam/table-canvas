@@ -1,30 +1,35 @@
 # Production deployment
 
-This is the production baseline for the hosted portfolio project. Vercel serves the Vite frontend, Render runs the Express API, and MongoDB Atlas stores account data and synced files.
+This is the production baseline for the hosted portfolio project. A Cloudflare Worker provides one public origin, Vercel serves the Vite frontend, Render runs the Express API, and MongoDB Atlas stores account data and synced files.
 
 ## Recommended topology
 
-- `<project>.vercel.app`: Vercel frontend
-- `<service>.onrender.com`: Render backend
+- `<gateway>.<account>.workers.dev`: public application origin
+- `<project>.vercel.app`: frontend upstream
+- `<service>.onrender.com`: API upstream
 - MongoDB Atlas: projects, authentication data, rate limits, and GridFS files
 
-The free generated frontend and API URLs are unrelated domains, so production uses `COOKIE_SAME_SITE=none`. The API validates mutation origins, but browsers that block all third-party cookies can still restrict refresh sessions. A future custom domain should use sibling frontend and API subdomains and switch the cookie setting to `strict`.
-
-Set `VITE_API_URL` directly to Render rather than proxying API traffic through Vercel. This keeps file uploads and downloads up to the application's 20 MiB limit away from Vercel's function payload limit.
+The Worker streams frontend requests to Vercel and `/api` requests to Render. The browser sees one origin, so authentication uses `COOKIE_SAME_SITE=strict` without third-party cookies. The Worker runtime accepts the application's 20 MiB file limit and keeps those transfers out of Vercel Functions.
 
 ## Vercel frontend
 
 Set these production environment variables:
 
 ```env
-VITE_API_URL=https://<service>.onrender.com/api
+VITE_API_URL=/api
 VITE_AUTO_GUEST=false
 # Optional:
 # VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
 # VITE_SENTRY_DSN=<sentry-project-dsn>
 ```
 
-`vercel.json` supplies the SPA fallback, immutable asset caching, and baseline security headers. Deploy previews may use a different API, but production must use HTTPS and the exact API origin configured on the backend.
+`vercel.json` supplies the SPA fallback, immutable asset caching, and baseline security headers. The generated Vercel URL is an upstream, not the URL published to users.
+
+## Cloudflare gateway
+
+Deploy `gateway/` as a Worker. `gateway/wrangler.jsonc` defines the Vercel and Render upstream origins. The Worker removes authentication headers and cookies before frontend requests reach Vercel, preserves them for API requests, and rewrites upstream redirects back to the public Worker origin.
+
+The generated `workers.dev` URL is the production frontend origin used by Render and Google OAuth. No Worker secrets are required.
 
 ## Backend
 
@@ -39,9 +44,9 @@ JWT_ACCESS_SECRET=<independent-random-secret-at-least-32-characters>
 JWT_REFRESH_SECRET=<different-random-secret-at-least-32-characters>
 JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
-FRONTEND_URL=https://<project>.vercel.app
+FRONTEND_URL=https://<gateway>.<account>.workers.dev
 TRUST_PROXY=1
-COOKIE_SAME_SITE=none
+COOKIE_SAME_SITE=strict
 ENABLE_REGISTRATION=false
 # Optional:
 # GOOGLE_CLIENT_ID=<same-google-oauth-client-id>
@@ -58,7 +63,7 @@ Configure the host to use:
 - readiness: `GET /api/ready`
 - graceful shutdown timeout: at least 10 seconds
 
-Create one external uptime monitor for `GET /api/health` with a five-minute interval. Keep only one Render Free service continuously warm in the workspace because a 31-day month consumes 744 of the 750 included instance hours.
+Create one external uptime monitor for `https://<gateway>.<account>.workers.dev/api/health` with a five-minute interval. This checks the complete Worker-to-Render path. Keep only one Render Free service continuously warm in the workspace because a 31-day month consumes 744 of the 750 included instance hours.
 
 ## Data protection
 
@@ -131,11 +136,11 @@ npm --prefix server audit --omit=dev
 npm run test:production
 ```
 
-Deploy the backend first, verify `/api/ready`, then promote the Vercel deployment. Rollback by restoring the previous backend release and promoting the previous Vercel deployment. Database changes must remain backward compatible across that window.
+Deploy the backend first, verify `/api/ready`, promote the Vercel deployment, then deploy the Worker gateway. Rollback by restoring the previous backend and frontend releases before restoring the previous Worker version. Database changes must remain backward compatible across that window.
 
 `npm run test:production` builds the production Docker images, starts an isolated MongoDB/backend/nginx stack, waits for container health checks, and verifies liveness, database readiness, frontend API proxying, CORS, and DuckDB content/cache headers. It generates temporary secrets and destroys the stack and volume afterward.
 
-It does not replace a live-host smoke test: Docker cannot validate Vercel TLS, custom-domain DNS, Atlas network access, or browser cookie policy across your final frontend and API origins.
+It does not replace a live-host smoke test: Docker cannot validate the Worker gateway, Vercel TLS, Atlas network access, or browser cookie policy on the public origin.
 
 ## Supported concurrency
 

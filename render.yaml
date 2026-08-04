@@ -25,7 +25,7 @@ services:
       - key: TRUST_PROXY
         value: "1"
       - key: COOKIE_SAME_SITE
-        value: none
+        value: strict
       - key: ENABLE_REGISTRATION
         value: "false"
       - key: GOOGLE_CLIENT_ID
