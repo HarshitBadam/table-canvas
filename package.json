@@ -1,7 +1,6 @@
 {
   "name": "table-canvas",
   "private": true,
-  "workspaces": ["gateway"],
   "version": "1.0.0",
   "type": "module",
   "engines": {
@@ -12,7 +11,7 @@
     "build": "tsc -b && vite build",
     "lint": "npm run check:lines && eslint .",
     "check:lines": "node scripts/check-file-lines.mjs",
-    "check:dead-code": "knip && knip --cycles && knip --directory server && knip --directory server --cycles && knip --directory gateway && knip --directory gateway --cycles",
+    "check:dead-code": "knip && knip --cycles && knip --directory server && knip --directory server --cycles",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",

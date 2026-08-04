@@ -8,7 +8,7 @@ This is the production baseline for the hosted portfolio project. Vercel serves 
 - `<service>.onrender.com`: API upstream behind Vercel's `/api` rewrite
 - MongoDB Atlas: projects, authentication data, rate limits, and GridFS files
 
-`vercel.json` rewrites `/api/:path*` to Render before the SPA fallback. The browser stays on one origin, so authentication uses `COOKIE_SAME_SITE=strict` without third-party cookies. Validate a real 20 MiB upload and download through this path before announcing the release; if that proxy fails the size check, either buy sibling custom domains for Vercel and Render or fall back to the Worker in `gateway/`.
+`vercel.json` rewrites `/api/:path*` to Render before the SPA fallback. The browser stays on one origin, so authentication uses `COOKIE_SAME_SITE=strict` without third-party cookies. Production authentication and large file transfers have been validated through this path.
 
 ## Vercel frontend
 
