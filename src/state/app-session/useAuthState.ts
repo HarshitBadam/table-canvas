@@ -3,10 +3,11 @@ import {
   checkAuth,
   login as apiLogin,
   loginWithGoogle as apiLoginWithGoogle,
+  logout as apiLogout,
   LoginCredentials,
   User,
 } from '@/api/auth.api'
-import { setAuthErrorHandler, API_BASE_URL } from '@/api/client'
+import { setAuthErrorHandler } from '@/api/client'
 import { migrateLegacyGuestData } from '@/persistence/storage/legacyGuestMigration'
 import {
   accountStorageScope,
@@ -108,13 +109,19 @@ export function useAuthState() {
   }, [])
 
   const performLogout = useCallback(async () => {
-    // Cookies are origin-shared; keep Sign out tab-local so other tabs keep their session.
-    // An explicit login clears this marker.
-    setTabLocalAccountSignOut(true)
-    setGuestSession(false)
-    resetLoggedOutStorageScope()
-    setUser(null)
-    setIsAuthenticated(false)
+    let remoteError: unknown
+    try {
+      await apiLogout()
+    } catch (error) {
+      remoteError = error
+    } finally {
+      setTabLocalAccountSignOut(true)
+      setGuestSession(false)
+      resetLoggedOutStorageScope()
+      setUser(null)
+      setIsAuthenticated(false)
+    }
+    if (remoteError) throw remoteError
   }, [])
 
   const performCheckAuth = useCallback(async (): Promise<{
@@ -130,34 +137,14 @@ export function useAuthState() {
 
     // Guest choice is tab-local; shared account cookies from another tab must not
     // replace this tab's isolated guest workspace on reload.
-    let authedUser = hasGuestSession() ? LOCAL_USER : await checkAuth()
+    const guestSession = hasGuestSession()
+    const authResult = guestSession
+      ? { user: LOCAL_USER, backendReachable: true }
+      : await checkAuth()
+    let authedUser = authResult.user
 
     if (!authedUser) {
-      let backendReachable = false
-
-      try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 3000)
-        const response = await fetch(`${API_BASE_URL}/auth/me`, {
-          method: 'GET',
-          credentials: 'include',
-          signal: controller.signal,
-        })
-        clearTimeout(timeoutId)
-        backendReachable = true
-
-        if (response.status === 401) {
-          resetLoggedOutStorageScope()
-          setUser(null)
-          setIsAuthenticated(false)
-          return { user: null, shouldContinue: false }
-        }
-      } catch (error) {
-        console.error('[useAuthState] Backend reachability check failed:', error)
-        backendReachable = false
-      }
-
-      if (!backendReachable) {
+      if (!authResult.backendReachable) {
         const allowAutomaticLocalMode = import.meta.env.DEV
           || import.meta.env.VITE_AUTO_GUEST === 'true'
         if (!allowAutomaticLocalMode) {

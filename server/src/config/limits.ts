@@ -20,6 +20,8 @@ export interface TierLimits {
   maxServerStorageBytes?: number;
 }
 
+export const MAX_SERVER_FILE_STORAGE_BYTES = 300 * 1024 * 1024;
+
 export const LIMITS: Record<Tier, TierLimits> = {
   guest: {
     maxFileSizeBytes: 2 * 1024 * 1024,
@@ -29,12 +31,12 @@ export const LIMITS: Record<Tier, TierLimits> = {
     cloudSync: false,
   },
   google: {
-    maxFileSizeBytes: 25 * 1024 * 1024,
+    maxFileSizeBytes: 20 * 1024 * 1024,
     maxRowsPerTable: 500_000,
     maxTablesPerProject: 20,
     maxProjects: 10,
     cloudSync: true,
-    maxServerStorageBytes: 40 * 1024 * 1024,
+    maxServerStorageBytes: 20 * 1024 * 1024,
   },
 } as const;
 

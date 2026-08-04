@@ -70,6 +70,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     syncError: null,
   })
   const initialized = useRef(false)
+  const engineInitialization = useRef<Promise<void> | null>(null)
   const {
     saveLatestProject,
     flushLocalProjectSave,
@@ -90,6 +91,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       phaseMessage: error || PHASE_MESSAGES[phase],
       error: phase === 'error' ? error || 'Unknown error' : null,
     }))
+  }, [])
+  const ensureEngineReady = useCallback(async () => {
+    if (!engineInitialization.current) {
+      engineInitialization.current = initializeEngine()
+        .then(() => {
+          setState(previous => ({ ...previous, engineReady: true }))
+        })
+        .catch((error) => {
+          engineInitialization.current = null
+          throw error
+        })
+    }
+    await engineInitialization.current
   }, [])
   const prepareProject = useCallback(prepareProjectState, [])
   const clearActiveWorkspace = useCallback(async () => {
@@ -159,9 +173,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     async function initialize() {
       try {
-        setPhase('initializing_engine')
-        await initializeEngine()
-        setState(previous => ({ ...previous, engineReady: true }))
         setPhase('checking_auth')
         const authResult = await performCheckAuth()
         if (!authResult.shouldContinue || !authResult.user) {
@@ -171,6 +182,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
             isAuthenticated: false,
           }))
           setPhase('ready')
+          void ensureEngineReady().catch(error => {
+            console.error('[AppContext] Background engine initialization failed:', error)
+          })
           return
         }
         setState(previous => ({
@@ -178,6 +192,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           user: authResult.user,
           isAuthenticated: true,
         }))
+        setPhase('initializing_engine')
+        await ensureEngineReady()
         if (authResult.user.tier !== 'guest') {
           try {
             await syncOfflineAccountProjects()
@@ -209,7 +225,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     void initialize()
-  }, [performCheckAuth, prepareProject, setPhase])
+  }, [ensureEngineReady, performCheckAuth, prepareProject, setPhase])
 
   const {
     login,
@@ -221,6 +237,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     user,
     setState,
     setPhase,
+    ensureEngineReady,
     prepareProject,
     clearActiveWorkspace,
     resetWorkspace,

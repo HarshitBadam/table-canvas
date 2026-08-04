@@ -1,4 +1,6 @@
-import { api, ApiError, refreshSession } from './client';
+import { api, ApiError, probeApi, refreshSession } from './client';
+
+const AUTH_BOOT_TIMEOUT_MS = 3_000;
 
 
 export interface User {
@@ -20,6 +22,10 @@ export interface AuthResponse {
   message: string;
 }
 
+export interface AuthCheckResult {
+  user: User | null;
+  backendReachable: boolean;
+}
 
 export async function login(credentials: LoginCredentials): Promise<AuthResponse> {
   return api.post<AuthResponse>('/auth/login', credentials, {
@@ -33,26 +39,41 @@ export async function loginWithGoogle(credential: string): Promise<AuthResponse>
   });
 }
 
-/** Uses skipAuth so a 401 on /auth/me does not trigger the client's refresh loop. */
-async function getCurrentUser(): Promise<{ user: User }> {
-  return api.get<{ user: User }>('/auth/me', { skipAuth: true });
+export async function logout(): Promise<void> {
+  await api.post('/auth/logout', undefined, { skipAuth: true });
 }
 
-export async function checkAuth(): Promise<User | null> {
+export async function warmBackend(): Promise<boolean> {
+  return probeApi('/health');
+}
+
+async function getCurrentUser(timeoutMs: number): Promise<{ user: User }> {
+  return api.get<{ user: User }>('/auth/me', {
+    skipAuth: true,
+    timeoutMs,
+  });
+}
+
+export async function checkAuth(): Promise<AuthCheckResult> {
   try {
-    const { user } = await getCurrentUser();
-    return user;
+    const { user } = await getCurrentUser(AUTH_BOOT_TIMEOUT_MS);
+    return { user, backendReachable: true };
   } catch (error) {
     if (error instanceof ApiError && error.statusCode === 401) {
       try {
-        if (!await refreshSession()) return null;
-        const { user } = await getCurrentUser();
-        return user;
-      } catch (error) {
-        console.error('[auth] Failed to refresh token during auth check:', error);
-        return null;
+        if (!await refreshSession(AUTH_BOOT_TIMEOUT_MS)) {
+          return { user: null, backendReachable: true };
+        }
+        const { user } = await getCurrentUser(AUTH_BOOT_TIMEOUT_MS);
+        return { user, backendReachable: true };
+      } catch (refreshError) {
+        console.error('[auth] Failed to refresh token during auth check:', refreshError);
+        return { user: null, backendReachable: true };
       }
     }
-    return null;
+    return {
+      user: null,
+      backendReachable: error instanceof ApiError && error.statusCode !== 408,
+    };
   }
 }

@@ -6,6 +6,7 @@ const authApi = vi.hoisted(() => ({
   checkAuth: vi.fn(),
   login: vi.fn(),
   loginWithGoogle: vi.fn(),
+  logout: vi.fn(),
 }))
 
 vi.mock('@/api/auth.api', () => authApi)
@@ -38,7 +39,7 @@ describe('useAuthState guest sessions', () => {
       configurable: true,
     })
     vi.clearAllMocks()
-    authApi.checkAuth.mockResolvedValue(null)
+    authApi.checkAuth.mockResolvedValue({ user: null, backendReachable: true })
   })
 
   afterEach(() => {
@@ -92,9 +93,12 @@ describe('useAuthState guest sessions', () => {
 
   it('does not let an account cookie replace an active guest tab', async () => {
     authApi.checkAuth.mockResolvedValue({
-      id: 'account-user',
-      email: 'user@example.com',
-      tier: 'google',
+      backendReachable: true,
+      user: {
+        id: 'account-user',
+        email: 'user@example.com',
+        tier: 'google',
+      },
     })
     const { result } = renderHook(() => useAuthState())
 

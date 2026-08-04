@@ -184,9 +184,13 @@ button.auth-action:disabled {
   height: 40px;
 }
 
-.auth-google[data-busy] {
+.auth-google[data-disabled] {
   opacity: 0.55;
   pointer-events: none;
+}
+
+.auth-google[data-busy] .auth-google-host {
+  visibility: hidden;
 }
 
 .auth-google-host {

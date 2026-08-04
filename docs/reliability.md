@@ -80,7 +80,7 @@ Implemented in `src/state/app-session/useAuthState.ts` and the storage/sync modu
 **Tab-local (`sessionStorage`)**
 
 - Guest selection (`table-canvas:guest-session`) is tab-local. An existing guest tab keeps its isolated guest workspace on reload even when another tab has signed into an account; shared account cookies must not silently replace that guest choice.
-- Explicit sign-out sets `table-canvas:account-signed-out` in that tab only. Signing out one tab clears that tab's React auth state and storage scope; it does not tear down another tab's workspace. An explicit login in the same tab clears the marker.
+- Explicit sign-out revokes the current server refresh session, clears the shared auth cookies, and sets `table-canvas:account-signed-out` in the initiating tab. Other account tabs keep their current workspace until their next authenticated request receives `401`; guest tabs remain isolated. An explicit login in the signed-out tab clears its marker.
 - Guest tabs ignore account `401` handlers so another tab's logout cannot interrupt an in-progress guest session.
 
 **Broadcast between tabs (not auth state)**

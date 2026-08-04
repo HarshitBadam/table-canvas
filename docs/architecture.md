@@ -107,7 +107,7 @@ Editing a source cell updates its patches and marks the node plus every downstre
 
 ### Cross-tab session vs document coordination
 
-Auth cookies are origin-shared; guest choice and explicit sign-out markers are tab-local (`sessionStorage`). Auth React state is **not** broadcast between tabs. Within a storage scope, open-document invalidations and project-catalog changes use `BroadcastChannel`, with `visibilitychange` refreshes as a fallback. Full contract: [Reliability — Cross-tab authentication and session](reliability.md#cross-tab-authentication-and-session).
+Auth cookies are origin-shared, while guest choice and the initiating tab's explicit sign-out marker are tab-local (`sessionStorage`). Explicit account sign-out revokes the server refresh session and clears the shared cookies. Auth React state is **not** broadcast between tabs. Within a storage scope, open-document invalidations and project-catalog changes use `BroadcastChannel`, with `visibilitychange` refreshes as a fallback. Full contract: [Reliability — Cross-tab authentication and session](reliability.md#cross-tab-authentication-and-session).
 
 ## Computation engine
 
