@@ -4,6 +4,7 @@ import type { Edge, Patches, ProjectNode, TableNode } from '@/types'
 import { useDataStore } from '@/state/dataStore'
 import { invalidateMaterializations } from '@/engine/materialization/materializationCoordinator'
 import { cancelTableOperation } from '@/state/runtime/tableOperationCoordinator'
+import { hasActiveCanvasImportBatch } from '@/state/runtime/canvasImportBatchStore'
 import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import { computePatchesVersion } from '@/engine/materialization/cacheUtils'
 import { getDependentNodeIds } from '@/engine/graph/workflowGraph'
@@ -183,7 +184,11 @@ export const createHistorySlice: StateCreator<
 
   undo: () => {
     const state = get()
-    if (state.history.transaction || state.history.past.length === 0) return
+    if (
+      state.history.transaction
+      || state.history.past.length === 0
+      || hasActiveCanvasImportBatch(state.projectId)
+    ) return
     const previous = state.history.past[state.history.past.length - 1]
     const current = cloneEntry(state, previous.description)
     const past = state.history.past.slice(0, -1)
@@ -193,7 +198,11 @@ export const createHistorySlice: StateCreator<
 
   redo: () => {
     const state = get()
-    if (state.history.transaction || state.history.future.length === 0) return
+    if (
+      state.history.transaction
+      || state.history.future.length === 0
+      || hasActiveCanvasImportBatch(state.projectId)
+    ) return
     const next = state.history.future[state.history.future.length - 1]
     const current = cloneEntry(state, next.description)
     const past = [...state.history.past, current]
@@ -202,8 +211,18 @@ export const createHistorySlice: StateCreator<
     restore(next, past, future, get, set, removed)
   },
 
-  canUndo: () => !get().history.transaction && get().history.past.length > 0,
-  canRedo: () => !get().history.transaction && get().history.future.length > 0,
+  canUndo: () => {
+    const state = get()
+    return !state.history.transaction
+      && state.history.past.length > 0
+      && !hasActiveCanvasImportBatch(state.projectId)
+  },
+  canRedo: () => {
+    const state = get()
+    return !state.history.transaction
+      && state.history.future.length > 0
+      && !hasActiveCanvasImportBatch(state.projectId)
+  },
 
   beginHistoryTransaction: (description) => {
     const state = get()

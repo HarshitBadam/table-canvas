@@ -188,11 +188,13 @@
   color: var(--color-text-secondary) !important;
 }
 
+.react-flow__controls > :first-child .react-flow__controls-button,
 .react-flow__controls-button:first-child {
   border-top-left-radius: var(--radius-md) !important;
   border-top-right-radius: var(--radius-md) !important;
 }
 
+.react-flow__controls > :last-child .react-flow__controls-button,
 .react-flow__controls-button:last-child {
   border-bottom-left-radius: var(--radius-md) !important;
   border-bottom-right-radius: var(--radius-md) !important;

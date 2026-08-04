@@ -1,6 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import ReactFlow, {
-  Controls,
   Node,
   Edge,
   Connection,
@@ -17,6 +16,7 @@ import 'reactflow/dist/style.css'
 
 import { useProjectStore } from '@/state/projectStore'
 import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
+import { useCanvasImportBatchStore } from '@/state/runtime/canvasImportBatchStore'
 import { useWorkspaceLease } from '@/state/document/useWorkspaceLease'
 import { LoadingSpinner } from '@/layout/LoadingSpinner'
 import type { ProjectNode, Edge as ProjectEdge } from '@/types'
@@ -29,7 +29,12 @@ import { CustomConnectionLine } from './ConnectionLine'
 import { getLayoutedNodes, LayoutDirection } from './autoLayout'
 import { CanvasAutoArrangePanel, CanvasEmptyState, CycleWarningToast } from './CanvasViewPanels'
 import { NewTableModal } from './modals/NewTableModal'
-import { CANVAS_FIT_VIEW_OPTIONS, CanvasFitView } from './CanvasFitView'
+import { CanvasFitView } from './CanvasFitView'
+import { CanvasControls } from './CanvasControls'
+import {
+  getCanvasFitViewOptions,
+  shouldFitViewOnMount,
+} from './canvasFitViewOptions'
 
 const TransformModal = lazy(() => import('./modals/TransformModal').then(m => ({ default: m.TransformModal })))
 const LazyChartNodeComponent = lazy(() => import('./nodes/ChartNode').then(m => ({ default: m.ChartNodeComponent })))
@@ -156,6 +161,13 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const fitViewOptions = getCanvasFitViewOptions(nodes.length)
+  const hasActiveImport = Object.values(
+    useCanvasImportBatchStore.getState().activeBatches,
+  ).some(batch => batch.projectId === projectId)
+  const fitViewOnMountRef = useRef(
+    shouldFitViewOnMount(initialNodes.length, hasActiveImport),
+  )
   const dragStartRef = useRef<{ id: string; position: { x: number; y: number } } | null>(null)
 
   useLayoutEffect(() => {
@@ -276,8 +288,8 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         onNodeDoubleClick={handleNodeDoubleClick}
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={CANVAS_FIT_VIEW_OPTIONS}
+        fitView={fitViewOnMountRef.current}
+        fitViewOptions={fitViewOptions}
         defaultEdgeOptions={{
           type: 'smoothstep',
           style: {
@@ -306,20 +318,13 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         <CanvasFitView
           nodes={nodes}
           projectId={projectId}
-          selectedNodeId={selectedNodeId}
         />
 
         {Object.keys(projectNodes).length > 1 && (
           <CanvasAutoArrangePanel onArrange={handleAutoArrange} />
         )}
 
-        <Controls
-          showInteractive={false}
-          fitViewOptions={CANVAS_FIT_VIEW_OPTIONS}
-          position="bottom-left"
-          style={{ marginLeft: 12, marginBottom: 12 }}
-          className="!z-sticky !rounded-lg !border !border-border !bg-surface !shadow-md [&>button]:!border-0 [&>button]:!bg-surface [&>button]:!text-text-secondary [&>button:hover]:!bg-surface-secondary"
-        />
+        <CanvasControls fitViewOptions={fitViewOptions} />
 
         {Object.keys(projectNodes).length === 0 && (
           <CanvasEmptyState onNewTable={() => setNewTableModalOpen(true)} />

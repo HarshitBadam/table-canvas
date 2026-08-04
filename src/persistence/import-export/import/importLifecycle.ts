@@ -1,4 +1,8 @@
 import { useProjectStore } from '@/state/projectStore'
+import {
+  beginCanvasImportBatch,
+  registerCanvasImportNode,
+} from '@/state/runtime/canvasImportBatchStore'
 import { beginTableOperation } from '@/state/runtime/tableOperationCoordinator'
 import type { TableSchema } from '@/types'
 
@@ -20,11 +24,13 @@ export function isDataFile(file: File): boolean {
 export function reservePendingImport(
   file: Pick<File, 'name'>,
   // Optional display name: workbook sheets are not 1:1 with the source file name.
-  options?: { name?: string },
-): { tableId: string; generation: number } {
+  options?: { name?: string; focusBatchId?: string; recordHistory?: boolean },
+): { tableId: string; generation: number; focusBatchId: string } {
   const name = options?.name ?? fileBaseName(file.name)
   // Undo snapshot so a failed/incomplete reserve can be rolled back.
-  useProjectStore.getState().saveSnapshot(`Import table ${name}`)
+  if (options?.recordHistory !== false) {
+    useProjectStore.getState().saveSnapshot(`Import table ${name}`)
+  }
   const tableId = useProjectStore.getState().addSourceTable({
     name,
     fileRef: `pending:${crypto.randomUUID()}`,
@@ -33,7 +39,14 @@ export function reservePendingImport(
     schema: PENDING_SCHEMA,
     recordHistory: false,
   })
-  return { tableId, generation: beginTableOperation(tableId, 'reading') }
+  const focusBatchId = options?.focusBatchId
+    ?? beginCanvasImportBatch(useProjectStore.getState().projectId)
+  registerCanvasImportNode(focusBatchId, tableId)
+  return {
+    tableId,
+    generation: beginTableOperation(tableId, 'reading'),
+    focusBatchId,
+  }
 }
 
 export function discardPendingImport(tableId: string): void {

@@ -49,17 +49,20 @@ export function useProjectCatalogReconcile({
         const activeProjectId = storeProjectId || null
         const deletedActive = Boolean(
           activeProjectId
-          && (
-            (event?.type === 'project-deleted' && event.projectId === activeProjectId)
-            || !projects.some(project => project.id === activeProjectId)
-          ),
+          && event?.type === 'project-deleted'
+          && event.projectId === activeProjectId,
         )
         if (deletedActive) {
+          const remainingProjects = projects.filter(
+            project => project.id !== activeProjectId,
+          )
           setState(previous => ({
             ...previous,
             projectId: null,
             projectName: 'Untitled Project',
-            projects,
+            projects: remainingProjects.length > 0
+              ? remainingProjects
+              : previous.projects.filter(project => project.id !== activeProjectId),
             isProjectOperationPending: true,
             syncError: 'This project was deleted in another tab.',
           }))
@@ -69,12 +72,33 @@ export function useProjectCatalogReconcile({
             ...previous,
             projectId: null,
             projectName: 'Untitled Project',
-            projects,
+            projects: remainingProjects.length > 0
+              ? remainingProjects
+              : previous.projects.filter(project => project.id !== activeProjectId),
             isProjectOperationPending: false,
           }))
           return
         }
-        setState(previous => ({ ...previous, projects }))
+        setState(previous => {
+          if (projects.length === 0 && previous.projects.length > 0) {
+            return previous
+          }
+          if (
+            activeProjectId
+            && !projects.some(project => project.id === activeProjectId)
+          ) {
+            const activeProject = previous.projects.find(
+              project => project.id === activeProjectId,
+            )
+            if (activeProject) {
+              return {
+                ...previous,
+                projects: [activeProject, ...projects],
+              }
+            }
+          }
+          return { ...previous, projects }
+        })
       } catch (error) {
         console.error('[AppContext] Failed to reconcile the project catalog:', error)
       }

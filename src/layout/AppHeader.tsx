@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useProjectStore } from '@/state/projectStore'
 import { useApp, useAppAuth } from '@/state/AppContext'
-import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/document/useWorkspaceLease'
 import { LoadingSpinner } from './LoadingSpinner'
 import { EditingElsewhereBanner } from './EditingElsewhereBanner'
 import { focusMenuItem } from '@/lib/focusMenuItem'
@@ -36,15 +34,6 @@ export function AppHeader({
   const { user, leaveGuest } = useAppAuth()
   const { isSaving, projects } = useApp()
   const [guestSignInOpen, setGuestSignInOpen] = useState(false)
-  const { canEdit } = useWorkspaceLease()
-  const canUndo = useProjectStore(
-    state => !state.history.transaction && state.history.past.length > 0,
-  )
-  const canRedo = useProjectStore(
-    state => !state.history.transaction && state.history.future.length > 0,
-  )
-  const undo = useProjectStore(state => state.undo)
-  const redo = useProjectStore(state => state.redo)
   const exportButtonRef = useRef<HTMLButtonElement>(null)
   const exportMenuModalityRef = useRef<'pointer' | 'keyboard'>('pointer')
 
@@ -250,35 +239,6 @@ export function AppHeader({
             className="hidden"
           />
         </>
-      )}
-
-      {viewMode === 'grid' && (
-        <div className="flex items-center gap-1" role="group" aria-label="Edit history">
-          <button
-            type="button"
-            onClick={undo}
-            disabled={!canUndo || !canEdit}
-            className="btn btn-ghost p-1.5 disabled:opacity-40"
-            aria-label="Undo"
-            title={canEdit ? 'Undo' : EDITING_ELSEWHERE_TOOLTIP}
-          >
-            <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m15 18-6-6 6-6" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={redo}
-            disabled={!canRedo || !canEdit}
-            className="btn btn-ghost p-1.5 disabled:opacity-40"
-            aria-label="Redo"
-            title={canEdit ? 'Redo' : EDITING_ELSEWHERE_TOOLTIP}
-          >
-            <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m9 18 6-6-6-6" />
-            </svg>
-          </button>
-        </div>
       )}
 
       {viewMode !== 'canvas' && viewMode !== 'report' && isSaving && (

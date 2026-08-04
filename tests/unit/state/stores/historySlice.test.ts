@@ -3,13 +3,36 @@ import { addFilter, addSource, cacheOf, clean, resetStore } from '@/engine/integ
 import { useDataStore } from '@/state/dataStore'
 import { useProjectStore } from '@/state/projectStore'
 import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
+import {
+  beginCanvasImportBatch,
+  cancelCanvasImportBatch,
+  resetCanvasImportBatches,
+} from '@/state/runtime/canvasImportBatchStore'
 
 beforeEach(() => {
   resetStore()
+  resetCanvasImportBatches()
   useDataStore.setState({ tableData: {} })
 })
 
 describe('history slice', () => {
+  it('blocks undo and redo while an import batch is active', () => {
+    const tableId = addSource('Original')
+    useProjectStore.setState({ history: { past: [], future: [] } })
+    useProjectStore.getState().saveSnapshot('Before rename')
+    useProjectStore.getState().updateNode(tableId, { name: 'Renamed' })
+    const batchId = beginCanvasImportBatch(useProjectStore.getState().projectId)
+
+    expect(useProjectStore.getState().canUndo()).toBe(false)
+    useProjectStore.getState().undo()
+    expect(useProjectStore.getState().nodes[tableId]?.name).toBe('Renamed')
+
+    cancelCanvasImportBatch(batchId)
+    expect(useProjectStore.getState().canUndo()).toBe(true)
+    useProjectStore.getState().undo()
+    expect(useProjectStore.getState().nodes[tableId]?.name).toBe('Original')
+  })
+
   it('restores patches on undo and redo while invalidating cached table data', () => {
     const tableId = addSource('Source')
     const derivedId = addFilter(tableId, 'Filtered')
@@ -165,6 +188,35 @@ describe('history slice', () => {
     expect(useProjectStore.getState().rollbackHistoryTransaction(rollbackId)).toBe(true)
     expect(useProjectStore.getState().nodes[rejectedId]).toBeUndefined()
     expect(useProjectStore.getState().history.past).toHaveLength(1)
+  })
+
+  it('undoes a multi-table import as one step and stops at the project baseline', () => {
+    const originalId = addSource('Original')
+    useProjectStore.setState({ history: { past: [], future: [] } })
+    useProjectStore.getState().saveSnapshot('Import 2 tables')
+
+    const importedIds = ['First import', 'Second import'].map((name) => {
+      return useProjectStore.getState().addSourceTable({
+        name,
+        fileRef: `file-${name}`,
+        fileName: `${name}.csv`,
+        fileType: 'csv',
+        schema: { columns: [], rowCount: 0 },
+        recordHistory: false,
+      })
+    })
+
+    expect(useProjectStore.getState().history.past).toHaveLength(1)
+
+    useProjectStore.getState().undo()
+    expect(Object.keys(useProjectStore.getState().nodes)).toEqual([originalId])
+    expect(useProjectStore.getState().canUndo()).toBe(false)
+
+    useProjectStore.getState().undo()
+    expect(Object.keys(useProjectStore.getState().nodes)).toEqual([originalId])
+
+    useProjectStore.getState().redo()
+    expect(importedIds.every(id => useProjectStore.getState().nodes[id])).toBe(true)
   })
 
   it('does not dirty unrelated tables when undoing a node move', () => {
