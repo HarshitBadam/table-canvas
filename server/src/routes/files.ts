@@ -157,7 +157,7 @@ router.post(
     const reserved = await reserveStorage(
       userId,
       file.size,
-      tier === 'google' ? undefined : getLimits(tier).maxServerStorageBytes,
+      getLimits(tier).maxServerStorageBytes,
     );
     if (!reserved) {
       throw new AppError('This upload would exceed your storage quota', 413);

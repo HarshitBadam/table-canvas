@@ -1,21 +1,23 @@
 # Production deployment
 
-This is the production baseline for the hosted portfolio project. Vercel serves the Vite frontend; the Express API must run on a persistent Node host, and MongoDB must run on MongoDB Atlas or an equivalent managed service.
+This is the production baseline for the hosted portfolio project. Vercel serves the Vite frontend, Render runs the Express API, and MongoDB Atlas stores account data and synced files.
 
 ## Recommended topology
 
-- `app.example.com`: Vercel frontend
-- `api.example.com`: Express backend
+- `<project>.vercel.app`: Vercel frontend
+- `<service>.onrender.com`: Render backend
 - MongoDB Atlas: projects, authentication data, rate limits, and GridFS files
 
-Using frontend and API subdomains under one registrable domain keeps authentication cookies same-site. If the frontend and API use unrelated domains, set `COOKIE_SAME_SITE=none`; the API validates mutation origins, but some browsers may still restrict those third-party cookies.
+The free generated frontend and API URLs are unrelated domains, so production uses `COOKIE_SAME_SITE=none`. The API validates mutation origins, but browsers that block all third-party cookies can still restrict refresh sessions. A future custom domain should use sibling frontend and API subdomains and switch the cookie setting to `strict`.
+
+Set `VITE_API_URL` directly to Render rather than proxying API traffic through Vercel. This keeps file uploads and downloads up to the application's 20 MiB limit away from Vercel's function payload limit.
 
 ## Vercel frontend
 
 Set these production environment variables:
 
 ```env
-VITE_API_URL=https://api.example.com/api
+VITE_API_URL=https://<service>.onrender.com/api
 VITE_AUTO_GUEST=false
 # Optional:
 # VITE_GOOGLE_CLIENT_ID=<google-oauth-client-id>
@@ -26,7 +28,9 @@ VITE_AUTO_GUEST=false
 
 ## Backend
 
-Deploy `server/` to a persistent Node host. Set:
+Create the Render service from `render.yaml`. The Blueprint generates independent JWT secrets and prompts for `MONGODB_URI`, `FRONTEND_URL`, and `GOOGLE_CLIENT_ID`. Set `SENTRY_DSN` manually when server error reporting is required.
+
+Add the Render service's published outbound IP ranges to the Atlas project Network Access list. Do not leave Atlas open to `0.0.0.0/0`.
 
 ```env
 NODE_ENV=production
@@ -35,9 +39,9 @@ JWT_ACCESS_SECRET=<independent-random-secret-at-least-32-characters>
 JWT_REFRESH_SECRET=<different-random-secret-at-least-32-characters>
 JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
-FRONTEND_URL=https://app.example.com
+FRONTEND_URL=https://<project>.vercel.app
 TRUST_PROXY=1
-COOKIE_SAME_SITE=strict
+COOKIE_SAME_SITE=none
 ENABLE_REGISTRATION=false
 # Optional:
 # GOOGLE_CLIENT_ID=<same-google-oauth-client-id>
@@ -54,9 +58,31 @@ Configure the host to use:
 - readiness: `GET /api/ready`
 - graceful shutdown timeout: at least 10 seconds
 
+Create one external uptime monitor for `GET /api/health` with a five-minute interval. Keep only one Render Free service continuously warm in the workspace because a 31-day month consumes 744 of the 750 included instance hours.
+
 ## Data protection
 
-Enable Atlas backups for the database containing normal collections and both GridFS collections (`files.files` and `files.chunks`). Treat them as one backup unit.
+Atlas Free has no managed backups. Back up the database from a trusted machine with MongoDB Database Tools:
+
+```bash
+mkdir -p backups
+mongodump \
+  --uri="$MONGODB_URI" \
+  --archive="backups/table-canvas-$(date +%Y%m%dT%H%M%S).archive.gz" \
+  --gzip
+```
+
+Treat normal collections and both GridFS collections (`files.files` and `files.chunks`) as one backup unit. Restore into a temporary database rather than production:
+
+```bash
+BACKUP_FILE=backups/table-canvas-YYYYMMDDTHHMMSS.archive.gz
+mongorestore \
+  --uri="$MONGODB_RESTORE_URI" \
+  --archive="$BACKUP_FILE" \
+  --gzip \
+  --nsFrom='table-canvas.*' \
+  --nsTo='table-canvas-restore.*'
+```
 
 Before announcing a release:
 
@@ -65,6 +91,8 @@ Before announcing a release:
 3. remove the temporary database after validation.
 
 For a portfolio project, run this restore check before major releases and at least quarterly while the site remains public.
+
+Cloud files are limited to 20 MiB per Google account and 300 MiB globally. The global ceiling reserves Atlas capacity for projects, users, indexes, rate limits, and refresh sessions.
 
 ## Monitoring
 

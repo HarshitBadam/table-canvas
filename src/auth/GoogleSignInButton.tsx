@@ -26,9 +26,14 @@ function readGoogleIdentity(): GoogleIdentity | undefined {
 interface GoogleSignInButtonProps {
   onCredential: (response: GoogleCredentialResponse) => void
   busy?: boolean
+  disabled?: boolean
 }
 
-export function GoogleSignInButton({ onCredential, busy = false }: GoogleSignInButtonProps) {
+export function GoogleSignInButton({
+  onCredential,
+  busy = false,
+  disabled = false,
+}: GoogleSignInButtonProps) {
   const [status, setStatus] = useState<Status>(
     GOOGLE_CLIENT_ID ? 'loading' : 'unconfigured',
   )
@@ -137,10 +142,19 @@ export function GoogleSignInButton({ onCredential, busy = false }: GoogleSignInB
   }
 
   return (
-    <div className="auth-google" data-busy={busy || undefined}>
-      <div className="auth-action" aria-hidden="true">
+    <div
+      className="auth-google"
+      data-busy={busy || undefined}
+      data-disabled={disabled || undefined}
+      aria-busy={busy || undefined}
+    >
+      <div
+        className="auth-action"
+        aria-hidden={busy ? undefined : true}
+        role={busy ? 'status' : undefined}
+      >
         <GoogleGlyph />
-        Continue with Google
+        {busy ? 'Signing in…' : 'Continue with Google'}
       </div>
       <div ref={hostRef} className="auth-google-host" />
     </div>

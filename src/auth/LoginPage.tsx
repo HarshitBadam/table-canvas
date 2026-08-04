@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '@/state/AppContext'
+import { warmBackend } from '@/api/auth.api'
 import { ApiError } from '@/api/client'
 import { LoadingSpinner } from '@/layout/LoadingSpinner'
 import { BrandMark } from '@/components/BrandMark'
@@ -14,6 +15,10 @@ export function LoginPage() {
 
   const { googleLogin, continueAsGuest } = useApp()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    void warmBackend()
+  }, [])
 
   const handleError = useCallback((err: unknown) => {
     if (err instanceof ApiError) {
@@ -88,7 +93,8 @@ export function LoginPage() {
             <div className="auth-choices">
               <GoogleSignInButton
                 onCredential={handleGoogleCredential}
-                busy={pendingMethod !== null}
+                busy={pendingMethod === 'google'}
+                disabled={pendingMethod !== null}
               />
               <div className="auth-divider" aria-hidden="true">or</div>
               <button

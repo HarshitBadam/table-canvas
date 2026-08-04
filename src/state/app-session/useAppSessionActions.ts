@@ -37,6 +37,7 @@ interface Options {
   user: User | null
   setState: Dispatch<SetStateAction<AppProviderState>>
   setPhase: (phase: AppPhase, error?: string) => void
+  ensureEngineReady: () => Promise<void>
   prepareProject: (project: ProjectWithSync) => Promise<void>
   clearActiveWorkspace: () => Promise<void>
   resetWorkspace: () => Promise<void>
@@ -52,6 +53,7 @@ export function useAppSessionActions({
   user,
   setState,
   setPhase,
+  ensureEngineReady,
   prepareProject,
   clearActiveWorkspace,
   resetWorkspace,
@@ -108,17 +110,16 @@ export function useAppSessionActions({
   }, [postLoginSetup, setPhase, setState])
 
   const beginLoginSetup = useCallback(async (enter: () => Promise<{ tier: Tier }>) => {
-    // Leave phase 'ready' before auth flips isAuthenticated, otherwise the
-    // catalog reconcile effect races getDB() against post-login project load.
-    setPhase('loading_project')
     try {
       const loggedInUser = await enter()
+      setPhase('initializing_engine')
+      await ensureEngineReady()
       await runPostLoginSetup(loggedInUser.tier)
     } catch (error) {
       setPhase('ready')
       throw error
     }
-  }, [runPostLoginSetup, setPhase])
+  }, [ensureEngineReady, runPostLoginSetup, setPhase])
 
   const login = useCallback(async (credentials: LoginCredentials) => {
     await beginLoginSetup(() => performLogin(credentials))
@@ -165,8 +166,7 @@ export function useAppSessionActions({
     try {
       await performLogout()
     } catch (error) {
-      // performLogout clears local auth in finally; a failed server revoke must
-      // not block tab-local sign-out.
+      // A failed server revoke must not block local sign-out.
       console.warn('[AppContext] Remote session revoke failed during sign out:', error)
     } finally {
       await resetWorkspace()

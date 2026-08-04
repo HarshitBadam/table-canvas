@@ -9,7 +9,11 @@ interface ApiResponse<T = unknown> {
 
 export interface RequestOptions extends RequestInit {
   skipAuth?: boolean;
+  timeoutMs?: number;
 }
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 75_000;
+const FILE_REQUEST_TIMEOUT_MS = 120_000;
 
 export class ApiError extends Error {
   statusCode: number;
@@ -67,12 +71,60 @@ export function setAuthErrorHandler(handler: (() => void) | null): void {
   onAuthError = handler;
 }
 
-async function refreshToken(): Promise<boolean> {
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const externalSignal = options.signal;
+  const forwardAbort = () => controller.abort();
+  if (externalSignal?.aborted) {
+    controller.abort();
+  } else {
+    externalSignal?.addEventListener('abort', forwardAbort, { once: true });
+  }
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-    });
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted && !externalSignal?.aborted) {
+      throw new ApiError('Request timed out. Please try again.', 408);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    externalSignal?.removeEventListener('abort', forwardAbort);
+  }
+}
+
+export async function probeApi(
+  endpoint: string,
+  timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+): Promise<boolean> {
+  try {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}${endpoint}`,
+      { method: 'GET', credentials: 'omit' },
+      timeoutMs,
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function refreshToken(timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS): Promise<boolean> {
+  try {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/auth/refresh`,
+      {
+        method: 'POST',
+        credentials: 'include',
+      },
+      timeoutMs,
+    );
 
     if (response.ok) return true;
     if (response.status === 401 || response.status === 403) return false;
@@ -83,13 +135,13 @@ async function refreshToken(): Promise<boolean> {
   }
 }
 
-export async function refreshSession(): Promise<boolean> {
+export async function refreshSession(timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS): Promise<boolean> {
   if (isRefreshing) {
     return refreshPromise!;
   }
 
   isRefreshing = true;
-  refreshPromise = refreshToken();
+  refreshPromise = refreshToken(timeoutMs);
 
   try {
     const success = await refreshPromise;
@@ -104,7 +156,11 @@ async function request<T>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { skipAuth = false, ...fetchOptions } = options;
+  const {
+    skipAuth = false,
+    timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+    ...fetchOptions
+  } = options;
 
   const url = `${API_BASE_URL}${endpoint}`;
 
@@ -122,13 +178,13 @@ async function request<T>(
     credentials: 'include',
   };
 
-  let response = await fetch(url, config);
+  let response = await fetchWithTimeout(url, config, timeoutMs);
 
   if (response.status === 401 && !skipAuth) {
-    const refreshed = await refreshSession();
+    const refreshed = await refreshSession(timeoutMs);
 
     if (refreshed) {
-      response = await fetch(url, config);
+      response = await fetchWithTimeout(url, config, timeoutMs);
     } else {
       if (onAuthError) {
         onAuthError();
@@ -220,9 +276,9 @@ export const api = {
       credentials: 'include',
       headers: operationId ? { 'Idempotency-Key': operationId } : undefined,
     };
-    let response = await fetch(url, config);
-    if (response.status === 401 && await refreshSession()) {
-      response = await fetch(url, config);
+    let response = await fetchWithTimeout(url, config, FILE_REQUEST_TIMEOUT_MS);
+    if (response.status === 401 && await refreshSession(FILE_REQUEST_TIMEOUT_MS)) {
+      response = await fetchWithTimeout(url, config, FILE_REQUEST_TIMEOUT_MS);
     }
 
     if (!response.ok) {
@@ -249,9 +305,9 @@ export const api = {
       method: 'GET',
       credentials: 'include',
     };
-    let response = await fetch(url, config);
-    if (response.status === 401 && await refreshSession()) {
-      response = await fetch(url, config);
+    let response = await fetchWithTimeout(url, config, FILE_REQUEST_TIMEOUT_MS);
+    if (response.status === 401 && await refreshSession(FILE_REQUEST_TIMEOUT_MS)) {
+      response = await fetchWithTimeout(url, config, FILE_REQUEST_TIMEOUT_MS);
     }
 
     if (!response.ok) {
