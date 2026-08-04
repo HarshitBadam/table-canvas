@@ -80,7 +80,8 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
   const colCount = schema?.columns.length ?? 0
   const viewMode = getViewMode(data.ui)
   const updating = isTableUpdating(cacheInfo) && !cacheInfo?.error
-  const [showUpdatingChrome, setShowUpdatingChrome] = useState(false)
+  const [updatingChromeReady, setUpdatingChromeReady] = useState(false)
+  const showUpdatingChrome = updating && updatingChromeReady
   const hasColumns = (schema?.columns.length ?? 0) > 0
   const showSchemaBody = (viewMode === 'collapsed' && hasColumns)
     || (showUpdatingChrome && !hasColumns)
@@ -88,10 +89,10 @@ export const TableNodeComponent = memo(({ data, selected }: NodeProps<TableNodeD
 
   useEffect(() => {
     if (!updating) {
-      setShowUpdatingChrome(false)
+      setUpdatingChromeReady(false)
       return
     }
-    const timer = window.setTimeout(() => setShowUpdatingChrome(true), UPDATING_CHROME_DELAY_MS)
+    const timer = window.setTimeout(() => setUpdatingChromeReady(true), UPDATING_CHROME_DELAY_MS)
     return () => window.clearTimeout(timer)
   }, [updating])
 

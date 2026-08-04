@@ -12,7 +12,6 @@ import ReactFlow, {
   ConnectionLineType,
   ConnectionMode,
   type NodeProps,
-  type ReactFlowInstance,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 
@@ -30,6 +29,7 @@ import { CustomConnectionLine } from './ConnectionLine'
 import { getLayoutedNodes, LayoutDirection } from './autoLayout'
 import { CanvasAutoArrangePanel, CanvasEmptyState, CycleWarningToast } from './CanvasViewPanels'
 import { NewTableModal } from './modals/NewTableModal'
+import { CANVAS_FIT_VIEW_OPTIONS, CanvasFitView } from './CanvasFitView'
 
 const TransformModal = lazy(() => import('./modals/TransformModal').then(m => ({ default: m.TransformModal })))
 const LazyChartNodeComponent = lazy(() => import('./nodes/ChartNode').then(m => ({ default: m.ChartNodeComponent })))
@@ -156,51 +156,12 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
-  const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null)
-  const fittedProjectRef = useRef<string | null | undefined>(undefined)
-  const visibleNodeIdsRef = useRef<Set<string>>(new Set())
-  const pendingFitNodeIdRef = useRef<string | null>(null)
   const dragStartRef = useRef<{ id: string; position: { x: number; y: number } } | null>(null)
 
   useLayoutEffect(() => {
     setNodes(initialNodes)
     setEdges(initialEdges)
   }, [initialEdges, initialNodes, setEdges, setNodes])
-
-  useLayoutEffect(() => {
-    if (!flowInstance || nodes.length === 0) return
-
-    const currentNodeIds = new Set(nodes.map(node => node.id))
-    if (fittedProjectRef.current !== projectId) {
-      fittedProjectRef.current = projectId
-      visibleNodeIdsRef.current = currentNodeIds
-      pendingFitNodeIdRef.current = null
-      void flowInstance.fitView({
-        padding: 0.08,
-        maxZoom: 1.1,
-        duration: 0,
-      })
-      return
-    }
-
-    const addedNodes = nodes.filter(node => !visibleNodeIdsRef.current.has(node.id))
-    visibleNodeIdsRef.current = currentNodeIds
-    const addedTarget = addedNodes.find(node => node.id === selectedNodeId)
-      ?? addedNodes[addedNodes.length - 1]
-    if (addedTarget) pendingFitNodeIdRef.current = addedTarget.id
-
-    const pendingTarget = nodes.find(node => node.id === pendingFitNodeIdRef.current)
-    const pendingSchema = pendingTarget?.data?.schema
-    if (!pendingTarget || !pendingSchema || pendingSchema.columns.length === 0) return
-
-    pendingFitNodeIdRef.current = null
-    const frame = window.requestAnimationFrame(() => void flowInstance.fitView({
-      padding: 0.08,
-      maxZoom: 1.1,
-      duration: 180,
-    }))
-    return () => window.cancelAnimationFrame(frame)
-  }, [flowInstance, nodes, projectId, selectedNodeId])
 
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -314,10 +275,9 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         onNodeClick={onNodeClick}
         onNodeDoubleClick={handleNodeDoubleClick}
         onPaneClick={onPaneClick}
-        onInit={setFlowInstance}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.08, maxZoom: 1.1 }}
+        fitViewOptions={CANVAS_FIT_VIEW_OPTIONS}
         defaultEdgeOptions={{
           type: 'smoothstep',
           style: {
@@ -343,12 +303,19 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         proOptions={{ hideAttribution: true }}
         className="!bg-transparent"
       >
+        <CanvasFitView
+          nodes={nodes}
+          projectId={projectId}
+          selectedNodeId={selectedNodeId}
+        />
+
         {Object.keys(projectNodes).length > 1 && (
           <CanvasAutoArrangePanel onArrange={handleAutoArrange} />
         )}
 
         <Controls
           showInteractive={false}
+          fitViewOptions={CANVAS_FIT_VIEW_OPTIONS}
           position="bottom-left"
           style={{ marginLeft: 12, marginBottom: 12 }}
           className="!z-sticky !rounded-lg !border !border-border !bg-surface !shadow-md [&>button]:!border-0 [&>button]:!bg-surface [&>button]:!text-text-secondary [&>button:hover]:!bg-surface-secondary"
