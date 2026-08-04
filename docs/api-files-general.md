@@ -155,9 +155,7 @@ All errors follow this format:
 
 ## Rate Limiting
 
-Authentication endpoints use a shared MongoDB-backed rate limiter, including a
-unique key index for concurrent backend instances. A reverse proxy or hosting
-provider may add broader edge limits for the remaining API surface.
+Authentication endpoints use a shared MongoDB-backed rate limiter, including a unique key index for concurrent backend instances. A reverse proxy or hosting provider may add broader edge limits for the remaining API surface.
 
 ## CORS
 

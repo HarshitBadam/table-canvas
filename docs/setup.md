@@ -16,9 +16,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000` and choose **Continue as guest**. Everything persists in
-IndexedDB and remains in that browser with no cross-device sync. Development can set
-`VITE_AUTO_GUEST=true` to skip the explicit choice.
+Open `http://localhost:3000` and choose **Continue as guest**. Everything persists in IndexedDB and remains in that browser with no cross-device sync. Development can set `VITE_AUTO_GUEST=true` to skip the explicit choice.
 
 ### 2. Full stack (Docker)
 
@@ -53,32 +51,23 @@ npm run dev
 
 ## Choosing a database
 
-`MONGODB_URI` must name a database, not just a host. A connection string that ends
-at the host or at `/?` connects to a database called `test`, which is why data can
-appear to vanish after the name is added later:
+`MONGODB_URI` must name a database, not just a host. A connection string that ends at the host or at `/?` connects to a database called `test`, which is why data can appear to vanish after the name is added later:
 
 ```
 mongodb+srv://user:password@cluster.mongodb.net/table-canvas?retryWrites=true&w=majority
                                                ^^^^^^^^^^^^ required
 ```
 
-Give each environment its own database name so local work never writes where
-production reads. One cluster is fine; the separation is the database name.
+Give each environment its own database name so local work never writes where production reads. One cluster is fine; the separation is the database name.
 
 | Environment | Database |
 |-------------|----------|
 | Local development | `table-canvas-dev` |
 | Production | `table-canvas` |
 
-A hosted cluster works for local development, but check two things in its console
-first. Network access provisioned by a platform integration is often open to
-`0.0.0.0/0`; narrow it once the backend has a stable address. And an integration's
-generated user is usually a cluster administrator, so create a separate user
-scoped to the application database for the server to use.
+A hosted cluster works for local development, but check two things in its console first. Network access provisioned by a platform integration is often open to `0.0.0.0/0`; narrow it once the backend has a stable address. And an integration's generated user is usually a cluster administrator, so create a separate user scoped to the application database for the server to use.
 
-Platform database integrations inject the connection string into the project they
-are attached to. The Vercel deployment serves only the static frontend and never
-connects to MongoDB, so the backend host needs the value set on it directly.
+Platform database integrations inject the connection string into the project they are attached to. The Vercel deployment serves only the static frontend and never connects to MongoDB, so the backend host needs the value set on it directly.
 
 ## Environment variables
 
@@ -119,8 +108,7 @@ VITE_GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
 
 Generate secrets with `openssl rand -base64 32`.
 
-Google Sign-In is optional in every environment. The client hides the Google button
-when its client ID is absent.
+Google Sign-In is optional in every environment. The client hides the Google button when its client ID is absent.
 
 ## Build
 
@@ -128,16 +116,12 @@ when its client ID is absent.
 npm run build   # tsc + vite, output in dist/
 ```
 
-`dist/` can be served by any static file server. Configure it to fall back to `index.html` for
-client-side routing.
+`dist/` can be served by any static file server. Configure it to fall back to `index.html` for client-side routing.
 
-For the hosted Vercel frontend and production backend checklist, see
-[Production deployment](production.md).
+For the hosted Vercel frontend and production backend checklist, see [Production deployment](production.md).
 
 ## Gotchas
 
-- **Backend reachability** is checked during authentication. When it is unavailable,
-  users can explicitly continue with a guest workspace.
+- **Backend reachability** is checked during authentication. When it is unavailable, users can explicitly continue with a guest workspace.
 - **CORS errors** usually mean `FRONTEND_URL` doesn't match the actual frontend origin (including port).
-- **Reset local data**: `indexedDB.deleteDatabase('table-canvas-v2')` in the browser console, or
-  clear site data.
+- **Reset local data**: `indexedDB.deleteDatabase('table-canvas-v2')` in the browser console, or clear site data.

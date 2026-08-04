@@ -1,8 +1,6 @@
 # UX release contract
 
-UX is release-blocking. A change passes only when `npm run test:release` is green with
-committed visual baselines. Updating a screenshot is a product decision, not a way to
-silence a failure.
+UX is release-blocking. A change passes only when `npm run test:release` is green with committed visual baselines. Updating a screenshot is a product decision, not a way to silence a failure.
 
 ## Supported experience
 
@@ -12,8 +10,7 @@ silence a failure.
 - WCAG 2.1 A/AA rules covered by axe, plus explicit focus and keyboard journeys.
 - Tables up to the product limit, with a deterministic 2,000-row browser fixture.
 
-Smaller touch layouts are not currently a supported product surface. Expanding that
-support requires adding viewports and baselines before changing the claim.
+Smaller touch layouts are not currently a supported product surface. Expanding that support requires adding viewports and baselines before changing the claim.
 
 ## Binary gates
 
@@ -30,8 +27,7 @@ support requires adding viewports and baselines before changing the claim.
 | Runtime errors | Critical UX tests allow zero uncaught errors and zero `console.error` calls |
 | Production signals | The production build records FCP, TTFB, CLS, INP, and LCP through `web-vitals` |
 
-Performance gates intentionally use bounded work and long tasks rather than total
-wall-clock duration, which varies with CI hardware.
+Performance gates intentionally use bounded work and long tasks rather than total wall-clock duration, which varies with CI hardware.
 
 ## Commands
 
@@ -40,28 +36,19 @@ npm run test:ux
 npm run test:release
 ```
 
-Use `npm run test:ux:update` only after reviewing every changed image. CI runs the full
-Playwright suite, which includes the UX contract.
+Use `npm run test:ux:update` only after reviewing every changed image. CI runs the full Playwright suite, which includes the UX contract.
 
 ## Production telemetry
 
-`src/observability/frontendTelemetry.ts` keeps the latest 100 events in
-`window.__tableCanvasTelemetry`, emits `tablecanvas:telemetry`, and records:
+`src/observability/frontendTelemetry.ts` keeps the latest 100 events in `window.__tableCanvasTelemetry`, emits `tablecanvas:telemetry`, and records:
 
 - CLS, FCP, INP, LCP, and TTFB
 - uncaught errors
 - unhandled promise rejections
 - React error-boundary failures
 
-The buffer is local to the tab and is what the performance budget asserts against.
-Web vitals stay there. Errors are additionally sent to Sentry when `VITE_SENTRY_DSN`
-is set on a production build; see [Error monitoring](reliability.md#error-monitoring).
-No payload contains table contents, cell values, email addresses, or project names.
+The buffer is local to the tab and is what the performance budget asserts against. Web vitals stay there. Errors are additionally sent to Sentry when `VITE_SENTRY_DSN` is set on a production build; see [Error monitoring](reliability.md#error-monitoring). No payload contains table contents, cell values, email addresses, or project names.
 
 ## Review rule
 
-The automated contract is necessary but does not prove that UX is universally
-“perfect.” Any newly supported browser, viewport, input method, or user journey must
-first be expressed as a reproducible gate. Subjective usability findings become
-release requirements only after they are converted into an observable behavior or
-reviewed visual baseline.
+The automated contract is necessary but does not prove that UX is universally “perfect.” Any newly supported browser, viewport, input method, or user journey must first be expressed as a reproducible gate. Subjective usability findings become release requirements only after they are converted into an observable behavior or reviewed visual baseline.

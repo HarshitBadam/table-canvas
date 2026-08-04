@@ -261,8 +261,7 @@ Partial update of project. Only provided fields are updated.
 }
 ```
 
-**Allowed fields:** `name`, `nodes`, `edges`, `patches`, `reports`.
-`expectedRevision` is required for both PUT and PATCH.
+**Allowed fields:** `name`, `nodes`, `edges`, `patches`, `reports`. `expectedRevision` is required for both PUT and PATCH.
 
 **Response (200):**
 ```json
@@ -281,8 +280,7 @@ Partial update of project. Only provided fields are updated.
 
 ### DELETE /projects/:id
 
-Soft delete a project. The revision is advanced atomically. Restorable files remain
-stored and count toward quota.
+Soft delete a project. The revision is advanced atomically. Restorable files remain stored and count toward quota.
 
 **Request:**
 ```json

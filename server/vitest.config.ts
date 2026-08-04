@@ -17,6 +17,10 @@ export default defineConfig({
         'node_modules/',
         'dist/',
         'tests/',
+        // Process bootstrap/wiring: exercised by e2e/smoke tests against a
+        // real Mongo instance and process lifecycle, not unit tests.
+        'src/index.ts',
+        'src/config/db.ts',
       ],
       thresholds: {
         lines: 70,

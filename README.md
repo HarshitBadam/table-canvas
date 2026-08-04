@@ -1,24 +1,10 @@
 # Table Canvas
 
-Table Canvas replaces the spreadsheet grid-of-formulas with a node graph: import a file, drop it
-on a canvas, and wire it into filters, joins, group-bys, and calculated columns that produce new
-tables you can see, trace, and rerun. Every derived table remembers exactly which transform and
-which upstream tables produced it, so the pipeline is never hidden inside a cell reference.
+A local-first visual data workbench. Import CSV or Excel files, then build transformation pipelines by wiring tables together on a canvas instead of editing formulas across cells. SQL runs entirely in the browser via DuckDB-WASM, so data never has to leave the machine.
 
-Under the hood it's a real analytical engine, not a UI trick: DuckDB-WASM runs actual SQL against
-your data inside a Web Worker, entirely in the browser, so nothing is uploaded anywhere. The
-project graph is a reactive DAG — change a source table and every downstream derived table,
-chart, and report block that depends on it is marked dirty and recomputes automatically. From the
-same project you also get a virtualized grid with spreadsheet-style formula columns, an
-auto-suggestion engine that profiles your data and proposes cleanups and charts, a live dashboard
-with lineage, and a Notion-style report editor with embedded, always-in-sync tables and charts.
+Everything persists locally in IndexedDB. There's also an optional Express + MongoDB backend that adds login and cross-device sync, but the app runs fully without it.
 
-Everything persists locally in IndexedDB by default — full offline, no account needed. An
-optional Express + MongoDB backend adds login and cross-device sync on top, with multi-tab
-editing handled safely (one tab owns writes at a time; others mirror it live).
-
-> Built solo. Core technical pieces: DuckDB-WASM for in-browser SQL, a reactive DAG compute
-> engine, and a ReactFlow canvas.
+> Built solo. Core technical pieces: DuckDB-WASM for in-browser SQL, a reactive DAG compute engine, and a ReactFlow canvas. No server required.
 
 ## Quick start
 
@@ -29,9 +15,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000` and choose **Continue as guest** for a browser-local
-workspace. Set `VITE_AUTO_GUEST=true` only when automatic guest startup is useful
-during development.
+Open `http://localhost:3000` and choose **Continue as guest** for a browser-local workspace. Set `VITE_AUTO_GUEST=true` only when automatic guest startup is useful during development.
 
 For the full stack (auth + sync) with Docker:
 
@@ -45,15 +29,15 @@ See [docs/setup.md](docs/setup.md) for environment variables and the manual back
 
 ## Docs
 
-| Document | What's in it |
-|----------|--------------|
-| [Setup](docs/setup.md) | Run modes, environment variables, troubleshooting |
-| [Architecture](docs/architecture.md) | DAG, engine, state, materialization, persistence |
-| [Session and data reliability](docs/reliability.md) | Guest/account isolation, tabs, promotion, concurrency, quotas |
-| [Production deployment](docs/production.md) | Vercel, backend, backups, monitoring, release and rollback |
-| [Features](docs/features.md) | Canvas, grid, formulas, transforms, charts, dashboard, reports |
-| [API](docs/api.md) | REST endpoints for the optional backend |
-| [Testing](docs/testing.md) | How to run tests, where they live, CI |
+| Document                                            | What's in it                                                   |
+| --------------------------------------------------- | -------------------------------------------------------------- |
+| [Setup](docs/setup.md)                              | Run modes, environment variables, troubleshooting              |
+| [Architecture](docs/architecture.md)                | DAG, engine, state, materialization, persistence               |
+| [Session and data reliability](docs/reliability.md) | Guest/account isolation, tabs, promotion, concurrency, quotas  |
+| [Production deployment](docs/production.md)         | Vercel, backend, backups, monitoring, release and rollback     |
+| [Features](docs/features.md)                        | Canvas, grid, formulas, transforms, charts, dashboard, reports |
+| [API](docs/api.md)                                  | REST endpoints for the optional backend                        |
+| [Testing](docs/testing.md)                          | How to run tests, where they live, CI                          |
 
 ## How it works
 
@@ -66,17 +50,17 @@ See [docs/setup.md](docs/setup.md) for environment variables and the manual back
 
 ## Tech stack
 
-| Layer | Technology | Purpose |
-| --- | --- | --- |
-| UI | React 18 + TypeScript | Component architecture and type safety |
-| Engine | DuckDB-WASM | In-browser SQL execution (in a Web Worker) |
-| State | Zustand + Immer | DAG state and immutable updates |
-| Canvas | ReactFlow + Dagre | Node graph and auto-layout |
-| Charts | Recharts | Bar / line / pie / scatter |
-| Reports | TipTap | Notion-style rich-text editor |
-| Persistence | IndexedDB (`idb`) | Local storage, offline-capable |
-| Parsing/Export | PapaParse, xlsx, JSZip | CSV/Excel import and project export |
-| Backend (optional) | Express + MongoDB | Auth and cross-device sync |
+| Layer              | Technology             | Purpose                                    |
+| ------------------ | ---------------------- | ------------------------------------------ |
+| UI                 | React 18 + TypeScript  | Component architecture and type safety     |
+| Engine             | DuckDB-WASM            | In-browser SQL execution (in a Web Worker) |
+| State              | Zustand + Immer        | DAG state and immutable updates            |
+| Canvas             | ReactFlow + Dagre      | Node graph and auto-layout                 |
+| Charts             | Recharts               | Bar / line / pie / scatter                 |
+| Reports            | TipTap                 | Notion-style rich-text editor              |
+| Persistence        | IndexedDB (`idb`)      | Local storage, offline-capable             |
+| Parsing/Export     | PapaParse, xlsx, JSZip | CSV/Excel import and project export        |
+| Backend (optional) | Express + MongoDB      | Auth and cross-device sync                 |
 
 ## Project structure
 
