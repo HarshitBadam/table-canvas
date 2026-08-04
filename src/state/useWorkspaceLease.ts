@@ -6,11 +6,9 @@ import {
 } from './documentLease'
 
 export interface WorkspaceLease extends LeaseState {
-  /** Mutating controls read this; false means another tab is editing. */
   canEdit: boolean
 }
 
-/** Tooltip for every control disabled because another tab holds editing. */
 export const EDITING_ELSEWHERE_TOOLTIP = 'Editing is active in another tab.'
 
 export function useWorkspaceLease(): WorkspaceLease {

@@ -1,7 +1,7 @@
 /**
- * In-process stand-ins for the two browser APIs that coordinate tabs: Web Locks and
- * BroadcastChannel. Both are shared buses, so tests can run several "tabs" (separate
- * module registries) against one lock manager and one channel bus.
+ * In-process stand-ins for Web Locks and BroadcastChannel. Shared buses let
+ * tests run several "tabs" (separate module registries) against one lock
+ * manager and one channel bus.
  */
 
 interface FakeLock {
@@ -141,7 +141,6 @@ export class FakeLockManager {
     return { held, pending }
   }
 
-  /** True while some tab holds the lock. */
   isHeld(name: string): boolean {
     return (this.held.get(name)?.length ?? 0) > 0
   }

@@ -6,7 +6,6 @@ import type { Edge, Patches, ProjectNode } from '@/types'
 export type ProjectActionErrorCode =
   | 'auth'
   | 'busy'
-  | 'last-project'
   | 'limit'
   | 'network'
   | 'not-found'

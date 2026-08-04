@@ -39,15 +39,15 @@ function serializedSize(value: unknown): number {
 
 function trimPast(entries: HistoryEntry[]): HistoryEntry[] {
   const removed: HistoryEntry[] = []
+  let totalBytes = entries.reduce((total, entry) => total + serializedSize(entry), 0)
   while (
     entries.length > 1
-    && (
-      entries.length > MAX_UNDO_HISTORY
-      || entries.reduce((total, entry) => total + serializedSize(entry), 0) > MAX_HISTORY_BYTES
-    )
+    && (entries.length > MAX_UNDO_HISTORY || totalBytes > MAX_HISTORY_BYTES)
   ) {
     const entry = entries.shift()
-    if (entry) removed.push(entry)
+    if (!entry) break
+    removed.push(entry)
+    totalBytes -= serializedSize(entry)
   }
   return removed
 }
@@ -71,6 +71,7 @@ function updateFileRetention(
   queueHistoryFileCleanup(scope, candidates)
 }
 
+/** Identity for merge restamping: ignore timestamps and view-only UI. */
 function mergeSignature(node: ProjectNode | undefined): string {
   if (!node) return ''
   return JSON.stringify(Object.fromEntries(
@@ -78,6 +79,7 @@ function mergeSignature(node: ProjectNode | undefined): string {
   ))
 }
 
+/** Data identity for cache invalidation: rename/position-only edits must not clear rows. */
 function dataSignature(node: ProjectNode | undefined, patches: Patches | undefined): string {
   if (!isTableNode(node)) return ''
   return JSON.stringify({
@@ -225,6 +227,7 @@ export const createHistorySlice: StateCreator<
 
   commitHistoryTransaction: (id) => {
     const transaction = get().history.transaction
+    // projectId guards against committing after a project switch reused the same id space.
     if (!transaction || transaction.id !== id || transaction.projectId !== get().projectId) {
       return false
     }
@@ -270,6 +273,8 @@ function restore(
   const current = get()
   const target = structuredClone(targetEntry)
   const reconciliation = reconciliationFor(current, target)
+  // Restored snapshots carry old updatedAt values; restamp so cross-device merge
+  // treats an explicit undo/redo as newer than the pre-restore document.
   const restamped = new Date().toISOString()
   for (const id of reconciliation.restamp) {
     const node = target.nodes[id]

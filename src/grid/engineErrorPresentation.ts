@@ -1,9 +1,4 @@
-/**
- * Maps raw engine (DuckDB) error strings into a friendlier title + plain
- * English explanation for the GridView error panel. The raw message is
- * always still shown (collapsed, under "Show raw error"), this only
- * decides the headline copy shown above it.
- */
+/** Headline copy for the grid error panel; raw engine text remains under "Show raw error". */
 export interface EngineErrorPresentation {
   title: string
   description: string

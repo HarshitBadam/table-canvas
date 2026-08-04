@@ -14,36 +14,34 @@ registerRule({
     if (meta.column.type !== 'number') return false;
     return meta.columnProfile.missingPercent > 5 && meta.columnProfile.missingPercent < 100;
   },
-  build: (ctx, meta) => {
-    return {
-      id: createSuggestionId('fill_missing', ctx.tableId, meta.column?.id),
-      category: 'cleaning',
-      scope: 'column',
-      title: `Fill missing values in "${meta.column!.name}"`,
-      description: `${meta.columnProfile!.missingPercent.toFixed(1)}% of values are missing. Fill with mean.`,
-      confidence: meta.columnProfile!.missingPercent > 20 ? 'high' : 'medium',
-      context: {
-        tableId: ctx.tableId,
-        columnId: meta.column!.id,
-        tableVersionHash: getVersionHash(ctx),
-        cleaningOperation: { type: 'fill_missing_numeric', strategy: 'mean' as const },
-      },
-      why: [
-        `${meta.columnProfile!.missingPercent.toFixed(1)}% values are missing`,
-        'Missing data can affect calculations',
-        'May cause issues in joins and aggregations',
-      ],
-      impact: {
-        kind: 'derivedTable',
-        summary: `Fills ${meta.columnProfile!.missingCount} missing values`,
-      },
-      action: {
-        kind: 'applyPatch',
-        ops: [],
-        target: 'cleanCopy',
-      },
-    };
-  },
+  build: (ctx, meta) => ({
+    id: createSuggestionId('fill_missing', ctx.tableId, meta.column?.id),
+    category: 'cleaning',
+    scope: 'column',
+    title: `Fill missing values in "${meta.column!.name}"`,
+    description: `${meta.columnProfile!.missingPercent.toFixed(1)}% of values are missing. Fill with mean.`,
+    confidence: meta.columnProfile!.missingPercent > 20 ? 'high' : 'medium',
+    context: {
+      tableId: ctx.tableId,
+      columnId: meta.column!.id,
+      tableVersionHash: getVersionHash(ctx),
+      cleaningOperation: { type: 'fill_missing_numeric', strategy: 'mean' as const },
+    },
+    why: [
+      `${meta.columnProfile!.missingPercent.toFixed(1)}% values are missing`,
+      'Missing data can affect calculations',
+      'May cause issues in joins and aggregations',
+    ],
+    impact: {
+      kind: 'derivedTable',
+      summary: `Fills ${meta.columnProfile!.missingCount} missing values`,
+    },
+    action: {
+      kind: 'applyPatch',
+      ops: [],
+      target: 'cleanCopy',
+    },
+  }),
   score: (_ctx, meta) => {
     const missing = meta.columnProfile?.missingPercent ?? 0;
     if (missing > 30) return 85;

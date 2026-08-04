@@ -329,27 +329,24 @@ export function createColumnOps(set: SetFn, get: GetFn) {
       if (!node || (node.kind !== 'source_table' && node.kind !== 'derived_table') || !node.schema) {
         return { ok: false, code: 'TABLE_NOT_FOUND', error: 'Table not found.' } satisfies ColumnOperationResult
       }
-      if (!node.schema.columns.some((column) => column.id === columnId)) {
+      const currentColumn = node.schema.columns.find(column => column.id === columnId)
+      if (!currentColumn) {
         return { ok: false, code: 'COLUMN_NOT_FOUND', error: 'Column not found.' } satisfies ColumnOperationResult
       }
       const nameResult = validateColumnName(node.schema.columns, newName, columnId)
       if (!nameResult.ok) return nameResult
-      const currentColumn = node.schema.columns.find(column => column.id === columnId)
-      if (currentColumn?.name === nameResult.name) {
+      if (currentColumn.name === nameResult.name) {
         return { ok: true, columnId } satisfies ColumnOperationResult
       }
-      get().saveSnapshot(`Rename column ${currentColumn?.name ?? columnId}`)
+      get().saveSnapshot(`Rename column ${currentColumn.name}`)
 
       set((state) => {
         const currentNode = state.nodes[tableId]
         if (currentNode && (currentNode.kind === 'source_table' || currentNode.kind === 'derived_table')) {
-          const tableNode = currentNode as SourceTableNode
-          if (tableNode.schema) {
-            const column = tableNode.schema.columns.find(c => c.id === columnId)
-            if (column) {
-              column.name = nameResult.name
-              tableNode.updatedAt = new Date().toISOString()
-            }
+          const column = currentNode.schema?.columns.find(c => c.id === columnId)
+          if (column) {
+            column.name = nameResult.name
+            currentNode.updatedAt = new Date().toISOString()
           }
         }
       })

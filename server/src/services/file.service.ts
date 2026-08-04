@@ -215,10 +215,11 @@ export async function getFileMetadata(
   };
 }
 
+/** Returns true when the GridFS file exists and belongs to the user. */
 export async function getFileLifecycleMetadata(
   fileId: string,
   userId: string,
-): Promise<{ projectId?: string } | null> {
+): Promise<boolean> {
   const db = mongoose.connection.db;
   if (!db) throw new Error('Database connection not established');
   const file = await db.collection('files.files').findOne(
@@ -226,12 +227,7 @@ export async function getFileLifecycleMetadata(
       _id: new mongo.ObjectId(fileId),
       'metadata.userId': userId,
     },
-    { projection: { metadata: 1 } },
+    { projection: { _id: 1 } },
   );
-  if (!file) return null;
-  return {
-    projectId: typeof file.metadata?.projectId === 'string'
-      ? file.metadata.projectId
-      : undefined,
-  };
+  return file != null;
 }

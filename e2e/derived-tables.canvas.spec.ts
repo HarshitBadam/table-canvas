@@ -1,5 +1,11 @@
 import { expect, test } from './e2e.fixture'
-import { bootApp, createManualTable, openCanvasView, openManualTable } from './app.support'
+import {
+  bootApp,
+  createManualTable,
+  importCsv,
+  openCanvasView,
+  openManualTable,
+} from './app.support'
 
 test.describe('Canvas and table behavior', () => {
   test.beforeEach(async ({ page }) => {
@@ -58,17 +64,16 @@ test.describe('Canvas and table behavior', () => {
   })
 
   test('CSV import materializes exact rows and schema instead of only exposing a file input', async ({ page }) => {
-    await page.locator('aside input[type="file"][accept*=".csv"]').setInputFiles({
-      name: 'imported-data.csv',
-      mimeType: 'text/csv',
-      buffer: Buffer.from('ID,Name\n1,Ada\n2,Grace\n3,Linus'),
-    })
+    await importCsv(page, 'imported-data', [
+      'ID,Name',
+      '1,Ada',
+      '2,Grace',
+      '3,Linus',
+    ])
 
-    const table = page.locator('aside').getByRole('button', {
+    await page.locator('aside').getByRole('button', {
       name: /^imported-data .*3 rows/,
-    })
-    await expect(table).toBeVisible({ timeout: 20_000 })
-    await table.click()
+    }).click()
     await expect(page.getByText('3 rows × 2 columns')).toBeVisible()
     await expect(page.getByRole('gridcell').filter({ hasText: 'Ada' })).toHaveCount(1)
     await expect(page.getByRole('gridcell').filter({ hasText: 'Linus' })).toHaveCount(1)

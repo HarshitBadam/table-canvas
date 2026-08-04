@@ -11,17 +11,10 @@ const INTERACTIVE = 'button, input, textarea, select, a, [role="dialog"], [conte
 
 /**
  * Atomic block node views render their own DOM, so ProseMirror's built-in
- * click-to-select is unreliable inside them: inner scroll containers and React
- * handlers routinely consume the event before it resolves to a node position.
- * Setting the node selection explicitly on mousedown makes every block
- * selectable from anywhere in its body, which is what makes it deletable.
- *
- * Callers attach this on the capture phase. ProseMirror listens for mousedown
- * on the editor root, which is below React's delegated bubble listener. A
- * bubble-phase handler therefore runs only after ProseMirror has recorded a
- * geometry-derived mouseup destination. Preventing the default in capture
- * makes the DOM target authoritative for block chrome and keeps ProseMirror
- * from starting a second gesture for the same press.
+ * click-to-select is unreliable inside them. Set the node selection explicitly
+ * on capture-phase mousedown: ProseMirror listens on the editor root below
+ * React's delegated bubble listener, so a bubble handler runs only after PM has
+ * already recorded a geometry-derived mouseup destination.
  *
  * @param exemptSelector extra CSS selector whose subtree keeps its own click
  *   handling, e.g. the editable cells of a grid.
@@ -50,7 +43,6 @@ export function useNodeSelect(
   );
 }
 
-/** Selects the node this view renders, for callers that have no mouse event. */
 export function useSelectNode(
   editor: NodeViewProps['editor'],
   getPos: NodeViewProps['getPos'],
@@ -70,23 +62,19 @@ export function useSelectNode(
       view.dispatch(state.tr.setSelection(selection));
     }
 
-    // The block is already under the pointer, so focus without scrolling it
-    // into view and moving the page underneath the gesture.
+    // Block is already under the pointer — focus without scrolling the page.
     view.focus();
   }, [editor, getPos]);
 }
 
 /**
- * Hands the document selection back to the text flow. Node views call this
- * before giving focus to one of their own inputs: typing while the block is
- * still node-selected would replace the whole block.
+ * Release any node selection before focusing an inner input: typing while the
+ * block is still node-selected would replace the whole block.
  *
- * It releases whichever block is selected, not only this one. Entering a grid
- * is the user leaving the previously selected block, and that block cannot
- * release itself: node views swallow their own mouse events, so the click that
- * lands in this grid is never seen by the other block or by ProseMirror's own
- * click-to-select. Scoping this to the caller's own position left the earlier
- * block wearing its selection ring next to a freshly selected cell.
+ * Releases whichever block is selected, not only this one. Entering a grid
+ * leaves the previously selected block, and that block cannot release itself —
+ * node views swallow their own mouse events, so the click never reaches the
+ * other block or ProseMirror's click-to-select.
  */
 export function useReleaseNodeSelection(editor: NodeViewProps['editor']) {
   return useCallback(() => {

@@ -49,7 +49,6 @@ function textLeaf(node: JSONContent): ContentText {
   return leaf
 }
 
-/** Flattens a node's inline children into the runs of a single text paragraph. */
 export function inlineContent(nodes: JSONContent[] | undefined): Content[] {
   if (!nodes) return []
 
@@ -68,7 +67,6 @@ export function inlineContent(nodes: JSONContent[] | undefined): Content[] {
   return runs
 }
 
-/** Concatenates the plain text of a subtree, for contexts that take no markup. */
 export function plainText(nodes: JSONContent[] | undefined): string {
   if (!nodes) return ''
   return nodes.map((node) => node.text ?? plainText(node.content)).join('')

@@ -14,7 +14,6 @@ const CALLOUT_VARIANTS: Record<string, { accent: string; fill: string }> = {
   success: { accent: '#15803d', fill: '#f0fdf4' },
 }
 
-/** A block the author inserted but never pointed at a data source. */
 function isUnconfigured(node: JSONContent): boolean {
   if (node.type !== 'embeddedTable' && node.type !== 'chartBlock') return false
   if (!node.attrs?.sourceTableId) return true
@@ -31,7 +30,6 @@ function childBlocks(
   return (node.content ?? []).flatMap((child) => nodeBlocks(child, dataMap, topLevel))
 }
 
-/** A list item collapses to its single block, so lists stay tight. */
 function listItem(node: JSONContent, dataMap: EmbeddedDataMap): Content {
   const blocks = childBlocks(node, dataMap, false)
   if (blocks.length === 1) return blocks[0]
@@ -44,10 +42,8 @@ export function nodeBlocks(
   topLevel: boolean,
 ): Content[] {
   switch (node.type) {
-    // An empty paragraph is the editor's spacer — TipTap keeps one at the end of
-    // every document — not something the author wrote. Emitting it makes it a
-    // block the page flow has to place, which after a landscape table means
-    // breaking back to portrait and spending a whole page rendering nothing.
+    // TipTap keeps an empty trailing paragraph as a spacer. Emitting it after a
+    // landscape table forces a portrait break and an empty page.
     case 'paragraph': {
       const runs = inlineContent(node.content)
       if (runs.length === 0) return []
@@ -89,10 +85,8 @@ export function nodeBlocks(
     case 'hardBreak':
       return []
 
-    // An unconfigured block is an unfinished editing affordance rather than
-    // content, so it is dropped instead of shipped as a placeholder in a document
-    // someone else reads. A configured block whose data is missing keeps its
-    // placeholder, because dropping real content would hide the failure.
+    // Drop unfinished editing affordances. Configured blocks with missing data
+    // keep their placeholder so the failure stays visible.
     case 'embeddedTable':
       if (isUnconfigured(node)) return []
       return embeddedTableBlocks(node.attrs ?? {}, dataMap, topLevel)

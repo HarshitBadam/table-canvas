@@ -77,7 +77,7 @@
   --color-node-derived-border: oklch(62.7% 0.233 303.9);
   --color-node-derived-text: oklch(54.1% 0.247 293);
   --color-node-source: #e1eee5;
-  /* Darkened from #3f624b to clear WCAG AA 4.5:1 contrast on the sidebar's active-item tint. */
+  /* WCAG AA 4.5:1 on the sidebar's active-item tint. */
   --color-node-source-border: #2f4b3a;
   --color-node-chart: #ddeee7;
   --color-node-chart-border: #386856;
@@ -177,16 +177,9 @@ body,
   margin: 0;
   padding: 0;
   /*
-   * The viewport's overscroll behaviour is what decides whether a horizontal
-   * trackpad swipe that runs past the end of a scroller becomes a back or
-   * forward navigation. The workspace is a single document that never pushes
-   * history entries of its own, so that gesture does not step back through the
-   * app — it leaves for whatever the tab was showing beforehand, taking the
-   * session's view, selection and scroll position with it. Swiping across a wide
-   * table is an ordinary thing to do here, so the gesture is declined.
-   *
-   * All three elements are set because browsers disagree about which one the
-   * viewport takes this from.
+   * Decline viewport overscroll navigation: horizontal table swipe past the
+   * end must not trigger browser back/forward. Set on html, body, and #root
+   * because browsers disagree which element owns the viewport gesture.
    */
   overscroll-behavior: none;
 }

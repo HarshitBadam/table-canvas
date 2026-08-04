@@ -9,7 +9,7 @@
     border-radius: 4pt !important;
     padding: 10pt !important;
     background: white !important;
-    max-height: 5in !important; /* Prevent charts from being too tall */
+    max-height: 5in !important;
   }
 
   .chart-block svg,
@@ -37,24 +37,8 @@
   }
 
   .chart-block-grid,
-  .chart-block-toolbar,
   .chart-block-footer button {
     display: none !important;
-  }
-
-  /* Tables - can span pages with repeating headers */
-
-  .table-snippet-block,
-  .table-block-container {
-    margin: 12pt 0 !important;
-    /* Keep tables together - avoid splitting */
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  /* Only allow large tables to break if absolutely necessary */
-  .table-block-container.table-large {
-    page-break-inside: auto !important;
   }
 
   table {
@@ -63,15 +47,6 @@
     font-size: 8.5pt !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-  }
-
-  /* For large tables that must break, repeat header on each page */
-  .table-large table {
-    page-break-inside: auto !important;
-  }
-
-  .table-large thead {
-    display: table-header-group !important;
   }
 
   tfoot {
@@ -99,18 +74,6 @@
 
   tr:nth-child(even) td {
     background: #fbfcfb !important;
-  }
-
-  .table-block-footer {
-    font-size: 8pt !important;
-    color: #888 !important;
-    padding-top: 4pt !important;
-  }
-
-  /* Keep table with its header */
-  .table-block-header {
-    page-break-after: avoid !important;
-    break-after: avoid !important;
   }
 
   /* Editing chrome stays in the DOM so selection never reflows the block. */

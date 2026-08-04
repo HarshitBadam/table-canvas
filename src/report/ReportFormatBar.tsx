@@ -8,7 +8,6 @@ interface ReportFormatBarProps {
   showDividers?: boolean;
 }
 
-/** The compact toolbar scrolls horizontally instead of dropping editor controls. */
 const extended = 'flex';
 
 export function ReportFormatBar({ editor, blocked, showDividers = true }: ReportFormatBarProps) {

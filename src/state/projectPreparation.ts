@@ -45,11 +45,7 @@ export async function prepareProjectState(project: ProjectWithSync): Promise<voi
       selectedNodeId: null,
       history: { past: [], future: [] },
     })
-    // The runtime cache was just reset above, so nothing in this tab's DuckDB
-    // instance backs these tables yet. Mark them dirty so canvas/sidebar nodes
-    // reflect that honestly (instead of looking "ready" off the persisted
-    // schema alone) and the existing background refresh loop materializes
-    // them automatically.
+    // Runtime was cleared; mark dirty so UI cannot look ready from persisted schema alone.
     const tableIds = Object.values(nodes)
       .filter(node => node.kind === 'source_table' || node.kind === 'derived_table')
       .map(node => node.id)

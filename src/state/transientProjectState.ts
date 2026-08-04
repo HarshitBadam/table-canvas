@@ -15,10 +15,8 @@ export function hasPendingImportedTables(
 }
 
 /**
- * Per-tab compute state used to live on the node (`cacheInfo`) and now lives in
- * `tableRuntimeStore`. Documents written before that change still carry it, so strip it
- * on the way in and out: leaving it in place would make an untouched document look
- * changed to the cross-device merge.
+ * Strip legacy per-node `cacheInfo` (now in `tableRuntimeStore`). Leaving it would make
+ * an untouched document look changed to cross-device merge.
  */
 export function withoutRuntimeNodeState(
   nodes: Record<string, ProjectNode>,

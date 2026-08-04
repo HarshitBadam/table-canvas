@@ -7,22 +7,15 @@ export function getTableCount(nodes: Record<string, { kind: string }>): number {
 }
 
 export interface ImportOrderable {
-  /** Groups items that came from the same source file (e.g. every sheet in one
-   *  workbook is one block; a standalone CSV is a block of one). Items never
-   *  interleave across blocks — only the block order and the order within a block
-   *  are chosen by size. */
+  /** Same-file block key (workbook sheets share one; a CSV is its own block). */
   sourceKey: string
   rowCount: number
 }
 
 /**
- * Orders selected import items by size without scrambling which file each item came
- * from together. A block (one CSV, or every sheet of one workbook) is weighed by its
- * total row count, and blocks run smallest-total-first; within a block, its own items
- * also run smallest-first. So a small workbook's sheets all import — in size order —
- * before a much larger standalone CSV, but two sheets from the same workbook can never
- * end up separated by items from another file. Mirrors getDirtyTableRefreshOrder's
- * size heuristic for reload.
+ * Smallest-total block first, then smallest item within each block. Items that
+ * share a sourceKey stay contiguous so workbook sheets are never interleaved
+ * with another file. Mirrors getDirtyTableRefreshOrder's size heuristic.
  */
 export function getImportProcessingOrder<T extends ImportOrderable>(items: T[]): T[] {
   const blockOrder: string[] = []

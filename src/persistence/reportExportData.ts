@@ -8,10 +8,8 @@ import {
 } from './reportHtmlGenerator'
 
 /**
- * Resolves the table rows every embedded table/chart in a report needs.
- *
- * A failed read degrades to an empty row set so one broken source cannot abort a
- * whole export; the generator renders a placeholder block in its place.
+ * Load rows for every embedded table/chart. A failed read becomes an empty set
+ * so one broken source cannot abort the whole export.
  */
 export async function buildReportEmbeddedData(
   report: Report,

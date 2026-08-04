@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import * as XLSX from 'xlsx'
 import { expect, test } from './e2e.fixture'
 import {
@@ -8,12 +9,18 @@ import {
   openCanvasView,
 } from './app.support'
 
-async function readExportedWorkbook(page: Parameters<typeof downloadProjectZip>[0]) {
+async function readExportedWorkbook(page: Page) {
   const zip = await downloadProjectZip(page)
   const workbookFile = zip.file('data.xlsx')
   expect(workbookFile, 'The export must include data.xlsx').not.toBeNull()
   const workbook = XLSX.read(await workbookFile!.async('nodebuffer'), { type: 'buffer' })
   return { zip, workbook }
+}
+
+function sidebarTable(page: Page, name: string, rows: number) {
+  return page.locator('aside').getByRole('button', {
+    name: new RegExp(`^${name} .*${rows} rows`),
+  })
 }
 
 test.describe('Data import and export integrity', () => {
@@ -27,7 +34,8 @@ test.describe('Data import and export integrity', () => {
       'C-003,李雷,,999999.125',
     ])
 
-    await page.locator('aside').getByRole('button', { name: /^Edge Values .*3 rows/ }).click()
+    const edgeValues = sidebarTable(page, 'Edge Values', 3)
+    await edgeValues.click()
     await expect(page.getByText('3 rows × 4 columns')).toBeVisible()
     await expect(page.getByRole('gridcell')).toHaveCount(12)
     await expect(page.getByRole('gridcell', { name: 'Contact, row 1: Ada, Lovelace' })).toBeVisible()
@@ -36,9 +44,8 @@ test.describe('Data import and export integrity', () => {
     await expect(page.getByRole('gridcell', { name: 'Note, row 3: empty' })).toBeVisible()
 
     await page.reload()
-    await expect(page.locator('aside').getByRole('button', { name: /^Edge Values .*3 rows/ }))
-      .toBeVisible({ timeout: 20_000 })
-    await page.locator('aside').getByRole('button', { name: /^Edge Values .*3 rows/ }).click()
+    await expect(edgeValues).toBeVisible({ timeout: 20_000 })
+    await edgeValues.click()
     await expect(page.getByRole('gridcell', { name: 'Contact, row 1: Ada, Lovelace' })).toBeVisible()
     await expect(page.getByRole('gridcell', { name: 'Note, row 3: empty' })).toBeVisible()
     await openCanvasView(page)
@@ -108,7 +115,7 @@ test.describe('Join correctness', () => {
 
     await page.reload()
     await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
-    await page.locator('aside').getByRole('button', { name: /^Matched Orders .*2 rows/ }).click()
+    await sidebarTable(page, 'Matched Orders', 2).click()
     await expect(page.getByText('2 rows × 3 columns')).toBeVisible({ timeout: 20_000 })
     await expect(page.getByRole('gridcell').filter({ hasText: 'Grace' })).toHaveCount(2)
     await expect(page.getByRole('gridcell').filter({ hasText: 'A-10' })).toHaveCount(1)
@@ -139,7 +146,7 @@ test.describe('Suggestions panel state', () => {
       'Linus,40',
       'Margaret,50',
     ])
-    await page.locator('aside').getByRole('button', { name: /^Suggestion Review .*5 rows/ }).click()
+    await sidebarTable(page, 'Suggestion Review', 5).click()
     await expect(page.getByRole('gridcell').first()).toBeVisible({ timeout: 20_000 })
 
     await page.getByRole('button', { name: 'Suggestions', exact: true }).click()

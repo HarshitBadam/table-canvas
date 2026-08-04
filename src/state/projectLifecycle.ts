@@ -7,12 +7,6 @@ import { useDataStore } from './dataStore'
 import { clearAllTableOperations } from './tableOperationCoordinator'
 import { useTableRuntimeStore } from './tableRuntimeStore'
 
-export function hasProjectTables(nodes: Record<string, { kind: string }>): boolean {
-  return Object.values(nodes).some(
-    node => node.kind === 'source_table' || node.kind === 'derived_table',
-  )
-}
-
 export async function clearProjectRuntime(nodes: Record<string, ProjectNode>): Promise<void> {
   const tableIds = Object.values(nodes)
     .filter((node) => node.kind === 'source_table' || node.kind === 'derived_table')
@@ -41,9 +35,7 @@ function mostRecentlyUpdated(
 export async function loadOrCreateProject(requestedProjectId?: string | null) {
   const projects = await fetchProjects()
   if (projects.length === 0) {
-    // First entry (fresh guest, new account, or the initial boot before any
-    // project exists) must land in a real, usable workspace — not an empty
-    // "create your first project" prompt the user has to click through.
+    // Empty catalog must open a workspace rather than an empty first-run prompt.
     const project = await createProjectWithSync('Untitled Project')
     const now = new Date()
     return {

@@ -1,6 +1,4 @@
 /**
- * Downloads a single report as a standalone HTML file.
- *
  * Shares its renderer with the report files written into the project ZIP, so a
  * report exported on its own is byte-identical to the same report inside a
  * project archive.
@@ -18,7 +16,6 @@ export interface HtmlExportOptions {
   nodes: Record<string, ProjectNode>;
 }
 
-/** Matches the naming used for reports inside the project ZIP. */
 function toFileName(name: string): string {
   const base = name.replace(/[^a-zA-Z0-9-_ ]/g, '_').trim().slice(0, 50);
   return `${base || 'Untitled Report'}.html`;

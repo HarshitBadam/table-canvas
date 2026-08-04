@@ -16,8 +16,6 @@ import {
 } from './SlashCommandIcons';
 import type { SlashCommandItem } from './slashCommandTypes';
 
-export type { SlashCommandItem,  } from './slashCommandTypes';
-
 export function getSlashCommandItems(): SlashCommandItem[] {
   return [
     {

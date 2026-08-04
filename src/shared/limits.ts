@@ -1,10 +1,6 @@
 /**
- * Tier definitions and usage limits for Table Canvas.
- *
- * SOURCE OF TRUTH — if you update numbers here, mirror them in
- * server/src/config/limits.ts (the server duplicate).
- *
- * No enforcement happens in this file; it only exports plain constants.
+ * SOURCE OF TRUTH for client tier limits — mirror number changes in
+ * server/src/config/limits.ts. Constants only; enforcement lives elsewhere.
  */
 
 export type Tier = 'guest' | 'google';
@@ -42,15 +38,9 @@ export function getLimits(tier: Tier): TierLimits {
 }
 
 /**
- * Hard technical ceiling on join/union output rows, independent of pricing
- * tier (including 'google', which is otherwise exempt from row limits).
- *
- * DuckDB-Wasm runs entirely in the browser's in-memory heap (see
- * engine/worker/engine.worker.ts, opened with `path: ':memory:'` and no
- * temp_directory) with no ability to spill to disk. A join on a
- * low-cardinality or duplicate-heavy key can multiply two modest tables into
- * hundreds of millions or billions of output rows and crash the tab with an
- * Out of Memory error. This constant exists purely to protect the browser
- * process from that crash, not to gate features by plan.
+ * Hard ceiling on join/union output rows for every tier (including 'google').
+ * DuckDB-Wasm is in-memory only (engine.worker.ts, `path: ':memory:'`, no
+ * spill), so a low-cardinality join can explode into hundreds of millions of
+ * rows and OOM the tab. Not a plan gate.
  */
 export const MAX_SAFE_TRANSFORM_OUTPUT_ROWS = 5_000_000;

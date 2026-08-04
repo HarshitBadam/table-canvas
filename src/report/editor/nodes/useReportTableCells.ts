@@ -14,9 +14,9 @@ interface UseReportTableCellsOptions {
   headers: string[];
   rows: TableCellValue[][];
   updateAttributes: (attrs: Record<string, unknown>) => void;
-  /** Called as the pointer enters the grid, to hand the block selection back. */
+  /** Hand block selection back when the pointer enters the grid. */
   onEnterGrid?: () => void;
-  /** Escape from a selected cell steps out of the grid; the block takes over. */
+  /** Escape from a selected cell returns focus ownership to the block. */
   onLeaveGrid?: () => void;
 }
 
@@ -31,19 +31,10 @@ function isTypedCharacter(event: KeyboardEvent): boolean {
 }
 
 /**
- * The keyboard model of a report table, which is the one the workspace grid
- * already uses: a click selects a cell, and the cell stays a plain selection
- * until you ask to edit it. Arrows then move between cells immediately, rather
- * than walking the caret through the characters of whichever cell is open, and
- * Enter toggles the two states — open the editor, then commit and go back to
- * having the cell selected.
- *
- * The selected cell holds real DOM focus, and the grid stops editing keystrokes
- * from propagating any further. Both matter: a table is an atomic block, so any
- * key that reaches the document is applied to the selection sitting behind the
- * block instead — which is how Backspace in a cell could reach for the block
- * itself, and how the arrows ended up scrolling the report. Undo and redo are
- * deliberately let through, because they act on the report as a whole.
+ * Spreadsheet-style cell selection for report tables. Editing keys are stopped
+ * from reaching the document — atomic blocks would otherwise apply them to the
+ * selection behind the node (Backspace deleting the block, arrows scrolling the
+ * report). Undo/redo are deliberately let through so document history still works.
  */
 export function useReportTableCells({
   headers,
@@ -55,9 +46,8 @@ export function useReportTableCells({
   const [selectedCell, setSelectedCell] = useState<CellPosition | null>(null);
   const [editingCell, setEditingCell] = useState<CellPosition | null>(null);
   const [editValue, setEditValue] = useState('');
-  // Whether opening the editor should present the value as a selection to type
-  // over, which is what Enter means, or as a caret to amend.
-  const [selectEditValue, setSelectEditValue] = useState(true);
+  // Enter opens with the value selected for type-over; amend modes place a caret.
+  const [selectAllOnEdit, setSelectAllOnEdit] = useState(true);
   const focusRef = useRef<HTMLTableCellElement | null>(null);
   const gridRef = useRef<HTMLTableElement | null>(null);
 
@@ -84,9 +74,7 @@ export function useReportTableCells({
     updateAttributes({ rows: nextRows });
   }, [headers, rows, updateAttributes]);
 
-  // Focus follows the selection, so the cell that looks active is the one
-  // receiving keys. Bringing it into view is part of that: arrowing to a cell
-  // below the fold has to scroll the grid, and only the grid.
+  // Keep DOM focus on the selected cell, scrolling only the grid into view.
   useEffect(() => {
     if (editingCell || !selectedCell) return;
     focusRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -104,11 +92,10 @@ export function useReportTableCells({
   ) => {
     setSelectedCell(cell);
     setEditValue(options.initialValue ?? readCell(cell));
-    setSelectEditValue(options.selectValue ?? true);
+    setSelectAllOnEdit(options.selectValue ?? true);
     setEditingCell(cell);
   }, [readCell]);
 
-  /** Writes the open editor back and leaves that cell selected. */
   const commitEdit = useCallback(() => {
     if (!editingCell) return;
     writeCell(editingCell, editValue);
@@ -129,10 +116,8 @@ export function useReportTableCells({
   }, [onLeaveGrid]);
 
   /**
-   * The editing keys pressed anywhere in the grid, taken off the document's
-   * hands. Stopping propagation is what keeps ProseMirror out of it; the default
-   * action is left alone, so an open editor still types, deletes and moves its
-   * caret exactly like the text field it is.
+   * Stop grid keystrokes from reaching ProseMirror. Leave the browser default
+   * alone so an open editor still types, deletes, and moves its caret.
    */
   useEffect(() => {
     const grid = gridRef.current;
@@ -140,14 +125,10 @@ export function useReportTableCells({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       /*
-       * Undo belongs to the report, not to one of its tables. The grid claims
-       * plain keys so an atomic block never leaks them to the selection behind
-       * it, but claiming undo left it with nothing to act on: the keystroke
-       * reached neither the document's history nor anything else, so it looked
-       * like undo simply stopped working whenever a cell was selected.
-       *
-       * An open cell editor is the exception. It is a text field mid-edit, and
-       * its own undo is the only one that should answer until it is committed.
+       * Undo belongs to the report, not one table. Claiming plain keys keeps an
+       * atomic block from leaking them behind the node, but claiming undo left
+       * nothing to act on — so undo looked broken whenever a cell was selected.
+       * An open cell editor is the exception: its own undo answers until commit.
        */
       if (!editingCell && historyIntentFor(event)) return;
 
@@ -186,7 +167,6 @@ export function useReportTableCells({
         event.preventDefault();
         writeCell(selectedCell, '');
       } else if (isTypedCharacter(event)) {
-        // Typing over a selected cell replaces it, as it does in a spreadsheet.
         event.preventDefault();
         beginEdit(selectedCell, { initialValue: event.key, selectValue: false });
       }
@@ -206,30 +186,25 @@ export function useReportTableCells({
   ]);
 
   /**
-   * Capture-phase mousedown on a cell. The browser's default here is to focus the document's
-   * contenteditable, which puts a caret in the structural paragraph after the
-   * block for as long as it takes the cell to claim focus — long enough to see
-   * that paragraph open up and flash its placeholder. The grid manages its own
-   * focus, so that default is not wanted. Capture is also essential:
-   * ProseMirror's native listener is on the editor root, below React's delegated
-   * bubble listener, so stopping a bubble-phase React event cannot stop
-   * ProseMirror from installing its own mouseup selection handler first.
+   * Capture-phase mousedown: the browser default focuses the document's
+   * contenteditable, flashing the structural paragraph after the block. Capture
+   * is also required because ProseMirror's native listener is on the editor root
+   * below React's delegated bubble listener — stopping bubble cannot prevent PM
+   * from installing its mouseup selection handler first.
    */
   const handleCellMouseDown = useCallback((event: MouseEvent) => {
     event.stopPropagation();
-    // An open editor still needs its clicks, to place a caret or select text.
+    // Let clicks inside an open editor place a caret or select text.
     if (event.target instanceof Element && event.target.closest('input')) return;
     event.preventDefault();
     onEnterGrid?.();
   }, [onEnterGrid]);
 
-  /** A click selects the cell, except when it is placing a caret in the editor. */
   const handleCellClick = useCallback((event: MouseEvent, cell: CellPosition) => {
     if (event.target instanceof Element && event.target.closest('input')) return;
     selectCell(cell);
   }, [selectCell]);
 
-  /** Clears the selection once focus has left the grid altogether. */
   const handleCellBlur = useCallback((event: FocusEvent<HTMLElement>) => {
     const next = event.relatedTarget;
     if (next instanceof globalThis.Node && gridRef.current?.contains(next)) return;
@@ -248,10 +223,9 @@ export function useReportTableCells({
 
   return {
     selectedCell,
-    editingCell,
     editValue,
     setEditValue,
-    selectEditValue,
+    selectEditValue: selectAllOnEdit,
     focusRef,
     gridRef,
     isSelected,

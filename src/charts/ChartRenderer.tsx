@@ -18,8 +18,6 @@ interface ChartRendererProps {
   columnNames?: Record<string, string>
   colorScheme?: string[]
   showGrid?: boolean
-  title?: string
-  subtitle?: string
 }
 
 const CHART_COMPONENTS: Record<string, React.ComponentType<ChartTypeProps>> = {
@@ -39,8 +37,6 @@ export const ChartRenderer = memo(function ChartRenderer({
   columnNames = {},
   colorScheme,
   showGrid = true,
-  title,
-  subtitle,
 }: ChartRendererProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -63,9 +59,6 @@ export const ChartRenderer = memo(function ChartRenderer({
   const xAxisKey = config.xAxis || ''
   const xAxisName = columnNames[xAxisKey] || xAxisKey
   const yAxisName = (config.yAxis && columnNames[yAxisKey]) || (yAxisKey === COUNT_VALUE_KEY ? 'Count' : yAxisKey)
-
-  const headerHeight = (title ? 28 : 0) + (subtitle ? 20 : 0)
-  const chartHeight = height - headerHeight
 
   const tooltipStyle: React.CSSProperties = {
     backgroundColor: 'rgba(24, 24, 27, 0.95)',
@@ -119,36 +112,24 @@ export const ChartRenderer = memo(function ChartRenderer({
 
   return (
     <div style={{ height }}>
-      {(title || subtitle) && !compact && (
-        <div className="mb-2">
-          {title && (
-            <h3 className="text-base font-semibold text-text-primary">{title}</h3>
-          )}
-          {subtitle && (
-            <p className="text-sm text-text-secondary">{subtitle}</p>
-          )}
-        </div>
-      )}
-      <div style={{ height: chartHeight }}>
-        <ChartComponent
-          chartData={chartData}
-          xAxisKey={xAxisKey}
-          yAxisKey={yAxisKey}
-          xAxisName={xAxisName}
-          yAxisName={yAxisName}
-          themeColors={themeColors}
-          isDark={isDark}
-          colors={colors}
-          compact={compact}
-          showLegend={showLegend}
-          shouldShowGrid={shouldShowGrid}
-          hasTimestamps={hasTimestamps}
-          tooltipStyle={tooltipStyle}
-          tooltipLabelStyle={tooltipLabelStyle}
-          tooltipValueStyle={tooltipValueStyle}
-          chartHeight={chartHeight}
-        />
-      </div>
+      <ChartComponent
+        chartData={chartData}
+        xAxisKey={xAxisKey}
+        yAxisKey={yAxisKey}
+        xAxisName={xAxisName}
+        yAxisName={yAxisName}
+        themeColors={themeColors}
+        isDark={isDark}
+        colors={colors}
+        compact={compact}
+        showLegend={showLegend}
+        shouldShowGrid={shouldShowGrid}
+        hasTimestamps={hasTimestamps}
+        tooltipStyle={tooltipStyle}
+        tooltipLabelStyle={tooltipLabelStyle}
+        tooltipValueStyle={tooltipValueStyle}
+        chartHeight={height}
+      />
     </div>
   )
 })

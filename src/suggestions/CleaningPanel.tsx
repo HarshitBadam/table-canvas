@@ -16,11 +16,10 @@ function truncateForDisplay(value: string, maxLength = 40): string {
 interface CleaningPanelProps {
   suggestions: Suggestion[]
   tableId: string
-  onComplete?: () => void
   onCountChange?: (count: number) => void
 }
 
-export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, onCountChange }: CleaningPanelProps) {
+export function CleaningPanel({ suggestions, tableId, onCountChange }: CleaningPanelProps) {
   const node = useProjectStore((state) => state.getTableNode(tableId))
   const patches = useProjectStore((state) => state.patches[tableId])
   const { canEdit } = useWorkspaceLease()
@@ -95,10 +94,8 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       return values.reduce((a, b) => a + b, 0) / values.length
     }
 
-    // Mapping-based operations (typo fixes, case normalization) know their
-    // "from → to" example from the mapping alone, independent of whether the
-    // loaded preview rows happen to contain a matching value. Falling back to
-    // this keeps the example visible even when the preview sample misses it.
+    // Mapping-based ops know their "from → to" from the mapping alone. Fall back
+    // when the preview sample does not contain a matching value.
     const getMappingExample = (
       operation: NonNullable<Suggestion['context']['cleaningOperation']>,
     ): { oldValue: CellValue; newValue: CellValue } | undefined => {
@@ -106,6 +103,11 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
       const [from, to] = Object.entries(operation.mappings)[0] ?? []
       if (from === undefined) return undefined
       return { oldValue: from, newValue: to }
+    }
+
+    const isOutlierSuggestion = (suggestion: Suggestion) => {
+      const type = suggestion.context.cleaningOperation?.type
+      return type === 'highlight_outliers' || type === 'remove_outliers'
     }
 
     const result = deduplicatedSuggestions
@@ -129,14 +131,10 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         return previewIsTruncated || s.changes.length > 0 || s.highlights.length > 0
       })
 
-    // Keep review-only outlier suggestions after actionable cleaning fixes.
-    return result.sort((a, b) => {
-      const aIsOutlier = a.suggestion.context.cleaningOperation?.type === 'highlight_outliers'
-        || a.suggestion.context.cleaningOperation?.type === 'remove_outliers'
-      const bIsOutlier = b.suggestion.context.cleaningOperation?.type === 'highlight_outliers'
-        || b.suggestion.context.cleaningOperation?.type === 'remove_outliers'
-      return Number(aIsOutlier) - Number(bIsOutlier)
-    })
+    // Actionable cleaning fixes before review-only outlier suggestions.
+    return result.sort((a, b) =>
+      Number(isOutlierSuggestion(a.suggestion)) - Number(isOutlierSuggestion(b.suggestion)),
+    )
   }, [suggestions, rows, existingHighlights, previewIsTruncated])
 
   useEffect(() => {
@@ -259,7 +257,7 @@ export function CleaningPanel({ suggestions, tableId, onComplete: _onComplete, o
         {suggestionsWithEffects.map(({ suggestion, changes, highlights, operationType, example }) => {
           const isSelected = selectedIds.has(suggestion.id)
           const count = operationType === 'review' ? highlights.length : changes.length
-          
+
           return (
             <label
               key={suggestion.id}

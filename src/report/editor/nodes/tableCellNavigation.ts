@@ -1,4 +1,4 @@
-/** The header row is edited like any other row, and addressed as row -1. */
+/** Header cells share the body editing model and are addressed as row -1. */
 export const HEADER_ROW = -1;
 
 export interface CellPosition {
@@ -6,27 +6,24 @@ export interface CellPosition {
   col: number;
 }
 
-export interface GridBounds {
+interface GridBounds {
   rowCount: number;
   columnCount: number;
 }
 
 const NAVIGATION_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'] as const;
 
-export type NavigationKey = (typeof NAVIGATION_KEYS)[number];
+type NavigationKey = (typeof NAVIGATION_KEYS)[number];
 
 export function isNavigationKey(key: string): key is NavigationKey {
   return (NAVIGATION_KEYS as readonly string[]).includes(key);
 }
 
 /**
- * The cell a navigation key moves to, clamped to the grid so a key at the edge
- * holds position instead of doing nothing visible and letting the browser
- * scroll the grid instead. Tab walks the cells as text — along the row, then on
- * to the next one — which is the only move that changes both coordinates.
- *
- * The header row is part of the grid: ArrowUp from the first body row reaches
- * it, so column names are renamed with the same keys as everything else.
+ * Next cell for a navigation key, clamped to the grid so edge keys hold
+ * position instead of letting the browser scroll. Tab wraps along the row then
+ * to the next; the header row is included so ArrowUp from the first body row
+ * reaches column names.
  */
 export function moveTarget(
   key: NavigationKey,

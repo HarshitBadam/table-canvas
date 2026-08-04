@@ -190,7 +190,6 @@ export async function enqueueProjectDelete(
   return operation
 }
 
-/** Cancels a queued delete after the server rejects it as stale. */
 export async function cancelQueuedProjectDelete(
   projectId: string,
   scope = getStorageScope(),

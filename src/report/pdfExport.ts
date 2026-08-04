@@ -40,13 +40,12 @@ async function renderPdf({ report, nodes, appName, dataMap }: ExportOptions) {
   return createReportPdf(buildReportDocDefinition({ report, dataMap: data, appName }));
 }
 
-/** Generates the PDF and downloads it to the browser's download folder. */
 export async function exportReportToPDF(options: ExportOptions): Promise<void> {
   const pdf = await renderPdf(options);
   await pdf.download(reportPdfFilename(options.report));
 }
 
-/** Same document, returned as a Blob — used to embed report PDFs in the project ZIP. */
+/** Same document as a Blob — used to embed report PDFs in the project ZIP. */
 export async function renderReportPdfBlob(options: ExportOptions): Promise<Blob> {
   const pdf = await renderPdf(options);
   return pdf.getBlob();

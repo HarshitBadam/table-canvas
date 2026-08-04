@@ -22,7 +22,7 @@ export const ChartNodeComponent = memo(({ data }: NodeProps<ChartNodeData>) => {
   const sourceVersionHash = `${sourceCacheInfo?.currentVersionHash ?? ''}:${
     sourceCacheInfo?.dataRevision ?? 0
   }`
-  
+
   const columnNames = useMemo(() => {
     const names: Record<string, string> = {}
     sourceTable?.schema?.columns?.forEach(col => {
@@ -44,7 +44,7 @@ export const ChartNodeComponent = memo(({ data }: NodeProps<ChartNodeData>) => {
     pie: '#7c3aed',
     scatter: '#0891b2',
   }
-  
+
   const accentColor = typeColors[chartType] || '#217346'
 
   return (
@@ -70,7 +70,7 @@ export const ChartNodeComponent = memo(({ data }: NodeProps<ChartNodeData>) => {
       </div>
 
       <div className="relative px-2 py-2 bg-surface">
-        <div 
+        <div
           className="absolute inset-0 pointer-events-none"
           style={{
             backgroundImage: 'linear-gradient(var(--color-border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--color-border-subtle) 1px, transparent 1px)',
@@ -78,7 +78,7 @@ export const ChartNodeComponent = memo(({ data }: NodeProps<ChartNodeData>) => {
             opacity: 0.4,
           }}
         />
-        
+
         {sourceTable && loading ? (
           <div className="relative flex h-[110px] items-center justify-center gap-2 text-xs" style={{ color: accentColor }} role="status">
             <LoadingSpinner size="sm" />

@@ -27,11 +27,9 @@ type TransformModalProps = {
   targetNodeId: string
 }
 const MAX_TABLE_NAME_LENGTH = 100
-// Comparing values across two full tables (up to hundreds of thousands of rows
-// each) on every keystroke of key selection would make the modal janky, and
-// findBestKeys already runs this for every left/right column pair. Capping the
-// preview keeps match-rate checks bounded regardless of table size; the actual
-// join/append is still computed exactly over the full tables at creation time.
+// Cap preview size so key-selection match checks stay responsive; findBestKeys
+// compares every left/right pair against this sample. Full join/append still
+// runs over complete tables at creation time.
 const MATCH_PREVIEW_SAMPLE_LIMIT = 1_000
 
 export function TransformModal({
@@ -130,8 +128,6 @@ export function TransformModal({
     }
   }, [leftCols, rightCols, leftData, rightData])
   const match = useMemo(() => analyzeMatch(leftData, rightData, leftKey, rightKey), [leftData, rightData, leftKey, rightKey])
-  // Both sides fit under the preview limit, so the fetched rows are the whole
-  // table, not a slice of it - the match rate is exact, not an estimate.
   const isExactMatch = leftTotalRows <= MATCH_PREVIEW_SAMPLE_LIMIT && rightTotalRows <= MATCH_PREVIEW_SAMPLE_LIMIT
   const canUnion = leftCols.length > 0 && leftCols.length === rightCols.length && leftCols.every(
     (column, index) => column.type === rightCols[index]?.type,
@@ -156,6 +152,11 @@ export function TransformModal({
       return next
     })
   }, [])
+  const closeCombineAndOpenUpgrade = useCallback((violation: LimitExceeded) => {
+    setUpgradeViolation(violation)
+    onClose()
+    setUpgradeOpen(true)
+  }, [onClose])
   const handleCreate = useCallback(async () => {
     if (creatingRef.current) return
     if (operation === 'join' && (!leftKey || !rightKey)) return
@@ -166,9 +167,7 @@ export function TransformModal({
     ).length
     const tableCheck = checkTableCount(currentTableCount, tier)
     if (!tableCheck.ok) {
-      setUpgradeViolation(tableCheck)
-      onClose()
-      setUpgradeOpen(true)
+      closeCombineAndOpenUpgrade(tableCheck)
       return
     }
     const lCols = allCols.filter(c => c.side === 'L' && selected.has(c.id)).map(c => c.colId)
@@ -194,12 +193,9 @@ export function TransformModal({
     setIsCreating(true)
     setCreateError(undefined)
     try {
-      // Materialize the inputs and count the SQL result before adding a target
-      // node. This is exact for both joins and appends, so an over-limit result
-      // never appears as a prolonged 0-row computing table. The safety check
-      // below runs for every tier (including tiers exempt from row limits),
-      // since it protects the browser tab from an Out of Memory crash rather
-      // than enforcing a plan limit.
+      // Count the SQL result before creating a target node so over-limit outputs
+      // never appear as a stuck 0-row table. checkTransformOutputSafety runs for
+      // every tier (including uncapped ones) as an OOM guard, not a plan limit.
       const [left, right] = await Promise.all([
         getTableData(sourceNodeId, 0, 1),
         getTableData(targetNodeId, 0, 1),
@@ -210,10 +206,7 @@ export function TransformModal({
           `Unable to prepare ${failedTableName ?? 'an input table'}: ${left.error || right.error}`,
         )
       }
-      // A union's output size is just the sum of its inputs, which we already
-      // know exactly from the match-preview fetch above - no need to pay for
-      // another engine round trip to count it. A join's output size depends on
-      // how many keys match, so it still has to be computed by the engine.
+      // Union size is the sum of preview totals; join cardinality needs an engine count.
       let rowCount: number
       if (operation === 'union') {
         rowCount = leftTotalRows + rightTotalRows
@@ -236,13 +229,10 @@ export function TransformModal({
         const rowCheck = checkRowCount(rowCount, tier)
         if (!rowCheck.ok) {
           const action = operation === 'union' ? 'Appending these tables' : 'Joining these tables'
-          setUpgradeViolation({
+          closeCombineAndOpenUpgrade({
             ...rowCheck,
             reason: `${action} would create ${rowCount.toLocaleString()} rows. Guest projects allow up to ${rowCheck.limit.toLocaleString()} rows per table; filter or reduce the input rows, then try again.`,
           })
-          // Close combine first so the upgrade prompt is not stacked over it.
-          onClose()
-          setUpgradeOpen(true)
           return
         }
       }
@@ -265,7 +255,7 @@ export function TransformModal({
       creatingRef.current = false
       setIsCreating(false)
     }
-  }, [leftKey, rightKey, operation, canUnion, selected, outputName, leftNode, rightNode, sourceNodeId, targetNodeId, joinType, leftCols, rightCols, allCols, addDerivedTable, onClose, onDismiss, nodes, user, leftTotalRows, rightTotalRows])
+  }, [leftKey, rightKey, operation, canUnion, selected, outputName, leftNode, rightNode, sourceNodeId, targetNodeId, joinType, leftCols, rightCols, allCols, addDerivedTable, closeCombineAndOpenUpgrade, onDismiss, nodes, user, leftTotalRows, rightTotalRows])
   const leftOpts = useMemo(
     () => leftCols.map(c => ({ value: c.id, label: c.name, type: c.type })),
     [leftCols],

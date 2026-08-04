@@ -18,19 +18,15 @@ import type { AppPhase, AppProviderState } from './appContextValue'
 import type { Edge, ProjectNode } from '@/types'
 
 /**
- * Coalescing window for the high-frequency edits — cell values, positions, report text —
- * that would otherwise write the whole document on every keystroke or drag frame. A
- * crash inside the window loses the tail of a burst, which is the accepted trade-off.
- * The window is never extended by later changes, so a stream of them cannot postpone the
- * write indefinitely.
+ * Coalescing window for high-frequency edits. Never extended by later changes, so a
+ * burst cannot postpone the write indefinitely; a crash inside the window loses the tail.
  */
 const AUTOSAVE_INTERVAL_MS = 800
 
 /**
- * Topology of what IndexedDB actually keeps. Incomplete imports use a synthetic
- * `pending:` fileRef and are stripped on write, so counting live node ids would treat a
- * later real fileRef promotion as a no-op and leave a finished import on the 800ms
- * debounce — enough time for a reload or tab discard to drop it.
+ * Topology of what IndexedDB keeps. Pending imports use synthetic `pending:` fileRefs
+ * stripped on write; comparing live node ids would treat a real fileRef promotion as a
+ * no-op and leave a finished import on the debounce long enough to lose on reload.
  */
 function durableDocumentTopology(
   nodes: Record<string, ProjectNode>,
@@ -48,11 +44,10 @@ interface AutosaveOptions {
 }
 
 export interface ProjectAutosave {
-  /** Writes the document to IndexedDB (and enqueues remote sync) then mirrors it. */
   saveLatestProject: () => Promise<void>
-  /** Local durability only — used for import completion and bounded session exit. */
+  /** Local durability only — import completion and bounded session exit. */
   flushLocalProjectSave: () => Promise<void>
-  /** Saves completed imports while omitting any other imports that are still pending. */
+  /** Persist a finished import while other imports may still be pending. */
   flushImportProjectSave: () => Promise<void>
   /** Local save plus a best-effort remote flush. */
   flushProjectSave: () => Promise<void>
@@ -83,7 +78,7 @@ export function useProjectAutosave({
     debounceTimer.current = null
   }, [])
 
-  /** Covers the coalescing window too: pending work is not saved work. */
+  // Covers the coalescing window: pending work is not yet saved work.
   const markSaving = useCallback((saving: boolean) => {
     setState(previous => (previous.isSaving === saving
       ? previous
@@ -95,17 +90,16 @@ export function useProjectAutosave({
     if (useProjectStore.getState().history.transaction) {
       throw new Error('A table operation is still in progress.')
     }
-    // A pending import is intentionally excluded from durable snapshots. Never let a
-    // pagehide/autosave turn that incomplete graph into the latest persisted version.
-    // Import completion is the one safe exception: withoutRuntimeNodeState omits other
-    // pending imports while preserving the table that has just finished staging.
+    // Pending imports must not become the latest durable snapshot via pagehide/autosave.
+    // Import completion is the exception: withoutRuntimeNodeState keeps the finished
+    // table while still omitting other pending imports.
     if (
       !allowPendingImports
       && hasPendingImportedTables(useProjectStore.getState().nodes)
     ) {
       throw new Error('A table operation is still in progress.')
     }
-    // Mirror tabs hold the same stores but must never write the document.
+    // Mirror tabs share stores but must never write the document.
     if (!holdsWriteLease()) {
       markSaving(false)
       return
@@ -133,7 +127,7 @@ export function useProjectAutosave({
             project.patches,
             useReportStore.getState().reports,
           )
-          // Only once it is durable, so a failed write retries without waiting.
+          // Advance topology only after a durable write so failures retry promptly.
           savedTopology.current = topology
           publishDocumentInvalidation()
         } while (savePending.current)
@@ -155,7 +149,7 @@ export function useProjectAutosave({
     [saveProjectSnapshot],
   )
 
-  /** IndexedDB (+ sync enqueue) only — callers that also need reports flush those next. */
+  // IndexedDB (+ sync enqueue) only — callers flush reports separately when needed.
   const flushLocalProjectSave = useCallback(async () => {
     await saveLatestProject()
   }, [saveLatestProject])

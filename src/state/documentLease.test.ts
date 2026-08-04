@@ -11,7 +11,7 @@ type LeaseModule = typeof import('./documentLease')
 const KEY = 'guest:tab-a\u001fproject-1'
 const OTHER_SCOPE_KEY = 'account:user-7\u001fproject-1'
 
-/** Each tab is its own module registry, so module-level lease state is per tab. */
+/** Fresh module registry per tab so module-level lease state stays isolated. */
 async function openTab(): Promise<LeaseModule> {
   vi.resetModules()
   return import('./documentLease')

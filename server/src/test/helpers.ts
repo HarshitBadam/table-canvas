@@ -1,6 +1,5 @@
 import { Types } from 'mongoose';
 import { Project, IProjectDocument } from '../models/Project.js';
-import { File, IFileDocument } from '../models/File.js';
 import type { ProjectNode, Edge, SerializedPatches } from '../types/index.js';
 
 
@@ -87,63 +86,4 @@ export function createSampleEdge(
     toNodeId,
     transformType: 'select',
   };
-}
-
-
-export interface CreateTestFileOptions {
-  userId?: Types.ObjectId;
-  projectId?: Types.ObjectId;
-  filename?: string;
-  originalName?: string;
-  contentType?: string;
-  size?: number;
-  deleted?: boolean;
-}
-
-export async function createTestFile(
-  options: CreateTestFileOptions = {}
-): Promise<IFileDocument> {
-  const {
-    userId = createMockUserId(),
-    projectId,
-    filename = 'test-file.csv',
-    originalName = 'test-file.csv',
-    contentType = 'text/csv',
-    size = 1024,
-    deleted = false,
-  } = options;
-
-  const file = new File({
-    gridFsId: new Types.ObjectId(),
-    userId,
-    projectId,
-    filename,
-    originalName,
-    contentType,
-    size,
-    deletedAt: deleted ? new Date() : null,
-  });
-
-  await file.save();
-  return file;
-}
-
-export async function createTestFiles(
-  userId: Types.ObjectId,
-  count: number,
-  projectId?: Types.ObjectId
-): Promise<IFileDocument[]> {
-  const files: IFileDocument[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const file = await createTestFile({
-      userId,
-      projectId,
-      filename: `test-file-${i + 1}.csv`,
-      originalName: `test-file-${i + 1}.csv`,
-    });
-    files.push(file);
-  }
-
-  return files;
 }

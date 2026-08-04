@@ -58,6 +58,7 @@ test.describe('Accessibility', () => {
 
     await page.getByRole('button', { name: 'Suggestions', exact: true }).click()
     await expect(page.getByRole('dialog', { name: 'Suggestions' })).toBeVisible()
+    // Panel content mounts after open; give layout a beat before axe samples.
     await page.waitForTimeout(250)
     await expectAccessible(page, 'Suggestions panel')
   })
@@ -158,9 +159,9 @@ test.describe('Keyboard interaction', () => {
     await bootApp(page)
     await page.locator('aside').getByRole('button', { name: 'Report', exact: true }).click()
     await page.getByRole('button', { name: /Blank report/ }).click()
-    await page.waitForTimeout(200)
 
     const toolbar = page.getByRole('group', { name: 'Text style' })
+    await expect(toolbar).toBeVisible()
     const bold = toolbar.getByRole('button', { name: 'Bold' })
     await expect(bold).toHaveAttribute('aria-pressed', 'false')
     await bold.focus()

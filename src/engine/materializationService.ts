@@ -48,11 +48,6 @@ export interface MaterializationResult {
 }
 
 export interface MaterializationOptions {
-  /**
-   * When false, skip the shared "Updating…" cache flag so background refresh
-   * does not flash status badges on every canvas node. Callers that are
-   * actively waiting on data (grid, previews) leave this at the default.
-   */
   announce?: boolean
 }
 
@@ -186,10 +181,12 @@ async function loadSourceTable(
       }
     }
 
-    if (announce) updateNodeCacheInfo(tableId, {
-      isComputing: true,
-      phase: 'materializing',
-    })
+    if (announce) {
+      updateNodeCacheInfo(tableId, {
+        isComputing: true,
+        phase: 'materializing',
+      })
+    }
     let rows: TableRow[] = []
     if (snapshot.node.plan.fileRef) {
       const fileData = await loadFileWithSync(snapshot.node.plan.fileRef)
@@ -304,26 +301,45 @@ async function loadSourceTable(
 async function waitForRelatedTableOperations(tableId: string): Promise<void> {
   const projectStore = useProjectStore.getState()
   const node = projectStore.getTableNode(tableId)
-  if (!node) {
+  if (!node || node.kind === 'source_table') {
     await waitForTableOperation(tableId)
     return
   }
-  if (node.kind === 'source_table') {
-    await waitForTableOperation(tableId)
-    return
-  }
-  // getComputationOrder includes tableId itself (by design, for materializeTableInternal's
-  // use below, which also needs to recompute the target). Waiting on tableId's own gate
-  // here would deadlock: that gate is only released by completeTableOperation/
-  // failTableOperation, which run strictly after this function's caller
-  // (ensureTableMaterialized) resolves — e.g. a freshly created join/union table has its
-  // gate opened with beginTableOperation(id, 'waiting') right before ensureTableMaterialized
-  // is called on that same id. Only wait on the upstream tables it actually depends on.
+  // Skip tableId itself: its op gate stays open until ensureTableMaterialized
+  // returns (e.g. beginTableOperation(..., 'waiting') before join/union create).
+  // Waiting on it here would deadlock. Only wait on upstream deps.
   const order = getComputationOrder(tableId, projectStore.nodes, projectStore.edges)
   for (const relatedId of order) {
     if (relatedId === tableId) continue
     await waitForTableOperation(relatedId)
   }
+}
+
+function materializationRequestKey(
+  scope: MaterializationScope,
+  tableId: string,
+  options: MaterializationOptions,
+): string {
+  const mode = options.announce === false ? 'silent' : 'announce'
+  return `${scope.projectId}:${scope.generation}:${tableId}:${mode}`
+}
+
+function upstreamMaterializationFailure(
+  tableId: string,
+  upstreamName: string,
+  upstreamError: string | undefined,
+  scope: MaterializationScope,
+  requestGeneration: string | undefined,
+): MaterializationResult {
+  const error = `Upstream table "${upstreamName}" failed: ${upstreamError}`
+  if (scopeIsCurrent(scope) && captureTableRequestGeneration(tableId) === requestGeneration) {
+    updateNodeCacheInfo(tableId, {
+      isDirty: true,
+      isComputing: false,
+      error,
+    })
+  }
+  return { status: 'error', tableId, error }
 }
 
 export async function ensureTableMaterialized(
@@ -332,15 +348,14 @@ export async function ensureTableMaterialized(
 ): Promise<MaterializationResult> {
   const projectId = useProjectStore.getState().projectId
   const scope = captureMaterializationScope(projectId)
-  const announce = options.announce !== false
-  const requestKey = `${scope.projectId}:${scope.generation}:${tableId}:${announce ? 'a' : 's'}`
+  const requestKey = materializationRequestKey(scope, tableId, options)
   const existingPromise = inProgressMaterializations.get(requestKey)
   if (existingPromise) {
     return existingPromise
   }
 
-  // Wait for import/op gates BEFORE taking the mutation queue. Waiting inside
-  // the queue deadlocks against loadTableIntoEngine, which uses the same lane.
+  // Op gates must resolve before the mutation queue; waiting inside the queue
+  // deadlocks against loadTableIntoEngine, which shares that lane.
   const materializationPromise = (async () => {
     await waitForRelatedTableOperations(tableId)
     if (!scopeIsCurrent(scope)) return staleMaterialization(tableId)
@@ -356,8 +371,7 @@ export async function ensureTableMaterialized(
   inProgressMaterializations.set(requestKey, materializationPromise)
 
   try {
-    const result = await materializationPromise
-    return result
+    return await materializationPromise
   } finally {
     if (inProgressMaterializations.get(requestKey) === materializationPromise) {
       inProgressMaterializations.delete(requestKey)
@@ -397,45 +411,21 @@ async function materializeTableInternal(
     const tableNode = projectStore.getTableNode(nodeToCompute)
     if (!tableNode) continue
 
+    let result: MaterializationResult | null = null
     if (tableNode.kind === 'source_table') {
-      const result = await loadSourceTable(nodeToCompute, scope, options)
-      if (result.status === 'error') {
-        if (nodeToCompute !== tableId) {
-          if (scopeIsCurrent(scope) && captureTableRequestGeneration(tableId) === requestGeneration) {
-            updateNodeCacheInfo(tableId, {
-              isDirty: true,
-              isComputing: false,
-              error: `Upstream table "${tableNode.name}" failed: ${result.error}`,
-            })
-          }
-          return {
-            status: 'error',
-            tableId,
-            error: `Upstream table "${tableNode.name}" failed: ${result.error}`,
-          }
-        }
-        return result
-      }
+      result = await loadSourceTable(nodeToCompute, scope, options)
     } else if (tableNode.kind === 'derived_table') {
-      const result = await computeDerivedTable(nodeToCompute, scope, options)
-      if (result.status === 'error') {
-        if (nodeToCompute !== tableId) {
-          if (scopeIsCurrent(scope) && captureTableRequestGeneration(tableId) === requestGeneration) {
-            updateNodeCacheInfo(tableId, {
-              isDirty: true,
-              isComputing: false,
-              error: `Upstream table "${tableNode.name}" failed: ${result.error}`,
-            })
-          }
-          return {
-            status: 'error',
-            tableId,
-            error: `Upstream table "${tableNode.name}" failed: ${result.error}`,
-          }
-        }
-        return result
-      }
+      result = await computeDerivedTable(nodeToCompute, scope, options)
     }
+    if (!result || result.status !== 'error') continue
+    if (nodeToCompute === tableId) return result
+    return upstreamMaterializationFailure(
+      tableId,
+      tableNode.name,
+      result.error,
+      scope,
+      requestGeneration,
+    )
   }
 
   if (!scopeIsCurrent(scope)) return staleMaterialization(tableId)

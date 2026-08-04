@@ -185,7 +185,7 @@ export function SuggestionCard({
             <div className="mb-3">
               <button 
                 type="button"
-                onClick={() => setIsWhyCollapsed(showWhy)}
+                onClick={() => setIsWhyCollapsed((collapsed) => !collapsed)}
                 aria-expanded={showWhy}
                 aria-controls={whyId}
                 className="text-xs text-accent-green hover:text-accent-green/80 flex items-center gap-1 transition-colors"

@@ -18,52 +18,33 @@ export function safeLink(value: unknown): string | null {
   }
 }
 
-/** Usable width inside the document's centred column, in `px`. */
 const CONTAINER_WIDTH = 760
 
-/**
- * A single size, at the document's body type. Stepping the type down is how a
- * page buys width it cannot otherwise get; a scroll container has no such limit,
- * so shrinking here would cost legibility for nothing.
- */
+/** HTML export keeps body type; scroll replaces the PDF path's font step-down. */
 const HTML_FIT_CANDIDATES: FitCandidate[] = [
   { fontSize: 16, paddingX: 8, paddingY: 8 },
 ]
 
-/**
- * Widest a column is allowed to get before its cells wrap instead, in `em`. Only
- * bites on essay-length values: without it a single long cell would stretch one
- * column across the whole scroll width.
- */
+/** Cap natural column width (em) so one long cell cannot dominate scroll width. */
 const MAX_NATURAL_EM = 40
 
 export interface TableMarkup {
   headers: string[]
-  /** Rendered cell text, used to size the columns. */
   rows: string[][]
   showHeaders: boolean
-  /** Caption, thead and tbody markup for the table element. */
   inner: string
 }
 
 /**
- * Wraps a table body in the horizontal scroll container used by the HTML export.
- *
- * Column widths are measured from the content rather than shared out equally, so
- * a date column keeps the room it needs and a description column takes the rest.
- * Past the container width the columns keep the width they asked for and the
- * container scrolls, rather than being compressed to fit: this is an interactive
- * document, so the page-fitting the PDF exporter has to do — shrinking type,
- * splitting into bands — buys nothing here.
+ * HTML export table wrapper: content-measured columns that scroll horizontally
+ * instead of the PDF exporter's type-shrink / band split.
  */
 export function wrapTable({ headers, rows, showHeaders, inner }: TableMarkup): string {
   const { plan } = fitTable(headers, rows, {
     portraitWidth: CONTAINER_WIDTH,
     allowBanding: false,
     candidates: HTML_FIT_CANDIDATES,
-    // Every column gets the width its widest value asks for. Trimming to a
-    // percentile trades a little width for a little wrapping, which is a bargain
-    // on paper and pointless in a container that can just scroll further.
+    // Full natural width — percentile trimming only helps fixed page width.
     naturalPercentile: 1,
     maxNaturalEm: MAX_NATURAL_EM,
   }, showHeaders)
@@ -76,8 +57,7 @@ export function wrapTable({ headers, rows, showHeaders, inner }: TableMarkup): s
     .map((width) => `<col style="width:${((width / total) * 100).toFixed(3)}%">`)
     .join('')
 
-  // Only an overflowing table needs a floor; below the container width the
-  // declaration would force a scrollbar onto a table that already fits.
+  // Floor only when overflowing; otherwise min-width would force a useless scrollbar.
   const chrome = headers.length * 2 * plan.paddingX + (headers.length + 1)
   const minWidth = plan.overflow ? Math.ceil(total + chrome) : 0
   const style = minWidth > 0 ? ` style="--table-min-width:${minWidth}px"` : ''

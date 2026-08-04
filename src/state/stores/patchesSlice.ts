@@ -64,10 +64,6 @@ export const createPatchesSlice: StateCreator<
     get().markNodeAndDescendantsDirty(tableId)
   },
 
-  getPatches: (tableId) => {
-    return get().patches[tableId]
-  },
-
   toggleCellHighlight: (tableId, rowId, columnId) => {
     set((state) => {
       if (!state.patches[tableId]) {
@@ -103,11 +99,5 @@ export const createPatchesSlice: StateCreator<
       }
       state.patches[tableId].highlightedCells = new Set(cells)
     })
-  },
-
-  isCellHighlighted: (tableId, rowId, columnId) => {
-    const patches = get().patches[tableId]
-    if (!patches?.highlightedCells) return false
-    return patches.highlightedCells.has(`${rowId}:${columnId}`)
   },
 })

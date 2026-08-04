@@ -1,4 +1,3 @@
-import type { ViewFilterConfig } from '@/types'
 import { hasActiveFilters, countActiveFilters } from './filterUtils'
 import { formatNumber } from '@/lib/utils'
 import { EDITING_ELSEWHERE_TOOLTIP } from '@/state/useWorkspaceLease'
@@ -35,8 +34,7 @@ export function GridToolbar({
   onOpenChartBuilder,
   onClearHighlights,
 }: GridToolbarProps) {
-  const { filters: contextFilters, isEditable, canEdit, highlightedCells, tableId, handleAddRow, handleToggleFilters } = useGridContext()
-  const filters = contextFilters as ViewFilterConfig
+  const { filters, isEditable, canEdit, highlightedCells, tableId, handleAddRow, handleToggleFilters } = useGridContext()
   return (
     <div
       role="toolbar"
@@ -69,7 +67,7 @@ export function GridToolbar({
       <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:w-auto lg:flex-nowrap">
         {isEditable && (
           <div role="group" aria-label="Insert" className="flex items-center gap-2">
-            <button 
+            <button
               onClick={handleAddRow}
               disabled={!canEdit}
               className="btn btn-primary min-h-11 gap-1.5 px-2.5 py-0 text-xs disabled:opacity-40 sm:min-h-0 sm:px-3 sm:py-1.5"
@@ -81,7 +79,7 @@ export function GridToolbar({
               </svg>
               <span>Row</span>
             </button>
-            <button 
+            <button
               onClick={onAddColumn}
               disabled={!canEdit}
               className="btn btn-secondary min-h-11 gap-1.5 px-2.5 py-0 text-xs disabled:opacity-40 sm:min-h-0 sm:px-3 sm:py-1.5"
@@ -97,7 +95,7 @@ export function GridToolbar({
         )}
 
         <div role="group" aria-label="Explore" className="flex min-w-0 flex-wrap items-center gap-2">
-          <button 
+          <button
             onClick={() => handleToggleFilters()}
             className={`btn min-h-11 gap-1.5 px-2.5 py-0 text-xs sm:min-h-0 sm:px-3 sm:py-1.5 ${showFilterPanel || hasActiveFilters(filters) ? 'btn-primary' : 'btn-ghost'}`}
             aria-label="Filter table"
@@ -114,21 +112,21 @@ export function GridToolbar({
             )}
           </button>
 
-          <button 
+          <button
             onClick={onOpenChartBuilder}
             className="btn btn-secondary min-h-11 gap-1.5 px-2.5 py-0 text-xs sm:min-h-0 sm:px-3 sm:py-1.5"
             title="Create chart from this table"
             aria-label="Create chart from this table"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
             <span>Chart</span>
           </button>
 
           {highlightedCells && highlightedCells.size > 0 && (
-            <button 
+            <button
               onClick={() => onClearHighlights(tableId)}
               className="btn btn-ghost min-h-11 gap-1.5 px-2.5 py-0 text-xs text-accent-text hover:bg-accent-green/10 sm:min-h-0 sm:px-3 sm:py-1.5"
               title="Clear all highlighted cells"
@@ -141,7 +139,7 @@ export function GridToolbar({
             </button>
           )}
 
-          <button 
+          <button
             onClick={onToggleSuggestions}
             className={`btn min-h-11 gap-1.5 px-2.5 py-0 text-xs sm:min-h-0 sm:px-3 sm:py-1.5 ${showSuggestions ? 'btn-primary' : 'btn-ghost'}`}
             aria-label="Suggestions"

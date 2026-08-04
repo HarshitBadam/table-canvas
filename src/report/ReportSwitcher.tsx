@@ -7,7 +7,6 @@ interface ReportSwitcherProps {
   onSelectReport?: () => void;
 }
 
-/** Rename is a report-level verb, so it is triggered from the toolbar's actions menu. */
 export interface ReportSwitcherHandle {
   startRename: () => void;
 }
@@ -36,7 +35,6 @@ export const ReportSwitcher = forwardRef<ReportSwitcherHandle, ReportSwitcherPro
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
   const activeReport = activeReportId ? reports[activeReportId] || null : null;
-  // A chevron is only honest when there is somewhere else to go.
   const canSwitch = allReports.length > 1 || (allReports.length > 0 && !activeReport);
   const label = activeReport?.name
     || (allReports.length === 0 ? 'No reports yet' : 'Choose a report');

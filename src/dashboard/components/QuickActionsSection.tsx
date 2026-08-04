@@ -9,7 +9,7 @@ interface QuickActionsSectionProps {
 
 function getSuggestionIcon(suggestion: Suggestion) {
   const category = suggestion.category
-  
+
   if (category === 'analysis') {
     return (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -24,7 +24,7 @@ function getSuggestionIcon(suggestion: Suggestion) {
       </svg>
     )
   }
-  
+
   return (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -45,10 +45,19 @@ function getCategoryColor(category: Suggestion['category']): string {
   }
 }
 
-export function QuickActionsSection({ 
-  suggestions, 
-  onApply, 
-  isLoading 
+function SuggestionsHeader() {
+  return (
+    <header className="mb-3">
+      <h2 className="text-sm font-semibold text-text-primary">Suggested Actions</h2>
+      <p className="text-xs text-text-tertiary">Recommended next steps based on your data</p>
+    </header>
+  )
+}
+
+export function QuickActionsSection({
+  suggestions,
+  onApply,
+  isLoading,
 }: QuickActionsSectionProps) {
   const { openTable } = useNavigation()
   const topSuggestions = suggestions.slice(0, 3)
@@ -56,10 +65,7 @@ export function QuickActionsSection({
   if (isLoading) {
     return (
       <section>
-        <header className="mb-3">
-          <h2 className="text-sm font-semibold text-text-primary">Suggested Actions</h2>
-          <p className="text-xs text-text-tertiary">Recommended next steps based on your data</p>
-        </header>
+        <SuggestionsHeader />
         <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
           {[1, 2, 3].map((i) => (
             <div key={i} className="flex animate-pulse items-center gap-3 px-4 py-4">
@@ -79,10 +85,7 @@ export function QuickActionsSection({
   if (topSuggestions.length === 0) {
     return (
       <section>
-        <header className="mb-3">
-          <h2 className="text-sm font-semibold text-text-primary">Suggested Actions</h2>
-          <p className="text-xs text-text-tertiary">Recommended next steps based on your data</p>
-        </header>
+        <SuggestionsHeader />
         <p className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-text-tertiary shadow-sm">
           No suggestions yet. Import more data to discover insights.
         </p>
@@ -92,51 +95,53 @@ export function QuickActionsSection({
 
   return (
     <section>
-      <header className="mb-3">
-        <h2 className="text-sm font-semibold text-text-primary">Suggested Actions</h2>
-        <p className="text-xs text-text-tertiary">Recommended next steps based on your data</p>
-      </header>
+      <SuggestionsHeader />
 
       <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-        {topSuggestions.map((suggestion) => (
-          <div key={suggestion.id} className="flex items-center gap-3 px-4 py-4">
-            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${getCategoryColor(suggestion.category)}`}>
-              {getSuggestionIcon(suggestion)}
-            </div>
+        {topSuggestions.map((suggestion) => {
+          const opensTable =
+            suggestion.category === 'cleaning' || suggestion.action.kind === 'launchRecipe'
 
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-medium text-text-primary">
-                {suggestion.title}
-              </h3>
-              <p className="mt-0.5 line-clamp-1 text-sm text-text-secondary">
-                {suggestion.description}
-              </p>
+          return (
+            <div key={suggestion.id} className="flex items-center gap-3 px-4 py-4">
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${getCategoryColor(suggestion.category)}`}>
+                {getSuggestionIcon(suggestion)}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-medium text-text-primary">
+                  {suggestion.title}
+                </h3>
+                <p className="mt-0.5 line-clamp-1 text-sm text-text-secondary">
+                  {suggestion.description}
+                </p>
+                <button
+                  onClick={() => openTable(suggestion.context.tableId)}
+                  className="mt-1 text-xs text-text-tertiary transition-colors hover:text-accent-green"
+                >
+                  View source table
+                </button>
+              </div>
+
               <button
-                onClick={() => openTable(suggestion.context.tableId)}
-                className="mt-1 text-xs text-text-tertiary transition-colors hover:text-accent-green"
+                onClick={() => {
+                  if (opensTable) {
+                    openTable(suggestion.context.tableId)
+                  } else {
+                    onApply(suggestion)
+                  }
+                }}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
+                aria-label={`Apply suggestion: ${suggestion.title}`}
+                title="Apply suggestion"
               >
-                View source table
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m10 6 6 6-6 6" />
+                </svg>
               </button>
             </div>
-
-            <button
-              onClick={() => {
-                if (suggestion.category === 'cleaning' || suggestion.action.kind === 'launchRecipe') {
-                  openTable(suggestion.context.tableId)
-                } else {
-                  onApply(suggestion)
-                }
-              }}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
-              aria-label={`Apply suggestion: ${suggestion.title}`}
-              title="Apply suggestion"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m10 6 6 6-6 6" />
-              </svg>
-            </button>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </section>
   )

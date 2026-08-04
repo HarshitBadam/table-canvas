@@ -39,10 +39,6 @@ function ItemSpinner() {
   );
 }
 
-/**
- * Document-scoped verbs live behind one affordance next to the report name, so the
- * toolbar's remaining icons all act on the content rather than on the report itself.
- */
 export function ReportActionsMenu({
   blocked,
   exporting,

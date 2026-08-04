@@ -6,7 +6,7 @@ export interface IProjectDocument extends Omit<IProject, '_id'>, Document {
   clientOperationId?: string;
   clientOperationHash?: string;
   quotaSlot?: number;
-  
+
   toPublic(): {
     id: string;
     name: string;
@@ -108,20 +108,19 @@ const ProjectSchema = new Schema<IProjectDocument, IProjectModel>(
   {
     timestamps: true,
     collection: 'projects',
-    // Allow storing flexible node/edge structures
+    // Mixed node/edge/patch shapes require schemaless storage.
     strict: false,
   }
 );
 
-// Primary query pattern: user's active projects sorted by last update
 ProjectSchema.index({ userId: 1, deletedAt: 1, updatedAt: -1 });
 
 ProjectSchema.index({ userId: 1, name: 1 });
 
 ProjectSchema.index({ deletedAt: 1 }, { sparse: true });
 
-// These unique indexes are the cross-process synchronization boundary for
-// idempotent creation and per-user capacity.
+// Unique indexes are the cross-process sync boundary for idempotent creation
+// and per-user capacity (see projectCapacity.ts).
 ProjectSchema.index(
   { userId: 1, clientOperationId: 1 },
   {
@@ -155,7 +154,7 @@ ProjectSchema.methods.toPublic = function () {
 };
 
 ProjectSchema.statics.findByUser = function (userId: string | Types.ObjectId) {
-  return this.find({ 
+  return this.find({
     userId,
     deletedAt: null,
   })

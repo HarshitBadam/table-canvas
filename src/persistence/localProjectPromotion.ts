@@ -29,7 +29,6 @@ export interface ProjectPromotion {
   sourceScope: string
 }
 
-/** Promotes an offline `local_` project already inside an account scope. */
 export async function promoteLocalProject(
   projectId: string,
   scope: string,

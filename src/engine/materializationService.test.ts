@@ -55,6 +55,15 @@ const schema: TableSchema = {
   rowCount: 10,
 }
 const cacheOf = (id: string) => useTableRuntimeStore.getState().cacheInfo[id]
+
+function watchIsComputing(tableId: string) {
+  const states: Array<boolean | undefined> = []
+  const unsubscribe = useTableRuntimeStore.subscribe((state) => {
+    states.push(state.cacheInfo[tableId]?.isComputing)
+  })
+  return { states, unsubscribe }
+}
+
 function sourceNode(id: string, cacheInfo: Partial<CacheInfo> = {}): SourceTableNode {
   useTableRuntimeStore.getState().updateCacheInfo(id, {
     isDirty: false, isComputing: false, currentVersionHash: 'hash_123',
@@ -163,15 +172,12 @@ describe('source table materialization', () => {
     projectStore.nodes.table_1 = sourceNode('table_1', { isDirty: true })
     loadFile.mockResolvedValue(csv())
     engine.getSlice.mockRejectedValue(new Error('Not in engine'))
-    const computingStates: Array<boolean | undefined> = []
-    const unsubscribe = useTableRuntimeStore.subscribe((state) => {
-      computingStates.push(state.cacheInfo.table_1?.isComputing)
-    })
+    const computing = watchIsComputing('table_1')
 
     await ensureTableMaterialized('table_1', { announce: false })
-    unsubscribe()
+    computing.unsubscribe()
 
-    expect(computingStates).not.toContain(true)
+    expect(computing.states).not.toContain(true)
     expect(cacheOf('table_1')).toMatchObject({ isDirty: false, isComputing: false })
   })
   it('reloads a source table when the engine row count is incomplete', async () => {
@@ -280,7 +286,6 @@ describe('derived table materialization', () => {
     await ensureTableMaterialized('table_b')
     expect(engine.init).toHaveBeenCalled()
   })
-
   it('does not publish a computing state for a valid derived cache hit', async () => {
     const node = derivedNode(
       'table_b',
@@ -298,19 +303,15 @@ describe('derived table materialization', () => {
       table_b: node,
     }
     engine.getSlice.mockResolvedValue({ rows: [], totalRows: 10 })
-    const computingStates: Array<boolean | undefined> = []
-    const unsubscribe = useTableRuntimeStore.subscribe((state) => {
-      computingStates.push(state.cacheInfo.table_b?.isComputing)
-    })
+    const computing = watchIsComputing('table_b')
 
     const result = await computeDerivedTable('table_b')
-    unsubscribe()
+    computing.unsubscribe()
 
     expect(result.status).toBe('cached')
     expect(engine.executeTransform).not.toHaveBeenCalled()
-    expect(computingStates).not.toContain(true)
+    expect(computing.states).not.toContain(true)
   })
-
   it('recomputes a derived table when its cached engine row count is incomplete', async () => {
     const node = derivedNode(
       'table_b',
@@ -332,7 +333,6 @@ describe('derived table materialization', () => {
     expect(engine.executeTransform).toHaveBeenCalled()
     expect(result.status).toBe('computed')
   })
-
   it('propagates upstream errors', async () => {
     projectStore.nodes = {
       table_a: sourceNode('table_a', { isDirty: true }),
@@ -351,7 +351,6 @@ describe('getTableData', () => {
     expect(result.rows).toHaveLength(0)
     expect(result.totalRows).toBe(0)
   })
-
   it('returns data after materializing', async () => {
     projectStore.nodes.table_1 = sourceNode('table_1')
     loadFile.mockResolvedValue(csv('ID,Value\n1,100\n2,200'))

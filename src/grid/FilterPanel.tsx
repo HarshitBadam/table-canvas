@@ -55,7 +55,10 @@ export function FilterPanel({
     scope: string
     values: Record<string, CellValue[]>
   }>({ scope: distinctScope, values: {} })
-  const engineUniqueValues = distinctState.scope === distinctScope ? distinctState.values : {}
+  const engineUniqueValues = useMemo(
+    () => distinctState.scope === distinctScope ? distinctState.values : {},
+    [distinctScope, distinctState],
+  )
   const activeColumnIds = useMemo(() => {
     if (!isOpen) return []
     return [...new Set([
@@ -63,7 +66,6 @@ export function FilterPanel({
       ...(initialColumnId ? [initialColumnId] : []),
     ])]
   }, [filters.conditions, initialColumnId, isOpen])
-  const activeColumnKey = activeColumnIds.join('|')
 
   useEffect(() => {
     if (!isOpen || activeColumnIds.length === 0) return
@@ -98,7 +100,6 @@ export function FilterPanel({
     }
   }, [
     activeColumnIds,
-    activeColumnKey,
     columns,
     distinctScope,
     engineUniqueValues,
@@ -212,8 +213,8 @@ export function FilterPanel({
                 ? `Editing conditions for ${columns.find(column => column.id === initialColumnId)?.name ?? 'this column'}. Results update instantly.`
                 : 'Results update as you configure each condition.'}
             </Dialog.Description>
-          </div>
-          
+            </div>
+
           {filters.conditions.length > 0 && (
             <div className="mt-4 flex items-center gap-3 rounded-lg bg-surface-secondary px-3 py-2.5">
               <div
@@ -294,7 +295,6 @@ export function FilterPanel({
               )}
 
               {conditionsWithIds.map((condition, index) => {
-                const column = columns.find(c => c.id === condition.columnId)
                 const filterType = getColumnFilterType(condition.columnId)
                 const operators = getOperatorsForType(filterType)
                 const uniqueValues = getColumnUniqueValues(condition.columnId)
@@ -303,8 +303,6 @@ export function FilterPanel({
                 const commonProps: FilterCardProps = {
                   condition,
                   index,
-                  column,
-                  filterType,
                   uniqueValues,
                   operators,
                   onUpdate: (updates) => handleUpdateCondition(index, updates),

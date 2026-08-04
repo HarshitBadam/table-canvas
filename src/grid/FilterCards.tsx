@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, type ReactNode } from 'react'
-import { CellValue, ColumnSchema, FilterCondition, FilterOperator } from '@/types'
+import { CellValue, FilterCondition, FilterOperator } from '@/types'
 import {
-  FilterColumnType,
   getOperatorLabel,
   QuickDateFilter,
   quickDateOptions,
@@ -27,8 +26,6 @@ export interface FilterConditionWithId extends FilterCondition {
 export interface FilterCardProps {
   condition: FilterConditionWithId
   index: number
-  column?: ColumnSchema
-  filterType: FilterColumnType
   uniqueValues: CellValue[]
   operators: FilterOperator[]
   onUpdate: (updates: Partial<FilterCondition>) => void
@@ -90,7 +87,7 @@ function FilterConditionRow({
           </label>
         )}
         {valueControl && (
-          <div className={`flex min-w-0 items-center px-1.5 py-1 ${wideValue ? 'col-span-2 sm:col-span-2' : ''}`}>
+          <div className={`flex min-w-0 items-center px-1.5 py-1 ${wideValue ? 'col-span-2' : ''}`}>
             <span className="sr-only">Value</span>
             {valueControl}
           </div>

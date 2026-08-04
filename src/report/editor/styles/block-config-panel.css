@@ -1,5 +1,3 @@
-/* Block configuration popovers reuse the Combine Tables (join modal) design language. */
-
 /*
  * The panel opens inline underneath its block, so it competes with the report
  * for vertical space. Half the viewport leaves the block it configures visible

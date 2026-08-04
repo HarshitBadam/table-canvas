@@ -8,6 +8,10 @@ interface LineageMiniMapProps {
   onNodeClick: (nodeId: string) => void
 }
 
+function countLabel(count: number, singular: string): string {
+  return `${count} ${singular}${count !== 1 ? 's' : ''}`
+}
+
 export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProps) {
   const sourceNodes = useMemo(() => nodes.filter(n => n.kind === 'source_table'), [nodes])
   const derivedNodes = useMemo(() => nodes.filter(n => n.kind === 'derived_table'), [nodes])
@@ -17,6 +21,11 @@ export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProp
     return null
   }
 
+  const sourceLabel = countLabel(sourceNodes.length, 'source')
+  const derivedLabel = countLabel(derivedNodes.length, 'derived')
+  const chartLabel = chartNodes.length > 0 ? countLabel(chartNodes.length, 'chart') : null
+  const summaryLabel = [sourceLabel, derivedLabel, chartLabel].filter(Boolean).join(', ')
+
   return (
     <div className="bg-surface rounded-xl border border-border overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center justify-between">
@@ -24,13 +33,11 @@ export function LineageMiniMap({ nodes, edges, onNodeClick }: LineageMiniMapProp
           <h3 className="text-sm font-semibold text-text-primary">Data Flow</h3>
           <div
             className="flex items-center gap-2 text-xs text-text-tertiary"
-            aria-label={`${sourceNodes.length} source${sourceNodes.length !== 1 ? 's' : ''}, ${derivedNodes.length} derived${derivedNodes.length !== 1 ? 's' : ''}${chartNodes.length > 0 ? `, ${chartNodes.length} chart${chartNodes.length !== 1 ? 's' : ''}` : ''}`}
+            aria-label={summaryLabel}
           >
-            <span>{sourceNodes.length} source{sourceNodes.length !== 1 ? 's' : ''}</span>
-            <span>{derivedNodes.length} derived{derivedNodes.length !== 1 ? 's' : ''}</span>
-            {chartNodes.length > 0 && (
-              <span>{chartNodes.length} chart{chartNodes.length !== 1 ? 's' : ''}</span>
-            )}
+            <span>{sourceLabel}</span>
+            <span>{derivedLabel}</span>
+            {chartLabel && <span>{chartLabel}</span>}
           </div>
         </div>
         <div className="flex items-center gap-4 text-xs text-text-tertiary">
@@ -154,12 +161,6 @@ function LineageVisualization({
           style={{ overflow: 'visible' }}
         >
         <defs>
-          {/* Solid color for print */}
-          <linearGradient id="flowEdgePrint" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#6B7280" />
-            <stop offset="100%" stopColor="#6B7280" />
-          </linearGradient>
-          
           <marker
             id="flowArrowhead"
             markerWidth="10"
@@ -168,10 +169,7 @@ function LineageVisualization({
             refY="5"
             orient="auto"
           >
-            <path
-              d="M 0 0 L 10 5 L 0 10 Z"
-              fill={DERIVED_EDGE_COLOR}
-            />
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill={DERIVED_EDGE_COLOR} />
           </marker>
           <marker
             id="flowArrowheadChart"
@@ -181,10 +179,7 @@ function LineageVisualization({
             refY="5"
             orient="auto"
           >
-            <path
-              d="M 0 0 L 10 5 L 0 10 Z"
-              fill={CHART_EDGE_COLOR}
-            />
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill={CHART_EDGE_COLOR} />
           </marker>
         </defs>
 
@@ -192,20 +187,22 @@ function LineageVisualization({
           const fromPos = nodePositions.get(edge.from)
           const toPos = nodePositions.get(edge.to)
           const targetNode = nodes.find(node => node.id === edge.to)
-          
+
           if (!fromPos || !toPos) return null
-          
+
+          const isChartEdge = targetNode?.kind === 'chart'
+          const stroke = isChartEdge ? CHART_EDGE_COLOR : DERIVED_EDGE_COLOR
           const fromY = fromPos.y + MINIMAP_NODE_HEIGHT / 2
           const toY = toPos.y - MINIMAP_NODE_HEIGHT / 2
           const midY = (fromY + toY) / 2
-          
+
           const path = `
             M ${fromPos.x} ${fromY}
-            C ${fromPos.x} ${midY}, 
-              ${toPos.x} ${midY}, 
+            C ${fromPos.x} ${midY},
+              ${toPos.x} ${midY},
               ${toPos.x} ${toY}
           `
-          
+
           return (
             <g key={edge.id}>
               <path
@@ -220,12 +217,10 @@ function LineageVisualization({
               <path
                 d={path}
                 fill="none"
-                stroke={targetNode?.kind === 'chart' ? CHART_EDGE_COLOR : DERIVED_EDGE_COLOR}
+                stroke={stroke}
                 strokeWidth={2}
                 strokeLinecap="round"
-                markerEnd={targetNode?.kind === 'chart'
-                  ? 'url(#flowArrowheadChart)'
-                  : 'url(#flowArrowhead)'}
+                markerEnd={isChartEdge ? 'url(#flowArrowheadChart)' : 'url(#flowArrowhead)'}
                 className="lineage-edge transition-all"
               />
             </g>

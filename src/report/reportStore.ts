@@ -361,13 +361,5 @@ export const useReportStore = create<ReportStoreState>()(
     },
 
     flushSaves: flushPendingSaves,
-
-    // ========================================================================
-    // Selectors
-    // ========================================================================
-
-    getReport: (id) => {
-      return get().reports[id];
-    },
   }))
 );

@@ -184,7 +184,7 @@ const EmbeddedTableNodeView = memo(function EmbeddedTableNodeView({
         <EmptyState
           selected={selected}
           spinning
-            onMouseDownCapture={selectBlock}
+          onMouseDownCapture={selectBlock}
           title="Loading data…"
           description={tableNode ? `Preparing "${tableNode.name}"` : 'Preparing table'}
         />

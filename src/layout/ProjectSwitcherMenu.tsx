@@ -53,7 +53,6 @@ interface Props {
   onRenameFromActions: () => void | Promise<void>
   onDuplicateFromActions: () => void | Promise<void>
   onRenameNameChange: (name: string) => void
-  onRenameStart: () => void
   onRenameCancel: () => void
   onRenameSubmit: () => void
   setProjectLimitViolation: (violation: LimitExceeded | null) => void
@@ -92,7 +91,6 @@ export function ProjectSwitcherMenu({
   onRenameFromActions,
   onDuplicateFromActions,
   onRenameNameChange,
-  onRenameStart,
   onRenameCancel,
   onRenameSubmit,
   setProjectLimitViolation,
@@ -254,11 +252,9 @@ export function ProjectSwitcherMenu({
 
       {mode === 'full' && isRenaming && (
         <ProjectSwitcherActions
-          isRenaming={isRenaming}
           renameName={renameName}
           projectName={projectName}
           onRenameNameChange={onRenameNameChange}
-          onRenameStart={onRenameStart}
           onRenameCancel={onRenameCancel}
           onRenameSubmit={onRenameSubmit}
         />

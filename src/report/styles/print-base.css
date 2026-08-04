@@ -7,8 +7,6 @@
   button,
   .btn,
   [role="navigation"],
-  .no-print,
-  .block-toolbar,
   .block-config-panel,
   .slash-command-menu,
   .tiptap-block-wrapper.is-selected::before {
@@ -54,8 +52,7 @@
     margin: 0 !important;
   }
 
-  .tiptap-editor h1:first-child,
-  .report-title {
+  .tiptap-editor h1:first-child {
     font-size: 22pt !important;
     font-weight: 700 !important;
     margin-top: 0 !important;
@@ -93,7 +90,6 @@
     page-break-after: avoid;
   }
 
-  /* Text blocks - prevent splitting */
   p {
     orphans: 4;
     widows: 4;
@@ -102,7 +98,6 @@
     break-inside: avoid !important;
   }
 
-  /* Keep short paragraphs together */
   p:has(~ p) {
     page-break-after: auto;
   }

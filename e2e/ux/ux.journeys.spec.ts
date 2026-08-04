@@ -32,6 +32,7 @@ test.describe('Core workflows', () => {
 
     const dialog = page.getByRole('dialog', { name: 'Combine Tables' })
     await expect(dialog).toBeVisible()
+    // Dialog enter animations start at opacity 0; axe samples mid-flight otherwise.
     await page.addStyleTag({
       content: '*, *::before, *::after { animation: none !important; transition: none !important; }',
     })

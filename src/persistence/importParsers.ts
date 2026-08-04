@@ -18,40 +18,11 @@ export interface SheetInfo {
   selected: boolean
 }
 
-interface CSVParseResult extends ParsedTableData {
-  fileRef: string
-}
-
-interface ExcelMultiSheet {
-  kind: 'multi'
-  workbook: WorkBook
-  buffer: ArrayBuffer
-  sheets: SheetInfo[]
-}
-
-interface ExcelSingleSheet {
-  kind: 'single'
-  tableData: ParsedTableData
-  fileRef: string
-}
-
-type ExcelParseResult = ExcelMultiSheet | ExcelSingleSheet
-
 export async function inspectCSVFile(
   file: File,
   options?: CsvParseOptions,
 ): Promise<ParsedTableData> {
   return parseCsvFile(file, undefined, options)
-}
-
-export async function parseCSVFile(
-  file: File,
-  projectId: string,
-  options?: UploadFileSyncOptions,
-): Promise<CSVParseResult> {
-  const tableData = await inspectCSVFile(file)
-  const uploaded = await uploadFileWithSync(file, projectId, undefined, options)
-  return { ...tableData, fileRef: uploaded.id }
 }
 
 function sheetInfosFromWorkbook(workbook: WorkBook): SheetInfo[] {
@@ -73,22 +44,6 @@ export async function inspectExcelFile(file: File): Promise<{
   const buffer = await readFileAsArrayBuffer(file)
   const workbook = readWorkbook(buffer)
   return { workbook, buffer, sheets: sheetInfosFromWorkbook(workbook) }
-}
-
-export async function parseExcelFile(
-  file: File,
-  projectId: string,
-  options?: UploadFileSyncOptions,
-): Promise<ExcelParseResult> {
-  const { workbook, buffer, sheets } = await inspectExcelFile(file)
-
-  if (sheets.length === 1) {
-    const tableData = parseWorkbookSheet(workbook, sheets[0].name)
-    const uploaded = await uploadFileWithSync(file, projectId, undefined, options)
-    return { kind: 'single', tableData, fileRef: uploaded.id }
-  }
-
-  return { kind: 'multi', workbook, buffer, sheets }
 }
 
 export async function importSheetAndPersist(

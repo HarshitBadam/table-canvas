@@ -1,11 +1,3 @@
-/**
- * ReportView Component
- *
- * Main view for displaying and editing a report with TipTap.
- * Single seamless page - title is part of the content.
- * Includes toolbar for multi-report navigation and quick actions.
- */
-
 import { useCallback, useRef, useEffect, useMemo, useState } from 'react';
 import { useWorkspaceLease } from '@/state/useWorkspaceLease';
 import { useReportStore } from './reportStore';
@@ -17,7 +9,6 @@ import type { Report, ReportTemplateId } from './types';
 
 import './PrintStyles.css';
 
-/** Default document for a report that has no content yet. */
 function defaultDocFor(report: Report): JSONContent {
   return {
     type: 'doc',
@@ -48,15 +39,12 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [isChoosingTemplate, setIsChoosingTemplate] = useState(false);
 
-  // Resolve the content to display: the report's TipTap document, or a fresh
-  // default document titled after the report when it has no content yet.
   const content = useMemo<JSONContent>(() => {
     if (!report) return { type: 'doc', content: [] };
     if (report.tiptapContent) return report.tiptapContent as unknown as JSONContent;
     return defaultDocFor(report);
   }, [report]);
 
-  // Handle content changes - just save content, name is managed separately via toolbar
   const handleContentChange = useCallback((content: JSONContent) => {
     if (!reportId) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,7 +62,6 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
     setActiveReportEditor(instance);
   }, []);
 
-  // Focus editor on mount
   useEffect(() => {
     const timer = setTimeout(() => {
       editorRef.current?.focus();
@@ -82,7 +69,6 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
     return () => clearTimeout(timer);
   }, [reportId]);
 
-  // Toolbar action handlers
   const handleInsertTable = useCallback(() => {
     editorRef.current?.insertTable();
   }, []);
@@ -123,7 +109,6 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
 
   return (
     <div className="h-full flex flex-col bg-surface report-view">
-      {/* Report Toolbar */}
       <ReportToolbar
         activeReportId={reportId}
         editor={editor}
@@ -133,7 +118,6 @@ export function ReportView({ reportId, onOpenTable }: ReportViewProps) {
         onInsertChart={handleInsertChart}
       />
 
-      {/* Editor */}
       <div className="flex-1 overflow-auto overscroll-x-contain">
         <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12 print:max-w-none print:px-0 print:py-8">
           <TipTapEditor

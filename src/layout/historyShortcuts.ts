@@ -2,7 +2,6 @@ import type { ViewMode } from './viewNavigation'
 
 export type HistoryIntent = 'undo' | 'redo'
 
-/** The parts of a keydown that decide whether it asks for undo or redo. */
 export interface HistoryKeyStroke {
   key: string
   metaKey: boolean
@@ -30,12 +29,11 @@ export function historyIntentFor(stroke: HistoryKeyStroke): HistoryIntent | null
 }
 
 /**
- * Which history the keystroke belongs to.
+ * Which history owns the keystroke.
  *
- * - `native`: a form field's own undo stack owns it, and the browser applies it.
- * - `report`: the report document's history.
- * - `project`: the project's history of nodes, edges and cell edits.
- * - `blocked`: nobody may act, but the keystroke is still consumed.
+ * - `native`: leave it to the focused form field; the browser applies it.
+ * - `blocked`: consume without acting (modal open, or this tab cannot edit).
+ * - `report` / `project`: route there; report never falls through to project.
  */
 export type HistoryTarget = 'native' | 'report' | 'project' | 'blocked'
 

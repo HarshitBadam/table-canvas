@@ -19,7 +19,6 @@ export type LayoutDirection = 'LR' | 'TB' | 'RL' | 'BT'
 
 interface LayoutOptions {
   direction?: LayoutDirection
-  spacing?: number
 }
 
 export function getNodeHeight(node: Node): number {
@@ -33,7 +32,7 @@ export function getLayoutedNodes(
   edges: Edge[],
   options: LayoutOptions = {}
 ): Node[] {
-  const { direction = 'LR', spacing = 1 } = options
+  const { direction = 'LR' } = options
   const isVertical = direction === 'TB' || direction === 'BT'
 
   if (edges.length === 0) {
@@ -49,7 +48,7 @@ export function getLayoutedNodes(
         : { x: offset, y: LAYOUT_CONFIG.marginy })
       offset += (
         isVertical ? getNodeHeight(node) : NODE_WIDTH
-      ) + LAYOUT_CONFIG.ranksep * spacing
+      ) + LAYOUT_CONFIG.ranksep
     })
 
     return nodes.map(node => ({
@@ -65,11 +64,11 @@ export function getLayoutedNodes(
   
   // For vertical layout with data-preview nodes, increase both rank and node separation.
   const ranksep = isVertical && hasDataPreviewNodes
-    ? LAYOUT_CONFIG.ranksep * spacing * 1.5 
-    : LAYOUT_CONFIG.ranksep * spacing
+    ? LAYOUT_CONFIG.ranksep * 1.5
+    : LAYOUT_CONFIG.ranksep
   const nodesep = hasDataPreviewNodes
-    ? LAYOUT_CONFIG.nodesep * spacing * 1.2 
-    : LAYOUT_CONFIG.nodesep * spacing
+    ? LAYOUT_CONFIG.nodesep * 1.2
+    : LAYOUT_CONFIG.nodesep
   
   dagreGraph.setGraph({
     ...LAYOUT_CONFIG,

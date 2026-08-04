@@ -2,8 +2,8 @@ import { getStorageScope } from '@/persistence/storageScope'
 import { documentTabId } from '@/state/documentIdentity'
 
 /**
- * Account-level project list coordination. Document leases only cover one open
- * project; create, rename, and delete must still reach every tab in the scope.
+ * Cross-tab project catalog events. Document leases cover one open project;
+ * create/rename/delete still need scope-wide BroadcastChannel fan-out.
  */
 export type ProjectCatalogEvent =
   | { type: 'catalog-changed'; tabId: string }
@@ -58,7 +58,6 @@ export function publishProjectDeleted(
   } satisfies ProjectCatalogEvent)
 }
 
-/** Keeps the catalog channel bound to the active storage scope. */
 export function bindProjectCatalog(scope: string): () => void {
   ensureSession(scope)
   return () => {

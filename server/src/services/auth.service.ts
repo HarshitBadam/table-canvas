@@ -15,9 +15,8 @@ function parseDuration(duration: string): number {
   }
 
   const value = parseInt(match[1], 10);
-  const unit = match[2];
-
-  switch (unit) {
+  // Capture group is constrained to s|m|h|d by the regex above.
+  switch (match[2] as 's' | 'm' | 'h' | 'd') {
     case 's':
       return value * 1000;
     case 'm':
@@ -26,8 +25,6 @@ function parseDuration(duration: string): number {
       return value * 60 * 60 * 1000;
     case 'd':
       return value * 24 * 60 * 60 * 1000;
-    default:
-      return 15 * 60 * 1000;
   }
 }
 

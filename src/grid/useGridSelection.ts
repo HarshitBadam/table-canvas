@@ -14,7 +14,6 @@ export function useGridSelection(
   tableId: string,
   columns: ColumnSchema[],
   rowAccess: GridRowAccess,
-  _isEditable: boolean,
 ) {
   const { totalRows, getRowAtIndex } = rowAccess
   const toggleCellHighlight = useProjectStore((state) => state.toggleCellHighlight)
@@ -82,27 +81,29 @@ export function useGridSelection(
   }, [columns, selectCell, selection])
 
   const handleCellMouseEnter = useCallback((rowIndex: number, columnId: string) => {
-    if (isDraggingSelectionRef.current && dragSelectionStart.current) {
-      const colIndex = columns.findIndex(c => c.id === columnId)
-      const startRow = Math.min(dragSelectionStart.current.rowIndex, rowIndex)
-      const endRow = Math.max(dragSelectionStart.current.rowIndex, rowIndex)
-      const startColIndex = Math.min(dragSelectionStart.current.colIndex, colIndex)
-      const endColIndex = Math.max(dragSelectionStart.current.colIndex, colIndex)
+    if (!isDraggingSelectionRef.current || !dragSelectionStart.current) return
 
-      pendingDragRangeRef.current = startRow !== endRow || startColIndex !== endColIndex
-        ? { startRow, endRow, startColIndex, endColIndex }
-        : null
+    const colIndex = columns.findIndex(c => c.id === columnId)
+    const startRow = Math.min(dragSelectionStart.current.rowIndex, rowIndex)
+    const endRow = Math.max(dragSelectionStart.current.rowIndex, rowIndex)
+    const startColIndex = Math.min(dragSelectionStart.current.colIndex, colIndex)
+    const endColIndex = Math.max(dragSelectionStart.current.colIndex, colIndex)
 
-      if (dragFrameRef.current === null) {
-        dragFrameRef.current = requestAnimationFrame(() => {
-          dragFrameRef.current = null
-          setCellRangeSelection(pendingDragRangeRef.current)
-        })
-      }
+    pendingDragRangeRef.current = startRow !== endRow || startColIndex !== endColIndex
+      ? { startRow, endRow, startColIndex, endColIndex }
+      : null
+
+    // Coalesce drag updates to one React state write per frame.
+    if (dragFrameRef.current === null) {
+      dragFrameRef.current = requestAnimationFrame(() => {
+        dragFrameRef.current = null
+        setCellRangeSelection(pendingDragRangeRef.current)
+      })
     }
   }, [columns])
 
   const handleSelectionMouseUp = useCallback(() => {
+    // Flush any pending rAF range before clearing drag state so the final cell is kept.
     if (dragFrameRef.current !== null) {
       cancelAnimationFrame(dragFrameRef.current)
       dragFrameRef.current = null
@@ -268,7 +269,6 @@ export function useGridSelection(
     isIndexColumnSelected,
     isCornerSelected,
     cellRangeSelection,
-    setCellRangeSelection,
     selectCell,
     isDraggingSelectionRef,
     handleCellMouseDown,

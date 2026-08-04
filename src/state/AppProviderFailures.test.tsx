@@ -12,8 +12,6 @@ const mocks = vi.hoisted(() => ({
   loadOrCreate: vi.fn(),
   initializeEngine: vi.fn(),
   clearRuntime: vi.fn(),
-  materialize: vi.fn(),
-  hasTables: vi.fn(),
   flushReports: vi.fn(),
   loadReports: vi.fn(),
 }))
@@ -66,10 +64,8 @@ vi.mock('@/persistence/syncService', () => ({
 }))
 vi.mock('./projectLifecycle', () => ({
   clearProjectRuntime: mocks.clearRuntime,
-  hasProjectTables: mocks.hasTables,
   initializeEngine: mocks.initializeEngine,
   loadOrCreateProject: mocks.loadOrCreate,
-  materializeProjectTables: mocks.materialize,
 }))
 vi.mock('@/report/reportStore', () => ({ useReportStore: reportStore }))
 vi.mock('@/persistence/reportStorage', () => ({
@@ -120,8 +116,6 @@ beforeEach(() => {
   })
   mocks.initializeEngine.mockResolvedValue(undefined)
   mocks.clearRuntime.mockResolvedValue(undefined)
-  mocks.hasTables.mockReturnValue(false)
-  mocks.materialize.mockResolvedValue({ completedTableIds: [], failures: [] })
   mocks.flushReports.mockResolvedValue(undefined)
   mocks.loadReports.mockResolvedValue({})
   mocks.saveProject.mockResolvedValue(undefined)

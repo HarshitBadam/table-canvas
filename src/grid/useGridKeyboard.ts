@@ -62,6 +62,25 @@ export function useGridKeyboard({
   const undo = useProjectStore((state) => state.undo)
 
   useEffect(() => {
+    const beginEditAtSelection = (
+      rowIndex: number,
+      columnId: string,
+      options?: { initialValue?: string; selectValue?: boolean },
+    ) => {
+      if (!isEditable) {
+        onReadOnlyEditAttempt?.()
+        return
+      }
+      const row = getRowAtIndex(rowIndex)
+      if (!row) return
+      startEditing(
+        rowIndex,
+        columnId,
+        getDisplayValue(row.__rowId, columnId, row[columnId], row),
+        options,
+      )
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target instanceof HTMLElement ? e.target : null
       if (!target?.closest('[role="grid"]')) return
@@ -100,6 +119,7 @@ export function useGridKeyboard({
           const data = getSelectedCellData()
           if (data) {
             e.preventDefault()
+            // In-app paste uses this mirror when the async clipboard write is denied.
             window.__gridClipboard = data
             navigator.clipboard.writeText(formatClipboardText(data)).catch(() => {
               onFeedback({
@@ -136,19 +156,7 @@ export function useGridKeyboard({
           }
         } else if (e.key === 'Enter') {
           e.preventDefault()
-          if (!isEditable) {
-            onReadOnlyEditAttempt?.()
-            return
-          }
-          const row = getRowAtIndex(rowIndex)
-          if (row) {
-            startEditing(
-              rowIndex,
-              columnId,
-              getDisplayValue(row.__rowId, columnId, row[columnId], row),
-              { selectValue: true },
-            )
-          }
+          beginEditAtSelection(rowIndex, columnId, { selectValue: true })
         } else if (e.key === 'Tab') {
           e.preventDefault()
           const targetCell = getNavigationTarget(
@@ -162,19 +170,7 @@ export function useGridKeyboard({
           if (targetColumn) selectCell(targetCell.rowIndex, targetColumn.id)
         } else if (e.key === 'F2') {
           e.preventDefault()
-          if (!isEditable) {
-            onReadOnlyEditAttempt?.()
-            return
-          }
-          const row = getRowAtIndex(rowIndex)
-          if (row) {
-            startEditing(
-              rowIndex,
-              columnId,
-              getDisplayValue(row.__rowId, columnId, row[columnId], row),
-              { selectValue: false },
-            )
-          }
+          beginEditAtSelection(rowIndex, columnId, { selectValue: false })
         } else if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault()
           if (!isEditable) {
@@ -200,22 +196,11 @@ export function useGridKeyboard({
           && !e.metaKey
           && !e.ctrlKey
           && !e.altKey
+          // Avoid treating IME composition keydowns as type-to-edit.
           && !e.isComposing
         ) {
           e.preventDefault()
-          if (!isEditable) {
-            onReadOnlyEditAttempt?.()
-            return
-          }
-          const row = getRowAtIndex(rowIndex)
-          if (row) {
-            startEditing(
-              rowIndex,
-              columnId,
-              getDisplayValue(row.__rowId, columnId, row[columnId], row),
-              { initialValue: e.key, selectValue: false },
-            )
-          }
+          beginEditAtSelection(rowIndex, columnId, { initialValue: e.key, selectValue: false })
         }
       } else if (selection?.type === 'header-row' && e.key === 'ArrowDown' && totalRows > 0) {
         e.preventDefault()
@@ -236,6 +221,7 @@ export function useGridKeyboard({
 
       const target = event.target instanceof HTMLElement ? event.target : null
       if (!target?.closest('[role="grid"]')) return
+      // Let native inputs/contenteditable own paste while an editor is focused.
       if (target.matches('input, textarea, [contenteditable="true"]')) return
 
       const text = event.clipboardData?.getData('text/plain')

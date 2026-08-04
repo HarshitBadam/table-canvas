@@ -50,11 +50,8 @@ export interface TipTapEditorProps {
 }
 
 export interface TipTapEditorHandle {
-  getEditor: () => Editor | null;
   focus: () => void;
-  getHTML: () => string;
   getJSON: () => JSONContent;
-  toggleHighlight: () => void;
   insertTable: () => void;
   insertEmbeddedTable: () => void;
   insertChart: () => void;
@@ -244,11 +241,8 @@ export const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(
     }, [editor, pendingTablePaste]);
 
     useImperativeHandle(ref, () => ({
-      getEditor: () => editor,
       focus: () => editor?.commands.focus('end'),
-      getHTML: () => editor?.getHTML() || '',
       getJSON: () => editor?.getJSON() || { type: 'doc', content: [] },
-      toggleHighlight: () => editor?.chain().focus().toggleHighlight().run(),
       insertTable: () => editor?.chain().focus().insertContent({
         type: 'editableTable',
         attrs: { headers: [], rows: [], initialized: false },

@@ -61,7 +61,6 @@ export function useGridData(tableId: string) {
     totalRows: windowedTotalRows,
     version: windowedVersion,
   } = windowed
-  const isMaterializing = windowed.isInitialLoading
   const materializationError = localMaterializationError ?? windowed.error
 
   const prevDataRevision = useRef(dataRevision)
@@ -89,7 +88,6 @@ export function useGridData(tableId: string) {
 
   return {
     node,
-    patches,
     columns,
     loadedRows,
     totalRows: windowedTotalRows,
@@ -100,7 +98,6 @@ export function useGridData(tableId: string) {
     canMutate,
     isDirty,
     isComputing,
-    isMaterializing,
     materializationError,
     setMaterializationError,
     computationError,

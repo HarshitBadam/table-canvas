@@ -22,7 +22,7 @@ interface Tab {
   runtimeStore: typeof import('./tableRuntimeStore')
 }
 
-/** Each tab has its own stores and coordination module, like separate pages. */
+/** Fresh module registry per tab so store/mirror state stays isolated. */
 async function openTab(): Promise<Tab> {
   vi.resetModules()
   const [db, mirror, projectStore, runtimeStore] = await Promise.all([

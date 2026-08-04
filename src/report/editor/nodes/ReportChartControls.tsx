@@ -6,14 +6,6 @@ export function ChartGlyph() {
   )
 }
 
-export function TableGlyph() {
-  return (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 002 2z" />
-    </svg>
-  )
-}
-
 export function SettingsIcon() {
   return (
     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -23,45 +15,6 @@ export function SettingsIcon() {
   )
 }
 
-function DeleteIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-    </svg>
-  )
-}
-
 export function ChartGrid() {
   return <div className="chart-block-grid" aria-hidden="true" />
-}
-
-export function ChartToolbar({
-  selected,
-  onConfigure,
-  onDelete,
-}: {
-  selected: boolean
-  onConfigure: () => void
-  onDelete: () => void
-}) {
-  return (
-    <div className={`chart-block-toolbar ${selected ? 'is-visible' : ''}`}>
-      <button
-        onClick={onConfigure}
-        className="chart-block-toolbar-button"
-      >
-        <SettingsIcon />
-        Configure
-      </button>
-      <div className="chart-block-toolbar-divider" />
-      <button
-        onClick={onDelete}
-        className="chart-block-toolbar-button is-danger"
-        title="Delete chart (Backspace)"
-        aria-label="Delete chart"
-      >
-        <DeleteIcon />
-      </button>
-    </div>
-  )
 }

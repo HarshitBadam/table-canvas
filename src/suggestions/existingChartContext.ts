@@ -1,9 +1,11 @@
 import type { ChartConfig, ChartNode, ProjectNode, Suggestion } from '@/types'
 
+// Histogram suggestions are satisfied by an equivalent bar chart.
 function normalizedChartType(type: string): string {
   return type === 'histogram' ? 'bar' : type
 }
 
+// groupBy === xAxis is a no-op in chart plans; treat as unset for matching.
 function normalizedGroupBy(config: ChartConfig): string | undefined {
   return config.groupBy === config.xAxis ? undefined : config.groupBy
 }
@@ -19,7 +21,7 @@ function sameSeries(left?: string[], right?: string[]): boolean {
     && normalizedLeft.every((value, index) => value === normalizedRight[index])
 }
 
-export function chartSatisfiesSuggestion(
+function chartSatisfiesSuggestion(
   chart: ChartNode,
   suggestion: Suggestion,
 ): boolean {

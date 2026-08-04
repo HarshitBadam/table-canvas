@@ -3,17 +3,22 @@ import type { TableRow } from '@/state/dataStore'
 import type { CellValue, ColumnSchema, ColumnType, TableSchema } from '@/types'
 import { inferValueType } from '@/lib/utils'
 
+/** Papa's default chunk is multi-MB; keep slices small so schema can surface early. */
+const CSV_CHUNK_SIZE = 64 * 1024
+/** Rows sampled for type inference before flushing the buffered CSV prefix. */
+const SCHEMA_SAMPLE_SIZE = 100
+
 export interface ParsedTableData {
   schema: TableSchema
   rows: TableRow[]
 }
 
 export interface CsvParseOptions {
-  /** Called once the source columns have been inferred from the initial sample. */
+  /** Fires after columns are inferred from the initial sample, before parse completes. */
   onSchema?: (schema: TableSchema) => void
 }
 
-/** Yield to the browser between CSV chunks so import UI can paint immediately. */
+/** Yield between CSV chunks so the import UI can paint during large files. */
 function yieldToUi(): Promise<void> {
   return new Promise((resolve) => {
     if (typeof setTimeout === 'function') setTimeout(resolve, 0)
@@ -29,10 +34,7 @@ export function parseCsvData(
   return parseCsvSource(new TextDecoder('utf-8').decode(fileData), existingSchema, options)
 }
 
-/**
- * Streams a browser File through Papa Parse so callers can receive the inferred
- * schema before the entire CSV has been parsed.
- */
+/** Stream a File through Papa so inferred schema can arrive before full parse. */
 export function parseCsvFile(
   file: File,
   existingSchema?: TableSchema,
@@ -73,7 +75,7 @@ function parseCsvSource(
       options?.onSchema?.({
         ...existingSchema,
         columns: columns!,
-        // This is a schema preview, not evidence that any rows are ready.
+        // Preview only: rows are not ready yet, so callers must not treat this as loaded.
         rowCount: 0,
       })
     }
@@ -94,21 +96,18 @@ function parseCsvSource(
       Papa.parse<Record<string, string>>(source, {
         header: true,
         skipEmptyLines: true,
-        // Keep the first parse slice small enough for schema inference to be
-        // surfaced without waiting for a multi-megabyte default chunk.
-        chunkSize: 64 * 1024,
+        chunkSize: CSV_CHUNK_SIZE,
         chunk: (results: Papa.ParseResult<Record<string, string>>, parser: Papa.Parser) => {
           if (settling) return
           try {
             fields = results.meta.fields ?? fields
-            // Headers are enough to show column count immediately; keep sampling
-            // only until types can be inferred, then flush the buffered rows.
-            if (!columns && samples.length < 100) {
-              const needed = 100 - samples.length
+            // Buffer until we have enough samples for type inference, then flush.
+            if (!columns && samples.length < SCHEMA_SAMPLE_SIZE) {
+              const needed = SCHEMA_SAMPLE_SIZE - samples.length
               samples.push(...results.data.slice(0, needed))
               pendingRows.push(...results.data)
               if (fields.length > 0) publishSchema()
-              if (samples.length >= 100) {
+              if (samples.length >= SCHEMA_SAMPLE_SIZE) {
                 appendRows(pendingRows)
                 pendingRows.length = 0
               }
@@ -136,12 +135,8 @@ function parseCsvSource(
             console.warn('CSV parsing warnings:', results.errors)
           }
           try {
-            if (pendingRows.length > 0) {
-              publishSchema()
-              appendRows(pendingRows)
-            } else {
-              publishSchema()
-            }
+            publishSchema()
+            if (pendingRows.length > 0) appendRows(pendingRows)
             resolve({
               schema: {
                 ...existingSchema,
@@ -175,10 +170,10 @@ export function processTabularData(
 
   const rows = data.map((record, rowIndex) => {
     const row: TableRow = { __rowId: `row_${rowIndex}` }
-    fields.forEach((field) => {
+    for (const field of fields) {
       const column = columnsByName.get(field)
       if (column) row[column.id] = coerceValue(record[field], column.type)
-    })
+    }
     return row
   })
 
@@ -221,7 +216,7 @@ function inferColumns(data: Record<string, string>[], fields: string[]): ColumnS
     name: field,
     sourceName: field,
     type: inferColumnType(
-      data.slice(0, 100).map((row) => row[field]).filter(Boolean),
+      data.slice(0, SCHEMA_SAMPLE_SIZE).map((row) => row[field]).filter(Boolean),
     ),
     nullable: data.some(
       (row) => row[field] === '' || row[field] === null || row[field] === undefined,

@@ -3,9 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useReportTableCells } from './useReportTableCells'
 
 /**
- * The grid takes editing keys away from the report document so that an atomic
- * block never leaks them to the selection behind it. Undo is the exception: it
- * acts on the document, so it has to be allowed to leave the table.
+ * The grid stops editing keys from reaching the document. Undo is the
+ * exception: it acts on the document, so it must leave the table.
  */
 let escaped: KeyboardEvent[]
 const collect = (event: Event) => escaped.push(event as KeyboardEvent)
@@ -20,7 +19,6 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-/** Mounts the hook over a real table and selects a cell, as a click would. */
 function mountGridWithSelectedCell() {
   const view = renderHook(() => useReportTableCells({
     headers: ['Name', 'Value'],
@@ -34,7 +32,7 @@ function mountGridWithSelectedCell() {
   document.body.appendChild(table)
   view.result.current.gridRef.current = table
 
-  // Selecting re-runs the hook's listener effect, which is what binds the table.
+  // Selecting re-runs the listener effect that binds keydown to the table.
   act(() => view.result.current.selectCell({ row: 0, col: 0 }))
 
   return { view, cell }
@@ -53,7 +51,6 @@ describe('useReportTableCells keyboard containment', () => {
     press(cell, { key: 'y', ctrlKey: true })
 
     expect(escaped.map((event) => event.key)).toEqual(['z', 'Z', 'y'])
-    // The grid must not consume them either; the document's history decides.
     expect(escaped.every((event) => !event.defaultPrevented)).toBe(true)
   })
 

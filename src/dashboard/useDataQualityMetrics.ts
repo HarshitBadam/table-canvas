@@ -5,18 +5,15 @@ import {
   useAllProfiles,
   computeTableCompleteness,
   extractIssuesFromProfile,
-  isDataStale,
   formatRelativeTime,
-  computeTypeBreakdown,
   type TableQualityMetrics,
 } from './dashboardHelpers'
 
 export function useDataQualityMetrics(): {
   tableMetrics: TableQualityMetrics[]
-  isLoading: boolean
 } {
   const tableNodes = useTableNodes()
-  const { profiles, isLoading: profilesLoading } = useAllProfiles()
+  const { profiles } = useAllProfiles()
   const runtimeCacheInfo = useTableRuntimeStore((state) => state.cacheInfo)
 
   const tableMetrics = useMemo(() => {
@@ -27,18 +24,13 @@ export function useDataQualityMetrics(): {
         ?? table.schema?.rowCount
         ?? 0
       const columnCount = table.schema?.columns?.length || 0
-      const isLoading = !profile && profilesLoading
 
       const completeness = computeTableCompleteness(profile, rowCount)
-      const issues = extractIssuesFromProfile(profile, table.schema)
+      const issueCount = extractIssuesFromProfile(profile, table.schema).length
 
-      const importedAt = table.kind === 'source_table' ? table.createdAt : null
-      const isStale = table.kind === 'source_table' ? isDataStale(importedAt) : false
       const freshnessLabel = table.kind === 'source_table'
-        ? `Imported ${formatRelativeTime(importedAt)}`
+        ? `Imported ${formatRelativeTime(table.createdAt)}`
         : 'Derived'
-
-      const typeBreakdown = computeTypeBreakdown(table.schema)
 
       return {
         tableId: table.id,
@@ -47,17 +39,12 @@ export function useDataQualityMetrics(): {
         rowCount,
         columnCount,
         completeness,
-        issueCount: issues.length,
-        issues,
-        isLoading,
+        issueCount,
         hasProfile: !!profile,
-        importedAt,
-        isStale,
         freshnessLabel,
-        typeBreakdown,
       }
     })
-  }, [runtimeCacheInfo, tableNodes, profiles, profilesLoading])
+  }, [runtimeCacheInfo, tableNodes, profiles])
 
-  return { tableMetrics, isLoading: profilesLoading }
+  return { tableMetrics }
 }

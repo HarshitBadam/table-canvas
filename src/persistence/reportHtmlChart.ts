@@ -2,7 +2,6 @@ import { escapeHtml } from './reportHtmlUtils'
 
 interface ChartEntry {
   tableName: string
-  headers: string[]
   columnNames?: Record<string, string>
   rows: Record<string, unknown>[]
 }
@@ -72,7 +71,7 @@ function piePath(cx: number, cy: number, radius: number, start: number, end: num
   return `M ${cx} ${cy} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY} Z`
 }
 
-/** Slice colours, so a legend can be rebuilt for a target without HTML/CSS. */
+/** Legend entries carry colour so PDF (no CSS) can rebuild the key. */
 export interface ReportChartLegendItem {
   label: string
   value: number
@@ -80,7 +79,6 @@ export interface ReportChartLegendItem {
 }
 
 interface ChartGraphic {
-  /** Empty when the data holds nothing plottable. */
   svg: string
   legend: ReportChartLegendItem[]
 }
@@ -174,11 +172,7 @@ function renderCartesian(points: ChartPoint[], type: string): string {
   </svg>`
 }
 
-/**
- * A rendered chart, independent of any output format: the plain SVG graphic plus
- * the labels and legend that surround it. Consumers that cannot rely on CSS —
- * the PDF exporter — compose their own frame from these parts.
- */
+/** Format-neutral chart parts; PDF composes its own frame from these. */
 export interface ReportChartVector {
   chartType: string
   svg: string
@@ -227,10 +221,6 @@ function resolveChart(attrs: Record<string, unknown>, entry: ChartEntry): ChartR
   }
 }
 
-/**
- * Resolves a chart block to its vector graphic, or `null` when it cannot be
- * plotted (no axes chosen, or nothing numeric to plot).
- */
 export function buildReportChartVector(
   attrs: Record<string, unknown>,
   entry: ChartEntry,

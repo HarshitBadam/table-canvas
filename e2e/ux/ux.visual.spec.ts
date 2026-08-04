@@ -57,10 +57,9 @@ test.describe('Visual regression', () => {
     const rightNode = nodes.filter({
       has: page.getByRole('heading', { name: 'Visual Right', exact: true }),
     })
-    await leftNode.locator('.table-handle-right').first()
-      .dragTo(
-        rightNode.locator('.table-handle-left').first(),
-      )
+    await leftNode.locator('.table-handle-right').first().dragTo(
+      rightNode.locator('.table-handle-left').first(),
+    )
     await expect(page.getByRole('dialog', { name: 'Combine Tables' })).toBeVisible()
 
     await expect(page).toHaveScreenshot('combine-tables-dialog.png')

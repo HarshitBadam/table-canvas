@@ -14,7 +14,7 @@ export interface LimitExceeded {
 
 export type LimitCheck = LimitOk | LimitExceeded
 
-export interface SafetyLimitExceeded {
+interface SafetyLimitExceeded {
   ok: false
   reason: string
   limit: number
@@ -53,11 +53,8 @@ export function checkRowCount(rowCount: number, tier: Tier): LimitCheck {
 }
 
 /**
- * Guards against joins/unions whose output would be too large for the
- * browser tab's memory to hold, regardless of pricing tier. Unlike
- * checkRowCount, this never exempts any tier — it protects against a
- * crash, not a plan limit — so callers should treat a failure here as
- * blocking rather than an upsell opportunity.
+ * Memory safety for join/union output — never tier-exempt (unlike
+ * checkRowCount). Treat failures as blocking, not as an upsell.
  */
 export function checkTransformOutputSafety(rowCount: number): SafetyCheck {
   if (rowCount <= MAX_SAFE_TRANSFORM_OUTPUT_ROWS) return { ok: true }
@@ -81,9 +78,9 @@ export function checkTableCount(currentTableCount: number, tier: Tier): LimitChe
 }
 
 /**
- * Validates persisted project contents, including imports, before the project
- * is activated or synced. Creation flows use checkTableCount directly because
- * they need to check capacity before adding a new table.
+ * Validates persisted project contents (including imports) before
+ * activation/sync. Creation flows use checkTableCount — they need capacity
+ * before adding a table.
  */
 export function checkProjectTableLimits(
   nodes: Record<string, ProjectNode>,

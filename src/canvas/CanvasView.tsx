@@ -19,7 +19,6 @@ import 'reactflow/dist/style.css'
 import { useProjectStore } from '@/state/projectStore'
 import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import { useWorkspaceLease } from '@/state/useWorkspaceLease'
-import { useProfilingStore } from '@/lib/profiling'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import type { ProjectNode, Edge as ProjectEdge } from '@/types'
 import { useCanvasKeyboard } from './useCanvasKeyboard'
@@ -52,7 +51,6 @@ const nodeTypes: NodeTypes = {
   chartNode: ChartNodeLoader,
 }
 
-
 interface CanvasViewProps {
   onNodeDoubleClick: (nodeId: string) => void
 }
@@ -66,21 +64,19 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const saveSnapshot = useProjectStore((state) => state.saveSnapshot)
   const selectNode = useProjectStore((state) => state.selectNode)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
-  
+
   const runtimeSchemas = useTableRuntimeStore((state) => state.schemas)
-  const profiles = useProfilingStore((state) => state.profiles)
-  const profilesLoading = useProfilingStore((state) => state.loading)
-  
+
   const [transformModalOpen, setTransformModalOpen] = useState(false)
   const [pendingConnection, setPendingConnection] = useState<{
     source: string
     target: string
   } | null>(null)
-  
+
   const [newTableModalOpen, setNewTableModalOpen] = useState(false)
-  
+
   const [cycleWarning, setCycleWarning] = useState<string | null>(null)
-  
+
   const { handleSetViewMode } = useCanvasViewMode()
   const { canEdit } = useWorkspaceLease()
 
@@ -114,13 +110,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
       data: {
         ...node,
         schema: runtimeSchemas[node.id] ?? ('schema' in node ? node.schema : undefined),
-        selected: node.id === selectedNodeId,
-        profile: (node.kind === 'source_table' || node.kind === 'derived_table') 
-          ? profiles[node.id] 
-          : undefined,
-        profileLoading: (node.kind === 'source_table' || node.kind === 'derived_table')
-          ? profilesLoading[node.id]
-          : false,
         patches: (node.kind === 'source_table' || node.kind === 'derived_table')
           ? patches[node.id]
           : undefined,
@@ -132,8 +121,6 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     projectNodes,
     runtimeSchemas,
     selectedNodeId,
-    profiles,
-    profilesLoading,
     patches,
     handleSetViewMode,
   ])
@@ -233,7 +220,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       selectNode(node.id)
-      
+
       const projectNode = projectNodes[node.id]
       if (projectNode?.kind === 'chart') {
         onNodeDoubleClickProp(node.id)
@@ -269,13 +256,13 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     saveSnapshot('Auto-arrange canvas')
 
     const layoutedNodes = getLayoutedNodes(nodes, edges, { direction })
-    
+
     layoutedNodes.forEach((node) => {
       updateNodePosition(node.id, node.position)
     })
-    
+
     setNodes(layoutedNodes)
-    
+
     const smartEdges = computeSmartEdges(layoutedNodes, baseEdges)
     setEdges(smartEdges)
   }, [nodes, edges, baseEdges, updateNodePosition, saveSnapshot, setNodes, setEdges])
@@ -292,7 +279,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   return (
     <div className="h-full w-full relative">
       <div className="absolute inset-0 canvas-grid" />
-      
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -336,14 +323,14 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
         {Object.keys(projectNodes).length > 1 && (
           <CanvasAutoArrangePanel onArrange={handleAutoArrange} />
         )}
-        
-        <Controls 
+
+        <Controls
           showInteractive={false}
           position="bottom-left"
           style={{ marginLeft: 12, marginBottom: 12 }}
           className="!z-sticky !rounded-lg !border !border-border !bg-surface !shadow-md [&>button]:!border-0 [&>button]:!bg-surface [&>button]:!text-text-secondary [&>button:hover]:!bg-surface-secondary"
         />
-        
+
         {Object.keys(projectNodes).length === 0 && (
           <CanvasEmptyState onNewTable={() => setNewTableModalOpen(true)} />
         )}
@@ -360,14 +347,14 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
           />
         </Suspense>
       )}
-      
+
       {newTableModalOpen && (
         <NewTableModal
           isOpen={newTableModalOpen}
           onClose={() => setNewTableModalOpen(false)}
         />
       )}
-      
+
       <CycleWarningToast warning={cycleWarning} onClose={dismissCycleWarning} />
     </div>
   )

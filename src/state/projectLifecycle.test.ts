@@ -17,27 +17,12 @@ import {
   fetchProjects,
   loadProjectWithSync,
 } from '@/persistence/syncService'
-import { hasProjectTables, loadOrCreateProject } from './projectLifecycle'
+import { loadOrCreateProject } from './projectLifecycle'
 
 beforeEach(() => {
   vi.mocked(fetchProjects).mockReset()
   vi.mocked(loadProjectWithSync).mockReset()
   vi.mocked(createProjectWithSync).mockReset()
-})
-
-describe('hasProjectTables', () => {
-  it('detects source and derived tables without requiring eager materialization', () => {
-    expect(hasProjectTables({})).toBe(false)
-    expect(hasProjectTables({
-      chart: { kind: 'chart' },
-    })).toBe(false)
-    expect(hasProjectTables({
-      source: { kind: 'source_table' },
-    })).toBe(true)
-    expect(hasProjectTables({
-      derived: { kind: 'derived_table' },
-    })).toBe(true)
-  })
 })
 
 describe('loadOrCreateProject', () => {

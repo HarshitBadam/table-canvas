@@ -77,9 +77,7 @@ describe('claimGuestStorageScope', () => {
   })
 
   it('waits for a macrotask-delayed lock callback instead of assuming busy', async () => {
-    // A lock manager whose callback fires on a real macrotask (setTimeout)
-    // rather than synchronously/within a microtask, mirroring how a browser's
-    // Web Locks implementation may schedule the callback across processes.
+    // Browser Web Locks may grant via macrotask, not a microtask.
     class DelayedLockManager {
       private held = false
 
@@ -109,9 +107,7 @@ describe('claimGuestStorageScope', () => {
     const scope = await first.claimGuestStorageScope()
     expect(scope.startsWith('guest:')).toBe(true)
 
-    // While the first claim still holds the lock (macrotask-delayed grant),
-    // a second claim attempt on the same scope must correctly observe "busy"
-    // via the callback firing with a null lock, not by racing a microtask.
+    // Concurrent claim must see busy (null lock) while the first grant is held.
     const second = await loadScopeModule()
     const secondScope = await second.claimGuestStorageScope()
     expect(secondScope).not.toBe(scope)

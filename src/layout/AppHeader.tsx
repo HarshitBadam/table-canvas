@@ -149,11 +149,11 @@ export function AppHeader({
         <ChartHeaderContent selectedNode={selectedNode} />
       )}
       {viewMode === 'dashboard' && (
-        <ProjectSwitcherHeader mode="switch-only" />
+        <ProjectSwitcherHeader />
       )}
       {viewMode === 'report' && (
         <>
-          <ProjectSwitcherHeader mode="switch-only" />
+          <ProjectSwitcherHeader />
           {isSaving && (
             <div className="flex shrink-0 items-center gap-1.5 text-text-tertiary" role="status" aria-live="polite">
               <LoadingSpinner size="sm" className="h-3 w-3" />

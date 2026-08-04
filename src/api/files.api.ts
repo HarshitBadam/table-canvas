@@ -1,6 +1,5 @@
 import { api } from './client';
 
-
 export interface UploadedFile {
   id: string;
   filename: string;

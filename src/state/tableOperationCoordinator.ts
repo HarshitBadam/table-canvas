@@ -13,6 +13,24 @@ function nextGeneration(tableId: string): number {
   return (getNodeCacheInfo(tableId)?.operationGeneration ?? 0) + 1
 }
 
+function releaseTableWaiters(tableId: string, generation: number): void {
+  const gate = gates.get(tableId)
+  if (!gate || gate.generation !== generation) return
+  gates.delete(tableId)
+  gate.release()
+}
+
+function finishTableOperation(
+  tableId: string,
+  generation: number,
+  updates: Parameters<typeof updateNodeCacheInfo>[1],
+): boolean {
+  if (getNodeCacheInfo(tableId)?.operationGeneration !== generation) return false
+  releaseTableWaiters(tableId, generation)
+  updateNodeCacheInfo(tableId, updates)
+  return true
+}
+
 export function beginTableOperation(
   tableId: string,
   phase: Exclude<TableRuntimePhase, 'ready' | 'error'>,
@@ -54,16 +72,13 @@ export function updateTableOperation(
 }
 
 export function completeTableOperation(tableId: string, generation: number): boolean {
-  if (getNodeCacheInfo(tableId)?.operationGeneration !== generation) return false
-  releaseTableWaiters(tableId, generation)
-  updateNodeCacheInfo(tableId, {
+  return finishTableOperation(tableId, generation, {
     phase: 'ready',
     isComputing: false,
     isDirty: false,
     error: undefined,
     progress: undefined,
   })
-  return true
 }
 
 export function failTableOperation(
@@ -71,16 +86,13 @@ export function failTableOperation(
   generation: number,
   error: string,
 ): boolean {
-  if (getNodeCacheInfo(tableId)?.operationGeneration !== generation) return false
-  releaseTableWaiters(tableId, generation)
-  updateNodeCacheInfo(tableId, {
+  return finishTableOperation(tableId, generation, {
     phase: 'error',
     isComputing: false,
     isDirty: true,
     error,
     progress: undefined,
   })
-  return true
 }
 
 export function cancelTableOperation(tableId: string): void {
@@ -98,10 +110,8 @@ export function cancelTableOperation(tableId: string): void {
 
 /** Release every in-flight gate (project switch / full runtime reset). */
 export function clearAllTableOperations(): void {
-  for (const [tableId, gate] of gates) {
-    gate.release()
-    gates.delete(tableId)
-  }
+  for (const gate of gates.values()) gate.release()
+  gates.clear()
 }
 
 export async function waitForTableOperation(tableId: string): Promise<void> {
@@ -111,11 +121,4 @@ export async function waitForTableOperation(tableId: string): Promise<void> {
 
 export function isTableOperationCurrent(tableId: string, generation: number): boolean {
   return getNodeCacheInfo(tableId)?.operationGeneration === generation
-}
-
-function releaseTableWaiters(tableId: string, generation: number): void {
-  const gate = gates.get(tableId)
-  if (!gate || gate.generation !== generation) return
-  gates.delete(tableId)
-  gate.release()
 }

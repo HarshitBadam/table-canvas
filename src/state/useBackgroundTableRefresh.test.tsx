@@ -208,7 +208,7 @@ describe('useBackgroundTableRefresh', () => {
     clean(sourceId)
     renderHook(() => useBackgroundTableRefresh(true))
 
-    // First dirty batch on a freshly-mounted hook is treated like a load warm-up.
+    // Freshly-mounted hook treats the first dirty batch like a load warm-up.
     act(() => {
       useProjectStore.getState().setCellValue(sourceId, 'row-1', 'col1', 'first edit')
     })
@@ -216,13 +216,11 @@ describe('useBackgroundTableRefresh', () => {
       await vi.advanceTimersByTimeAsync(0)
     })
     ensureTableMaterialized.mockClear()
-    // ensureTableMaterialized is mocked, so it never clears isDirty itself; do that
-    // part of its real job so the next edit is a genuinely new dirty batch.
+    // Mock never clears isDirty; do that so the next edit is a new dirty batch.
     act(() => {
       useTableRuntimeStore.getState().updateCacheInfo(sourceId, { isDirty: false })
     })
 
-    // A later edit against the same still-mounted hook goes through the normal debounce.
     act(() => {
       useProjectStore.getState().setCellValue(sourceId, 'row-1', 'col1', 'second edit')
     })

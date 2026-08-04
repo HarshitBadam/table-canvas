@@ -38,59 +38,6 @@
   box-shadow: none;
 }
 
-.tiptap-block-wrapper.is-dragging {
-  opacity: 0.5;
-}
-
-.block-toolbar {
-  position: absolute;
-  top: 0;
-  left: -44px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  opacity: 0;
-  transition: opacity 150ms ease;
-  z-index: 10;
-}
-
-.tiptap-block-wrapper:hover .block-toolbar,
-.tiptap-block-wrapper.is-selected .block-toolbar {
-  opacity: 1;
-}
-
-.block-toolbar-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  color: var(--color-text-tertiary, #a1a1aa);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 100ms ease;
-}
-
-.block-toolbar-button:hover {
-  background: var(--color-surface-secondary, #f4f4f5);
-  color: var(--color-text-secondary, #71717a);
-}
-
-[data-theme="dark"] .block-toolbar-button:hover {
-  background: var(--color-surface-secondary, #27272a);
-  color: var(--color-text-secondary, #a1a1aa);
-}
-
-.block-toolbar-button.drag-handle {
-  cursor: grab;
-}
-
-.block-toolbar-button.drag-handle:active {
-  cursor: grabbing;
-}
-
 .block-empty-state {
   display: flex;
   flex-direction: column;

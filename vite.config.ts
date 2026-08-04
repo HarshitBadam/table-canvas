@@ -47,7 +47,6 @@ function duckdbLocalBundlePlugin(): Plugin {
   }
 }
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), duckdbLocalBundlePlugin()],
   server: {
@@ -69,18 +68,11 @@ export default defineConfig({
     format: 'es',
   },
   build: {
-    // Real chunk splitting below keeps most vendor code well isolated. The
-    // largest remaining chunk is `pdfmake` — the PDF engine plus the embedded
-    // Roboto font data it needs for accented and Cyrillic text — a single
-    // third-party bundle that cannot be subdivided and is only fetched when a
-    // report is exported. The threshold is raised just enough to cover it rather
-    // than emit a warning on every build.
+    // pdfmake embeds Roboto font data for accented/Cyrillic text and cannot be
+    // subdivided; raise the warning threshold to cover that on-demand chunk.
     chunkSizeWarningLimit: 1900,
     rollupOptions: {
       output: {
-        // Split large third-party dependencies into their own chunks so no
-        // single chunk balloons past the size warning threshold. Each group
-        // below is a self-contained library that is safe to isolate.
         manualChunks(id) {
           if (id.includes('commonjsHelpers')) return 'vendor-runtime'
           if (!id.includes('node_modules')) return

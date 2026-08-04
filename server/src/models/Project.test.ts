@@ -198,7 +198,6 @@ describe('Project Model', () => {
       expect(projects[0].name).toBeDefined();
       expect(projects[0].updatedAt).toBeDefined();
       expect(projects[0].createdAt).toBeDefined();
-
     });
 
     it('should return empty array for user with no projects', async () => {

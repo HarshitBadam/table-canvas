@@ -1,12 +1,9 @@
 import { expect, test } from './e2e.fixture'
-import { installMockBackend } from './derived-tables.support'
-import { createManualTable, downloadProjectZip } from './app.support'
+import { bootApp, createManualTable, downloadProjectZip } from './app.support'
 
 test('report text and linked tables survive reload and project export', async ({ page }) => {
   test.setTimeout(90_000)
-  await installMockBackend(page)
-  await page.goto('/')
-  await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
+  await bootApp(page)
   await createManualTable(page, 'Report Evidence')
 
   await page.locator('aside').getByRole('button', { name: 'Report', exact: true }).click()

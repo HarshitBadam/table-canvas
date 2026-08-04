@@ -101,7 +101,7 @@ for (const file of files) {
   const relativePath = file.slice(root.length + 1)
   const lineLimit = legacyLineLimits.get(relativePath) ?? LINE_LIMIT - 1
   if (lineCount > lineLimit) {
-    violations.push(`${file.slice(root.length + 1)}: ${lineCount} lines`)
+    violations.push(`${relativePath}: ${lineCount} lines`)
   }
 }
 

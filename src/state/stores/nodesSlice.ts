@@ -142,46 +142,6 @@ export const createNodesSlice: StateCreator<
     })
   },
 
-  addNewTable: () => {
-    const state = get()
-    state.saveSnapshot('Add new table')
-
-    const id = generateId()
-    const now = new Date().toISOString()
-
-    const existingNodes = Object.values(state.nodes)
-    const maxX = existingNodes.reduce((max, n) => Math.max(max, n.ui.position.x), 0)
-
-    const newTable: SourceTableNode = {
-      id,
-      kind: 'source_table',
-      name: `Table ${Object.keys(state.nodes).length + 1}`,
-      ui: {
-        position: { x: maxX + 300, y: 100 },
-      },
-      schema: {
-        columns: [
-          { id: 'col1', name: 'Column 1', type: 'string', nullable: true },
-        ],
-        rowCount: 0,
-      },
-      plan: {
-        fileRef: '',
-        fileName: '',
-        fileType: 'csv',
-        inferredSchemaVersion: 1,
-      },
-      createdAt: now,
-      updatedAt: now,
-    }
-
-    set((state) => {
-      state.nodes[id] = newTable
-      state.patches[id] = createInitialPatches()
-      state.selectedNodeId = id
-    })
-  },
-
   addSourceTable: ({
     name,
     fileRef,
@@ -338,23 +298,10 @@ export const createNodesSlice: StateCreator<
     set((state) => {
       const node = state.nodes[tableId]
       if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-        const tableNode = node as TableNode
-        if (filters && filters.conditions.length > 0) {
-          tableNode.viewFilters = filters
-        } else {
-          tableNode.viewFilters = undefined
-        }
-        tableNode.updatedAt = new Date().toISOString()
+        node.viewFilters = next
+        node.updatedAt = new Date().toISOString()
       }
     })
-  },
-
-  getTableFilters: (tableId) => {
-    const node = get().nodes[tableId]
-    if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
-      return (node as TableNode).viewFilters
-    }
-    return undefined
   },
 
   updateChartConfig: (chartId, updates) => {
@@ -407,7 +354,6 @@ export const createNodesSlice: StateCreator<
       if (node) node.updatedAt = new Date().toISOString()
     })
   },
-  getNode: (id) => get().nodes[id],
   getTableNode: (id) => {
     const node = get().nodes[id]
     if (node && (node.kind === 'source_table' || node.kind === 'derived_table')) {
@@ -423,14 +369,5 @@ export const createNodesSlice: StateCreator<
       .map(e => e.fromNodeId)
 
     return upstreamIds.map(id => state.nodes[id]).filter(Boolean)
-  },
-
-  getDownstreamNodes: (nodeId) => {
-    const state = get()
-    const downstreamIds = Object.values(state.edges)
-      .filter(e => e.fromNodeId === nodeId)
-      .map(e => e.toNodeId)
-
-    return downstreamIds.map(id => state.nodes[id]).filter(Boolean)
   },
 })

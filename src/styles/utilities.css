@@ -1,19 +1,4 @@
-/**
- * Utility Styles
- * 
- * Custom utilities, animations, and helper classes.
- */
-
-
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  .scrollbar-thin {
-    scrollbar-width: thin;
-  }
-
   .grid-viewport-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: rgb(100 116 139 / 0.35) transparent;
@@ -68,17 +53,6 @@
   }
 }
 
-@keyframes slide-in-left {
-  from { 
-    opacity: 0; 
-    transform: translateX(-20px);
-  }
-  to { 
-    opacity: 1; 
-    transform: translateX(0);
-  }
-}
-
 @keyframes slide-up {
   from { 
     opacity: 0; 
@@ -87,32 +61,6 @@
   to { 
     opacity: 1; 
     transform: translateY(0);
-  }
-}
-
-@keyframes fade-in-up {
-  from { 
-    opacity: 0; 
-    transform: translateY(8px);
-  }
-  to { 
-    opacity: 1; 
-    transform: translateY(0);
-  }
-}
-
-@keyframes expand-down {
-  from { 
-    opacity: 0; 
-    max-height: 0;
-    transform: scaleY(0.95);
-    transform-origin: top;
-  }
-  to { 
-    opacity: 1; 
-    max-height: 500px;
-    transform: scaleY(1);
-    transform-origin: top;
   }
 }
 
@@ -129,20 +77,8 @@
   animation: slide-in-right 200ms ease-out;
 }
 
-.animate-slide-in-left {
-  animation: slide-in-left 200ms ease-out;
-}
-
 .animate-slide-up {
   animation: slide-up 200ms ease-out;
-}
-
-.animate-fade-in-up {
-  animation: fade-in-up 200ms ease-out both;
-}
-
-.animate-expand-down {
-  animation: expand-down 200ms ease-out;
 }
 
 
@@ -157,24 +93,6 @@
 
 .connection-line-animated {
   animation: connection-dash 0.6s linear infinite;
-}
-
-/* Pulsing ring animation for connection target */
-@keyframes target-ring-pulse {
-  0%, 100% {
-    r: 12;
-    opacity: 0.4;
-    stroke-width: 2;
-  }
-  50% {
-    r: 18;
-    opacity: 0.15;
-    stroke-width: 1;
-  }
-}
-
-.connection-target-ring {
-  animation: target-ring-pulse 1s ease-in-out infinite;
 }
 
 

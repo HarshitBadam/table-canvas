@@ -4,6 +4,7 @@ import type { TableRow } from '@/state/dataStore'
 
 const SNAPSHOT_VERSION = 1
 
+/** JSON cannot represent NaN/±Infinity; encode them as tagged objects in the snapshot file. */
 interface SpecialNumber {
   $number: 'NaN' | 'Infinity' | '-Infinity'
 }

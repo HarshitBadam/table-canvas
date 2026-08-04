@@ -50,7 +50,9 @@ export function useCleaningApply({
     setIsApplying(true)
 
     try {
-      const applyRows = rows.length >= totalRows
+      // Preview may be truncated; apply against the full table so row patches are complete.
+      const previewCoversFullTable = rows.length >= totalRows
+      const applyRows = previewCoversFullTable
         ? rows
         : await loadCleaningRows(tableId, totalRows)
       const { changes: allChanges, highlights: allHighlights } =
@@ -130,7 +132,7 @@ export function useCleaningApply({
           : `Highlighted ${allHighlights.length.toLocaleString()} cell${allHighlights.length === 1 ? '' : 's'} for review`,
       })
     } catch (error) {
-      console.error('[CleaningPanel] handleApply ERROR:', error)
+      console.error('[useCleaningApply] handleApply ERROR:', error)
       showToast({
         type: 'error',
         message: error instanceof Error ? error.message : 'Could not apply cleaning operations',

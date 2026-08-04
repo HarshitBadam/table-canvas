@@ -40,7 +40,7 @@ export function useTopSuggestions(limit: number = 5): {
       try {
         const existingDerivedTables = getExistingDerivedTables(tableNodes, table.id)
 
-        const tableSuggestions = removeSatisfiedChartSuggestions(generateSuggestions({
+        const generated = generateSuggestions({
           tableId: table.id,
           tableName: table.name,
           schema: table.schema,
@@ -50,7 +50,12 @@ export function useTopSuggestions(limit: number = 5): {
           },
           tableVersionHash: versionHash,
           existingDerivedTables,
-        }), Object.values(projectNodes))
+        })
+        // Drop chart suggestions already covered by existing project charts.
+        const tableSuggestions = removeSatisfiedChartSuggestions(
+          generated,
+          Object.values(projectNodes),
+        )
 
         for (const suggestion of tableSuggestions) {
           if (!consumed.has(suggestion.id)) {
@@ -58,7 +63,7 @@ export function useTopSuggestions(limit: number = 5): {
           }
         }
       } catch (error) {
-        console.error('[useTopSuggestions] Suggestion generation failed for table:', table.name, error);
+        console.error('[useTopSuggestions] Suggestion generation failed for table:', table.name, error)
       }
     }
 

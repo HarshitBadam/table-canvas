@@ -67,16 +67,13 @@ export function isGuestStorageScope(scope: string): boolean {
 
 type GuestLockOutcome = 'acquired' | 'busy' | 'aborted'
 
-/** Guest login must never hang forever waiting on a stuck Web Locks callback. */
+/** Fail fast if the Web Locks callback never fires (stuck lock manager). */
 const GUEST_LOCK_CLAIM_TIMEOUT_MS = 2_500
 
 /**
- * Requests the guest scope lock and resolves the moment the Web Locks callback
- * actually fires — with 'acquired' or 'busy' — instead of guessing based on
- * microtask timing (the callback invocation is not guaranteed to happen within
- * one queued microtask tick; it can land as a macrotask). When acquired, the
- * underlying `locks.request` promise keeps running in the background, holding
- * the lock until `guestScopeLockRelease` is invoked.
+ * Settle from the Web Locks callback itself (`acquired` / `busy`), not microtask
+ * timing — browsers may invoke it as a macrotask. On acquire, the request promise
+ * keeps holding the lock until `guestScopeLockRelease` runs.
  */
 function requestGuestScopeLock(name: string, signal: AbortSignal): Promise<GuestLockOutcome> {
   return new Promise<GuestLockOutcome>(resolve => {
@@ -115,8 +112,7 @@ function requestGuestScopeLock(name: string, signal: AbortSignal): Promise<Guest
     }
 
     void request.catch(error => {
-      // Any rejection must settle the claim promise. Leaving it pending freezes
-      // the login button on "Opening…".
+      // Must settle; a pending claim freezes guest login on "Opening…".
       if (
         (error instanceof DOMException && error.name === 'AbortError')
         || (error as { name?: string })?.name === 'AbortError'
@@ -131,7 +127,6 @@ function requestGuestScopeLock(name: string, signal: AbortSignal): Promise<Guest
 }
 
 interface GuestScopeLockResult {
-  /** The last scope name tried, whether or not it was ever acquired. */
   scope: string
   acquired: boolean
 }
@@ -165,10 +160,8 @@ async function claimGuestScopeWithLocks(initialScope: string): Promise<GuestScop
       return { scope, acquired: true }
     }
     if (outcome === 'aborted') {
-      // Timed out or cancelled; fall back to BroadcastChannel rather than
-      // minting further scopes against a stuck lock manager. Hand back the
-      // scope tried so far rather than the original — it was already
-      // contended, which is why the caller is falling back in the first place.
+      // Stuck/cancelled lock manager: stop retrying and hand back this contended
+      // scope for BroadcastChannel fallback (not the original, already-busy one).
       guestScopeClaimAbort = null
       return { scope, acquired: false }
     }
@@ -176,9 +169,7 @@ async function claimGuestScopeWithLocks(initialScope: string): Promise<GuestScop
     scope = `${GUEST_SCOPE_PREFIX}${randomId()}`
     persistGuestScope(scope)
   }
-  // Exhausted retries without holding a lock — let BroadcastChannel isolate,
-  // continuing from the last (still-unverified) scope, not the first one we
-  // already know was contended.
+  // No lock held after retries — continue from the last scope for BC isolation.
   return { scope, acquired: false }
 }
 
@@ -218,9 +209,8 @@ async function claimGuestScopeWithBroadcast(initialScope: string): Promise<strin
 }
 
 /**
- * Duplicating a tab can clone sessionStorage. A Web Lock (with BroadcastChannel
- * fallback) gives the duplicate a fresh scope while a normal reload keeps the
- * existing one after the previous page releases its claim.
+ * Tab duplicates clone sessionStorage; Web Lock (+ BroadcastChannel fallback)
+ * mints a fresh scope. A normal reload reclaims the same scope after release.
  */
 export async function claimGuestStorageScope(): Promise<string> {
   releaseGuestStorageScopeClaim()
@@ -259,9 +249,8 @@ export function releaseGuestStorageScopeClaim(): void {
 }
 
 /**
- * After logout / leave-guest / auth expiry, drop any account partition so stray
- * persistence cannot keep reading or writing the previous user's IndexedDB keys.
- * Does not hold a guest scope lock — the next continue-as-guest claim will.
+ * Drop the account partition after logout so persistence cannot touch the prior
+ * user's IndexedDB keys. Does not hold a guest lock (next claim will).
  */
 export function resetLoggedOutStorageScope(): void {
   releaseGuestStorageScopeClaim()

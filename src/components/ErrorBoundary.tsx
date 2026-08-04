@@ -14,7 +14,6 @@ export interface ErrorBoundaryProps {
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
-  errorInfo: ErrorInfo | null;
 }
 
 
@@ -24,7 +23,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     this.state = {
       hasError: false,
       error: null,
-      errorInfo: null,
     };
   }
 
@@ -33,11 +31,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    this.setState({ errorInfo });
-    
     console.error(`[ErrorBoundary${this.props.name ? `: ${this.props.name}` : ''}]`, error, errorInfo);
     reportReactError(error);
-    
+
     this.props.onError?.(error, errorInfo);
   }
 
@@ -45,7 +41,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     this.setState({
       hasError: false,
       error: null,
-      errorInfo: null,
     });
   };
 

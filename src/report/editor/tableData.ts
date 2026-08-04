@@ -117,11 +117,9 @@ export function selectRows<T>(
   const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : DEFAULT_ROW_LIMIT;
 
   if (mode === 'first_n') return rows.slice(0, safeLimit);
-  if (mode === 'last_n') return safeLimit >= rows.length ? rows.slice() : rows.slice(-safeLimit);
-
-  return rows.slice();
+  // RowSelectionMode is exhaustive: remaining case is 'last_n'.
+  return safeLimit >= rows.length ? rows.slice() : rows.slice(-safeLimit);
 }
-
 export function resolveDisplayColumns(
   selectedColumnIds: readonly string[] | undefined,
   allColumns: readonly ColumnSchema[]

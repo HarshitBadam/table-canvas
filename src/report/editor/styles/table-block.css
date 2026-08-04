@@ -7,8 +7,7 @@
   width: 100%;
 }
 
-.editable-table-outer .editable-table-container,
-.editable-table-wrapper .editable-table-container {
+.editable-table-outer .editable-table-container {
   transition: outline-color 120ms ease;
   outline: 2px solid transparent;
   outline-offset: -1px;
@@ -27,15 +26,6 @@
 
 .editable-table-layout {
   position: relative;
-}
-
-.editable-table-wrapper {
-  position: relative;
-}
-
-.editable-table-wrapper.is-selected .editable-table-container,
-.editable-table-wrapper.is-selected:hover .editable-table-container {
-  outline-color: var(--color-accent-green);
 }
 
 .editable-table-caption {
@@ -105,7 +95,6 @@
   border-bottom: 1px solid var(--color-border, #e4e4e7);
   border-right: 1px solid var(--color-border-subtle, #f4f4f5);
   color: var(--color-text-secondary, #71717a);
-  /* A click selects the cell; editing it is a second, deliberate step. */
   cursor: cell;
   white-space: nowrap;
 }
@@ -299,11 +288,7 @@
   font-weight: 500;
 }
 
-/*
- * The add buttons stay mounted so selecting a table never changes its size.
- * They overlap the frame as small circular controls rather than pointing out
- * from it, which keeps the editing chrome visually part of the report block.
- */
+/* Stay mounted so selecting a table never changes its size. */
 .table-add-btn {
   display: flex;
   align-items: center;
@@ -329,7 +314,7 @@
    * button's clicks: pressing the visible triangle opened the gap instead,
    * which moved the button out from under the pointer. A control the user can
    * see owns the pixels it covers. While it is hidden it takes no clicks at
-   * all, so the strip keeps the whole gap. Stays below `.block-toolbar`.
+   * all, so the strip keeps the whole gap.
    */
   z-index: 5;
 }
@@ -358,10 +343,6 @@
   color: var(--color-text-primary, #fafafa);
 }
 
-/*
- * The controls are centred on the frame to make adding a row or column feel
- * connected to the table without adding visual weight around its perimeter.
- */
 .table-add-col-btn {
   position: absolute;
   top: 50%;
@@ -387,10 +368,6 @@
   height: 14px;
 }
 
-/*
- * Shares the add buttons' reveal timing so the whole table chrome behaves as
- * one set of controls.
- */
 .table-select-grip {
   position: absolute;
   top: 50%;
@@ -519,13 +496,4 @@
 
 [data-theme="dark"] .table-context-menu button.danger:hover {
   background: rgba(220, 38, 38, 0.15);
-}
-
-.context-menu-divider {
-  height: 1px;
-  background: var(--color-border, #e4e4e7);
-}
-
-[data-theme="dark"] .context-menu-divider {
-  background: var(--color-border, #3f3f46);
 }

@@ -10,9 +10,7 @@ beforeEach(() => {
 
 describe('getDB version recovery', () => {
   it('resets and reopens a database stuck at a newer version than expected', async () => {
-    // Simulate a stale on-disk database left at a higher version than the app
-    // currently requests, e.g. from an earlier local build that briefly used a
-    // higher schema version before being reverted.
+    // Stale on-disk schema above the app's DB_VERSION (e.g. reverted local build).
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, 99)
       request.onsuccess = () => {

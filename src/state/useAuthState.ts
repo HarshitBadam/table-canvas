@@ -72,9 +72,8 @@ export function useAuthState() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   const handleAuthError = useCallback(() => {
-    // Guest tabs do not use account cookies. A 401 from another tab's logout
-    // (or a background account request) must not tear down an isolated guest
-    // workspace mid-session or mid "Continue as guest".
+    // Guest tabs ignore account 401s — another tab's logout must not tear down
+    // an isolated guest workspace mid-session or mid "Continue as guest".
     if (hasGuestSession()) return
     resetLoggedOutStorageScope()
     setUser(null)
@@ -109,9 +108,8 @@ export function useAuthState() {
   }, [])
 
   const performLogout = useCallback(async () => {
-    // Account cookies are shared by every tab on this origin. Calling the server
-    // logout endpoint here would revoke and clear the session used by all of them.
-    // Keep "Sign out" local to this tab; an explicit login clears this marker.
+    // Cookies are origin-shared; keep Sign out tab-local so other tabs keep their session.
+    // An explicit login clears this marker.
     setTabLocalAccountSignOut(true)
     setGuestSession(false)
     resetLoggedOutStorageScope()
@@ -119,11 +117,6 @@ export function useAuthState() {
     setIsAuthenticated(false)
   }, [])
 
-  /**
-   * Checks authentication status with the backend.
-   * Returns the authenticated user and whether init should proceed to project loading.
-   * Falls back to a local user when the backend is unreachable.
-   */
   const performCheckAuth = useCallback(async (): Promise<{
     user: User | null
     shouldContinue: boolean
@@ -135,8 +128,8 @@ export function useAuthState() {
       return { user: null, shouldContinue: false }
     }
 
-    // A guest choice belongs to this tab. Shared account cookies created by another
-    // tab must not silently replace its isolated guest workspace on reload.
+    // Guest choice is tab-local; shared account cookies from another tab must not
+    // replace this tab's isolated guest workspace on reload.
     let authedUser = hasGuestSession() ? LOCAL_USER : await checkAuth()
 
     if (!authedUser) {
@@ -160,7 +153,7 @@ export function useAuthState() {
           return { user: null, shouldContinue: false }
         }
       } catch (error) {
-        console.error('[useAuthState] Backend reachability check failed:', error);
+        console.error('[useAuthState] Backend reachability check failed:', error)
         backendReachable = false
       }
 
@@ -215,8 +208,6 @@ export function useAuthState() {
   return {
     user,
     isAuthenticated,
-    setUser,
-    setIsAuthenticated,
     performLogin,
     performGoogleLogin,
     performLogout,

@@ -11,7 +11,6 @@ import {
 import type { ViewMode } from './viewNavigation'
 
 export interface WorkspaceView {
-  /** The view being shown, which is always one that can render right now. */
   activeView: ViewMode
   setActiveView: (view: ViewMode) => void
 }

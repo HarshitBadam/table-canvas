@@ -41,8 +41,7 @@ const InlineTableNodeView = memo(function InlineTableNodeView({
     onLeaveGrid: selectNode,
   });
 
-  // Grabbing the handle takes focus off the cell editor without a blur, so the
-  // pending edit has to be written back before the input unmounts.
+  // Grip mousedown steals focus without a blur — commit before the input unmounts.
   const { commitEdit } = cells;
   const selectTable = useCallback(() => {
     commitEdit();

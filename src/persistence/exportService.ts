@@ -7,9 +7,9 @@ import { createWorkbook } from './exportWorkbook'
 
 export interface ZipExportOptions {
   includeExcel?: boolean
-  /** Master switch for the `reports/` folder, as well as the HTML rendition itself. */
+  /** Controls the ZIP `reports/` folder and HTML files inside it. */
   includeReportHtml?: boolean
-  /** Adds a PDF alongside each exported report's HTML. */
+  /** When true, also write a PDF next to each report HTML. */
   includeReportPdf?: boolean
   onProgress?: (message: string, percent: number) => void
 }
@@ -21,10 +21,6 @@ const EXCEL_START = 15
 const EXCEL_END = 45
 const REPORTS_END = 92
 
-/**
- * createWorkbook reports on its own fixed 30-80 scale, which is squeezed into the
- * range above so that PDF rendering — by far the slowest step — gets most of the bar.
- */
 function scaleWorkbookProgress(onProgress?: ProgressCallback): ProgressCallback | undefined {
   if (!onProgress) return undefined
   return (message, percent) => {
@@ -38,7 +34,6 @@ interface ReportExportOptions {
   onProgress?: ProgressCallback
 }
 
-/** Unique base name shared by every format written for a single report. */
 function uniqueReportBaseName(name: string, used: Set<string>): string {
   const sanitized = name.replace(/[^a-zA-Z0-9-_ ]/g, '_').trim().substring(0, 50)
     || 'Untitled Report'

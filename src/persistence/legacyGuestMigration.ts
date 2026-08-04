@@ -33,14 +33,9 @@ function markMigrated(): void {
 }
 
 /**
- * One-time move of pre-per-tab `guest` IndexedDB records into the claiming tab's
- * `guest:{uuid}` scope. Without this, upgrading users see an empty guest workspace
- * while their old data remains stranded under ownerId `guest`.
- */
-/**
- * Never awaited on the login critical path: IndexedDB availability must not
- * gate "Continue as guest" or account sign-in, and any failure here (missing
- * IndexedDB, a blocked open, a stale schema) must never surface to the caller.
+ * One-time move of pre-per-tab `guest` IndexedDB records into `guest:{uuid}`.
+ * Without this, upgrades see an empty workspace while data stays under `guest`.
+ * Fire-and-forget on the login path: IndexedDB failures must never surface.
  */
 export async function migrateLegacyGuestData(targetScope: string): Promise<void> {
   if (!isGuestStorageScope(targetScope) || alreadyMigrated()) return

@@ -70,7 +70,6 @@ function workspaceViewStorage(): Storage | null {
   }
 }
 
-/** Returns null for anything that is missing, unreadable, or not a view. */
 export function readWorkspaceView(
   scope: string,
   projectId: string,

@@ -1,7 +1,7 @@
 import { getTableData } from '@/engine/tableDataService'
 import type { TableRow } from '@/state/dataStore'
 
-export const CLEANING_PREVIEW_ROWS = 1_000
+const CLEANING_PREVIEW_ROWS = 1_000
 
 export interface CleaningPreview {
   rows: TableRow[]

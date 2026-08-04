@@ -9,7 +9,7 @@ const READ_TYPES = new Set<WorkerRequestType>([
   'init',
 ])
 
-export type ScheduledRequest = {
+type ScheduledRequest = {
   request: WorkerRequest
   isRead: boolean
 }
@@ -23,7 +23,6 @@ export class WorkerRequestScheduler {
   private queue: ScheduledRequest[] = []
   private running = false
   private readonly handle: (request: WorkerRequest) => Promise<void>
-  private midwayReads: Array<() => Promise<void>> = []
 
   constructor(handle: (request: WorkerRequest) => Promise<void>) {
     this.handle = handle
@@ -51,8 +50,6 @@ export class WorkerRequestScheduler {
       const next = this.queue.shift()!
       await this.handle(next.request)
     }
-    const midway = this.midwayReads.splice(0)
-    for (const run of midway) await run()
   }
 
   private async pump(): Promise<void> {

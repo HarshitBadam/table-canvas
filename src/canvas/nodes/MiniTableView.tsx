@@ -1,8 +1,5 @@
 import { memo, useState, useCallback, useEffect, useMemo } from 'react'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
-
-/** Skip preview skeleton/footer when the engine answers in the same paint window. */
-const PREVIEW_LOADING_DELAY_MS = 120
 import { TableRow } from '@/state/dataStore'
 import { ColumnSchema, CellValue, ViewFilterConfig } from '@/types'
 import { formatNumber } from '@/lib/utils'
@@ -14,10 +11,13 @@ import { getEngine } from '@/engine/EngineAdapter'
 import type { FilterConditionDef } from '@/engine/types'
 import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 
+/** Skip preview skeleton/footer when the engine answers in the same paint window. */
+const PREVIEW_LOADING_DELAY_MS = 120
+
 interface MiniTableViewProps {
   tableId: string
   columns: ColumnSchema[]
-  maxHeight?: number // Maximum viewport height in pixels
+  maxHeight?: number
   patches?: {
     cellPatches?: Record<string, Record<string, CellValue>>
     deletedRows?: Set<string>
@@ -32,7 +32,6 @@ interface MiniTableViewProps {
   updatingLabel?: string
 }
 
-// Column width: minimum width, will expand to fill container
 const MIN_CELL_WIDTH = 65
 // Canvas previews show a bounded sample; the grid view is the full virtualized table.
 const PREVIEW_LIMIT = 1000
@@ -55,8 +54,8 @@ function buildFilterDefs(
   })
 }
 
-export const MiniTableView = memo(({ 
-  tableId, 
+export const MiniTableView = memo(({
+  tableId,
   columns,
   maxHeight = 220,
   patches,
@@ -76,6 +75,7 @@ export const MiniTableView = memo(({
   const [isLoaded, setIsLoaded] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [showPreviewLoading, setShowPreviewLoading] = useState(false)
   const updateCacheInfo = useTableRuntimeStore((state) => state.updateCacheInfo)
   const schemaKey = useMemo(
     () => columns.map(column => `${column.id}:${column.name}:${column.type}`).join('|'),
@@ -181,7 +181,7 @@ export const MiniTableView = memo(({
     }
     return result
   }, [rows, patches?.deletedRows])
-  
+
   const totalRows = visibleRows.length
   const previewIsTruncated = matchingTotalRows > rows.length
   const previewHeight = Math.min(
@@ -214,7 +214,7 @@ export const MiniTableView = memo(({
 
   const tableMinWidth = columns.length * MIN_CELL_WIDTH
   const gridTemplateColumns = `repeat(${columns.length}, minmax(${MIN_CELL_WIDTH}px, 1fr))`
-  const [showPreviewLoading, setShowPreviewLoading] = useState(false)
+
   useEffect(() => {
     if (isLoaded && !isUpdating) {
       setShowPreviewLoading(false)
@@ -223,6 +223,7 @@ export const MiniTableView = memo(({
     const timer = window.setTimeout(() => setShowPreviewLoading(true), PREVIEW_LOADING_DELAY_MS)
     return () => window.clearTimeout(timer)
   }, [isLoaded, isUpdating])
+
   const showLoadingChrome = showPreviewLoading && (!isLoaded || isUpdating)
   const bodyHeight = showLoadingChrome && totalRows === 0
     ? Math.min(maxHeight, HEADER_HEIGHT + CELL_HEIGHT * 3 + FOOTER_HEIGHT)
@@ -244,7 +245,7 @@ export const MiniTableView = memo(({
   }
 
   return (
-    <div 
+    <div
       className="flex flex-col overflow-hidden rounded-b-2xl"
       style={{ height: bodyHeight }}
       role="table"
@@ -252,22 +253,22 @@ export const MiniTableView = memo(({
       aria-rowcount={filtersActive ? matchingTotalRows : engineTotalRows}
       aria-busy={showLoadingChrome || undefined}
     >
-      {/* Scrollable table area - hide scrollbars but keep functionality */}
-      <div 
+      {/* nowheel + stopPropagation keep wheel scroll inside the preview (React Flow pans/zooms otherwise). */}
+      <div
         className="flex-1 overflow-auto overscroll-none nowheel scrollbar-hide"
         style={{ overscrollBehavior: 'none' }}
         onScroll={handleScroll}
         onWheelCapture={(e) => e.stopPropagation()}
       >
-        <div 
-          style={{ 
+        <div
+          style={{
             width: tableMinWidth,
             minWidth: '100%',
             height: Math.max(totalRows, showLoadingChrome ? 3 : 0) * CELL_HEIGHT + HEADER_HEIGHT,
-            position: 'relative'
+            position: 'relative',
           }}
         >
-          <div 
+          <div
             className="table-header-bg sticky top-0 z-10 grid border-y border-border"
             style={{ height: HEADER_HEIGHT, gridTemplateColumns }}
             role="row"
@@ -315,43 +316,41 @@ export const MiniTableView = memo(({
             </div>
           ) : (
             <div style={{ marginTop: startIndex * CELL_HEIGHT }} role="rowgroup">
-              {virtualRows.map((row) => {
-                return (
-                  <div
-                    key={row.__rowId}
-                    className="grid border-b border-border-subtle bg-surface"
-                    style={{ height: CELL_HEIGHT, gridTemplateColumns }}
-                    role="row"
-                  >
-                    {columns.map((col, idx) => {
-                      const value = getDisplayValue(row.__rowId, col.id, row[col.id], row)
-                      const displayValue = formatCellValue(value, col.type)
-                      const isLastColumn = idx === columns.length - 1
-                      return (
-                        <div
-                          key={col.id}
-                          className={`flex items-center px-1.5 text-xs overflow-hidden ${
-                            !isLastColumn ? 'border-r border-border' : ''
-                          } ${
-                            col.type === 'number' ? 'justify-end font-mono text-text-primary' : 'text-text-primary'
-                          }`}
-                          role="cell"
-                        >
-                          <span className="truncate">
-                            {displayValue || <span className="sr-only">Empty cell</span>}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })}
+              {virtualRows.map((row) => (
+                <div
+                  key={row.__rowId}
+                  className="grid border-b border-border-subtle bg-surface"
+                  style={{ height: CELL_HEIGHT, gridTemplateColumns }}
+                  role="row"
+                >
+                  {columns.map((col, idx) => {
+                    const value = getDisplayValue(row.__rowId, col.id, row[col.id], row)
+                    const displayValue = formatCellValue(value, col.type)
+                    const isLastColumn = idx === columns.length - 1
+                    return (
+                      <div
+                        key={col.id}
+                        className={`flex items-center px-1.5 text-xs overflow-hidden ${
+                          !isLastColumn ? 'border-r border-border' : ''
+                        } ${
+                          col.type === 'number' ? 'justify-end font-mono text-text-primary' : 'text-text-primary'
+                        }`}
+                        role="cell"
+                      >
+                        <span className="truncate">
+                          {displayValue || <span className="sr-only">Empty cell</span>}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
 
-      <div 
+      <div
         className="flex shrink-0 items-center gap-3 border-t border-border-subtle bg-surface-secondary px-3 text-xs text-text-secondary"
         style={{ height: FOOTER_HEIGHT }}
       >

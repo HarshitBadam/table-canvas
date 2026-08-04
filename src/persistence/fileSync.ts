@@ -22,8 +22,8 @@ export interface FileWithSync {
 export interface UploadFileSyncOptions {
   requireRemoteWhenOnline?: boolean
   /**
-   * Reuse an identical cloud file instead of consuming quota again. Import retries
-   * need this because the project save can be lost after the file upload succeeds.
+   * Import retries need this: the project save can be lost after a successful upload,
+   * so an identical cloud file must be reusable without consuming quota again.
    */
   deduplicate?: boolean
 }

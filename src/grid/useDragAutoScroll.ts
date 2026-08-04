@@ -1,20 +1,15 @@
 import { useEffect, useRef } from 'react'
 
-/** How close to an edge the pointer has to get before the grid starts moving. */
+/** Pointer distance from a scrollable edge that starts auto-scroll. */
 const EDGE_ZONE = 56
-/** Scroll distance per frame once the pointer is right on the edge. */
+/** Max pixels scrolled per animation frame at the edge. */
 const MAX_STEP = 26
 
 interface DragAutoScrollOptions {
-  /** The scrolling element that holds the grid. */
   containerRef: { current: HTMLElement | null }
-  /** True for as long as a range drag is in progress. */
   isActiveRef: { current: boolean }
-  /** Height of the sticky header row, which cells never sit under. */
   headerHeight: number
-  /** Width of the sticky row-number column, likewise. */
   rowHeaderWidth: number
-  /** Called with the cell the (clamped) pointer resolves to. */
   onReachCell: (rowIndex: number, colIndex: number) => void
 }
 
@@ -23,9 +18,8 @@ function clamp(value: number, min: number, max: number) {
 }
 
 /**
- * Distance to scroll along one axis: zero while the pointer sits comfortably
- * inside the viewport, ramping up to MAX_STEP as it reaches the edge and
- * staying there once it goes past.
+ * Scroll delta for one axis: 0 inside the safe band, then linear up to MAX_STEP
+ * through EDGE_ZONE, and MAX_STEP once the pointer is past the edge.
  */
 function axisStep(position: number, min: number, max: number) {
   if (position < min + EDGE_ZONE) {
@@ -37,7 +31,7 @@ function axisStep(position: number, min: number, max: number) {
   return 0
 }
 
-/** The topmost grid cell at a viewport point, looking past the sticky chrome. */
+/** Resolve the gridcell under a point, skipping sticky header/row-number chrome. */
 function cellAtPoint(x: number, y: number) {
   for (const element of document.elementsFromPoint(x, y)) {
     const cell = element.closest('[role="gridcell"]')
@@ -47,11 +41,9 @@ function cellAtPoint(x: number, y: number) {
 }
 
 /**
- * Range selection is driven by `mouseenter` on cells, so on its own it stops at
- * whatever is currently on screen: rows below the fold are not even mounted.
- * While a drag is running this walks the viewport towards the pointer and keeps
- * extending the range to the cell under it, so a selection can reach past the
- * visible window in any direction.
+ * Range selection relies on cell `mouseenter`, which cannot reach rows that are
+ * not mounted. While a drag is active, scroll toward the pointer and extend the
+ * selection to the cell under it so ranges can grow past the virtualized window.
  */
 export function useDragAutoScroll({
   containerRef,
@@ -77,6 +69,7 @@ export function useDragAutoScroll({
     const extendTo = (x: number, y: number) => {
       const cell = cellAtPoint(x, y)
       if (!cell) return
+      // aria-row/colindex are 1-based and include sticky header/index chrome.
       const rowIndex = Number(cell.getAttribute('aria-rowindex')) - 2
       const colIndex = Number(cell.getAttribute('aria-colindex')) - 2
       if (!Number.isInteger(rowIndex) || !Number.isInteger(colIndex)) return
@@ -97,7 +90,7 @@ export function useDragAutoScroll({
       const top = rect.top + headerHeight
       const stepX = axisStep(pointer.x, left, rect.right)
       const stepY = axisStep(pointer.y, top, rect.bottom)
-      // Back inside the safe area: plain cell hovering takes over again.
+      // Inside the safe band, native cell mouseenter owns range updates.
       if (stepX === 0 && stepY === 0) return
 
       container.scrollBy(stepX, stepY)

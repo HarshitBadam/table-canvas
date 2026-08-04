@@ -12,6 +12,13 @@ interface ChartViewProps {
   chartId: string
 }
 
+function formatAggregationLabel(aggregation: AggregationType | undefined): string {
+  const value = aggregation || 'sum'
+  return value === 'count_distinct'
+    ? 'Distinct'
+    : value.charAt(0).toUpperCase() + value.slice(1)
+}
+
 export function ChartView({ chartId }: ChartViewProps) {
   const nodes = useProjectStore((state) => state.nodes)
   const chartNode = useProjectStore((state) => state.nodes[chartId]) as ChartNode | undefined
@@ -343,17 +350,14 @@ export function ChartView({ chartId }: ChartViewProps) {
                 <div className="mb-3">
                   <h3 className="text-xs font-semibold text-text-primary">Summarize values</h3>
                   <p className="mt-0.5 text-xs text-accent-text">
-                    {config.aggregation === 'count_distinct'
-                      ? 'Distinct'
-                      : (config.aggregation || 'sum').charAt(0).toUpperCase()
-                        + (config.aggregation || 'sum').slice(1)}
+                    {formatAggregationLabel(config.aggregation)}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {['sum', 'avg', 'count', 'count_distinct', 'min', 'max'].map((agg) => (
+                  {(['sum', 'avg', 'count', 'count_distinct', 'min', 'max'] as AggregationType[]).map((agg) => (
                     <button
                       key={agg}
-                      onClick={() => handleConfigChange({ aggregation: agg as AggregationType })}
+                      onClick={() => handleConfigChange({ aggregation: agg })}
                       aria-pressed={config.aggregation === agg}
                       className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                         config.aggregation === agg
@@ -361,9 +365,7 @@ export function ChartView({ chartId }: ChartViewProps) {
                           : 'border-transparent bg-surface-secondary text-text-secondary hover:border-border hover:bg-surface-tertiary'
                       }`}
                     >
-                      {agg === 'count_distinct'
-                        ? 'Distinct'
-                        : agg.charAt(0).toUpperCase() + agg.slice(1)}
+                      {formatAggregationLabel(agg)}
                     </button>
                   ))}
                 </div>

@@ -11,12 +11,6 @@ interface TableEditableCellProps {
   onContextMenu: (event: MouseEvent) => void;
 }
 
-/**
- * One cell of an editable report table, in whichever of its two states applies:
- * selected, which is a target for the keyboard, or open for editing, which is a
- * text input. Header cells behave identically — they are row -1 — so both are
- * rendered from here and cannot drift apart.
- */
 export function TableEditableCell({
   cells,
   row,
@@ -29,8 +23,7 @@ export function TableEditableCell({
   const selected = cells.isSelected(row, col);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Runs once per opening, not per keystroke: re-selecting on every render would
-  // fight whatever the caret is doing.
+  // Focus/select once per open — re-running on every keystroke fights the caret.
   useEffect(() => {
     const input = inputRef.current;
     if (!editing || !input) return;
@@ -47,14 +40,13 @@ export function TableEditableCell({
 
   const shared = {
     className,
-    // Always focusable, never in the tab order: the grid moves focus itself, and
-    // dropping the attribute while editing would blur the cell mid-edit.
+    // Always focusable, never in the tab order: the grid moves focus itself.
+    // Dropping tabIndex while editing would blur the cell mid-edit.
     tabIndex: -1,
     ref: selected && !editing ? cells.focusRef : undefined,
     onMouseDownCapture: cells.handleCellMouseDown,
     onClick: (event: MouseEvent) => cells.handleCellClick(event, { row, col }),
-    // A double-click is aimed at a spot in the text, so it amends rather than
-    // replacing; Enter is the gesture that means "type over this".
+    // Double-click amends in place; Enter is the type-over gesture.
     onDoubleClick: () => cells.beginEdit({ row, col }, { selectValue: false }),
     onBlur: cells.handleCellBlur,
     onContextMenu,

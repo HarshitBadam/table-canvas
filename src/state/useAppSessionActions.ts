@@ -92,9 +92,8 @@ export function useAppSessionActions({
     setPhase('ready')
   }, [clearActiveWorkspace, prepareProject, setPhase, setState])
 
-  // postLoginSetup flips the phase to 'loading_project'. If it throws, the phase
-  // must be put back into a rendered state (rather than left stuck showing the
-  // full-screen loader forever) so the caller's own error handling can recover.
+  // If postLoginSetup throws after flipping to 'loading_project', restore a
+  // rendered phase so the full-screen loader is not left stuck forever.
   const runPostLoginSetup = useCallback(async (tier: Tier) => {
     try {
       await postLoginSetup(tier)
@@ -157,8 +156,8 @@ export function useAppSessionActions({
         useReportStore.getState().flushSaves(),
       ]), LOCAL_EXIT_TIMEOUT_MS)
     } catch (error) {
-      // Account-scoped IndexedDB and its outbox remain isolated for the next
-      // sign-in. A persistence failure must never trap the user in the session.
+      // Local durability failure must not trap the user in the session; the
+      // account-scoped IndexedDB/outbox stays isolated for the next sign-in.
       console.warn('[AppContext] Local save did not finish before sign out:', error)
     }
     clearWorkspaceViews(getStorageScope())
@@ -166,8 +165,8 @@ export function useAppSessionActions({
     try {
       await performLogout()
     } catch (error) {
-      // performLogout clears local auth state in a finally block. A failed revoke
-      // can be retried only by the server and must not block local sign-out.
+      // performLogout clears local auth in finally; a failed server revoke must
+      // not block tab-local sign-out.
       console.warn('[AppContext] Remote session revoke failed during sign out:', error)
     } finally {
       await resetWorkspace()

@@ -200,6 +200,9 @@ export function computeCombinedSuggestionEffect(
   const changesByCell = new Map<string, CellChange>()
   const highlights = new Set<string>()
 
+  // Overlapping cell edits must run in dependency order: general fixes, then
+  // nullify placeholders so fills can replace them, then fills, then removals,
+  // then highlight-only reviews (no mutation).
   const fixes = suggestions.filter(
     suggestion => suggestion.context.cleaningOperation?.type !== 'highlight_outliers'
       && suggestion.context.cleaningOperation?.type !== 'nullify_placeholders'
