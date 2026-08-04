@@ -1,6 +1,7 @@
 {
   "name": "table-canvas",
   "private": true,
+  "workspaces": ["gateway"],
   "version": "1.0.0",
   "type": "module",
   "engines": {
