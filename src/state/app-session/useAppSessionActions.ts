@@ -110,6 +110,7 @@ export function useAppSessionActions({
   }, [postLoginSetup, setPhase, setState])
 
   const beginLoginSetup = useCallback(async (enter: () => Promise<{ tier: Tier }>) => {
+    setState(previous => ({ ...previous, syncError: null }))
     try {
       const loggedInUser = await enter()
       setPhase('initializing_engine')
@@ -119,7 +120,7 @@ export function useAppSessionActions({
       setPhase('ready')
       throw error
     }
-  }, [ensureEngineReady, runPostLoginSetup, setPhase])
+  }, [ensureEngineReady, runPostLoginSetup, setPhase, setState])
 
   const login = useCallback(async (credentials: LoginCredentials) => {
     await beginLoginSetup(() => performLogin(credentials))
