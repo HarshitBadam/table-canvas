@@ -1,4 +1,8 @@
-import { documentLeaseName, documentOpenLockName } from './documentIdentity'
+import {
+  documentLeaseName,
+  documentOpenLockName,
+  documentTabId,
+} from './documentIdentity'
 
 /**
  * Exactly one tab per document may write it. Ownership is only ever established by
@@ -13,6 +17,8 @@ export interface LeaseState {
 
 interface LeaseSession {
   key: string
+  tabId: string
+  presenceChannel: BroadcastChannel | null
   abort: AbortController | null
   releaseLock: (() => void) | null
   releaseOpen: (() => void) | null
@@ -32,10 +38,93 @@ const IDLE_STATE: LeaseState = {
   role: 'acquiring',
 }
 
+const PRESENCE_CHANNEL_NAME = 'table-canvas:document-presence'
+const PRESENCE_PROBE_TIMEOUT_MS = 100
+
+interface PresenceProbe {
+  type: 'probe'
+  key: string
+  requestId: string
+  senderId: string
+}
+
+interface PresenceResponse {
+  type: 'open'
+  key: string
+  requestId: string
+  senderId: string
+}
+
 let session: LeaseSession | null = null
 let options: LeaseSessionOptions | null = null
 let state: LeaseState = IDLE_STATE
 const listeners = new Set<() => void>()
+
+function isPresenceProbe(value: unknown): value is PresenceProbe {
+  if (!value || typeof value !== 'object') return false
+  const message = value as Partial<PresenceProbe>
+  return message.type === 'probe'
+    && typeof message.key === 'string'
+    && typeof message.requestId === 'string'
+    && typeof message.senderId === 'string'
+}
+
+function isPresenceResponse(value: unknown): value is PresenceResponse {
+  if (!value || typeof value !== 'object') return false
+  const message = value as Partial<PresenceResponse>
+  return message.type === 'open'
+    && typeof message.key === 'string'
+    && typeof message.requestId === 'string'
+    && typeof message.senderId === 'string'
+}
+
+function openPresenceChannel(active: LeaseSession): void {
+  if (typeof BroadcastChannel === 'undefined') return
+  const channel = new BroadcastChannel(PRESENCE_CHANNEL_NAME)
+  channel.onmessage = event => {
+    if (!isPresenceProbe(event.data)) return
+    if (event.data.key !== active.key || event.data.senderId === active.tabId) return
+    channel.postMessage({
+      type: 'open',
+      key: active.key,
+      requestId: event.data.requestId,
+      senderId: active.tabId,
+    } satisfies PresenceResponse)
+  }
+  active.presenceChannel = channel
+}
+
+async function hasOpenPeer(key: string): Promise<boolean> {
+  if (typeof BroadcastChannel === 'undefined') return false
+  const channel = new BroadcastChannel(PRESENCE_CHANNEL_NAME)
+  const requestId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const senderId = documentTabId()
+
+  return new Promise(resolve => {
+    let settled = false
+    const finish = (open: boolean) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      channel.close()
+      resolve(open)
+    }
+    const timer = window.setTimeout(() => finish(false), PRESENCE_PROBE_TIMEOUT_MS)
+    channel.onmessage = event => {
+      if (!isPresenceResponse(event.data)) return
+      if (
+        event.data.key === key
+        && event.data.requestId === requestId
+        && event.data.senderId !== senderId
+      ) {
+        finish(true)
+      }
+    }
+    channel.postMessage({ type: 'probe', key, requestId, senderId } satisfies PresenceProbe)
+  })
+}
 
 function emit(next: Partial<LeaseState>): void {
   const merged = { ...state, ...next }
@@ -153,6 +242,8 @@ export function startDocumentLease(sessionOptions: LeaseSessionOptions): () => v
   stopDocumentLease()
   const active: LeaseSession = {
     key: sessionOptions.key,
+    tabId: documentTabId(),
+    presenceChannel: null,
     abort: null,
     releaseLock: null,
     releaseOpen: null,
@@ -164,6 +255,7 @@ export function startDocumentLease(sessionOptions: LeaseSessionOptions): () => v
   options = sessionOptions
   state = IDLE_STATE
 
+  openPresenceChannel(active)
   // Presence is independent of write ownership: every open tab (owner or mirror)
   // holds a shared lock so deletes can be blocked while the project is in use.
   void holdOpenPresence(active)
@@ -177,6 +269,8 @@ export function stopDocumentLease(): void {
   const active = session
   if (!active) return
   active.stopped = true
+  active.presenceChannel?.close()
+  active.presenceChannel = null
   releaseLock(active)
   releaseOpen(active)
   active.abort?.abort()
@@ -199,6 +293,7 @@ export async function canDeleteDocument(
   key: string,
   isActiveDocument: boolean,
 ): Promise<boolean> {
+  if (await hasOpenPeer(key)) return false
   const locks = navigator.locks
   if (!locks) {
     console.warn('[DocumentLease] Web Locks unavailable; assuming this is the only tab.')
@@ -263,6 +358,7 @@ export async function withInactiveDocumentDeleteGuard<T>(
   key: string,
   action: () => Promise<T>,
 ): Promise<DeleteGuardResult<T>> {
+  if (await hasOpenPeer(key)) return { acquired: false }
   const locks = navigator.locks
   if (!locks) {
     return { acquired: true, value: await action() }

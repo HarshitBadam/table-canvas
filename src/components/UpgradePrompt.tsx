@@ -62,7 +62,7 @@ export function UpgradePrompt({
         <Dialog.Content
           className={`fixed inset-0 ${contentLayer} m-auto h-fit w-[min(29rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border-elevation bg-surface shadow-[0_24px_64px_rgb(0_0_0_/_0.24)] focus:outline-none motion-safe:animate-scale-in`}
         >
-          <div className="px-5 pb-4 pt-5">
+          <div className={`px-5 pt-5 ${isHardFileLimit ? 'pb-2' : 'pb-4'}`}>
             <Dialog.Title className="text-base font-semibold leading-5 text-text-primary">
               {isGuest
                 ? 'Sign in to keep working'
@@ -71,11 +71,18 @@ export function UpgradePrompt({
                   : 'Free plan limit reached'}
             </Dialog.Title>
             <Dialog.Description className="mt-1 text-[13px] font-[450] leading-[18px] text-text-secondary">
-              {isGuest ? `${limitContext} Sign in to continue.` : violation.reason}
+              <span className="block">
+                {isGuest ? `${limitContext} Sign in to continue.` : violation.reason}
+              </span>
+              {isHardFileLimit && (
+                <span className="block">
+                  Choose a file no larger than 20 MB and try again.
+                </span>
+              )}
             </Dialog.Description>
           </div>
 
-          <div className="px-5 py-3.5">
+          {!isHardFileLimit && <div className="px-5 py-3.5">
             {isGuest ? (
               <ul className="space-y-2.5" aria-label="Sign in benefits">
                 {['Create more tables and projects', 'Sync your work across devices', 'Keep working without starting over'].map(benefit => (
@@ -91,9 +98,7 @@ export function UpgradePrompt({
               </ul>
             ) : (
               <p className="text-sm leading-6 text-text-secondary">
-                {isHardFileLimit
-                  ? 'Choose a file no larger than 20 MB and try again.'
-                  : 'You can continue by removing work you no longer need. Expanded plans are not available yet.'}
+                You can continue by removing work you no longer need. Expanded plans are not available yet.
               </p>
             )}
             {signInError && (
@@ -101,11 +106,14 @@ export function UpgradePrompt({
                 {signInError}
               </p>
             )}
-          </div>
+          </div>}
 
           <div className="flex items-center justify-end gap-2 px-5 py-3">
             <Dialog.Close asChild>
-              <button type="button" className="btn btn-ghost rounded-lg px-3 py-1.5">
+              <button
+                type="button"
+                className={`btn rounded-lg px-3 py-1.5 ${isHardFileLimit ? 'btn-primary' : 'btn-ghost'}`}
+              >
                 {isGuest ? 'Maybe later' : 'Close'}
               </button>
             </Dialog.Close>

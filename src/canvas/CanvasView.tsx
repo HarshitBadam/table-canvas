@@ -159,6 +159,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null)
   const fittedProjectRef = useRef<string | null | undefined>(undefined)
   const visibleNodeIdsRef = useRef<Set<string>>(new Set())
+  const pendingFitNodeIdRef = useRef<string | null>(null)
   const dragStartRef = useRef<{ id: string; position: { x: number; y: number } } | null>(null)
 
   useLayoutEffect(() => {
@@ -173,6 +174,7 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
     if (fittedProjectRef.current !== projectId) {
       fittedProjectRef.current = projectId
       visibleNodeIdsRef.current = currentNodeIds
+      pendingFitNodeIdRef.current = null
       void flowInstance.fitView({
         padding: 0.08,
         maxZoom: 1.1,
@@ -183,16 +185,21 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
 
     const addedNodes = nodes.filter(node => !visibleNodeIdsRef.current.has(node.id))
     visibleNodeIdsRef.current = currentNodeIds
-    if (addedNodes.length === 0) return
-
-    const target = addedNodes.find(node => node.id === selectedNodeId)
+    const addedTarget = addedNodes.find(node => node.id === selectedNodeId)
       ?? addedNodes[addedNodes.length - 1]
-    void flowInstance.fitView({
-      nodes: [target],
-      padding: 0.35,
-      maxZoom: 1,
+    if (addedTarget) pendingFitNodeIdRef.current = addedTarget.id
+
+    const pendingTarget = nodes.find(node => node.id === pendingFitNodeIdRef.current)
+    const pendingSchema = pendingTarget?.data?.schema
+    if (!pendingTarget || !pendingSchema || pendingSchema.columns.length === 0) return
+
+    pendingFitNodeIdRef.current = null
+    const frame = window.requestAnimationFrame(() => void flowInstance.fitView({
+      padding: 0.08,
+      maxZoom: 1.1,
       duration: 180,
-    })
+    }))
+    return () => window.cancelAnimationFrame(frame)
   }, [flowInstance, nodes, projectId, selectedNodeId])
 
   const onNodeDragStop = useCallback(
