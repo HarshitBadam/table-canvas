@@ -18,7 +18,10 @@ import { initializeFileIndexes } from './services/file.service.js';
 import { initializeRateLimitIndexes } from './services/rateLimitStore.js';
 import { createCsrfProtection } from './middleware/csrfProtection.js';
 import { closeServerTelemetry, initializeServerTelemetry } from './observability/sentry.js';
-import { recoverPendingFileDeletes } from './services/fileLifecycle.service.js';
+import {
+  recoverPendingFileDeletes,
+  startPendingFileDeleteReaper,
+} from './services/fileLifecycle.service.js';
 
 validateConfig();
 initializeServerTelemetry();
@@ -86,6 +89,7 @@ async function startServer(): Promise<void> {
     await initializeRateLimitIndexes();
     await recoverPendingFileDeletes();
     await reconcileStorageUsage();
+    startPendingFileDeleteReaper();
 
     httpServer = app.listen(config.port, () => {
       console.log(`[Server] Running on port ${config.port}`);

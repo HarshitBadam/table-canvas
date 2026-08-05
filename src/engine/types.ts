@@ -27,7 +27,7 @@ export interface WorkerRequest {
   payload: unknown
 }
 
-export interface WorkerMutationCancelRequest {
+interface WorkerMutationCancelRequest {
   type: 'cancelMutation'
   requestId: string
 }
@@ -40,12 +40,12 @@ export interface WorkerMutationCancelRequest {
  * decided synchronously against the same state used to fire the RPC timeout,
  * so the timeout and this handshake can never both "win" for the same request.
  */
-export interface WorkerCommitDecisionRequest {
+interface WorkerCommitDecisionRequest {
   type: 'prepareCommit'
   requestId: string
 }
 
-export interface WorkerCommitDecisionReply {
+interface WorkerCommitDecisionReply {
   type: 'commitDecision'
   requestId: string
   granted: boolean
@@ -60,7 +60,7 @@ export interface WorkerResponse {
   error?: string
 }
 
-export type WorkerReadyMessage = { type: 'ready' }
+type WorkerReadyMessage = { type: 'ready' }
 
 export type WorkerToMainMessage = WorkerResponse | WorkerReadyMessage | WorkerCommitDecisionRequest
 
