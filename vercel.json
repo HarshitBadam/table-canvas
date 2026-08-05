@@ -53,6 +53,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://table-canvas-api.onrender.com/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
     }
