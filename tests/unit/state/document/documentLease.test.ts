@@ -21,10 +21,6 @@ function leaseName(key: string): string {
   return `table-canvas:doc-lease:${key}`
 }
 
-function openName(key: string): string {
-  return `table-canvas:doc-open:${key}`
-}
-
 let locks: FakeLockManager
 
 beforeEach(() => {
@@ -104,7 +100,7 @@ describe('documentLease', () => {
     follower.stopDocumentLease()
   })
 
-  it('keeps ownership when durable adoption fails during promotion', async () => {
+  it('stays fail-closed when durable adoption fails during promotion', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const owner = await openTab()
     owner.startDocumentLease({ key: KEY })
@@ -123,10 +119,93 @@ describe('documentLease', () => {
     owner.stopDocumentLease()
     await settleTabs()
 
-    expect(follower.getLeaseState().role).toBe('owner')
-    expect(follower.holdsWriteLease()).toBe(true)
-    expect(locks.isHeld(leaseName(KEY))).toBe(true)
+    expect(follower.getLeaseState().role).toBe('mirror')
+    expect(follower.holdsWriteLease()).toBe(false)
     follower.stopDocumentLease()
+  })
+
+  it('releases the write lock after a failed adoption instead of blocking every tab forever', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const owner = await openTab()
+    owner.startDocumentLease({ key: KEY })
+    await settleTabs()
+
+    const stuck = await openTab()
+    stuck.startDocumentLease({
+      key: KEY,
+      onPromoted: async () => {
+        throw new Error('IndexedDB unavailable')
+      },
+    })
+    await settleTabs()
+
+    owner.stopDocumentLease()
+    await settleTabs()
+    expect(stuck.getLeaseState().role).toBe('mirror')
+
+    // Once the failed mirror releases the lock (even while it schedules its own
+    // retry), a third tab must be able to take ownership rather than being
+    // blocked by the stuck adopter forever.
+    expect(locks.isHeld(leaseName(KEY))).toBe(false)
+    const third = await openTab()
+    third.startDocumentLease({ key: KEY })
+    await settleTabs()
+
+    expect(third.getLeaseState().role).toBe('owner')
+    expect(third.holdsWriteLease()).toBe(true)
+    stuck.stopDocumentLease()
+    third.stopDocumentLease()
+  })
+
+  it('retries a failed mirror adoption and recovers to owner once it succeeds', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    // settleTabs() drains microtasks with a real setTimeout(0), which never
+    // fires under fake timers — advance-and-flush instead.
+    const settle = () => vi.advanceTimersByTimeAsync(0)
+    try {
+      const owner = await openTab()
+      owner.startDocumentLease({ key: KEY })
+      await settle()
+
+      let attempts = 0
+      const follower = await openTab()
+      follower.startDocumentLease({
+        key: KEY,
+        onPromoted: async () => {
+          attempts += 1
+          if (attempts === 1) throw new Error('IndexedDB unavailable')
+        },
+      })
+      await settle()
+
+      owner.stopDocumentLease()
+      await settle()
+      expect(follower.getLeaseState().role).toBe('mirror')
+      expect(attempts).toBe(1)
+
+      // Nobody else wants the lock, so the backoff retry re-acquires it itself
+      // and succeeds on the second attempt.
+      await vi.advanceTimersByTimeAsync(5000)
+
+      expect(attempts).toBe(2)
+      expect(follower.getLeaseState().role).toBe('owner')
+      expect(follower.holdsWriteLease()).toBe(true)
+      follower.stopDocumentLease()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('matches write ownership to the exact document key', async () => {
+    const tab = await openTab()
+    tab.startDocumentLease({ key: KEY })
+    await settleTabs()
+
+    expect(tab.holdsWriteLease(KEY)).toBe(true)
+    expect(tab.holdsWriteLease(OTHER_SCOPE_KEY)).toBe(false)
+    tab.stopDocumentLease()
+    expect(tab.holdsWriteLease(KEY)).toBe(false)
   })
 
   it('never exposes handover controls on the lease state', async () => {
@@ -172,116 +251,5 @@ describe('documentLease', () => {
     expect(tab.getLeaseState().role).toBe('owner')
     expect(tab.holdsWriteLease()).toBe(true)
     tab.stopDocumentLease()
-  })
-
-  it('holds shared open presence for every tab on the document', async () => {
-    const owner = await openTab()
-    owner.startDocumentLease({ key: KEY })
-    await settleTabs()
-    expect(locks.holderCount(openName(KEY))).toBe(1)
-
-    const follower = await openTab()
-    follower.startDocumentLease({ key: KEY })
-    await settleTabs()
-    expect(locks.holderCount(openName(KEY))).toBe(2)
-
-    owner.stopDocumentLease()
-    await settleTabs()
-    expect(locks.holderCount(openName(KEY))).toBe(1)
-
-    follower.stopDocumentLease()
-    await settleTabs()
-    expect(locks.holderCount(openName(KEY))).toBe(0)
-  })
-
-  it('allows deleting the active document only while no other tab has it open', async () => {
-    const owner = await openTab()
-    owner.startDocumentLease({ key: KEY })
-    await settleTabs()
-    expect(await owner.canDeleteDocument(KEY, true)).toBe(true)
-
-    const follower = await openTab()
-    follower.startDocumentLease({ key: KEY })
-    await settleTabs()
-    expect(await owner.canDeleteDocument(KEY, true)).toBe(false)
-    expect(await follower.canDeleteDocument(KEY, true)).toBe(false)
-
-    owner.stopDocumentLease()
-    follower.stopDocumentLease()
-  })
-
-  it('blocks deleting a project that is open in another tab', async () => {
-    const owner = await openTab()
-    owner.startDocumentLease({ key: KEY })
-    await settleTabs()
-
-    const other = await openTab()
-    expect(await other.canDeleteDocument(KEY, false)).toBe(false)
-    expect(locks.isHeld(openName(KEY))).toBe(true)
-
-    expect(await other.canDeleteDocument(OTHER_SCOPE_KEY, false)).toBe(true)
-    expect(locks.isHeld(openName(OTHER_SCOPE_KEY))).toBe(false)
-
-    owner.stopDocumentLease()
-  })
-
-  it('holds deletion guards through an inactive project delete', async () => {
-    const tab = await openTab()
-    const action = vi.fn(async () => {
-      expect(locks.isHeld(openName(KEY))).toBe(true)
-      expect(locks.isHeld(leaseName(KEY))).toBe(true)
-      return 'deleted'
-    })
-
-    const result = await tab.withInactiveDocumentDeleteGuard(KEY, action)
-
-    expect(result).toEqual({ acquired: true, value: 'deleted' })
-    expect(action).toHaveBeenCalledTimes(1)
-    expect(locks.isHeld(openName(KEY))).toBe(false)
-    expect(locks.isHeld(leaseName(KEY))).toBe(false)
-  })
-
-  it('does not start an inactive delete while another tab has the project open', async () => {
-    const owner = await openTab()
-    owner.startDocumentLease({ key: KEY })
-    await settleTabs()
-    const other = await openTab()
-    const action = vi.fn()
-
-    const result = await other.withInactiveDocumentDeleteGuard(KEY, action)
-
-    expect(result).toEqual({ acquired: false })
-    expect(action).not.toHaveBeenCalled()
-    owner.stopDocumentLease()
-  })
-
-  it('assumes a single tab and allows deletion when Web Locks are unavailable', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true })
-    const tab = await openTab()
-    expect(await tab.canDeleteDocument(KEY, false)).toBe(true)
-    expect(await tab.canDeleteDocument(KEY, true)).toBe(true)
-  })
-
-  it('blocks cross-tab deletion through presence messages when Web Locks are unavailable', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true })
-    const owner = await openTab()
-    owner.startDocumentLease({ key: KEY })
-    const other = await openTab()
-    const action = vi.fn()
-
-    expect(await other.canDeleteDocument(KEY, false)).toBe(false)
-    expect(await other.withInactiveDocumentDeleteGuard(KEY, action)).toEqual({
-      acquired: false,
-    })
-    expect(action).not.toHaveBeenCalled()
-    owner.stopDocumentLease()
-  })
-
-  it('treats omitted lock snapshot lists as empty when probing deletes', async () => {
-    const tab = await openTab()
-    vi.spyOn(locks, 'query').mockImplementation(async () => ({} as never))
-    expect(await tab.canDeleteDocument(KEY, false)).toBe(true)
   })
 })

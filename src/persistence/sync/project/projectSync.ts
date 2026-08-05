@@ -1,6 +1,4 @@
-import {
-  getProject, listProjects, type ProjectSummary,
-} from '@/api/projects.api'
+import { getProject, listProjects, type ProjectSummary } from '@/api/projects.api'
 import { ApiError } from '@/api/client'
 import type { Edge, Patches, ProjectNode } from '@/types'
 import {
@@ -9,10 +7,13 @@ import {
 } from '../../storage/local-db/db'
 import { deserializePatches } from '../../storage/local-db/patchSerialization'
 import { isNetworkOnline } from '../session/syncState'
-import { withoutRuntimeNodeState } from '@/state/document/transientProjectState'
+import { createRemoteProject, isRetryableRemoteDeferral } from './projectCreateReconciliation'
 import {
-  createRemoteProject, isRetryableRemoteDeferral,
-} from './projectCreateReconciliation'
+  createLocalProjectId,
+  createProjectIntentKey,
+  fromRemote,
+  toTimestamp,
+} from './projectSyncHelpers'
 import { deleteUnreferencedLocalFiles } from '../files/fileGarbageCollection'
 import {
   flushAllQueuedProjectSavesWithSync,
@@ -21,8 +22,9 @@ import {
   type ProjectSyncConflict,
 } from './save/projectSaveSync'
 import {
-  getStorageScope,
-  isCloudStorageScope,
+  captureStorageScopeContext,
+  isGuestStorageScope,
+  isStorageScopeContextCurrent,
 } from '../../storage/storageScope'
 import type { Report } from '@/report/types'
 import { replaceReportsForProject } from '../../storage/local-db/reportStorage'
@@ -39,22 +41,15 @@ import {
   dropProjectSyncBase,
   remoteProjectSnapshot,
 } from './save/projectSyncBase'
-import {
-  publishCatalogChanged,
-  publishProjectDeleted,
-} from './projectCatalog'
-export {
-  isRetryableRemoteDeferral,
-} from './projectCreateReconciliation'
+import { publishCatalogChanged, publishProjectDeleted } from './projectCatalog'
+export { isRetryableRemoteDeferral } from './projectCreateReconciliation'
 export { syncOfflineAccountProjects } from '../session/localProjectPromotion'
 export { importProjectWithSync } from './projectImportSync'
 export {
-  flushProjectSaveWithSync, saveProjectWithSync,
-  setProjectSyncErrorHandler,
+  flushProjectSaveWithSync, saveProjectWithSync, setProjectSyncErrorHandler,
 } from './save/projectSaveSync'
 export { setProjectMergeHandler } from '../session/syncNotifications'
 export type { ProjectMergeEvent } from '../session/syncNotifications'
-
 export interface ProjectWithSync {
   id: string
   name: string
@@ -66,36 +61,17 @@ export interface ProjectWithSync {
   revision?: number
   reports?: Record<string, Report>
 }
-
-function fromRemote(project: Awaited<ReturnType<typeof getProject>>): ProjectWithSync {
-  const revision = project.revision ?? 0
-  return {
-    id: project.id,
-    name: project.name,
-    nodes: withoutRuntimeNodeState(project.nodes),
-    edges: project.edges,
-    patches: deserializePatches(project.patches),
-    isLocalOnly: false,
-    needsSync: false,
-    revision,
-    reports: project.reports ?? {},
-  }
-}
-
-function toTimestamp(value: Date | string | undefined): number {
-  if (!value) return 0
-  const timestamp = new Date(value).getTime()
-  return Number.isFinite(timestamp) ? timestamp : 0
-}
-
 export async function fetchProjects(): Promise<ProjectSummary[]> {
-  if (isNetworkOnline() && isCloudStorageScope()) {
+  const context = captureStorageScopeContext()
+  const scope = context.scope
+  if (isNetworkOnline() && !isGuestStorageScope(scope)) {
     try {
       const [remoteProjects, localProjects, operations] = await Promise.all([
         listProjects(),
-        listProjectsLocal(),
-        listProjectSyncOperations(),
+        listProjectsLocal(scope),
+        listProjectSyncOperations(scope),
       ])
+      if (!isStorageScopeContextCurrent(context)) return []
       const localById = new Map(localProjects.map(project => [project.id, project]))
       const operationById = new Map(operations.map(operation => [
         operation.projectId,
@@ -132,10 +108,13 @@ export async function fetchProjects(): Promise<ProjectSummary[]> {
       )
     } catch (error) {
       console.error('[syncService] Failed to fetch projects from backend:', error)
+      if (!isStorageScopeContextCurrent(context)) return []
       if (!isRetryableRemoteDeferral(error)) throw error
     }
   }
-  return (await listProjectsLocal()).map(project => ({
+  const localProjects = await listProjectsLocal(scope)
+  if (!isStorageScopeContextCurrent(context)) return []
+  return localProjects.map(project => ({
     id: project.id,
     name: project.name,
     updatedAt: new Date(project.updatedAt),
@@ -144,11 +123,18 @@ export async function fetchProjects(): Promise<ProjectSummary[]> {
 }
 
 export async function flushAllProjectSavesWithSync(): Promise<ProjectSyncConflict[]> {
-  const scope = getStorageScope()
+  const context = captureStorageScopeContext()
+  const scope = context.scope
   const conflicts = await flushAllQueuedProjectSavesWithSync(scope)
+  if (!isStorageScopeContextCurrent(context)) return []
   for (const conflict of conflicts) {
     if (conflict.operation === 'delete') {
-      await cancelQueuedProjectDelete(conflict.projectId, scope)
+      await cancelQueuedProjectDelete(
+        conflict.projectId,
+        scope,
+        conflict.generation,
+        context,
+      )
       reportProjectSyncError(
         'A project changed in the cloud and was not deleted. The newer version was kept.',
       )
@@ -159,17 +145,24 @@ export async function flushAllProjectSavesWithSync(): Promise<ProjectSyncConflic
 }
 
 export async function loadProjectWithSync(projectId: string): Promise<ProjectWithSync | null> {
-  const scope = getStorageScope()
-  const localProject = await loadProjectLocal(projectId)
+  const context = captureStorageScopeContext()
+  const scope = context.scope
+  const localProject = await loadProjectLocal(projectId, scope)
   const pending = await getProjectSyncOperation(projectId, scope)
+  if (!isStorageScopeContextCurrent(context)) return null
   if (pending?.operation === 'delete') {
-    if (isNetworkOnline() && isCloudStorageScope()) {
+    if (isNetworkOnline() && !isGuestStorageScope(scope)) {
       try {
-        await flushProjectSaveWithSync(projectId, scope)
+        await flushProjectSaveWithSync(projectId, scope, context)
         return null
       } catch (error) {
         if (error instanceof ApiError && error.statusCode === 409) {
-          await cancelQueuedProjectDelete(projectId, scope)
+          await cancelQueuedProjectDelete(
+            projectId,
+            scope,
+            pending.generation,
+            context,
+          )
           publishCatalogChanged(scope)
           reportProjectSyncError(
             'This project changed in the cloud and was not deleted. The newer version was kept.',
@@ -195,12 +188,14 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
     }
   }
 
-  if (isNetworkOnline() && isCloudStorageScope()) {
+  if (isNetworkOnline() && !isGuestStorageScope(scope)) {
     try {
       let remoteProject = await getProject(projectId)
+      if (!isStorageScopeContextCurrent(context)) return null
       if (pending?.operation === 'save' && localProject) {
         try {
-          await flushProjectSaveWithSync(projectId, scope)
+          await flushProjectSaveWithSync(projectId, scope, context)
+          if (!isStorageScopeContextCurrent(context)) return null
           const synced = await loadProjectLocal(projectId, scope)
           if (synced) {
             return {
@@ -215,6 +210,7 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
           if (error instanceof ApiError && error.statusCode === 409) {
             // The flush already merged or preserved the queued work; take the cloud copy.
             remoteProject = await getProject(projectId)
+            if (!isStorageScopeContextCurrent(context)) return null
           } else if (isRetryableRemoteDeferral(error)) {
             return {
               ...localProject,
@@ -241,20 +237,27 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
           updatedAt: remoteProject.updatedAt,
           revision: remoteProject.revision,
         },
+        scope,
       )
+      if (!isStorageScopeContextCurrent(context)) return null
       await replaceReportsForProject(
         loaded.id,
         remoteProject.reports ?? {},
+        scope,
       )
+      if (!isStorageScopeContextCurrent(context)) return null
       await captureProjectSyncBase(
         loaded.id,
         remoteProject.revision ?? 0,
         remoteProjectSnapshot(remoteProject),
         scope,
+        context,
       )
+      if (!isStorageScopeContextCurrent(context)) return null
       return loaded
     } catch (error) {
       console.error('[syncService] Failed to load project from backend:', error)
+      if (!isStorageScopeContextCurrent(context)) return null
       // Invalid/missing remote ids should fall back to the local cache instead of
       // hard-failing boot when IndexedDB still has a usable copy.
       const missingOrInvalidRemote = error instanceof ApiError
@@ -268,7 +271,7 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
   const fallback = {
     ...localProject,
     patches: deserializePatches(localProject.patches),
-    isLocalOnly: !isNetworkOnline() || !isCloudStorageScope(),
+    isLocalOnly: !isNetworkOnline() || isGuestStorageScope(scope),
     needsSync: pending?.operation === 'save',
     revision: localProject.revision ?? 0,
   }
@@ -276,8 +279,15 @@ export async function loadProjectWithSync(projectId: string): Promise<ProjectWit
 }
 
 export async function createProjectWithSync(name = 'Untitled Project'): Promise<ProjectWithSync> {
-  if (isNetworkOnline() && isCloudStorageScope()) {
-    const remoteProject = await createRemoteProject({ name }, `create:${name}`)
+  const context = captureStorageScopeContext()
+  const scope = context.scope
+  if (isNetworkOnline() && !isGuestStorageScope(scope)) {
+    const remoteProject = await createRemoteProject(
+      { name },
+      createProjectIntentKey(scope, name),
+      context,
+    )
+    if (!isStorageScopeContextCurrent(context)) throw new Error('The account changed while the project was being created.')
     const project = fromRemote(remoteProject)
     await saveProjectLocal(
       project.id,
@@ -290,16 +300,21 @@ export async function createProjectWithSync(name = 'Untitled Project'): Promise<
         updatedAt: remoteProject.updatedAt,
         revision: remoteProject.revision,
       },
+      scope,
     )
+    if (!isStorageScopeContextCurrent(context)) throw new Error('The account changed while the project was being created.')
     await captureProjectSyncBase(
       project.id,
       remoteProject.revision ?? 0,
       remoteProjectSnapshot(remoteProject),
+      scope,
+      context,
     )
+    if (!isStorageScopeContextCurrent(context)) throw new Error('The account changed while the project was being created.')
     return project
   }
   const project: ProjectWithSync = {
-    id: createLocalId('local'),
+    id: createLocalProjectId(),
     name,
     nodes: {},
     edges: {},
@@ -309,20 +324,33 @@ export async function createProjectWithSync(name = 'Untitled Project'): Promise<
     needsSync: true,
     revision: 0,
   }
-  await saveProjectLocal(project.id, project.name, project.nodes, project.edges, project.patches)
+  await saveProjectLocal(
+    project.id,
+    project.name,
+    project.nodes,
+    project.edges,
+    project.patches,
+    undefined,
+    scope,
+  )
+  if (!isStorageScopeContextCurrent(context)) throw new Error('The account changed while the project was being created.')
   return project
 }
 
 export async function deleteProjectWithSync(projectId: string): Promise<void> {
-  const scope = getStorageScope()
-  const localProject = await loadProjectLocal(projectId)
-  if (projectId.startsWith('local_') || !isCloudStorageScope()) {
-    const deletedNodes = await deleteProjectSnapshot(projectId, scope)
-    await clearProjectSyncOperation(projectId, scope)
+  const context = captureStorageScopeContext()
+  const scope = context.scope
+  const localProject = await loadProjectLocal(projectId, scope)
+  if (!isStorageScopeContextCurrent(context)) return
+  if (projectId.startsWith('local_') || isGuestStorageScope(scope)) {
+    const deletedNodes = await deleteProjectSnapshot(projectId, scope, context)
+    if (!isStorageScopeContextCurrent(context)) return
+    await clearProjectSyncOperation(projectId, scope, undefined, context)
+    if (!isStorageScopeContextCurrent(context)) return
     publishProjectDeleted(projectId, scope)
     if (!deletedNodes) return
     await dropProjectSyncBase(projectId, scope)
-    await deleteUnreferencedLocalFiles(deletedNodes, scope)
+    await deleteUnreferencedLocalFiles(deletedNodes, scope, context)
     return
   }
 
@@ -330,6 +358,7 @@ export async function deleteProjectWithSync(projectId: string): Promise<void> {
   if (isNetworkOnline()) {
     try {
       const remoteProject = await getProject(projectId)
+      if (!isStorageScopeContextCurrent(context)) return
       expectedRevision = remoteProject.revision
     } catch (error) {
       const alreadyDeleted = error instanceof ApiError && error.statusCode === 404
@@ -337,28 +366,29 @@ export async function deleteProjectWithSync(projectId: string): Promise<void> {
     }
   }
 
-  await enqueueProjectDelete(projectId, expectedRevision, scope)
+  if (!isStorageScopeContextCurrent(context)) return
+  const queuedDelete = await enqueueProjectDelete(projectId, expectedRevision, scope)
+  if (!isStorageScopeContextCurrent(context)) return
   if (isNetworkOnline()) {
     try {
-      await flushProjectSaveWithSync(projectId, scope)
+      await flushProjectSaveWithSync(projectId, scope, context)
       return
     } catch (error) {
       if (!isRetryableRemoteDeferral(error)) {
-        await cancelQueuedProjectDelete(projectId, scope)
+        await cancelQueuedProjectDelete(
+          projectId,
+          scope,
+          queuedDelete.generation,
+          context,
+        )
         publishCatalogChanged(scope)
         throw error
       }
     }
   }
-  const deletedNodes = await deleteProjectSnapshot(projectId, scope)
+  const deletedNodes = await deleteProjectSnapshot(projectId, scope, context)
+  if (!isStorageScopeContextCurrent(context)) return
   await dropProjectSyncBase(projectId, scope)
   publishProjectDeleted(projectId, scope)
-  if (deletedNodes) await deleteUnreferencedLocalFiles(deletedNodes, scope)
-}
-
-function createLocalId(prefix: 'local'): string {
-  const suffix = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}_${Math.random().toString(36).slice(2)}`
-  return `${prefix}_${suffix}`
+  if (deletedNodes) await deleteUnreferencedLocalFiles(deletedNodes, scope, context)
 }

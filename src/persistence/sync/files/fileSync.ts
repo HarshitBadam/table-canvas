@@ -10,7 +10,12 @@ import {
   saveFile as saveFileLocal,
 } from '../../storage/local-db/fileStorage'
 import { isNetworkOnline } from '../session/syncState'
-import { isCloudStorageScope } from '../../storage/storageScope'
+import {
+  captureStorageScopeContext,
+  isGuestStorageScope,
+  isStorageScopeContextCurrent,
+  type StorageScopeContext,
+} from '../../storage/storageScope'
 import { isRetryableRemoteDeferral } from '../project/projectCreateReconciliation'
 
 export interface FileWithSync {
@@ -51,16 +56,25 @@ function buffersEqual(left: ArrayBuffer, right: ArrayBuffer): boolean {
 async function findIdenticalRemoteFile(
   file: File,
   buffer: ArrayBuffer,
+  context: StorageScopeContext,
 ): Promise<FileWithSync | null> {
   try {
     const candidates = (await listFiles()).filter(candidate => (
       candidate.filename === file.name && candidate.size === file.size
     ))
+    if (!isStorageScopeContextCurrent(context)) return null
     for (const candidate of candidates) {
-      const existing = await loadFileLocal(candidate.id)
+      const existing = await loadFileLocal(candidate.id, context.scope)
         ?? await getFileAsArrayBuffer(candidate.id)
+      if (!isStorageScopeContextCurrent(context)) return null
       if (!buffersEqual(existing, buffer)) continue
-      await saveFileLocal(candidate.id, candidate.filename, candidate.contentType, buffer)
+      await saveFileLocal(
+        candidate.id,
+        candidate.filename,
+        candidate.contentType,
+        buffer,
+        context.scope,
+      )
       return {
         id: candidate.id,
         name: candidate.filename,
@@ -76,16 +90,26 @@ async function findIdenticalRemoteFile(
 }
 
 export async function loadFileWithSync(fileId: string): Promise<ArrayBuffer | null> {
-  const localFile = await loadFileLocal(fileId)
+  const context = captureStorageScopeContext()
+  const localFile = await loadFileLocal(fileId, context.scope)
+  if (!isStorageScopeContextCurrent(context)) return null
   if (localFile) return localFile
   if (
     !isNetworkOnline()
-    || !isCloudStorageScope()
+    || isGuestStorageScope(context.scope)
     || fileId.startsWith('local_file_')
   ) return null
   try {
     const buffer = await getFileAsArrayBuffer(fileId)
-    await saveFileLocal(fileId, fileId, 'application/octet-stream', buffer)
+    if (!isStorageScopeContextCurrent(context)) return null
+    await saveFileLocal(
+      fileId,
+      fileId,
+      'application/octet-stream',
+      buffer,
+      context.scope,
+    )
+    if (!isStorageScopeContextCurrent(context)) return null
     return buffer
   } catch (error) {
     console.error('[syncService] Failed to load file from backend:', error)
@@ -99,11 +123,14 @@ export async function uploadFileWithSync(
   operationId = createUploadOperationId(),
   options?: UploadFileSyncOptions,
 ): Promise<FileWithSync> {
+  const context = captureStorageScopeContext()
   const buffer = await readFileBuffer(file)
-  const remoteAvailable = isNetworkOnline() && isCloudStorageScope()
+  assertStorageContext(context)
+  const remoteAvailable = isNetworkOnline() && !isGuestStorageScope(context.scope)
   if (remoteAvailable) {
     if (options?.deduplicate) {
-      const existing = await findIdenticalRemoteFile(file, buffer)
+      const existing = await findIdenticalRemoteFile(file, buffer, context)
+      assertStorageContext(context)
       if (existing) return existing
     }
     let uploaded: Awaited<ReturnType<typeof uploadFile>> | null = null
@@ -112,6 +139,7 @@ export async function uploadFileWithSync(
       uploaded = await uploadFile(file, projectId, operationId)
     } catch (firstError) {
       uploadError = firstError
+      assertStorageContext(context)
       if (isRetryableRemoteDeferral(firstError)) {
         try {
           uploaded = await uploadFile(file, projectId, operationId)
@@ -123,12 +151,20 @@ export async function uploadFileWithSync(
         console.error('[syncService] Failed to upload file to backend:', firstError)
       }
     }
+    assertStorageContext(context)
     if (uploaded) {
       try {
-        await saveFileLocal(uploaded.id, uploaded.filename, uploaded.contentType, buffer)
+        await saveFileLocal(
+          uploaded.id,
+          uploaded.filename,
+          uploaded.contentType,
+          buffer,
+          context.scope,
+        )
       } catch (error) {
         console.error('[syncService] Uploaded file but could not cache it locally:', error)
       }
+      assertStorageContext(context)
       return { id: uploaded.id, name: uploaded.filename, contentType: uploaded.contentType }
     }
     if (options?.requireRemoteWhenOnline) {
@@ -137,8 +173,10 @@ export async function uploadFileWithSync(
         : new Error('The file could not be saved to cloud storage.')
     }
   }
+  assertStorageContext(context)
   const id = `local_file_${Date.now()}_${Math.random().toString(36).slice(2)}`
-  await saveFileLocal(id, file.name, file.type, buffer)
+  await saveFileLocal(id, file.name, file.type, buffer, context.scope)
+  assertStorageContext(context)
   return { id, name: file.name, contentType: file.type }
 }
 
@@ -152,21 +190,25 @@ function createUploadOperationId(): string {
 export async function deleteFileWithSync(
   fileId: string,
   options?: { strictRemote?: boolean },
+  context = captureStorageScopeContext(),
 ): Promise<void> {
+  if (!isStorageScopeContextCurrent(context)) return
   if (
     options?.strictRemote
     && isNetworkOnline()
-    && isCloudStorageScope()
+    && !isGuestStorageScope(context.scope)
     && !fileId.startsWith('local_file_')
   ) {
     await deleteFileRemote(fileId)
-    await deleteFileLocal(fileId)
+    if (!isStorageScopeContextCurrent(context)) return
+    await deleteFileLocal(fileId, context.scope)
     return
   }
-  await deleteFileLocal(fileId)
+  await deleteFileLocal(fileId, context.scope)
+  if (!isStorageScopeContextCurrent(context)) return
   if (
     isNetworkOnline()
-    && isCloudStorageScope()
+    && !isGuestStorageScope(context.scope)
     && !fileId.startsWith('local_file_')
   ) {
     try {
@@ -174,5 +216,11 @@ export async function deleteFileWithSync(
     } catch (error) {
       console.error('[syncService] Failed to delete file from backend:', error)
     }
+  }
+}
+
+function assertStorageContext(context: StorageScopeContext): void {
+  if (!isStorageScopeContextCurrent(context)) {
+    throw new Error('The account changed while the file operation was in progress.')
   }
 }

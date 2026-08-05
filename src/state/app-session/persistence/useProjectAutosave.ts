@@ -8,6 +8,7 @@ import {
 import { isRetryableRemoteDeferral } from '@/persistence/sync/project/projectSync'
 import { useReportStore } from '@/report/reportStore'
 import { holdsWriteLease } from '../../document/documentLease'
+import { activeDocumentIdentity } from '../../document/documentIdentity'
 import { publishDocumentInvalidation } from '../../document/documentMirror'
 import { useProjectStore } from '../../projectStore'
 import {
@@ -22,6 +23,11 @@ import type { Edge, ProjectNode } from '@/types'
  * burst cannot postpone the write indefinitely; a crash inside the window loses the tail.
  */
 const AUTOSAVE_INTERVAL_MS = 800
+
+function holdsProjectWriteLease(projectId: string | null | undefined): boolean {
+  const identity = activeDocumentIdentity(projectId)
+  return Boolean(identity && holdsWriteLease(identity.key))
+}
 
 /**
  * Topology of what IndexedDB keeps. Pending imports use synthetic `pending:` fileRefs
@@ -99,8 +105,8 @@ export function useProjectAutosave({
     ) {
       throw new Error('A table operation is still in progress.')
     }
-    // Mirror tabs share stores but must never write the document.
-    if (!holdsWriteLease()) {
+    // Ownership must match the snapshot project, not merely some document in this tab.
+    if (!holdsProjectWriteLease(useProjectStore.getState().projectId)) {
       markSaving(false)
       return
     }
@@ -118,6 +124,8 @@ export function useProjectAutosave({
           savePending.current = false
           const project = useProjectStore.getState()
           if (!project.projectId) break
+          const identity = activeDocumentIdentity(project.projectId)
+          if (!identity || !holdsWriteLease(identity.key)) break
           const topology = durableDocumentTopology(project.nodes, project.edges)
           await saveProjectWithSync(
             project.projectId,
@@ -129,7 +137,7 @@ export function useProjectAutosave({
           )
           // Advance topology only after a durable write so failures retry promptly.
           savedTopology.current = topology
-          publishDocumentInvalidation()
+          if (holdsWriteLease(identity.key)) publishDocumentInvalidation()
         } while (savePending.current)
       } finally {
         if (!debounceTimer.current) markSaving(false)
@@ -161,7 +169,7 @@ export function useProjectAutosave({
   const flushProjectSave = useCallback(async () => {
     await flushLocalProjectSave()
     const activeProjectId = useProjectStore.getState().projectId
-    if (!activeProjectId || !holdsWriteLease()) return
+    if (!activeProjectId || !holdsProjectWriteLease(activeProjectId)) return
     try {
       await flushProjectSaveWithSync(activeProjectId)
     } catch (error) {
@@ -171,7 +179,7 @@ export function useProjectAutosave({
   }, [flushLocalProjectSave])
 
   const scheduleSave = useCallback(() => {
-    if (!holdsWriteLease()) return
+    if (!holdsProjectWriteLease(useProjectStore.getState().projectId)) return
     if (hasPendingImportedTables(useProjectStore.getState().nodes)) {
       cancelPendingSave()
       markSaving(false)

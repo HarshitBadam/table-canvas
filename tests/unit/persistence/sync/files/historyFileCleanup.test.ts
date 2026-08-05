@@ -71,6 +71,7 @@ describe('history file cleanup', () => {
     expect(mocks.deleteFileWithSync).toHaveBeenCalledWith(
       'cloud-file',
       { strictRemote: true },
+      expect.objectContaining({ scope }),
     )
   })
 
@@ -87,6 +88,23 @@ describe('history file cleanup', () => {
     })
 
     await flushHistoryFileCleanup({}, GUEST_SCOPE)
+
+    expect(mocks.deleteFileWithSync).not.toHaveBeenCalled()
+  })
+
+  it('stops cleanup when the auth epoch changes during a local reference scan', async () => {
+    setStorageScope(GUEST_SCOPE)
+    queueHistoryFileCleanup(GUEST_SCOPE, ['stale-session-file'])
+    retainHistoryFileRefs(GUEST_SCOPE, [])
+    let resolveProjects!: (projects: Array<{ id: string }>) => void
+    mocks.listProjects.mockImplementation(() => new Promise(resolve => {
+      resolveProjects = resolve
+    }))
+
+    const cleanup = flushHistoryFileCleanup({}, GUEST_SCOPE)
+    setStorageScope(GUEST_SCOPE)
+    resolveProjects([])
+    await cleanup
 
     expect(mocks.deleteFileWithSync).not.toHaveBeenCalled()
   })

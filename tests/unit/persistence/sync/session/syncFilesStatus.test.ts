@@ -50,8 +50,8 @@ vi.mock('@/persistence/storage/local-db/db', () => ({
 
 vi.mock('@/persistence/storage/local-db/fileStorage', () => ({
   saveFile: (...args: unknown[]) => mocks.saveFileLocal(...args),
-  loadFile: (id: string) => mocks.loadFileLocal(id),
-  deleteFile: (id: string) => mocks.deleteFileLocal(id),
+  loadFile: (...args: unknown[]) => mocks.loadFileLocal(...args),
+  deleteFile: (...args: unknown[]) => mocks.deleteFileLocal(...args),
 }))
 
 import {
@@ -165,9 +165,29 @@ describe('loadFileWithSync', () => {
     const buffer = new ArrayBuffer(10)
     mockLoadFileLocal.mockResolvedValue(buffer)
     const result = await loadFileWithSync('file_123')
-    expect(mockLoadFileLocal).toHaveBeenCalledWith('file_123')
+    expect(mockLoadFileLocal).toHaveBeenCalledWith(
+      'file_123',
+      accountStorageScope('test-user'),
+    )
     expect(mockGetFileAsArrayBuffer).not.toHaveBeenCalled()
     expect(result).toBe(buffer)
+  })
+
+  it('does not cache a remote file after the auth epoch changes', async () => {
+    mockLoadFileLocal.mockResolvedValue(null)
+    let resolveDownload!: (buffer: ArrayBuffer) => void
+    mockGetFileAsArrayBuffer.mockImplementation(() => new Promise(resolve => {
+      resolveDownload = resolve
+    }))
+
+    const loading = loadFileWithSync('file_123')
+    await Promise.resolve()
+    await Promise.resolve()
+    setStorageScope(accountStorageScope('test-user'))
+    resolveDownload(new ArrayBuffer(10))
+
+    await expect(loading).resolves.toBeNull()
+    expect(mockSaveFileLocal).not.toHaveBeenCalled()
   })
 
   it('fetches from backend if not in cache', async () => {
@@ -191,13 +211,19 @@ describe('loadFileWithSync', () => {
 describe('deleteFileWithSync', () => {
   it('deletes locally and from backend', async () => {
     await deleteFileWithSync('file_123')
-    expect(mockDeleteFileLocal).toHaveBeenCalledWith('file_123')
+    expect(mockDeleteFileLocal).toHaveBeenCalledWith(
+      'file_123',
+      accountStorageScope('test-user'),
+    )
     expect(mockDeleteFile).toHaveBeenCalledWith('file_123')
   })
 
   it('does not call backend for local-only files', async () => {
     await deleteFileWithSync('local_file_123')
-    expect(mockDeleteFileLocal).toHaveBeenCalledWith('local_file_123')
+    expect(mockDeleteFileLocal).toHaveBeenCalledWith(
+      'local_file_123',
+      accountStorageScope('test-user'),
+    )
     expect(mockDeleteFile).not.toHaveBeenCalled()
   })
 })

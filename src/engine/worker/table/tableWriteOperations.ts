@@ -16,7 +16,8 @@ const INSERT_BATCH_SIZE = 1000
 export async function loadTable(
   conn: duckdb.AsyncDuckDBConnection,
   request: LoadTableRequest,
-  onBatchComplete?: () => Promise<void>,
+  onMutationCheckpoint?: () => Promise<void>,
+  onFinalizeCommit?: () => Promise<void>,
 ): Promise<void> {
   const { tableId, data } = request
   const tableName = quoteIdentifier(sanitizeTableName(tableId))
@@ -37,8 +38,11 @@ export async function loadTable(
       ).join(', ')
       await conn.query(`INSERT INTO ${tableName} (${columns}) VALUES ${values}`)
       // Let short reads for other tables slip in between INSERT batches.
-      if (onBatchComplete) await onBatchComplete()
+      if (onMutationCheckpoint) await onMutationCheckpoint()
     }
+    // The only point that may irrevocably commit: a denial here always rolls
+    // back, whether or not any insert batches ran.
+    if (onFinalizeCommit) await onFinalizeCommit()
     await conn.query('COMMIT')
   } catch (error) {
     try {
@@ -50,7 +54,15 @@ export async function loadTable(
   }
 }
 
-export async function dropTable(conn: duckdb.AsyncDuckDBConnection, tableId: string): Promise<void> {
+export async function dropTable(
+  conn: duckdb.AsyncDuckDBConnection,
+  tableId: string,
+  onFinalizeCommit?: () => Promise<void>,
+): Promise<void> {
+  // dropTable is a single autocommitting statement: once it starts running it
+  // cannot be interrupted, so the finalize handshake must gate execution
+  // itself rather than a later checkpoint.
+  if (onFinalizeCommit) await onFinalizeCommit()
   await conn.query(`DROP TABLE IF EXISTS ${quoteIdentifier(sanitizeTableName(tableId))}`)
 }
 
@@ -60,8 +72,12 @@ export async function updateCell(
   rowId: string,
   column: string,
   value: CellValue,
-  columnType?: string
+  columnType?: string,
+  onFinalizeCommit?: () => Promise<void>,
 ): Promise<void> {
+  // Single autocommitting statement: gate execution itself, since there is no
+  // later point at which cancellation could still prevent the commit.
+  if (onFinalizeCommit) await onFinalizeCommit()
   const tableName = quoteIdentifier(sanitizeTableName(tableId))
   const formattedValue = columnType ? formatValueWithType(value, columnType) : formatValue(value)
   await conn.query(
@@ -76,8 +92,10 @@ export async function insertRow(
   tableId: string,
   values: Record<string, CellValue>,
   columns: string[],
-  types: string[]
+  types: string[],
+  onFinalizeCommit?: () => Promise<void>,
 ): Promise<void> {
+  if (onFinalizeCommit) await onFinalizeCommit()
   const tableName = quoteIdentifier(sanitizeTableName(tableId))
   const columnNames = columns.map(quoteIdentifier).join(', ')
   const formattedValues = columns.map((column, index) =>
@@ -89,8 +107,10 @@ export async function insertRow(
 export async function deleteRow(
   conn: duckdb.AsyncDuckDBConnection,
   tableId: string,
-  rowIndex: number
+  rowIndex: number,
+  onFinalizeCommit?: () => Promise<void>,
 ): Promise<void> {
+  if (onFinalizeCommit) await onFinalizeCommit()
   const tableName = quoteIdentifier(sanitizeTableName(tableId))
   await conn.query(
     `DELETE FROM ${tableName} WHERE rowid = (

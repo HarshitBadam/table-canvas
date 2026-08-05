@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { createMockReport, getDB } from '@/persistence/storage/local-db/dbTestSupport'
 
 describe('storage ownership scopes', () => {
+  it('invalidates captured work when auth reactivates the same account scope', async () => {
+    const scopeModule = await import('@/persistence/storage/storageScope')
+    const scope = scopeModule.accountStorageScope('same-account')
+    scopeModule.setStorageScope(scope)
+    const captured = scopeModule.captureStorageScopeContext()
+
+    scopeModule.setStorageScope(scope)
+
+    expect(scopeModule.isStorageScopeContextCurrent(captured)).toBe(false)
+    expect(scopeModule.captureStorageScopeContext()).toMatchObject({
+      scope,
+      authEpoch: captured.authEpoch + 1,
+    })
+  })
+
   it('isolates projects, files, and reports with identical public IDs', async () => {
     const db = await getDB()
     const accountA = db.accountStorageScope('account-a')

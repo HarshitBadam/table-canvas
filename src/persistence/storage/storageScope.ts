@@ -42,6 +42,17 @@ function persistGuestScope(scope: string): void {
 }
 
 let activeStorageScope = readGuestScope()
+let authEpoch = 0
+
+export interface StorageScopeContext {
+  scope: string
+  authEpoch: number
+}
+
+function activateStorageScope(scope: string): void {
+  activeStorageScope = scope
+  authEpoch += 1
+}
 
 export function accountStorageScope(userId: string): string {
   if (!userId.trim()) throw new Error('A user id is required for account storage')
@@ -52,9 +63,17 @@ export function getStorageScope(): string {
   return activeStorageScope
 }
 
+export function captureStorageScopeContext(): StorageScopeContext {
+  return { scope: activeStorageScope, authEpoch }
+}
+
+export function isStorageScopeContextCurrent(context: StorageScopeContext): boolean {
+  return context.scope === activeStorageScope && context.authEpoch === authEpoch
+}
+
 export function setStorageScope(scope: string): void {
   if (!scope.trim()) throw new Error('Storage scope cannot be empty')
-  activeStorageScope = scope
+  activateStorageScope(scope)
 }
 
 export function isCloudStorageScope(): boolean {
@@ -75,13 +94,17 @@ const GUEST_LOCK_CLAIM_TIMEOUT_MS = 2_500
  * timing — browsers may invoke it as a macrotask. On acquire, the request promise
  * keeps holding the lock until `guestScopeLockRelease` runs.
  */
-function requestGuestScopeLock(name: string, signal: AbortSignal): Promise<GuestLockOutcome> {
+function requestGuestScopeLock(
+  name: string,
+  signal: AbortSignal,
+): Promise<GuestLockOutcome> {
   return new Promise<GuestLockOutcome>(resolve => {
     let settled = false
-    const finish = (outcome: GuestLockOutcome) => {
-      if (settled) return
+    const finish = (outcome: GuestLockOutcome): boolean => {
+      if (settled) return false
       settled = true
       resolve(outcome)
+      return true
     }
 
     if (signal.aborted) {
@@ -93,13 +116,19 @@ function requestGuestScopeLock(name: string, signal: AbortSignal): Promise<Guest
     try {
       request = navigator.locks.request(
         name,
-        { mode: 'exclusive', ifAvailable: true, signal },
+        { mode: 'exclusive', ifAvailable: true },
         async lock => {
+          if (signal.aborted) {
+            finish('aborted')
+            return
+          }
           if (!lock) {
             finish('busy')
             return
           }
-          finish('acquired')
+          // A timed-out request may be granted late. Returning immediately releases
+          // that stale grant instead of retaining a lock for the fallback claim.
+          if (!finish('acquired')) return
           await new Promise<void>(release => {
             guestScopeLockRelease = release
           })
@@ -220,7 +249,7 @@ export async function claimGuestStorageScope(): Promise<string> {
     const result = await claimGuestScopeWithLocks(scope)
     scope = result.scope
     if (result.acquired) {
-      activeStorageScope = scope
+      activateStorageScope(scope)
       return scope
     }
   } catch (error) {
@@ -234,7 +263,7 @@ export async function claimGuestStorageScope(): Promise<string> {
     scope = `${GUEST_SCOPE_PREFIX}${randomId()}`
     persistGuestScope(scope)
   }
-  activeStorageScope = scope
+  activateStorageScope(scope)
   return scope
 }
 
@@ -254,7 +283,7 @@ export function releaseGuestStorageScopeClaim(): void {
  */
 export function resetLoggedOutStorageScope(): void {
   releaseGuestStorageScopeClaim()
-  activeStorageScope = readGuestScope()
+  activateStorageScope(readGuestScope())
 }
 
 const KEY_SEPARATOR = '\u001f'

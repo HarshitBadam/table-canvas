@@ -1,5 +1,9 @@
 import { createProject } from '@/api/projects.api'
 import { ApiError } from '@/api/client'
+import {
+  isStorageScopeContextCurrent,
+  type StorageScopeContext,
+} from '../../storage/storageScope'
 
 class AmbiguousProjectCreateError extends Error {
   constructor(
@@ -20,52 +24,87 @@ export function isRetryableRemoteDeferral(error: unknown): boolean {
   return error instanceof TypeError
 }
 
-const unresolvedCreateOperations = new Map<string, string>()
+/**
+ * Per-intent (scope + name) queue of unresolved create attempts. Concurrent
+ * intentional creates of the same name each claim their own fresh entry, so
+ * they never share an operation id. A create that ends ambiguously (server
+ * state unconfirmed) leaves its entry behind as 'ambiguous'; only a later
+ * retry of that specific intent claims and reuses it, reconciling with the
+ * same idempotency key instead of risking a duplicate server project.
+ */
+interface UnresolvedCreateEntry {
+  operationId: string
+  state: 'inflight' | 'ambiguous'
+}
+
+const unresolvedByIntent = new Map<string, UnresolvedCreateEntry[]>()
 const CREATE_OPERATIONS_KEY = 'tablecanvas:unresolved-project-creates'
 
-function readPersistedOperations(): Record<string, string> {
+function readPersistedAmbiguous(): Record<string, string[]> {
   try {
     const value = localStorage.getItem(CREATE_OPERATIONS_KEY)
-    return value ? JSON.parse(value) as Record<string, string> : {}
+    return value ? JSON.parse(value) as Record<string, string[]> : {}
   } catch {
     return {}
   }
 }
 
-function persistOperations(): void {
+function persistAmbiguous(): void {
+  const persisted: Record<string, string[]> = {}
+  for (const [intentKey, entries] of unresolvedByIntent) {
+    const ambiguous = entries
+      .filter(entry => entry.state === 'ambiguous')
+      .map(entry => entry.operationId)
+    if (ambiguous.length) persisted[intentKey] = ambiguous
+  }
   try {
-    localStorage.setItem(
-      CREATE_OPERATIONS_KEY,
-      JSON.stringify({
-        ...readPersistedOperations(),
-        ...Object.fromEntries(unresolvedCreateOperations),
-      }),
-    )
+    localStorage.setItem(CREATE_OPERATIONS_KEY, JSON.stringify(persisted))
   } catch {
     // In-memory reconciliation still protects retries in this page session.
   }
 }
 
-function operationFor(recoveryKey: string): string {
-  const persisted = readPersistedOperations()[recoveryKey]
-  const operationId = unresolvedCreateOperations.get(recoveryKey)
-    ?? persisted
-    ?? createOperationId()
-  unresolvedCreateOperations.set(recoveryKey, operationId)
-  persistOperations()
+function entriesFor(intentKey: string): UnresolvedCreateEntry[] {
+  let entries = unresolvedByIntent.get(intentKey)
+  if (!entries) {
+    const persisted = readPersistedAmbiguous()[intentKey] ?? []
+    entries = persisted.map(operationId => ({ operationId, state: 'ambiguous' as const }))
+    unresolvedByIntent.set(intentKey, entries)
+  }
+  return entries
+}
+
+/**
+ * A prior ambiguous attempt for this exact intent is a retry: reuse its operation
+ * id. Otherwise this is a new, concurrent intent and gets a fresh one so it can
+ * never collapse into another in-flight create of the same name.
+ */
+function operationFor(intentKey: string): string {
+  const entries = entriesFor(intentKey)
+  const retry = entries.find(entry => entry.state === 'ambiguous')
+  if (retry) {
+    retry.state = 'inflight'
+    persistAmbiguous()
+    return retry.operationId
+  }
+  const operationId = createOperationId()
+  entries.push({ operationId, state: 'inflight' })
   return operationId
 }
 
-function resolveOperation(recoveryKey: string): void {
-  unresolvedCreateOperations.delete(recoveryKey)
-  const persisted = readPersistedOperations()
-  delete persisted[recoveryKey]
-  for (const [key, value] of unresolvedCreateOperations) persisted[key] = value
-  try {
-    localStorage.setItem(CREATE_OPERATIONS_KEY, JSON.stringify(persisted))
-  } catch {
-    // The in-memory entry was still cleared.
-  }
+function markAmbiguous(intentKey: string, operationId: string): void {
+  const entry = entriesFor(intentKey).find(candidate => candidate.operationId === operationId)
+  if (entry) entry.state = 'ambiguous'
+  persistAmbiguous()
+}
+
+function resolveOperation(intentKey: string, operationId: string): void {
+  const entries = unresolvedByIntent.get(intentKey)
+  if (!entries) return
+  const remaining = entries.filter(entry => entry.operationId !== operationId)
+  if (remaining.length) unresolvedByIntent.set(intentKey, remaining)
+  else unresolvedByIntent.delete(intentKey)
+  persistAmbiguous()
 }
 
 function createOperationId(): string {
@@ -77,27 +116,33 @@ function createOperationId(): string {
 
 export async function createRemoteProject(
   data: Parameters<typeof createProject>[0],
-  recoveryKey: string,
+  intentKey: string,
+  context: StorageScopeContext,
 ) {
-  const operationId = operationFor(recoveryKey)
+  const operationId = operationFor(intentKey)
   try {
     const created = await createProject(data, operationId)
-    resolveOperation(recoveryKey)
+    resolveOperation(intentKey, operationId)
     return created
   } catch (firstError) {
+    if (!isStorageScopeContextCurrent(context)) {
+      resolveOperation(intentKey, operationId)
+      throw new Error('The account changed while the project was being created.')
+    }
     if (!isRetryableRemoteDeferral(firstError)) {
-      resolveOperation(recoveryKey)
+      resolveOperation(intentKey, operationId)
       throw firstError
     }
     try {
       const reconciled = await createProject(data, operationId)
-      resolveOperation(recoveryKey)
+      resolveOperation(intentKey, operationId)
       return reconciled
     } catch (retryError) {
       if (!isRetryableRemoteDeferral(retryError)) {
-        resolveOperation(recoveryKey)
+        resolveOperation(intentKey, operationId)
         throw retryError
       }
+      markAmbiguous(intentKey, operationId)
       throw new AmbiguousProjectCreateError(
         'The server may have created the project, but confirmation failed. Retry to reconcile the same operation.',
         operationId,

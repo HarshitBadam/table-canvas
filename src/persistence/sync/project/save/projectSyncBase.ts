@@ -7,15 +7,25 @@ import {
   type ProjectSyncBaseRecord,
 } from '../../../storage/local-db/dbCore'
 import type { SerializedPatches } from '../../../storage/local-db/patchSerialization'
-import { getStorageScope, scopedStorageKey } from '../../../storage/storageScope'
+import {
+  getStorageScope,
+  isStorageScopeContextCurrent,
+  scopedStorageKey,
+  type StorageScopeContext,
+} from '../../../storage/storageScope'
 
 export async function putProjectSyncBase(
   projectId: string,
   revision: number,
   snapshot: ProjectSnapshot,
   scope = getStorageScope(),
+  context?: StorageScopeContext,
 ): Promise<void> {
   const db = await getDB()
+  if (
+    context
+    && (context.scope !== scope || !isStorageScopeContextCurrent(context))
+  ) return
   await db.put('projectSyncBase', {
     id: scopedStorageKey(scope, projectId),
     entityId: projectId,
@@ -69,9 +79,10 @@ export async function captureProjectSyncBase(
   revision: number,
   snapshot: ProjectSnapshot,
   scope = getStorageScope(),
+  context?: StorageScopeContext,
 ): Promise<void> {
   try {
-    await putProjectSyncBase(projectId, revision, snapshot, scope)
+    await putProjectSyncBase(projectId, revision, snapshot, scope, context)
   } catch (error) {
     console.error('[Sync] Failed to record the merge base snapshot:', error)
   }

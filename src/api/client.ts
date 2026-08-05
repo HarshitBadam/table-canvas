@@ -115,6 +115,8 @@ export async function probeApi(
   }
 }
 
+const AUTH_REFRESH_LOCK_NAME = 'excel-table-app:auth-refresh';
+
 async function refreshToken(timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS): Promise<boolean> {
   try {
     const response = await fetchWithTimeout(
@@ -135,13 +137,50 @@ async function refreshToken(timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS): Promise<boo
   }
 }
 
+/** Raw probe (bypasses `request()`) so a 401 here never triggers another refresh. */
+async function probeIsAuthenticated(timeoutMs: number): Promise<boolean> {
+  try {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/auth/me`,
+      { method: 'GET', credentials: 'include' },
+      timeoutMs,
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Serializes refresh attempts across tabs with a Web Lock. A tab that loses the
+ * race to rotate the refresh token would otherwise get a failure response even
+ * though another tab already rotated it successfully. Once this tab acquires
+ * the lock, it first probes `/auth/me` with the browser's current cookies: if
+ * another tab (the winner) already installed fresh cookies, this tab reuses
+ * them instead of attempting a redundant rotation that could fail.
+ */
+async function refreshSessionAcrossTabs(timeoutMs: number): Promise<boolean> {
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  if (!locks) {
+    // Safe fallback without Web Locks: fall through to a direct refresh. The
+    // server-side CAS still protects token rotation; this tab just won't
+    // benefit from reusing another tab's winning cookies before retrying.
+    return refreshToken(timeoutMs);
+  }
+
+  return locks.request(AUTH_REFRESH_LOCK_NAME, { mode: 'exclusive' }, async () => {
+    if (await probeIsAuthenticated(timeoutMs)) return true;
+    return refreshToken(timeoutMs);
+  });
+}
+
 export async function refreshSession(timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS): Promise<boolean> {
   if (isRefreshing) {
     return refreshPromise!;
   }
 
   isRefreshing = true;
-  refreshPromise = refreshToken(timeoutMs);
+  refreshPromise = refreshSessionAcrossTabs(timeoutMs);
 
   try {
     const success = await refreshPromise;

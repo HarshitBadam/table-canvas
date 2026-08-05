@@ -6,6 +6,68 @@ import {
 } from '@/persistence/storage/local-db/dbTestSupport'
 
 describe('durable project sync queue', () => {
+  it('acknowledges a save in its original scope even after the auth epoch changes', async () => {
+    const db = await getDB()
+    const scopeModule = await import('@/persistence/storage/storageScope')
+    const scope = db.accountStorageScope('epoch-user')
+    scopeModule.setStorageScope(scope)
+    await db.saveProject('project-1', 'Before login', {}, {}, {}, { revision: 4 }, scope)
+    const queued = await db.enqueueProjectSave('project-1', {
+      name: 'Before login',
+      nodes: {},
+      edges: {},
+      patches: {},
+      reports: {},
+    }, 4, scope)
+    const context = scopeModule.captureStorageScopeContext()
+
+    // A relogin (even into the same account) bumps the auth epoch.
+    scopeModule.setStorageScope(scope)
+    expect(scopeModule.isStorageScopeContextCurrent(context)).toBe(false)
+
+    await db.acknowledgeProjectSave(
+      'project-1',
+      queued.generation,
+      5,
+      '2026-01-01T00:00:00.000Z',
+      scope,
+      context,
+    )
+
+    expect(await db.getProjectSyncOperation('project-1', scope)).toBeNull()
+    expect(await db.loadProject('project-1', scope)).toMatchObject({ revision: 5 })
+  })
+
+  it('does not acknowledge into a scope other than the one the context captured', async () => {
+    const db = await getDB()
+    const scopeModule = await import('@/persistence/storage/storageScope')
+    const originalScope = db.accountStorageScope('original-user')
+    const otherScope = db.accountStorageScope('other-user')
+    scopeModule.setStorageScope(otherScope)
+    const context = scopeModule.captureStorageScopeContext()
+    await db.enqueueProjectSave('project-1', {
+      name: 'Mismatched',
+      nodes: {},
+      edges: {},
+      patches: {},
+      reports: {},
+    }, 0, originalScope)
+
+    await db.acknowledgeProjectSave(
+      'project-1',
+      1,
+      1,
+      '2026-01-01T00:00:00.000Z',
+      originalScope,
+      context,
+    )
+
+    expect(await db.getProjectSyncOperation('project-1', originalScope)).toMatchObject({
+      operation: 'save',
+    })
+  })
+
+
   it('keeps a newer generation when an older save is acknowledged', async () => {
     const db = await getDB()
     const scope = db.accountStorageScope('queue-user')
@@ -76,6 +138,22 @@ describe('durable project sync queue', () => {
     })
   })
 
+  it('does not cancel a newer queued delete generation', async () => {
+    const db = await getDB()
+    const scope = db.accountStorageScope('newer-delete-user')
+    db.setStorageScope(scope)
+    const attempted = await db.enqueueProjectDelete('project-1', 4, scope)
+    const newer = await db.enqueueProjectDelete('project-1', 5, scope)
+
+    await db.cancelQueuedProjectDelete('project-1', scope, attempted.generation)
+
+    expect(await db.getProjectSyncOperation('project-1', scope)).toMatchObject({
+      operation: 'delete',
+      generation: newer.generation,
+      expectedRevision: 5,
+    })
+  })
+
   it('replaces a queued payload, its revision and the local project together', async () => {
     const db = await getDB()
     const queue = await import('@/persistence/sync/project/save/projectSyncQueue')
@@ -90,7 +168,7 @@ describe('durable project sync queue', () => {
       reports: {},
     }, 4)
 
-    const replaced = await queue.replaceQueuedProjectSave('project-1', {
+    const replaced = await queue.replaceQueuedProjectSave('project-1', queued.generation, {
       name: 'After merge',
       nodes: { node_1: createMockSourceTableNode('node_1', 'Merged') },
       edges: {},
@@ -135,7 +213,7 @@ describe('durable project sync queue', () => {
       reports: {},
     }
 
-    expect(await queue.replaceQueuedProjectSave('project-1', snapshot, 9)).toBeNull()
+    expect(await queue.replaceQueuedProjectSave('project-1', 1, snapshot, 9)).toBeNull()
     expect(await db.getProjectSyncOperation('project-1')).toMatchObject({
       operation: 'delete',
       expectedRevision: 4,
@@ -144,6 +222,49 @@ describe('durable project sync queue', () => {
       name: 'Delete requested',
       revision: 4,
     })
+  })
+
+  it('does not replace a newer queued generation during conflict recovery', async () => {
+    const db = await getDB()
+    const queue = await import('@/persistence/sync/project/save/projectSyncQueue')
+    const scope = db.accountStorageScope('merge-generation-user')
+    db.setStorageScope(scope)
+    await db.saveProject('project-1', 'Newest edit', {}, {}, {}, { revision: 4 })
+    const attempted = await db.enqueueProjectSave('project-1', {
+      name: 'Attempted edit',
+      nodes: {},
+      edges: {},
+      patches: {},
+      reports: {},
+    }, 4)
+    const newest = await db.enqueueProjectSave('project-1', {
+      name: 'Newest edit',
+      nodes: {},
+      edges: {},
+      patches: {},
+      reports: {},
+    }, 4)
+
+    const replaced = await queue.replaceQueuedProjectSave(
+      'project-1',
+      attempted.generation,
+      {
+        name: 'Stale merge',
+        nodes: {},
+        edges: {},
+        patches: {},
+        reports: {},
+      },
+      9,
+      scope,
+    )
+
+    expect(replaced).toBeNull()
+    expect(await db.getProjectSyncOperation('project-1', scope)).toMatchObject({
+      generation: newest.generation,
+      payload: { name: 'Newest edit' },
+    })
+    expect(await db.loadProject('project-1', scope)).toMatchObject({ name: 'Newest edit' })
   })
 
   it('finalizes a delete atomically with its project and reports', async () => {

@@ -1,11 +1,20 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import request from 'supertest';
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { setupMongoTestDB } from '../../support/setup.js';
 import { createFilesTestApp } from '../../support/filesTestApp.js';
-import { createDefaultMockUser, type MockUser } from '../../support/testApp.js';
+import {
+  createDefaultMockUser,
+  createTestApp,
+  type MockUser,
+} from '../../support/testApp.js';
 import { createTestProject } from '../../support/helpers.js';
 import { User } from '../../../src/models/User.js';
+import { Project } from '../../../src/models/Project.js';
+import {
+  fileReferences,
+  recoverPendingFileDeletes,
+} from '../../../src/services/fileLifecycle.service.js';
 
 setupMongoTestDB();
 
@@ -28,6 +37,7 @@ describe('Files API', () => {
   let app: ReturnType<typeof createFilesTestApp>;
 
   beforeEach(async () => {
+    vi.restoreAllMocks();
     mockUser = createDefaultMockUser();
     app = createFilesTestApp(mockUser);
     await User.create({
@@ -199,6 +209,7 @@ describe('Files API', () => {
 
   describe('DELETE /api/files/:id', () => {
     it('deletes a file owned by the user', async () => {
+      const bulkWrite = vi.spyOn(User, 'bulkWrite');
       const uploadResponse = await uploadSample(app).expect(201);
       const fileId = uploadResponse.body.data.file.id;
 
@@ -206,6 +217,8 @@ describe('Files API', () => {
       expect(response.body.success).toBe(true);
 
       await request(app).get(`/api/files/${fileId}`).expect(404);
+      expect((await User.findById(mockUser.userId))?.storageUsedBytes).toBe(0);
+      expect(bulkWrite).not.toHaveBeenCalled();
     });
 
     it('returns 404 when deleting a non-existent file', async () => {
@@ -241,6 +254,82 @@ describe('Files API', () => {
 
       const response = await request(app).delete(`/api/files/${fileId}`).expect(409);
       expect(response.body.success).toBe(false);
+    });
+
+    it('never commits a project reference to concurrently deleted bytes', async () => {
+      const uploadResponse = await uploadSample(app).expect(201);
+      const fileId = uploadResponse.body.data.file.id;
+      const project = await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+      });
+      const projectApp = createTestApp(mockUser);
+      const nodes = {
+        node1: {
+          id: 'node1',
+          kind: 'source_table',
+          name: 'Node 1',
+          ui: { position: { x: 0, y: 0 } },
+          plan: { fileRef: fileId },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+
+      const [save, deletion] = await Promise.all([
+        request(projectApp)
+          .put(`/api/projects/${project._id}`)
+          .send({ nodes, expectedRevision: project.revision }),
+        request(app).delete(`/api/files/${fileId}`),
+      ]);
+
+      expect([save.status, deletion.status].sort()).toEqual([200, 409]);
+      const retainedProject = await Project.findById(project._id);
+      const referencesFile = fileReferences(retainedProject?.nodes).has(fileId);
+      const fileExists = await mongoose.connection.db?.collection('files.files')
+        .findOne({ _id: new Types.ObjectId(fileId) });
+      expect(referencesFile && !fileExists).toBe(false);
+    });
+
+    it('recovers only unreferenced files left pending by a crash', async () => {
+      const retainedId = (await uploadSample(app, { filename: 'retained.csv' })
+        .expect(201)).body.data.file.id;
+      const orphanId = (await uploadSample(app, { filename: 'orphan.csv' })
+        .expect(201)).body.data.file.id;
+      await createTestProject({
+        userId: new Types.ObjectId(mockUser.userId),
+        nodes: {
+          node1: {
+            id: 'node1',
+            kind: 'source_table',
+            name: 'Node 1',
+            ui: { position: { x: 0, y: 0 } },
+            plan: { fileRef: retainedId },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      });
+      await mongoose.connection.db?.collection('files.files').updateMany(
+        { _id: { $in: [new Types.ObjectId(retainedId), new Types.ObjectId(orphanId)] } },
+        {
+          $set: {
+            'metadata.pendingDelete': {
+              token: 'crashed-delete',
+              markedAt: new Date(),
+            },
+          },
+        },
+      );
+
+      await recoverPendingFileDeletes();
+
+      const retained = await mongoose.connection.db?.collection('files.files')
+        .findOne({ _id: new Types.ObjectId(retainedId) });
+      const orphan = await mongoose.connection.db?.collection('files.files')
+        .findOne({ _id: new Types.ObjectId(orphanId) });
+      expect(retained).not.toBeNull();
+      expect(retained?.metadata?.pendingDelete).toBeUndefined();
+      expect(orphan).toBeNull();
     });
   });
 });

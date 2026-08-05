@@ -6,15 +6,17 @@ import type { ProjectSyncOperation } from '../../../storage/local-db/dbCore'
 import { isNetworkOnline } from '../../session/syncState'
 import { withoutRuntimeNodeState } from '@/state/document/transientProjectState'
 import {
+  captureStorageScopeContext,
   getStorageScope,
   isGuestStorageScope,
+  isStorageScopeContextCurrent,
   scopedStorageKey,
+  type StorageScopeContext,
 } from '../../../storage/storageScope'
 import type { Report } from '@/report/types'
 import {
   acknowledgeProjectSave,
   clearProjectSyncOperation,
-  deleteProjectSnapshot,
   finalizeProjectDelete,
   getProjectSyncOperation,
   listProjectSyncOperations,
@@ -44,6 +46,52 @@ export {
 
 const saveTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 const flushes = new Map<string, Promise<void>>()
+const fallbackFlushTails = new Map<string, Promise<void>>()
+const PROJECT_FLUSH_LOCK_PREFIX = 'table-canvas:project-sync:'
+
+/**
+ * Keyed by the scoped project (not the whole account) so unrelated projects never
+ * wait on each other; same-project flushes still serialize through this same key.
+ */
+async function withFallbackProjectFlushLock(
+  key: string,
+  flush: () => Promise<void>,
+): Promise<void> {
+  const previous = fallbackFlushTails.get(key) ?? Promise.resolve()
+  const current = previous.catch(() => undefined).then(flush)
+  fallbackFlushTails.set(key, current)
+  try {
+    await current
+  } finally {
+    if (fallbackFlushTails.get(key) === current) {
+      fallbackFlushTails.delete(key)
+    }
+  }
+}
+
+async function withProjectFlushLock(
+  key: string,
+  flush: () => Promise<void>,
+): Promise<void> {
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks
+  if (!locks) return withFallbackProjectFlushLock(key, flush)
+
+  let started = false
+  try {
+    await locks.request(
+      `${PROJECT_FLUSH_LOCK_PREFIX}${key}`,
+      { mode: 'exclusive' },
+      async () => {
+        started = true
+        await flush()
+      },
+    )
+  } catch (error) {
+    if (started) throw error
+    console.warn('[Sync] Web Lock unavailable; using tab-local flush serialization:', error)
+    await withFallbackProjectFlushLock(key, flush)
+  }
+}
 
 /**
  * The queued payload holds the reports as they stood when it was enqueued, but report
@@ -67,10 +115,12 @@ async function flushQueuedSave(
   projectId: string,
   scope: string,
   queued: ProjectSyncOperation,
-): Promise<void> {
+  context: StorageScopeContext,
+): Promise<boolean> {
   let pending = await withDurableReports(projectId, scope, queued)
   let merge: MergeNotice | null = null
   for (let attempt = 1; attempt <= MAX_SAVE_ATTEMPTS; attempt += 1) {
+    if (!isStorageScopeContextCurrent(context)) return false
     const payload = pending.payload
     if (!payload) throw new Error('Queued project save has no payload')
     try {
@@ -78,29 +128,60 @@ async function flushQueuedSave(
         ...payload,
         expectedRevision: pending.expectedRevision,
       })
+      // The server already committed this revision. Acknowledge it in its
+      // original scope unconditionally so a later login never re-sends an
+      // already-accepted operation, even if the auth epoch changed while the
+      // request was in flight. The remaining bookkeeping below is safe to skip
+      // once the scope context has moved on.
       await acknowledgeProjectSave(
         projectId,
         pending.generation,
         updated.revision,
         updated.updatedAt,
         scope,
+        context,
       )
-      await captureProjectSyncBase(projectId, updated.revision, payload, scope)
-      await flushHistoryFileCleanup(payload.nodes, scope)
+      if (!isStorageScopeContextCurrent(context)) return false
+      await captureProjectSyncBase(projectId, updated.revision, payload, scope, context)
+      if (!isStorageScopeContextCurrent(context)) return false
+      await flushHistoryFileCleanup(payload.nodes, scope, context)
+      if (!isStorageScopeContextCurrent(context)) return false
       if (merge) notifyProjectMerge({ projectId, ...merge })
-      return
+      return true
     } catch (error) {
+      if (!isStorageScopeContextCurrent(context)) return false
       const recovery = attempt < MAX_SAVE_ATTEMPTS
-        ? await recoverQueuedSave(projectId, scope, pending, error)
+        ? await recoverQueuedSave(projectId, scope, pending, error, context)
         : null
+      if (!isStorageScopeContextCurrent(context)) return false
       if (!recovery) {
+        const current = await getProjectSyncOperation(projectId, scope)
+        if (
+          current?.operation === 'save'
+          && current.generation !== pending.generation
+        ) {
+          pending = await withDurableReports(projectId, scope, current)
+          continue
+        }
         if (error instanceof ApiError && error.statusCode === 409) {
-          await preserveConflictCopy(projectId, payload, scope)
+          const preserved = await preserveConflictCopy(
+            projectId,
+            payload,
+            pending.generation,
+            scope,
+            context,
+          )
+          if (!preserved) return true
         } else if (error instanceof ApiError && error.statusCode === 404) {
-          // Deleted elsewhere: keep queued edits as a conflict copy, then drop the
-          // phantom original so it cannot linger in the local project list.
-          await preserveConflictCopy(projectId, payload, scope)
-          await deleteProjectSnapshot(projectId, scope)
+          const preserved = await preserveConflictCopy(
+            projectId,
+            payload,
+            pending.generation,
+            scope,
+            context,
+            true,
+          )
+          if (!preserved) return true
           await dropProjectSyncBase(projectId, scope)
           publishProjectDeleted(projectId, scope)
           reportProjectSyncError(
@@ -109,45 +190,52 @@ async function flushQueuedSave(
         }
         throw error
       }
-      pending = recovery.operation
+      pending = await withDurableReports(projectId, scope, recovery.operation)
       if (recovery.merge) merge = combineMergeNotices(merge, recovery.merge)
     }
   }
+  return true
 }
 
 async function flushQueuedDelete(
   projectId: string,
   scope: string,
   pending: ProjectSyncOperation,
-): Promise<void> {
+  context: StorageScopeContext,
+): Promise<boolean> {
   try {
     await deleteProject(projectId, pending.expectedRevision)
   } catch (error) {
     if (!(error instanceof ApiError) || error.statusCode !== 404) throw error
   }
+  if (!isStorageScopeContextCurrent(context)) return false
   const deletedNodes = await finalizeProjectDelete(
     projectId,
     pending.generation,
     scope,
+    context,
   )
-  if (!deletedNodes) return
+  if (!isStorageScopeContextCurrent(context)) return false
+  if (!deletedNodes) return true
   publishProjectDeleted(projectId, scope)
   await dropProjectSyncBase(projectId, scope)
-  await deleteUnreferencedLocalFiles(deletedNodes, scope)
+  await deleteUnreferencedLocalFiles(deletedNodes, scope, context)
+  return true
 }
 
 async function flushQueuedOperation(
   projectId: string,
   scope: string,
+  context: StorageScopeContext,
 ): Promise<void> {
   while (true) {
+    if (!isStorageScopeContextCurrent(context)) return
     const pending = await getProjectSyncOperation(projectId, scope)
     if (!pending) return
-    if (pending.operation === 'save') {
-      await flushQueuedSave(projectId, scope, pending)
-    } else {
-      await flushQueuedDelete(projectId, scope, pending)
-    }
+    const completed = pending.operation === 'save'
+      ? await flushQueuedSave(projectId, scope, pending, context)
+      : await flushQueuedDelete(projectId, scope, pending, context)
+    if (!completed) return
     reportProjectSyncError(null)
   }
 }
@@ -155,6 +243,7 @@ async function flushQueuedOperation(
 export async function flushProjectSaveWithSync(
   projectId: string,
   scope = getStorageScope(),
+  context = captureStorageScopeContext(),
 ): Promise<void> {
   const key = scopedStorageKey(scope, projectId)
   const timeout = saveTimeouts.get(key)
@@ -163,13 +252,17 @@ export async function flushProjectSaveWithSync(
   if (
     !isNetworkOnline()
     || isGuestStorageScope(scope)
-    || scope !== getStorageScope()
+    || scope !== context.scope
+    || !isStorageScopeContextCurrent(context)
     || projectId.startsWith('local_')
   ) return
 
   const existing = flushes.get(key)
   if (existing) return existing
-  const flush = flushQueuedOperation(projectId, scope)
+  const flush = withProjectFlushLock(
+    key,
+    () => flushQueuedOperation(projectId, scope, context),
+  )
   flushes.set(key, flush)
   try {
     await flush
@@ -186,11 +279,13 @@ export async function saveProjectWithSync(
   patches: Record<string, Patches>,
   reports: Record<string, Report> = {},
 ): Promise<void> {
-  const scope = getStorageScope()
+  const context = captureStorageScopeContext()
+  const scope = context.scope
   const persistedNodes = withoutRuntimeNodeState(nodes)
   if (isGuestStorageScope(scope) || projectId.startsWith('local_')) {
     await saveProjectLocal(projectId, name, persistedNodes, edges, patches, undefined, scope)
-    await flushHistoryFileCleanup(persistedNodes, scope)
+    if (!isStorageScopeContextCurrent(context)) return
+    await flushHistoryFileCleanup(persistedNodes, scope, context)
     return
   }
   await saveProjectAndEnqueue(
@@ -206,7 +301,7 @@ export async function saveProjectWithSync(
   const existingTimeout = saveTimeouts.get(key)
   if (existingTimeout) clearTimeout(existingTimeout)
   const timeout = setTimeout(() => {
-    void flushProjectSaveWithSync(projectId, scope).catch((error) => {
+    void flushProjectSaveWithSync(projectId, scope, context).catch((error) => {
       console.error('[Sync] Failed to save to backend:', error)
       reportProjectSyncError(
         error instanceof Error ? error.message : 'Project sync failed',
@@ -219,28 +314,38 @@ export async function saveProjectWithSync(
 export interface ProjectSyncConflict {
   projectId: string
   operation: 'save' | 'delete'
+  generation: number
 }
 
 export async function flushAllQueuedProjectSavesWithSync(
   scope = getStorageScope(),
 ): Promise<ProjectSyncConflict[]> {
+  const context = captureStorageScopeContext()
+  if (context.scope !== scope) return []
   const operations = await listProjectSyncOperations(scope)
   const conflicts: ProjectSyncConflict[] = []
   for (const operation of operations) {
     try {
-      await flushProjectSaveWithSync(operation.projectId, scope)
+      await flushProjectSaveWithSync(operation.projectId, scope, context)
     } catch (error) {
       if (error instanceof ApiError && error.statusCode === 409) {
         conflicts.push({
           projectId: operation.projectId,
           operation: operation.operation,
+          generation: operation.generation,
         })
         continue
       }
       // Drop doomed queue entries (e.g. invalid project ids) so one bad sync
       // cannot brick app startup for an otherwise healthy account.
       if (error instanceof ApiError && error.statusCode === 400) {
-        await clearProjectSyncOperation(operation.projectId, scope)
+        if (!isStorageScopeContextCurrent(context)) return conflicts
+        await clearProjectSyncOperation(
+          operation.projectId,
+          scope,
+          operation.generation,
+          context,
+        )
         reportProjectSyncError(
           error.errors?.join(', ') || error.message || 'Project sync failed',
         )

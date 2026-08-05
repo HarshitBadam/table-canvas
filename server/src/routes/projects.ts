@@ -16,6 +16,10 @@ import {
 } from '../services/projectCapacity.js';
 import { validateProjectTierLimits } from '../services/projectPayloadLimits.js';
 import { createApiRateLimit } from '../middleware/apiRateLimit.js';
+import {
+  assertProjectFilesAvailable,
+  withUserFileLifecycleLease,
+} from '../services/fileLifecycle.service.js';
 
 const router = Router();
 
@@ -76,6 +80,7 @@ async function updateOwnedProject(
   userId: string,
   body: Record<string, unknown>,
   tier: Tier,
+  assertLeaseHeld: () => Promise<void>,
 ) {
   validateProjectPayload(body);
   const revision = expectedRevision(body.expectedRevision);
@@ -107,6 +112,11 @@ async function updateOwnedProject(
     tier,
     (updates.patches as Record<string, unknown> | undefined) ?? currentProject.patches,
   );
+  await assertProjectFilesAvailable(
+    userId,
+    (updates.nodes as typeof currentProject.nodes | undefined) ?? currentProject.nodes,
+  );
+  await assertLeaseHeld();
   const project = await Project.findOneAndUpdate(
     {
       ...ownershipFilter,
@@ -133,7 +143,16 @@ async function handleProjectWrite(req: AuthenticatedRequest, res: Response) {
 
   const userDoc = await User.findById(userId);
   const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
-  const project = await updateOwnedProject(projectId, userId, req.body, tier);
+  const project = await withUserFileLifecycleLease(
+    userId,
+    lease => updateOwnedProject(
+      projectId,
+      userId,
+      req.body,
+      tier,
+      () => lease.assertHeld(),
+    ),
+  );
 
   const response: ApiResponse<{ project: IProjectPublic }> = {
     success: true,
@@ -185,15 +204,19 @@ router.post(
     const userDoc = await User.findById(userId);
     const tier: Tier = (userDoc?.tier as Tier) ?? 'google';
     validateProjectTierLimits(nodes ?? {}, tier, patches ?? {});
-    const project = await createProjectWithinCapacity({
-      userId,
-      tier,
-      operationId,
-      name,
-      nodes,
-      edges,
-      patches,
-      reports,
+    const project = await withUserFileLifecycleLease(userId, async lease => {
+      await assertProjectFilesAvailable(userId, nodes);
+      await lease.assertHeld();
+      return createProjectWithinCapacity({
+        userId,
+        tier,
+        operationId,
+        name,
+        nodes,
+        edges,
+        patches,
+        reports,
+      });
     });
 
     const response: ApiResponse<{ project: IProjectPublic }> = {
@@ -249,25 +272,28 @@ router.delete(
     }
 
     const revision = expectedRevision(req.body.expectedRevision);
-    const project = await Project.findOneAndDelete(
-      {
-        _id: new Types.ObjectId(projectId),
-        userId: new Types.ObjectId(userId),
-        deletedAt: null,
-        ...revisionLockFilter(revision),
-      },
-    );
-
-    if (!project) {
-      const existing = await Project.findOne({
-        _id: new Types.ObjectId(projectId),
-        userId: new Types.ObjectId(userId),
-      });
-      if (!existing) throw new NotFoundError('Project');
-      throw new ConflictError(
-        'Project changed in another session. Reload before deleting it.',
+    await withUserFileLifecycleLease(userId, async lease => {
+      await lease.assertHeld();
+      const project = await Project.findOneAndDelete(
+        {
+          _id: new Types.ObjectId(projectId),
+          userId: new Types.ObjectId(userId),
+          deletedAt: null,
+          ...revisionLockFilter(revision),
+        },
       );
-    }
+
+      if (!project) {
+        const existing = await Project.findOne({
+          _id: new Types.ObjectId(projectId),
+          userId: new Types.ObjectId(userId),
+        });
+        if (!existing) throw new NotFoundError('Project');
+        throw new ConflictError(
+          'Project changed in another session. Reload before deleting it.',
+        );
+      }
+    });
 
     const response: ApiResponse = {
       success: true,
