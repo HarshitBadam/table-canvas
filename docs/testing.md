@@ -59,7 +59,7 @@ npm --prefix server run build
 CI=true npm run test:e2e
 ```
 
-`test:coverage` writes HTML to `coverage/index.html`. `test:ux:update` updates reviewed visual baselines. `test:ci` writes JUnit output to `test-results/junit.xml`. `test:release` runs lint, dead-code, frontend/backend coverage, backend typecheck, E2E, and builds.
+`test:coverage` writes HTML to `coverage/index.html`. `test:ux:update` updates reviewed visual baselines. `test:ci` writes JUnit output to `test-results/junit.xml`. `test:release` runs lint, dead-code and cycle checks, frontend/backend coverage, backend typechecking, E2E, both builds, and dependency audits.
 
 Run a single file: `npm run test:run tests/unit/engine/graph/dependencyGraph.test.ts`.
 
@@ -76,23 +76,24 @@ Run a single file: `npm run test:run tests/unit/engine/graph/dependencyGraph.tes
 | Suggestions | `suggestions/engine/suggestionEngine.{analysis,classification,cleaning,detection}.test.ts` |
 | Concurrency | `state/document/document{Lease,Mirror}.test.ts`, `state/document/useDocumentCoordination.test.ts`, `persistence/merge/projectMerge*.test.ts`, `persistence/sync/project/save/projectSaveConflict.test.ts` |
 
-**Backend** (`server/tests/unit/`, mirroring `server/src/`) covers models, project/file routes, Google integration, file service behavior, and limit enforcement.
+**Backend** (`server/tests/unit/`, mirroring `server/src/`) covers configuration, middleware, models, authentication, project/file routes, Google integration, storage and rate-limit services, and payload-limit enforcement.
 
 | Area | Test files |
 |------|------|
 | Project routes | `routes/projects{CreateRead,UpdateDelete,Limits}.test.ts` |
-| File routes | `routes/files.test.ts` |
-| Models and services | `models/*.test.ts`, `services/*.test.ts`, `config/enforce.test.ts` |
+| Authentication and files | `routes/auth.test.ts`, `routes/files.test.ts` |
+| Configuration and middleware | `config/*.test.ts`, `middleware/*.test.ts` |
+| Models and services | `models/*.test.ts`, `services/*.test.ts` |
 
 **E2E**: `e2e/derived-tables.{canvas,interactions,layout}.spec.ts` covers canvas rendering, interactions, and responsive layout. `sample-workbook.spec.ts`, `report-workflow.spec.ts`, `data-workflows.spec.ts`, and `formula-columns.spec.ts` cover persisted import/edit/clean/report workflows. `tab-ownership.spec.ts` drives two real tabs for mirroring, focus handover, and project independence. Specs share helpers in `e2e/derived-tables.support.ts` and `e2e/app.support.ts`.
 
-`e2e/ux/` is the release-blocking UX contract: committed visual baselines, WCAG checks, keyboard/focus behavior, supported viewport geometry, browser-error detection, project switching, canvas joins, production telemetry, bounded DOM/memory use, and main-thread long-task budgets. The exact pass/fail contract is documented in `docs/ux-quality.md`.
+`e2e/ux/` is the release-blocking UX contract: committed visual baselines, WCAG checks, keyboard/focus behavior, supported viewport geometry, browser-error detection, project switching, canvas joins, production telemetry, bounded DOM/memory use, and main-thread long-task budgets.
 
 The well-covered core is the engine (DAG, materialization), the formula parser, filtering, persistence, and the backend routes. React components are only lightly covered; canvas interactions are exercised via E2E.
 
 ## Setup
 
-- **Frontend**: the `jsdom` environment is set in `vitest.config.ts`. Discovery includes `tests/unit/**/*.{test,spec}.{ts,tsx}` and excludes `**/*.scratch.test.ts` (local scratch files are not part of the suite). Coverage instruments `src/**/*.{ts,tsx}`, emits text/HTML/LCOV/JSON reports, and enforces a ratchetable baseline threshold. `tests/support/setup.ts` imports `@testing-library/jest-dom` and enables Immer's MapSet plugin. Persistence tests import `fake-indexeddb/auto` directly (for example, `dbProjectFile.test.ts` and `exportServiceHappy.test.ts`) to run against an in-memory IndexedDB. Shared tab fakes live in `tests/support/fakeTabEnvironment.ts` and are imported via `@test/fakeTabEnvironment`.
+- **Frontend**: the `jsdom` environment is set in `vitest.config.ts`. Discovery includes `tests/unit/**/*.{test,spec}.{ts,tsx}`. Coverage instruments `src/**/*.{ts,tsx}`, emits text/HTML/LCOV/JSON reports, and enforces a ratchetable baseline threshold. `tests/support/setup.ts` imports `@testing-library/jest-dom` and enables Immer's MapSet plugin. Persistence test support loads `fake-indexeddb/auto` to provide an in-memory IndexedDB. Shared tab fakes live in `tests/support/fakeTabEnvironment.ts` and are imported via `@test/fakeTabEnvironment`.
 - **Backend** (`server/tests/support/setup.ts`): in-memory MongoDB via `mongodb-memory-server`, exposed as `setupMongoTestDB()` which test files import and call directly. Backend Vitest discovers `server/tests/unit/**/*.{test,spec}.ts`. Backend test TypeScript is checked with `npm --prefix server run typecheck` (`server/tsconfig.test.json`).
 
 Reset Zustand state in `beforeEach` with `useProjectStore.setState({...})` when a test touches the store.
@@ -101,7 +102,7 @@ Reset Zustand state in `beforeEach` with `useProjectStore.setState({...})` when 
 
 GitHub Actions workflows live in `.github/workflows/`:
 
-- **`ci.yml`**: runs on push/PR to `main` and `develop`. Jobs: lint, typecheck (`tsc --noEmit`), dependency audit, unit tests (with coverage), E2E, build, backend checks (lint, typecheck, build, coverage, dead-code), and the production Compose smoke test. A final gate job fails if any of them fail.
+- **`ci.yml`**: runs on push/PR to `main` and `develop`. Jobs: lint, frontend typecheck (`tsc --noEmit`), dependency audit, unit tests (with coverage), E2E, build, backend checks (including backend typecheck, build, coverage, and dead-code), and the production Compose smoke test. A final gate job fails if any of them fail.
 - **`test-suites.yml`**: manual (`workflow_dispatch`); run a single suite (engine, formula, persistence, suggestions, or e2e) on demand.
 - **`release.yml`**: runs on `v*` tags and repeats the full frontend/backend release checks and production Compose smoke test before building a release.
 

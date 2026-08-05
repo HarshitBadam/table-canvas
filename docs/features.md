@@ -66,7 +66,7 @@ Operators: `+`, `-`, `*`, `/`, `%`, `^`, `=`, `<>`, `>`, `<`, `>=`, `<=`, `AND`,
 
 ## Transforms
 
-Opened from the transform modal when you connect nodes. Six types:
+The transform modal exposes six data transforms:
 
 - **Filter**: keep rows matching conditions, combined with AND or OR. Operators include equals, not equals, contains / not contains, starts/ends with, greater/less than, greater/less-or-equal, between, is null / is not null.
 - **Group & Summarize**: group by columns and aggregate with SUM, AVG, MIN, MAX, COUNT, or COUNT DISTINCT.
@@ -75,7 +75,9 @@ Opened from the transform modal when you connect nodes. Six types:
 - **Calculated column**: add a column from a formula expression (same engine as formula columns).
 - **Union**: stack rows from multiple tables.
 
-No pivot or standalone sort transform.
+The edge type also includes an internal `reference` relationship used to bind
+charts to tables; it is not offered as a data-transform choice. There is no
+pivot or standalone sort transform.
 
 ## Charts
 
@@ -116,18 +118,18 @@ Notion-style rich-text documents (TipTap) that embed live tables and charts (`sr
 
 - **Editing**: headings, bold/italic/underline, lists, code blocks, quotes, callouts, toggles, horizontal rules, plus a slash (`/`) command menu for inserting blocks.
 - **Embedded blocks**: embedded table (references a project table, stays in sync), inline/editable table (static, manually entered), and chart.
-- **Export**: reports are written as HTML into the project ZIP. "Export as PDF" serialises the same stored content into a paged document and prints it through the browser, so text, tables and charts stay vector and selectable.
+- **Export**: reports are written as HTML and PDF into the project ZIP. "Export as PDF" uses pdfmake to generate and download a paged document directly, so text, tables, and charts stay vector and selectable.
 
 ## Persistence
 
-- **Local (IndexedDB)**: projects auto-save: graph (nodes/edges/patches), imported files, cached results, and reports. Everything lives locally by default. Records are keyed by storage scope (`guest:<id>` or `account:<userId>`).
+- **Local (IndexedDB)**: projects auto-save their graph (nodes/edges/patches), imported files, reports, and durable sync queues. Materialized DuckDB results and dirty/compute flags remain per-tab runtime state and are rebuilt when needed. Records are keyed by storage scope (`guest:<id>` or `account:<userId>`).
 - **Server sync**: when connected to the backend, the project graph (nodes, edges, patches) and its reports sync to MongoDB on save. Files are stored in GridFS and fetched on load.
-- **Concurrency**: one tab writes a project at a time and other tabs mirror it live; editing follows focus. Conflicting saves from another device merge on the client (see [Reliability](reliability.md)).
+- **Concurrency**: one tab writes a project at a time and other tabs mirror it live in read-only mode until the owner closes or releases the document. Focus does not transfer ownership. Conflicting saves from another device merge on the client (see [Reliability](reliability.md)).
 - **Cross-tab auth**: account cookies are origin-shared for new/reloaded tabs; guest choice remains tab-local. Explicit sign-out revokes the shared account session, while guest tabs remain isolated. Catalog and document updates use `BroadcastChannel` (auth React state is not broadcast). See [Cross-tab authentication and session](reliability.md#cross-tab-authentication-and-session).
 
 ## Export
 
-- **Project** (`.tablecanvas.zip`): `project.tablecanvas.json` (full state with base64-encoded source files), `data.xlsx` (every table as a sheet), and `reports/*.html`. Self-contained.
+- **Project** (`.tablecanvas.zip`): `project.tablecanvas.json` (full state with base64-encoded source files), `data.xlsx` (every table as a sheet), and `reports/*.html` plus `reports/*.pdf`. Self-contained.
 - **Data**: all tables are included as sheets in `data.xlsx` inside the project ZIP.
 
 ## Keyboard shortcuts

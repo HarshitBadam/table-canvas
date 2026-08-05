@@ -9,13 +9,17 @@ Backend availability does not choose the user's mode in production. The login pa
 
 ## Storage scopes
 
-IndexedDB records are keyed by an owner scope (`guest:<id>` per guest tab partition, or `account:<user id>`). Records from one account are never returned while another scope is active. Records written by the old unscoped schema (and the legacy `guest` partition) are quarantined or migrated because their owner cannot be assumed. They remain available for an explicit recovery tool or support migration, but are never exposed automatically to a guest or another account.
+IndexedDB records are keyed by an owner scope (`guest:<id>` per guest tab partition, or `account:<user id>`). Records from one account are never returned while another scope is active. The legacy `guest` partition is migrated automatically to a scoped guest id. Older unscoped records are quarantined and never exposed automatically to a guest or another account; there is currently no user-facing recovery UI for them.
 
 ## Document ownership
 
 Write ownership is per document, not per browser. A document is the pair of owner scope and project id, and the Web Locks API grants exactly one tab the right to write it. Other tabs open the same document read-only, mirror the owner's changes live over a BroadcastChannel, and stay fully navigable — pan, zoom, scroll, switch views, read reports. Two tabs on different projects both edit normally. No tab is ever refused the workspace.
 
-Editing follows attention. A reading tab claims the document after 400ms of sustained focus, or immediately when the reader presses "Edit here". The outgoing owner flushes its pending save before releasing, so handover cannot strand work in a tab that is about to stop writing. If that flush fails, the owner keeps the document and the requesting tab says so rather than taking over silently — a tab never loses ownership while its own persistence is broken. Closing or discarding a tab releases the document to the next waiting tab.
+Focus and visibility never transfer ownership. Mirror tabs remain read-only while
+the writer holds the Web Lock; there is no forced-takeover control. Closing or
+unmounting the owner releases the document, and the next waiting tab adopts
+the latest durable snapshot before becoming writable. If adoption fails, it
+stays read-only and retries rather than writing stale state.
 
 Only the owner writes. Per-tab compute state — materialization progress, cache counts, derived schema — lives outside the document in a runtime store, so a mirroring tab can materialize and browse tables locally without its results reaching IndexedDB, the server, or the owner's document.
 
@@ -27,7 +31,7 @@ After sign-in, local guest and account-offline projects are promoted with stable
 2. upload local file references;
 3. save the revisioned project and reports remotely;
 4. cache the server project in the account scope;
-5. copy reports to the server project id;
+5. re-key local report records to the server project id;
 6. delete the source project and reports.
 
 Failures leave the source data intact and retries resolve to the same server project. File uploads use stable idempotency keys, so retries cannot consume quota with duplicate blobs. Offline and conflict-copy projects use the same path, and an active local workspace is remapped to its server id before editing resumes.
@@ -54,7 +58,7 @@ Two known losses are deliberate, because closing them needs a server-side clock 
 
 Every `updatedAt` is a client wall clock. A device whose clock is wrong can win an arbitration it should have lost, and the merge succeeds — the conflict-copy fallback only catches merges that *fail*, not merges that resolve wrongly. The exposure is bounded to fields that genuinely collided on two devices, and reports are exempt because their loser survives as a "(recovered)" copy.
 
-Autosave coalesces bursts — cell values, node positions, report text — into one write roughly every 800ms, so a crash inside that window loses the last keystrokes rather than the last edit. Adding or removing a table or a connection is written immediately, and every intentional exit is flushed first: tab hide, `pagehide`, and handing editing to another tab.
+Autosave coalesces bursts — cell values, node positions, report text — into one write roughly every 800ms, so a crash inside that window loses the last keystrokes rather than the last edit. Adding or removing a table or a connection is written immediately, and tab hide and `pagehide` flush pending work.
 
 ## Authentication contract
 
@@ -98,7 +102,7 @@ Rate-limit counters live in MongoDB rather than a dedicated cache. A second stat
 | --- | --- | --- | --- |
 | Sign-in, registration, Google sign-in | 15 min | 20 | address |
 | Token refresh | 15 min | 120 | address |
-| Project create, update, delete, restore | 5 min | 300 | account |
+| Project create, update, delete | 5 min | 300 | account |
 | File upload | 15 min | 60 | account |
 | File download | 15 min | 300 | account |
 
@@ -112,7 +116,11 @@ Clients that exceed a limit receive HTTP 429. Queued project operations survive 
 
 Uploads validate project ownership before writing. Storage is reserved atomically on the user record, so concurrent uploads cannot exceed the tier quota. Failed uploads release their reservation; deletion releases used bytes. Server startup raises legacy counters to at least the bytes present in GridFS without temporarily zeroing live counters during rolling restarts.
 
-Project deletion is revisioned and soft: files remain restorable and continue to count toward quota until permanent purge. Direct file deletion is rejected while the owning project or any other active project can reference the file. Browser-cache garbage collection removes only files no remaining local project references.
+Project deletion is revision-checked and permanent; there is no restore route.
+Files are separate resources and become eligible for direct/client cleanup
+after no active project references them. Direct file deletion is rejected
+while any active project references the file. Browser-cache garbage collection
+removes only files that no remaining local project references.
 
 ## Error monitoring
 
@@ -120,7 +128,15 @@ Error reporting is optional in every environment. Without `SENTRY_DSN` the backe
 
 The backend reports only failures it did not anticipate: HTTP 5xx responses, uncaught exceptions, and unhandled rejections. Expected 4xx answers — validation, authentication, conflicts, quota, throttling — are normal API behaviour and are never reported. Each event carries the request method, the matched route pattern rather than the concrete path, the status code, and the account id. Request bodies, headers, cookies, addresses, and email addresses are excluded.
 
-The browser reports uncaught errors, unhandled rejections, and React error-boundary failures, and only from production builds. Every error passes through one collector in `src/observability/frontendTelemetry.ts` that truncates messages and stacks, and drops repeats of the same failure within five seconds, so a render loop cannot flood the project. The SDK's own window hooks are disabled to keep that path single. Errors raised before the SDK chunk loads are held in a bounded backlog and flushed once it arrives; if the chunk is blocked, reporting is abandoned and the app continues.
+The browser reports uncaught errors, unhandled rejections, and React
+error-boundary failures in production, or in development when
+`VITE_ENABLE_FRONTEND_TELEMETRY=true`. Every error passes through one collector
+in `src/observability/frontendTelemetry.ts` that truncates messages and stacks,
+and drops repeats of the same failure within five seconds, so a render loop
+cannot flood the project. The SDK's own window hooks are disabled to keep that
+path single. Errors raised before the SDK chunk loads are held in a bounded
+backlog and flushed once it arrives; if the chunk is blocked, reporting is
+abandoned and the app continues.
 
 Core Web Vitals are deliberately not sent anywhere. They are buffered on `window.__tableCanvasTelemetry` to enforce the performance budget asserted by the UX end-to-end suite, which needs neither a collector nor a sampling quota.
 

@@ -114,20 +114,15 @@ Run from the repository root:
 ```bash
 npm ci
 npm --prefix server ci
-npm run lint
-npm run check:dead-code
-npm run test:coverage
-npm --prefix server run lint
-npm --prefix server run typecheck
-npm --prefix server run test:coverage
-npm run test:e2e
-npx tsc -p e2e/tsconfig.json --noEmit
-npm run build
-npm --prefix server run build
-npm audit --omit=dev
-npm --prefix server audit --omit=dev
+npm run test:release
 npm run test:production
 ```
+
+`test:release` runs frontend lint, dead-code and cycle checks, frontend and
+backend coverage, backend typechecking, E2E tests, both production builds, and
+dependency audits (critical findings for the frontend and moderate findings
+for the backend). The tag-based release workflow then runs the production
+Compose smoke test separately.
 
 Deploy the backend first, verify `/api/ready`, then promote the Vercel deployment. Rollback by restoring the previous backend release and promoting the previous Vercel deployment. Database changes must remain backward compatible across that window.
 

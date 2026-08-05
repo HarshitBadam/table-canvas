@@ -25,10 +25,15 @@ Adds auth and server-side persistence.
 ```bash
 npm run docker:up            # MongoDB + backend + frontend
 npm run docker:up:attached   # same, but attached so you see logs
-npm run docker:seed          # optional sample data
+npm run docker:seed          # reset local users and recreate the demo user
 npm run docker:down          # stop, keep data
 npm run docker:down:volumes  # stop and wipe data
 ```
+
+`docker:up` automatically resets users in the local Docker database and creates
+`demo@tablecanvas.app` with password `1234`. `docker:up:attached` does not run
+that seed step. Never run the seed command against a database containing data
+you need to keep.
 
 | Service | URL |
 |---------|-----|
@@ -40,7 +45,7 @@ npm run docker:down:volumes  # stop and wipe data
 
 ```bash
 # Terminal 1: MongoDB (needs a local install, or use a hosted cluster instead)
-mongod --dbpath ./data/db
+mkdir -p ./data/db && mongod --dbpath ./data/db
 
 # Terminal 2: backend
 cd server && npm install && npm run dev
@@ -58,12 +63,14 @@ mongodb+srv://user:password@cluster.mongodb.net/table-canvas?retryWrites=true&w=
                                                ^^^^^^^^^^^^ required
 ```
 
-Give each environment its own database name so local work never writes where production reads. One cluster is fine; the separation is the database name.
+The local defaults use `table-canvas`. If local and production share a cluster,
+give production a different database name so local work never writes where
+production reads.
 
-| Environment | Database |
-|-------------|----------|
-| Local development | `table-canvas-dev` |
-| Production | `table-canvas` |
+| Environment | Example database |
+|-------------|------------------|
+| Local development | `table-canvas` |
+| Production | `table-canvas-prod` |
 
 A hosted cluster works for local development, but check two things in its console first. Network access provisioned by a platform integration is often open to `0.0.0.0/0`; narrow it once the backend has a stable address. And an integration's generated user is usually a cluster administrator, so create a separate user scoped to the application database for the server to use.
 
@@ -76,7 +83,7 @@ Only needed when running the backend. In local mode you can skip all of this.
 **Frontend**: `.env.local` in the project root:
 
 ```env
-VITE_API_URL=http://localhost:5173/api
+VITE_API_URL=/api
 VITE_AUTO_GUEST=false
 ```
 
@@ -102,7 +109,7 @@ GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
 **Frontend**: also add the same Google client ID in the project-root `.env`:
 
 ```env
-VITE_API_URL=http://localhost:5173/api
+VITE_API_URL=/api
 VITE_GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com
 ```
 
