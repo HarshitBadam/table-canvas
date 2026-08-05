@@ -263,6 +263,22 @@ describe('documentLease', () => {
     expect(await tab.canDeleteDocument(KEY, true)).toBe(true)
   })
 
+  it('blocks cross-tab deletion through presence messages when Web Locks are unavailable', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true })
+    const owner = await openTab()
+    owner.startDocumentLease({ key: KEY })
+    const other = await openTab()
+    const action = vi.fn()
+
+    expect(await other.canDeleteDocument(KEY, false)).toBe(false)
+    expect(await other.withInactiveDocumentDeleteGuard(KEY, action)).toEqual({
+      acquired: false,
+    })
+    expect(action).not.toHaveBeenCalled()
+    owner.stopDocumentLease()
+  })
+
   it('treats omitted lock snapshot lists as empty when probing deletes', async () => {
     const tab = await openTab()
     vi.spyOn(locks, 'query').mockImplementation(async () => ({} as never))
