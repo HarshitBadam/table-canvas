@@ -162,7 +162,7 @@ export const createNodesSlice: StateCreator<
     const existingNodes = Object.values(state.nodes)
     const defaultPosition = {
       x: existingNodes.length > 0
-        ? Math.max(...existingNodes.map(n => n.ui.position.x)) + 300
+        ? Math.max(...existingNodes.map(n => n.ui.position.x)) + 380
         : 100,
       y: 100,
     }

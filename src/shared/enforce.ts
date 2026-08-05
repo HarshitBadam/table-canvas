@@ -29,7 +29,6 @@ function formatBytes(bytes: number): string {
 }
 
 export function checkFileSize(fileBytes: number, tier: Tier): LimitCheck {
-  if (tier === 'google') return { ok: true }
   const { maxFileSizeBytes } = getLimits(tier)
   if (fileBytes <= maxFileSizeBytes) return { ok: true }
   return {

@@ -27,7 +27,10 @@ import {
   hasUnexportedActivity,
   markProjectActive,
 } from '@/layout/project-controls/projectActivity'
-import { canDeleteDocument } from '../../document/documentLease'
+import {
+  canDeleteDocument,
+  withInactiveDocumentDeleteGuard,
+} from '../../document/documentLease'
 import {
   cloneProjectContents,
   nextDuplicateName,
@@ -197,8 +200,9 @@ export function useProjectActions({
     if (index < 0) throw new ProjectActionError('not-found', 'Project not found.')
     const isActive = projectId === state.projectId
     try {
+      const documentKey = scopedStorageKey(getStorageScope(), projectId)
       const canDelete = await canDeleteDocument(
-        scopedStorageKey(getStorageScope(), projectId),
+        documentKey,
         isActive,
       )
       if (!canDelete) {
@@ -207,11 +211,22 @@ export function useProjectActions({
           'This project is open in another tab and can’t be deleted right now.',
         )
       }
+      const performDelete = async () => {
+        await deleteProjectWithSync(projectId)
+      }
       if (isActive) {
         await flushProjectSave()
         await useReportStore.getState().flushSaves()
+        await performDelete()
+      } else {
+        const result = await withInactiveDocumentDeleteGuard(documentKey, performDelete)
+        if (!result.acquired) {
+          throw new ProjectActionError(
+            'open-elsewhere',
+            'This project is open in another tab and can’t be deleted right now.',
+          )
+        }
       }
-      await deleteProjectWithSync(projectId)
       clearProjectActivity(getStorageScope(), projectId)
       if (isActive) await clearActiveWorkspace()
       setState(previous => ({

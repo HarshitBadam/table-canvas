@@ -326,12 +326,18 @@ export async function deleteProjectWithSync(projectId: string): Promise<void> {
     return
   }
 
-  await enqueueProjectDelete(
-    projectId,
-    localProject?.revision ?? 0,
-    scope,
-  )
-  publishProjectDeleted(projectId, scope)
+  let expectedRevision = localProject?.revision ?? 0
+  if (isNetworkOnline()) {
+    try {
+      const remoteProject = await getProject(projectId)
+      expectedRevision = remoteProject.revision
+    } catch (error) {
+      const alreadyDeleted = error instanceof ApiError && error.statusCode === 404
+      if (!alreadyDeleted && !isRetryableRemoteDeferral(error)) throw error
+    }
+  }
+
+  await enqueueProjectDelete(projectId, expectedRevision, scope)
   if (isNetworkOnline()) {
     try {
       await flushProjectSaveWithSync(projectId, scope)
@@ -346,7 +352,7 @@ export async function deleteProjectWithSync(projectId: string): Promise<void> {
   }
   const deletedNodes = await deleteProjectSnapshot(projectId, scope)
   await dropProjectSyncBase(projectId, scope)
-  publishCatalogChanged(scope)
+  publishProjectDeleted(projectId, scope)
   if (deletedNodes) await deleteUnreferencedLocalFiles(deletedNodes, scope)
 }
 

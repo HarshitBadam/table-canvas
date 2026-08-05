@@ -157,7 +157,8 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null)
-  const fittedNodeKeyRef = useRef('')
+  const fittedProjectRef = useRef<string | null | undefined>(undefined)
+  const visibleNodeIdsRef = useRef<Set<string>>(new Set())
   const dragStartRef = useRef<{ id: string; position: { x: number; y: number } } | null>(null)
 
   useLayoutEffect(() => {
@@ -168,16 +169,31 @@ export function CanvasView({ onNodeDoubleClick: onNodeDoubleClickProp }: CanvasV
   useLayoutEffect(() => {
     if (!flowInstance || nodes.length === 0) return
 
-    const nodeKey = `${projectId}:${nodes.map(node => node.id).sort().join('|')}`
-    if (fittedNodeKeyRef.current === nodeKey) return
-    fittedNodeKeyRef.current = nodeKey
+    const currentNodeIds = new Set(nodes.map(node => node.id))
+    if (fittedProjectRef.current !== projectId) {
+      fittedProjectRef.current = projectId
+      visibleNodeIdsRef.current = currentNodeIds
+      void flowInstance.fitView({
+        padding: 0.08,
+        maxZoom: 1.1,
+        duration: 0,
+      })
+      return
+    }
 
+    const addedNodes = nodes.filter(node => !visibleNodeIdsRef.current.has(node.id))
+    visibleNodeIdsRef.current = currentNodeIds
+    if (addedNodes.length === 0) return
+
+    const target = addedNodes.find(node => node.id === selectedNodeId)
+      ?? addedNodes[addedNodes.length - 1]
     void flowInstance.fitView({
-      padding: 0.08,
-      maxZoom: 1.1,
-      duration: 0,
+      nodes: [target],
+      padding: 0.35,
+      maxZoom: 1,
+      duration: 180,
     })
-  }, [flowInstance, nodes, projectId])
+  }, [flowInstance, nodes, projectId, selectedNodeId])
 
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {

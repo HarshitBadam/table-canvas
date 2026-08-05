@@ -225,6 +225,36 @@ describe('documentLease', () => {
     owner.stopDocumentLease()
   })
 
+  it('holds deletion guards through an inactive project delete', async () => {
+    const tab = await openTab()
+    const action = vi.fn(async () => {
+      expect(locks.isHeld(openName(KEY))).toBe(true)
+      expect(locks.isHeld(leaseName(KEY))).toBe(true)
+      return 'deleted'
+    })
+
+    const result = await tab.withInactiveDocumentDeleteGuard(KEY, action)
+
+    expect(result).toEqual({ acquired: true, value: 'deleted' })
+    expect(action).toHaveBeenCalledTimes(1)
+    expect(locks.isHeld(openName(KEY))).toBe(false)
+    expect(locks.isHeld(leaseName(KEY))).toBe(false)
+  })
+
+  it('does not start an inactive delete while another tab has the project open', async () => {
+    const owner = await openTab()
+    owner.startDocumentLease({ key: KEY })
+    await settleTabs()
+    const other = await openTab()
+    const action = vi.fn()
+
+    const result = await other.withInactiveDocumentDeleteGuard(KEY, action)
+
+    expect(result).toEqual({ acquired: false })
+    expect(action).not.toHaveBeenCalled()
+    owner.stopDocumentLease()
+  })
+
   it('assumes a single tab and allows deletion when Web Locks are unavailable', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true })

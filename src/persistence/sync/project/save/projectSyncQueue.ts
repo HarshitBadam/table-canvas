@@ -181,7 +181,7 @@ export async function enqueueProjectDelete(
     ownerId: scope,
     projectId,
     generation,
-    expectedRevision: existing?.expectedRevision ?? expectedRevision,
+    expectedRevision,
     operation: 'delete',
     updatedAt: now,
   }
