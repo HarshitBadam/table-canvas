@@ -8,7 +8,7 @@ Computation happens client-side in DuckDB-WASM. The optional server only handles
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐    │
 │  │   React UI  │  │   Zustand   │  │      IndexedDB      │    │
 │  │ (Canvas,    │◄─┤   Stores    │◄─┤ (Projects, Files,   │    │
-│  │  Grid, etc.)│  │             │  │      Reports)       │    │
+│  │  Grid, etc.)│  │             │  │ Reports, Sync Queue)│    │
 │  └──────┬──────┘  └──────┬──────┘  └─────────────────────┘    │
 │         │                │                                    │
 │         │         ┌──────▼───────┐                            │
@@ -72,7 +72,7 @@ interface Edge {
 
 ### Cycle detection
 
-Before an edge is created, the graph is checked for cycles with a reachability test (`src/engine/graph/dependencyGraph.ts`). A self-loop, or a target that can already reach the source, is rejected and the connection is blocked.
+Before an edge is created, the graph is checked for cycles with a reachability test (`src/engine/graph/dependencyGraphCycle.ts`, re-exported by `dependencyGraph.ts`). A self-loop, or a target that can already reach the source, is rejected and the connection is blocked.
 
 ### Computation order
 
@@ -87,15 +87,15 @@ Zustand stores, with Immer for immutable updates. State is split by subdomain un
 | App session | `app-session/` | Boot, auth (`useAuthState`), autosave, project actions, catalog reconcile |
 | Document | `document/` | Per-document identity, write lease, mirror invalidation |
 | Project helpers | `project/` | Load/create/duplicate lifecycle |
-| Runtime | `runtime/` | Per-tab compute coordination (not persisted) |
+| Runtime | `runtime/`, `tableRuntimeStore.ts` | Per-tab compute coordination and cache/dirty state (not persisted) |
 | Graph slices | `stores/` | `nodesSlice`, `edgesSlice`, `patchesSlice`, `historySlice`, `selectionSlice`, column ops |
 
 Other stores:
 
 - **`projectStore`**: composed graph state from `stores/`
 - **`dataStore`**: temporary in-memory rows while importing/editing; DuckDB is authoritative for materialized rows
-- **`tableRuntimeStore`**: per-tab cache/dirty/compute flags kept out of the persisted document
-- **`profilingStore`** (`src/lib/profiling/`): per-column profiles
+- **`useTableRuntimeStore`**: per-tab cache/dirty/compute flags kept out of the persisted document
+- **`useProfilingStore`** (`src/lib/profiling/`): per-column profiles
 - **`suggestionsStore`** (`src/suggestions/panel/state/`): analysis/cleaning suggestions
 - **`reportStore`** (`src/report/`): report documents
 
@@ -103,7 +103,7 @@ Other stores:
 
 ### Dirty propagation
 
-Editing a source cell updates its patches and marks the node plus every downstream descendant dirty (`cacheInfo.isDirty = true`). Dirty tables are recomputed the next time they're needed.
+Editing a source cell updates its patches and marks the node plus every downstream descendant dirty in `useTableRuntimeStore`. These flags are not persisted on project nodes. Dirty tables are recomputed the next time they're needed.
 
 ### Cross-tab session vs document coordination
 
@@ -129,7 +129,7 @@ Main thread                Worker thread
 
 1. Dedupe: an `inProgressMaterializations` map prevents duplicate concurrent requests.
 2. Resolve the computation order (topological sort).
-3. Materialize each node in order; the queue chains promises so execution stays sequential.
+3. Materialize each node in order; `materializationCoordinator.ts` serializes engine mutations through a promise queue.
 4. Update cache info.
 
 ### Cache invalidation
@@ -138,7 +138,7 @@ Version hashes decide whether cached data is stale:
 
 ```typescript
 // source table
-hash = simpleHash(`source:${tableId}:${fileRef}:${patchVersion}`)
+hash = simpleHash(`source:${tableId}:${fileRef}:${patchVersion}:${schemaFingerprint}`)
 
 // derived table
 hash = simpleHash(`derived:${tableId}:${transformDefJson}:${upstreamHashes}`)
@@ -152,7 +152,9 @@ When a table is opened, the profiler (`src/lib/profiling/`) computes per-column 
 
 ## Transforms
 
-Six transform types (`TransformType` in `src/types/transform.types.ts`). Each has its own definition shape:
+`TransformType` in `src/types/transform.types.ts` contains six user-facing data
+transforms plus an internal `reference` edge used to bind charts to tables.
+Each data transform has its own definition shape:
 
 ### filter
 ```typescript
@@ -194,6 +196,10 @@ Stacks rows from multiple tables.
 { type: 'union', sourceTableIds: string[] }
 ```
 
+### reference
+Internal chart-to-table relationship. It records dependency/lineage and is not
+offered in the transform modal.
+
 ## Persistence
 
 Client persistence is organized under `src/persistence/`:
@@ -208,30 +214,36 @@ Client persistence is organized under `src/persistence/`:
 
 ### IndexedDB
 
-Development uses the clean `table-canvas-v2` database with a single schema version. Earlier development databases are intentionally not migrated. Records are keyed by owner scope (`guest:<id>` or `account:<userId>`).
+The `table-canvas-v2` database is currently schema version 3. Upgrades migrate
+supported versions in place; the legacy guest partition is also migrated to a
+scoped guest id. Records are keyed by owner scope (`guest:<id>` or
+`account:<userId>`).
 
-```typescript
-interface TableCanvasDB {
-  projects: {
-    key: string
-    value: { id, name, nodes, edges, patches, createdAt, updatedAt }
-    indexes: { 'by-updated': string }
-  }
-  files: {
-    key: string
-    value: { id, name, type, data: ArrayBuffer, createdAt }
-  }
-  reports: {
-    key: string
-    value: Report
-    indexes: { 'by-updated': string }
-  }
-}
-```
+The database has five stores:
+
+- `projects` — owner-scoped project snapshots and server revisions;
+- `files` — owner-scoped source bytes and metadata;
+- `reports` — owner/project-scoped report documents;
+- `projectSync` — durable queued project operations;
+- `projectSyncBase` — the last server-acknowledged snapshot used for
+  three-way conflict merges.
+
+Materialized DuckDB rows and cache/dirty flags are runtime state, not IndexedDB
+records.
 
 ### Server sync
 
-When the backend is available, `syncService` (`src/persistence/sync/session/syncService.ts`) saves local changes through the API to MongoDB and loads them back on startup. Saves carry the revision they were based on and the server applies them only if it still matches, so a save built on stale data is rejected rather than allowed to overwrite newer work. A rejection is resolved on the client by `projectMerge`, which merges the last acknowledged base, the local payload, and the current server state entity by entity, and retries the save against the fresh revision. Only an unmergeable conflict falls back to keeping the local work as a separate conflict copy. When the backend is unreachable, all of this is skipped and the app stays purely local.
+When the backend is available, session sync orchestration uses the project save
+queue under `src/persistence/sync/project/save/`, file sync, and the
+`syncService.ts` re-export barrel to persist through the API and load state on
+startup. Saves carry the revision they were based on and the server applies
+them only if it still matches, so a save built on stale data is rejected rather
+than allowed to overwrite newer work. A rejection is resolved on the client by
+`projectMerge`, which merges the last acknowledged base, the local payload,
+and the current server state entity by entity, and retries the save against the
+fresh revision. Only an unmergeable conflict falls back to keeping the local
+work as a separate conflict copy. When the backend is unreachable, all of this
+is skipped and the app stays purely local.
 
 Within one browser, `documentLease` gives a single tab the right to write a given project while `documentMirror` invalidates readers over `BroadcastChannel` (readers reload from IndexedDB). `projectCatalog` fans out create/rename/delete within a storage scope the same way. See [Reliability](reliability.md) for the ownership and merge contract in full.
 
@@ -250,8 +262,8 @@ Optional backend under `server/src/`:
 
 | Path | Role |
 |------|------|
-| `routes/` | Auth, projects, files, health |
-| `services/` | Google auth, storage quota, rate-limit store, files |
+| `index.ts`, `routes/` | Health/readiness plus auth, project, and file routes |
+| `services/` | Auth/Google, files and lifecycle, leases, project capacity/payload limits, storage quota, rate-limit store |
 | `models/` | Mongoose models |
 | `middleware/` | Auth, CSRF, rate limits, errors |
 | `config/`, `observability/`, `types/` | Env/enforce, Sentry, shared types |
@@ -266,6 +278,7 @@ Exporting a project bundles everything into a self-contained ZIP:
 project.tablecanvas.json   # full state, with base64-encoded source files
 data.xlsx                  # every table as a sheet
 reports/*.html             # reports as HTML
+reports/*.pdf              # reports as PDF
 ```
 
 All tables are included as individual sheets in `data.xlsx` inside the ZIP.

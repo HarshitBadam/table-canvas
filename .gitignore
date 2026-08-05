@@ -21,6 +21,10 @@ playwright-report/
 blob-report/
 test-results/
 .nyc_output/
+**/*.scratch.test.ts
+
+# Local/manual data fixtures
+data/*.csv
 
 # Logs
 logs/

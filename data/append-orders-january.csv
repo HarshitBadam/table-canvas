@@ -1,6 +1,0 @@
-order_id,customer,region,order_date,items,total
-1001,Avery Patel,North,2026-01-03,3,124.50
-1002,Jordan Lee,West,2026-01-07,1,42.00
-1003,Sam Rivera,East,2026-01-12,5,318.75
-1004,Morgan Chen,South,2026-01-19,2,89.90
-1005,Taylor Brooks,North,2026-01-28,4,204.00

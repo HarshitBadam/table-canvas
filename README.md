@@ -6,6 +6,8 @@ Everything persists locally in IndexedDB. There's also an optional Express + Mon
 
 > Built solo. Core technical pieces: DuckDB-WASM for in-browser SQL, a reactive DAG compute engine, and a ReactFlow canvas. No server required.
 
+**Live app:** [table-canvas.vercel.app](https://table-canvas.vercel.app)
+
 ## Quick start
 
 Frontend only. No Docker, no database, no config.
@@ -20,10 +22,12 @@ Open `http://localhost:3000` and choose **Continue as guest** for a browser-loca
 For the full stack (auth + sync) with Docker:
 
 ```bash
-npm run docker:up      # MongoDB + backend + frontend
-npm run docker:seed    # optional sample data
+npm run docker:up      # MongoDB + backend + frontend; creates the demo user
 npm run docker:down    # stop
 ```
+
+`docker:up` resets the local Docker users and creates `demo@tablecanvas.app`
+with password `1234`. Run `npm run docker:seed` only to reset that demo user again.
 
 See [docs/setup.md](docs/setup.md) for environment variables and the manual backend setup.
 
@@ -52,12 +56,14 @@ See [docs/setup.md](docs/setup.md) for environment variables and the manual back
 
 | Layer              | Technology             | Purpose                                    |
 | ------------------ | ---------------------- | ------------------------------------------ |
-| UI                 | React 18 + TypeScript  | Component architecture and type safety     |
+| UI                 | React 18, TypeScript, Tailwind CSS | Components, type safety, and styling |
+| Routing            | React Router           | Client-side application routes             |
 | Engine             | DuckDB-WASM            | In-browser SQL execution (in a Web Worker) |
 | State              | Zustand + Immer        | DAG state and immutable updates            |
 | Canvas             | ReactFlow + Dagre      | Node graph and auto-layout                 |
 | Charts             | Recharts               | Bar / line / pie / scatter                 |
-| Reports            | TipTap                 | Notion-style rich-text editor              |
+| Reports            | TipTap + pdfmake       | Rich-text editing and PDF export           |
+| Grid               | TanStack Virtual       | Windowed rendering for large tables        |
 | Persistence        | IndexedDB (`idb`)      | Local storage, offline-capable             |
 | Parsing/Export     | PapaParse, xlsx, JSZip | CSV/Excel import and project export        |
 | Backend (optional) | Express + MongoDB      | Auth and cross-device sync                 |
@@ -67,7 +73,7 @@ See [docs/setup.md](docs/setup.md) for environment variables and the manual back
 ```
 src/
 ├── api/             # HTTP client for the optional backend
-├── auth/            # Login and early-access pages
+├── auth/            # Login, Google sign-in, and legal dialogs
 ├── canvas/          # ReactFlow canvas, nodes, transform modals
 ├── charts/          # Chart builder + renderers
 ├── components/      # Shared UI (import, theme, banners)
@@ -105,7 +111,7 @@ server/
     └── support/     # Mongo memory server and route helpers
 e2e/                 # Playwright end-to-end tests
 docs/                # Architecture, reliability, API, testing
-data/                # Sample datasets
+data/                # Workbook fixture used by tests
 scripts/             # Docker and production smoke helpers
 ```
 
@@ -124,6 +130,8 @@ npm run test             # Frontend unit tests (watch)
 npm run test:run         # Frontend unit tests once
 npm run test:coverage    # Frontend coverage report
 npm run test:e2e         # Playwright E2E
+npm run test:all         # Frontend unit + E2E tests
+npm run test:release     # Full frontend/backend release gate
 npm run test:production  # Isolated production Docker smoke test
 
 npm --prefix server run lint
@@ -132,8 +140,11 @@ npm --prefix server run build
 npm --prefix server run test
 
 npm run docker:up        # Full stack (Docker)
+npm run docker:up:attached # Full stack with attached logs; does not auto-seed
+npm run docker:logs      # Follow frontend/backend logs
 npm run docker:down      # Stop the stack
-npm run docker:seed      # Seed sample data
+npm run docker:down:volumes # Stop and erase Docker data
+npm run docker:seed      # Reset local Docker users and recreate the demo user
 ```
 
 See [docs/testing.md](docs/testing.md) for domain suites, release checks, and E2E details.
