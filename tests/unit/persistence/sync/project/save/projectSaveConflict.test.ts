@@ -210,7 +210,7 @@ describe('save conflicts resolved by merging', () => {
     expect(await db.getProjectSyncOperation('project-1', scope)).toBeNull()
   })
 
-  it('gives up after three attempts and keeps the conflict copy safety net', async () => {
+  it('stops merging when the retry no longer matches the captured base revision', async () => {
     const { db, scope, sync, ApiError } = await queueSave(
       'capped-user',
       snapshot({ node_1: node('node_1') }),
@@ -223,8 +223,63 @@ describe('save conflicts resolved by merging', () => {
     await expect(sync.flushProjectSaveWithSync('project-1', scope))
       .rejects.toMatchObject({ statusCode: 409 })
 
-    expect(api.updateProject).toHaveBeenCalledTimes(3)
+    expect(api.updateProject).toHaveBeenCalledTimes(2)
     expect(await conflictCopyName(db, scope)).toBe('Quarterly (conflict copy)')
+  })
+
+  it('rejects a merge base captured for a different revision', async () => {
+    const local = snapshot({ node_1: node('node_1') })
+    const { db, scope, syncBase, sync, ApiError } = await queueSave(
+      'stale-base-user',
+      local,
+      4,
+      snapshot({}),
+    )
+    await syncBase.putProjectSyncBase('project-1', 3, snapshot({}), scope)
+    api.updateProject.mockRejectedValue(new ApiError('Conflict', 409))
+
+    await expect(sync.flushProjectSaveWithSync('project-1', scope))
+      .rejects.toMatchObject({ statusCode: 409 })
+
+    expect(api.getProject).not.toHaveBeenCalled()
+    expect(await conflictCopyName(db, scope)).toBe('Quarterly (conflict copy)')
+  })
+
+  it('restarts from a newer generation queued while merge recovery is awaiting', async () => {
+    const { db, scope, sync, ApiError } = await queueSave(
+      'newer-generation-user',
+      snapshot({ node_1: node('node_1') }),
+      4,
+      snapshot({}),
+    )
+    let resolveServer!: (value: ReturnType<typeof serverProject>) => void
+    api.getProject.mockImplementation(() => new Promise(resolve => {
+      resolveServer = resolve
+    }))
+    acceptSave()
+    api.updateProject.mockRejectedValueOnce(new ApiError('Conflict', 409))
+
+    const flush = sync.flushProjectSaveWithSync('project-1', scope)
+    await vi.waitFor(() => expect(api.getProject).toHaveBeenCalledTimes(1))
+    await db.saveProjectAndEnqueue(
+      'project-1',
+      'Newest edit',
+      { node_2: node('node_2') },
+      {},
+      {},
+      {},
+      scope,
+    )
+    resolveServer(serverProject(snapshot({ node_3: node('node_3') }), 5))
+    await flush
+
+    expect(api.updateProject).toHaveBeenCalledTimes(2)
+    expect(api.updateProject.mock.calls[1][1]).toMatchObject({
+      name: 'Newest edit',
+      nodes: { node_2: { id: 'node_2' } },
+    })
+    expect(await db.getProjectSyncOperation('project-1', scope)).toBeNull()
+    expect(await conflictCopyName(db, scope)).toBeUndefined()
   })
 })
 
@@ -249,6 +304,43 @@ describe('saves against a project deleted elsewhere', () => {
     expect(await syncBase.getProjectSyncBase('project-1', scope)).toBeNull()
     const remaining = await db.listProjects(scope)
     expect(remaining.some(project => project.id === 'project-1')).toBe(false)
+  })
+
+  it('does not let an older 404 delete a newer queued snapshot', async () => {
+    const { db, scope, sync, ApiError } = await queueSave(
+      'newer-after-404-user',
+      snapshot({ node_1: node('node_1') }),
+      4,
+      snapshot({}),
+    )
+    let rejectAttempt!: (error: unknown) => void
+    api.updateProject.mockImplementationOnce(() => new Promise((_, reject) => {
+      rejectAttempt = reject
+    }))
+    acceptSave()
+
+    const flush = sync.flushProjectSaveWithSync('project-1', scope)
+    await vi.waitFor(() => expect(api.updateProject).toHaveBeenCalledTimes(1))
+    await db.saveProjectAndEnqueue(
+      'project-1',
+      'Newest after delete',
+      { node_2: node('node_2') },
+      {},
+      {},
+      {},
+      scope,
+    )
+    rejectAttempt(new ApiError('Project not found', 404))
+    await flush
+
+    expect(api.updateProject).toHaveBeenCalledTimes(2)
+    expect(api.updateProject.mock.calls[1][1]).toMatchObject({
+      name: 'Newest after delete',
+    })
+    expect(await db.loadProject('project-1', scope)).toMatchObject({
+      name: 'Newest after delete',
+    })
+    expect(await conflictCopyName(db, scope)).toBeUndefined()
   })
 })
 

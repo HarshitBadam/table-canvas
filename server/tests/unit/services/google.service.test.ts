@@ -66,6 +66,39 @@ describe('POST /api/auth/google', () => {
     expect(res.body.data.user.refreshTokens).toBeUndefined();
   });
 
+  it('converges concurrent first Google logins on one user', async () => {
+    let verifiedCount = 0;
+    let releaseVerification!: () => void;
+    const bothVerified = new Promise<void>((resolve) => {
+      releaseVerification = resolve;
+    });
+    mockedVerify.mockImplementation(async () => {
+      verifiedCount += 1;
+      if (verifiedCount === 2) releaseVerification();
+      await bothVerified;
+      return {
+        googleId: 'g-concurrent',
+        email: 'concurrent-google@example.com',
+        name: 'Concurrent Google User',
+      };
+    });
+    const createSpy = vi.spyOn(User, 'create');
+
+    try {
+      const responses = await Promise.all([
+        request(app).post('/api/auth/google').send({ credential: 'tok-1' }),
+        request(app).post('/api/auth/google').send({ credential: 'tok-2' }),
+      ]);
+
+      expect(createSpy).toHaveBeenCalledTimes(2);
+      expect(responses.map(response => response.status)).toEqual([200, 200]);
+      expect(responses[0].body.data.user.id).toBe(responses[1].body.data.user.id);
+      expect(await User.countDocuments({ googleId: 'g-concurrent' })).toBe(1);
+    } finally {
+      createSpy.mockRestore();
+    }
+  });
+
   it('returns the same user on repeat Google login', async () => {
     mockedVerify.mockResolvedValue({
       googleId: 'g-repeat',

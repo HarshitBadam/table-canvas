@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockProject } from '@/persistence/sync/session/syncServiceTestSupport'
 import { ApiError } from '@/api/client'
-
 const mocks = vi.hoisted(() => ({
   listProjects: vi.fn(), getProject: vi.fn(), createProject: vi.fn(),
   updateProject: vi.fn(), deleteProject: vi.fn(), saveProjectLocal: vi.fn(),
@@ -18,7 +17,6 @@ const mocks = vi.hoisted(() => ({
   cancelQueuedProjectDelete: vi.fn(),
   deleteProjectSnapshot: vi.fn(),
 }))
-
 vi.mock('@/api/projects.api', () => ({
   listProjects: () => mocks.listProjects(),
   getProject: (id: string) => mocks.getProject(id),
@@ -38,10 +36,9 @@ vi.mock('@/persistence/sync/project/save/projectSyncQueue', () => ({
   cancelQueuedProjectDelete: (...args: unknown[]) => mocks.cancelQueuedProjectDelete(...args),
   deleteProjectSnapshot: (...args: unknown[]) => mocks.deleteProjectSnapshot(...args),
 }))
-
 vi.mock('@/persistence/storage/local-db/db', () => ({
   saveProject: (...args: unknown[]) => mocks.saveProjectLocal(...args),
-  loadProject: (id: string) => mocks.loadProjectLocal(id),
+  loadProject: (...args: unknown[]) => mocks.loadProjectLocal(...args),
   listProjects: (scope?: string) => mocks.listProjectsLocal(scope),
   deleteProject: (...args: unknown[]) => mocks.deleteProjectLocal(...args),
   updateProjectRevision: (...args: unknown[]) => mocks.updateProjectRevision(...args),
@@ -52,13 +49,11 @@ vi.mock('@/persistence/storage/local-db/reportStorage', () => ({
   loadReportsForProject: (...args: unknown[]) => mocks.loadReportsForProject(...args),
   replaceReportsForProject: vi.fn(),
 }))
-
 import {
   fetchProjects, flushProjectSaveWithSync, loadProjectWithSync,
   saveProjectWithSync,
 } from '@/persistence/sync/session/syncService'
 import { accountStorageScope, setStorageScope } from '@/persistence/storage/storageScope'
-
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
@@ -132,7 +127,6 @@ beforeEach(() => {
   }))
   setStorageScope(accountStorageScope('test-user'))
 })
-
 afterEach(() => {
   vi.useRealTimers()
   window.dispatchEvent(new Event('online'))
@@ -220,9 +214,27 @@ describe('loadProjectWithSync', () => {
       patches: {},
     })
     const result = await loadProjectWithSync('proj_123')
-    expect(mockLoadProjectLocal).toHaveBeenCalledWith('proj_123')
+    expect(mockLoadProjectLocal).toHaveBeenCalledWith(
+      'proj_123',
+      accountStorageScope('test-user'),
+    )
     expect(result?.name).toBe('Local Cached Project')
     expect(result).not.toBeNull()
+  })
+  it('does not cache a remote project after the auth epoch changes', async () => {
+    let resolveRemote!: (project: ReturnType<typeof createMockProject>) => void
+    mockGetProject.mockImplementation(() => new Promise(resolve => {
+      resolveRemote = resolve
+    }))
+
+    const loading = loadProjectWithSync('proj_123')
+    await Promise.resolve()
+    await Promise.resolve()
+    setStorageScope(accountStorageScope('test-user'))
+    resolveRemote(createMockProject('proj_123', 'Previous session'))
+
+    await expect(loading).resolves.toBeNull()
+    expect(mockSaveProjectLocal).not.toHaveBeenCalled()
   })
   it('does not load stale local data after an authorization failure', async () => {
     mockGetProject.mockRejectedValue(new ApiError('Forbidden', 403))

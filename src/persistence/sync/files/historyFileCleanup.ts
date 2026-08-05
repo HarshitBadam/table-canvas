@@ -2,8 +2,10 @@ import type { ProjectNode } from '@/types'
 import { listProjects, loadProject } from '../../storage/local-db/db'
 import { deleteFileWithSync } from './fileSync'
 import {
-  getStorageScope,
+  captureStorageScopeContext,
   isGuestStorageScope,
+  isStorageScopeContextCurrent,
+  type StorageScopeContext,
 } from '../../storage/storageScope'
 import { isNetworkOnline } from '../session/syncState'
 
@@ -33,8 +35,9 @@ export function queueHistoryFileCleanup(scope: string, refs: Iterable<string>): 
 export async function flushHistoryFileCleanup(
   liveNodes: Record<string, ProjectNode>,
   scope: string,
+  context: StorageScopeContext = captureStorageScopeContext(),
 ): Promise<void> {
-  if (scope !== getStorageScope()) return
+  if (scope !== context.scope || !isStorageScopeContextCurrent(context)) return
   const candidates = candidatesByScope.get(scope)
   if (!candidates?.size) return
   if (!isGuestStorageScope(scope) && !isNetworkOnline()) return
@@ -49,14 +52,18 @@ export async function flushHistoryFileCleanup(
       isGuestStorageScope(scope)
       && await isReferencedByLocalProject(fileId, scope)
     ) {
+      if (!isStorageScopeContextCurrent(context)) return
       candidates.delete(fileId)
       continue
     }
+    if (!isStorageScopeContextCurrent(context)) return
     try {
       await deleteFileWithSync(
         fileId,
         isGuestStorageScope(scope) ? undefined : { strictRemote: true },
+        context,
       )
+      if (!isStorageScopeContextCurrent(context)) return
       candidates.delete(fileId)
     } catch (error) {
       console.warn('[history] Deferred unreferenced file cleanup:', error)

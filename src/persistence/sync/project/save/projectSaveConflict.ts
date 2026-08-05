@@ -1,10 +1,17 @@
 import { getProject } from '@/api/projects.api'
 import { ApiError } from '@/api/client'
-import type { ProjectSnapshot, ProjectSyncOperation } from '../../../storage/local-db/dbCore'
+import type { ProjectSyncOperation } from '../../../storage/local-db/dbCore'
 import { mergeProjectSnapshots } from '../../../merge/projectMerge'
 import { getProjectSyncBase, remoteProjectSnapshot } from './projectSyncBase'
-import { replaceQueuedProjectSave } from './projectSyncQueue'
+import {
+  getProjectSyncOperation,
+  replaceQueuedProjectSave,
+} from './projectSyncQueue'
 import type { ProjectMergeEvent } from '../../session/syncNotifications'
+import {
+  isStorageScopeContextCurrent,
+  type StorageScopeContext,
+} from '../../../storage/storageScope'
 
 export const MAX_SAVE_ATTEMPTS = 3
 const DEFAULT_RETRY_DELAY_MS = 1_000
@@ -45,15 +52,23 @@ export async function recoverQueuedSave(
   scope: string,
   pending: ProjectSyncOperation,
   error: unknown,
+  context: StorageScopeContext,
 ): Promise<QueuedSaveRetry | null> {
   if (!(error instanceof ApiError) || !pending.payload) return null
   if (error.statusCode === 429) {
     await delay(retryAfterDelayMs(error))
-    return { operation: pending, merge: null }
+    if (!isStorageScopeContextCurrent(context)) return null
+    const current = await getProjectSyncOperation(projectId, scope)
+    if (!isStorageScopeContextCurrent(context)) return null
+    if (current && current.operation !== 'save') return null
+    return {
+      operation: current ?? pending,
+      merge: null,
+    }
   }
   if (error.statusCode !== 409) return null
   try {
-    return await mergeQueuedSave(projectId, scope, pending.payload)
+    return await mergeQueuedSave(projectId, scope, pending, context)
   } catch (mergeError) {
     console.error('[Sync] Automatic merge failed:', mergeError)
     return null
@@ -63,24 +78,29 @@ export async function recoverQueuedSave(
 async function mergeQueuedSave(
   projectId: string,
   scope: string,
-  local: ProjectSnapshot,
+  pending: ProjectSyncOperation,
+  context: StorageScopeContext,
 ): Promise<QueuedSaveRetry | null> {
-  const [base, server] = await Promise.all([
-    getProjectSyncBase(projectId, scope),
-    getProject(projectId),
-  ])
+  if (!pending.payload) return null
+  const base = await getProjectSyncBase(projectId, scope)
+  if (!isStorageScopeContextCurrent(context)) return null
+  if (!base || base.revision !== pending.expectedRevision) return null
+  const server = await getProject(projectId)
+  if (!isStorageScopeContextCurrent(context)) return null
   const outcome = mergeProjectSnapshots({
-    base: base?.snapshot ?? null,
-    local,
+    base: base.snapshot,
+    local: pending.payload,
     server: remoteProjectSnapshot(server),
   })
   if (outcome.status !== 'merged') return null
 
   const operation = await replaceQueuedProjectSave(
     projectId,
+    pending.generation,
     outcome.snapshot,
     server.revision ?? 0,
     scope,
+    context,
   )
   if (!operation) return null
   return {

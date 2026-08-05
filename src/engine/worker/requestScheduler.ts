@@ -22,6 +22,8 @@ type ScheduledRequest = {
 export class WorkerRequestScheduler {
   private queue: ScheduledRequest[] = []
   private running = false
+  private activeRequestId: string | null = null
+  private cancelledMutationIds = new Set<string>()
   private readonly handle: (request: WorkerRequest) => Promise<void>
 
   constructor(handle: (request: WorkerRequest) => Promise<void>) {
@@ -41,6 +43,18 @@ export class WorkerRequestScheduler {
     void this.pump()
   }
 
+  cancelMutation(requestId: string): boolean {
+    const isScheduled = this.activeRequestId === requestId
+      || this.queue.some(entry => entry.request.id === requestId)
+    if (!isScheduled) return false
+    this.cancelledMutationIds.add(requestId)
+    return true
+  }
+
+  isMutationCancelled(requestId: string): boolean {
+    return this.cancelledMutationIds.has(requestId)
+  }
+
   /**
    * Allow queued reads to run between mutation batches (e.g. INSERT chunks).
    * Mutations stay exclusive; only reads are drained mid-flight.
@@ -48,7 +62,11 @@ export class WorkerRequestScheduler {
   async flushPendingReads(): Promise<void> {
     while (this.queue.length > 0 && this.queue[0].isRead) {
       const next = this.queue.shift()!
-      await this.handle(next.request)
+      try {
+        await this.handle(next.request)
+      } finally {
+        this.cancelledMutationIds.delete(next.request.id)
+      }
     }
   }
 
@@ -58,7 +76,13 @@ export class WorkerRequestScheduler {
     try {
       while (this.queue.length > 0) {
         const next = this.queue.shift()!
-        await this.handle(next.request)
+        this.activeRequestId = next.request.id
+        try {
+          await this.handle(next.request)
+        } finally {
+          this.cancelledMutationIds.delete(next.request.id)
+          this.activeRequestId = null
+        }
       }
     } finally {
       this.running = false

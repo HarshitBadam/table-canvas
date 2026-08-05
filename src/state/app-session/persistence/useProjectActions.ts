@@ -28,7 +28,7 @@ import {
   markProjectActive,
 } from '@/layout/project-controls/projectActivity'
 import {
-  canDeleteDocument,
+  withActiveDocumentDeleteGuard,
   withInactiveDocumentDeleteGuard,
 } from '../../document/documentLease'
 import {
@@ -37,6 +37,10 @@ import {
   ProjectActionError,
   toProjectActionError,
 } from '../../project/projectOperations'
+import {
+  bumpActiveProjectGeneration,
+  serializeProjectOperation,
+} from './projectOperationSerializer'
 
 interface Options {
   state: AppProviderState
@@ -63,9 +67,13 @@ export function useProjectActions({
       throw new ProjectActionError('busy', 'Another project action is already in progress.')
     }
     operationInFlight.current = true
+    // Any new user-initiated action means the active project may be about to
+    // change; long-running background work (reconnect sync) checks this before
+    // committing so a user switch always wins over a stale result.
+    bumpActiveProjectGeneration()
     setState(previous => ({ ...previous, isProjectOperationPending: true }))
     try {
-      return await operation()
+      return await serializeProjectOperation(operation)
     } finally {
       operationInFlight.current = false
       setState(previous => ({ ...previous, isProjectOperationPending: false }))
@@ -201,31 +209,21 @@ export function useProjectActions({
     const isActive = projectId === state.projectId
     try {
       const documentKey = scopedStorageKey(getStorageScope(), projectId)
-      const canDelete = await canDeleteDocument(
-        documentKey,
-        isActive,
-      )
-      if (!canDelete) {
+      const performDelete = async () => {
+        await deleteProjectWithSync(projectId)
+      }
+      const result = isActive
+        ? await withActiveDocumentDeleteGuard(documentKey, async () => {
+          await flushProjectSave()
+          await useReportStore.getState().flushSaves()
+          await performDelete()
+        })
+        : await withInactiveDocumentDeleteGuard(documentKey, performDelete)
+      if (!result.acquired) {
         throw new ProjectActionError(
           'open-elsewhere',
           'This project is open in another tab and can’t be deleted right now.',
         )
-      }
-      const performDelete = async () => {
-        await deleteProjectWithSync(projectId)
-      }
-      if (isActive) {
-        await flushProjectSave()
-        await useReportStore.getState().flushSaves()
-        await performDelete()
-      } else {
-        const result = await withInactiveDocumentDeleteGuard(documentKey, performDelete)
-        if (!result.acquired) {
-          throw new ProjectActionError(
-            'open-elsewhere',
-            'This project is open in another tab and can’t be deleted right now.',
-          )
-        }
       }
       clearProjectActivity(getStorageScope(), projectId)
       if (isActive) await clearActiveWorkspace()

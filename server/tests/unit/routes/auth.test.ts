@@ -88,14 +88,43 @@ describe('Auth API session lifecycle', () => {
 
     expect(calls.map(call => call.status).sort()).toEqual([200, 401]);
     const loser = calls.find(call => call.status === 401);
-    const loserCookies = loser?.headers['set-cookie'];
-    expect(
-      Array.isArray(loserCookies) ? loserCookies.join('; ') : loserCookies,
-    ).toContain('refresh_token=;');
+    expect(loser?.headers['set-cookie']).toBeUndefined();
     const refreshed = await User.findById(user.id);
     expect(refreshed?.refreshTokens).toHaveLength(1);
     expect(refreshed?.refreshTokens[0].tokenHash)
       .not.toBe(hashRefreshToken(refreshToken));
+  });
+
+  it('does not clear cookies for an invalid refresh JWT', async () => {
+    // A stale/invalid token failure must never clear cookies: another tab's
+    // concurrent login or refresh may have already installed valid ones for
+    // this same browser, and this response could land after that one.
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', 'refresh_token=not-a-valid-jwt')
+      .expect(401);
+
+    expect(response.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('does not clear cookies for a refresh token that no longer matches any session', async () => {
+    // Same rationale for the CAS-loser path: the token was valid JWT-wise but
+    // no longer matches a stored session (already rotated by a winner).
+    const user = await User.create({
+      email: 'stale-cas@example.com',
+      name: 'Stale CAS User',
+      passwordHash: await hashPassword('SecurePass1'),
+    });
+    const staleRefreshToken = generateRefreshToken(user.id, user.email);
+    // Intentionally do not persist this token, simulating a token that was
+    // already rotated out from under this request.
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', `refresh_token=${staleRefreshToken}`)
+      .expect(401);
+
+    expect(response.headers['set-cookie']).toBeUndefined();
   });
 
   it('does not resurrect a rotated token during concurrent login', async () => {

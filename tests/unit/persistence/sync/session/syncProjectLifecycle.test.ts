@@ -316,8 +316,17 @@ describe('deleteProjectWithSync', () => {
 
   it('hard-deletes local-only projects without calling the backend', async () => {
     await deleteProjectWithSync('local_123')
-    expect(mocks.deleteProjectSnapshot).toHaveBeenCalledWith('local_123', accountScope)
-    expect(mocks.clearProjectSyncOperation).toHaveBeenCalledWith('local_123', accountScope)
+    expect(mocks.deleteProjectSnapshot).toHaveBeenCalledWith(
+      'local_123',
+      accountScope,
+      expect.objectContaining({ scope: accountScope }),
+    )
+    expect(mocks.clearProjectSyncOperation).toHaveBeenCalledWith(
+      'local_123',
+      accountScope,
+      undefined,
+      expect.objectContaining({ scope: accountScope }),
+    )
     expect(mocks.enqueueProjectDelete).not.toHaveBeenCalled()
     expect(mocks.deleteProject).not.toHaveBeenCalled()
   })
@@ -366,6 +375,8 @@ describe('deleteProjectWithSync', () => {
     expect(mocks.cancelQueuedProjectDelete).toHaveBeenCalledWith(
       'proj_123',
       accountScope,
+      1,
+      expect.objectContaining({ scope: accountScope }),
     )
   })
 })

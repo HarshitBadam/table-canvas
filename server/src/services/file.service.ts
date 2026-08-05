@@ -62,6 +62,7 @@ export async function findFileByOperationId(
   const file = await db.collection('files.files').findOne({
     'metadata.userId': userId,
     'metadata.clientOperationId': operationId,
+    'metadata.pendingDelete': { $exists: false },
   });
   if (!file) return null;
   return {
@@ -117,6 +118,7 @@ export async function downloadFile(
 
   const fileDoc = await db.collection('files.files').findOne({
     _id: new mongo.ObjectId(fileId),
+    'metadata.pendingDelete': { $exists: false },
   });
 
   if (!fileDoc) {
@@ -137,9 +139,10 @@ export async function downloadFile(
   };
 }
 
-export async function deleteFile(
+export async function deletePendingFile(
   fileId: string,
-  userId: string
+  userId: string,
+  pendingToken: string,
 ): Promise<number | null> {
   const gridFS = getGridFSBucket();
   const db = mongoose.connection.db;
@@ -150,13 +153,13 @@ export async function deleteFile(
 
   const fileDoc = await db.collection('files.files').findOne({
     _id: new mongo.ObjectId(fileId),
+    'metadata.userId': userId,
+    'metadata.pendingDelete.token': pendingToken,
+  }, {
+    projection: { length: 1 },
   });
 
   if (!fileDoc) {
-    return null;
-  }
-
-  if (fileDoc.metadata?.userId !== userId) {
     return null;
   }
 
@@ -173,7 +176,10 @@ export async function listUserFiles(userId: string): Promise<UploadedFile[]> {
   }
 
   const files = await db.collection('files.files')
-    .find({ 'metadata.userId': userId })
+    .find({
+      'metadata.userId': userId,
+      'metadata.pendingDelete': { $exists: false },
+    })
     .sort({ uploadDate: -1 })
     .toArray();
 
@@ -200,6 +206,7 @@ export async function getFileMetadata(
   const fileDoc = await db.collection('files.files').findOne({
     _id: new mongo.ObjectId(fileId),
     'metadata.userId': userId,
+    'metadata.pendingDelete': { $exists: false },
   });
 
   if (!fileDoc) {
@@ -215,11 +222,15 @@ export async function getFileMetadata(
   };
 }
 
-/** Returns true when the GridFS file exists and belongs to the user. */
+export interface FileLifecycleMetadata {
+  size: number;
+  pendingDeleteToken?: string;
+}
+
 export async function getFileLifecycleMetadata(
   fileId: string,
   userId: string,
-): Promise<boolean> {
+): Promise<FileLifecycleMetadata | null> {
   const db = mongoose.connection.db;
   if (!db) throw new Error('Database connection not established');
   const file = await db.collection('files.files').findOne(
@@ -227,7 +238,60 @@ export async function getFileLifecycleMetadata(
       _id: new mongo.ObjectId(fileId),
       'metadata.userId': userId,
     },
-    { projection: { _id: 1 } },
+    {
+      projection: {
+        length: 1,
+        'metadata.pendingDelete.token': 1,
+      },
+    },
   );
-  return file != null;
+  if (!file) return null;
+  const pendingDeleteToken = file.metadata?.pendingDelete?.token;
+  return {
+    size: file.length,
+    pendingDeleteToken: typeof pendingDeleteToken === 'string'
+      ? pendingDeleteToken
+      : undefined,
+  };
+}
+
+export async function markFilePendingDelete(
+  fileId: string,
+  userId: string,
+  token: string,
+): Promise<boolean> {
+  const db = mongoose.connection.db;
+  if (!db) throw new Error('Database connection not established');
+  const result = await db.collection('files.files').updateOne(
+    {
+      _id: new mongo.ObjectId(fileId),
+      'metadata.userId': userId,
+    },
+    {
+      $set: {
+        'metadata.pendingDelete': {
+          token,
+          markedAt: new Date(),
+        },
+      },
+    },
+  );
+  return result.matchedCount === 1;
+}
+
+export async function clearPendingFileDelete(
+  fileId: string,
+  userId: string,
+  token: string,
+): Promise<void> {
+  const db = mongoose.connection.db;
+  if (!db) throw new Error('Database connection not established');
+  await db.collection('files.files').updateOne(
+    {
+      _id: new mongo.ObjectId(fileId),
+      'metadata.userId': userId,
+      'metadata.pendingDelete.token': token,
+    },
+    { $unset: { 'metadata.pendingDelete': '' } },
+  );
 }

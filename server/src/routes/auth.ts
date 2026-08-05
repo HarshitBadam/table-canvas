@@ -197,7 +197,9 @@ router.post(
 
     const payload = verifyRefreshToken(refreshToken);
     if (!payload) {
-      clearAuthCookies(res);
+      // Do not clear cookies here: a concurrent login/refresh from another tab
+      // may have already installed newer, valid cookies for this same browser.
+      // Clearing them now would log out a session this request knows nothing about.
       throw new AuthenticationError('Invalid or expired refresh token');
     }
 
@@ -224,7 +226,8 @@ router.post(
       { new: true },
     );
     if (!user) {
-      clearAuthCookies(res);
+      // Same rationale as above: a CAS loser must not clear cookies that the
+      // winning request (or a concurrent login) may have just installed.
       throw new AuthenticationError('Refresh token not found or expired');
     }
 
@@ -271,13 +274,28 @@ router.post(
           'An account already uses this email. Sign in with its password before linking Google.',
         );
       }
-      user = await User.create({
-        email: googleInfo.email.toLowerCase().trim(),
-        name: googleInfo.name,
-        googleId: googleInfo.googleId,
-        avatarUrl: googleInfo.avatarUrl,
-        tier: 'google',
-      });
+      try {
+        user = await User.create({
+          email: googleInfo.email.toLowerCase().trim(),
+          name: googleInfo.name,
+          googleId: googleInfo.googleId,
+          avatarUrl: googleInfo.avatarUrl,
+          tier: 'google',
+        });
+      } catch (err) {
+        if ((err as { code?: number }).code !== 11000) throw err;
+
+        user = await User.findOne({ googleId: googleInfo.googleId });
+        if (!user) {
+          const concurrentPasswordAccount = await User.findByEmail(googleInfo.email);
+          if (concurrentPasswordAccount) {
+            throw new ConflictError(
+              'An account already uses this email. Sign in with its password before linking Google.',
+            );
+          }
+          throw err;
+        }
+      }
     } else {
       if (googleInfo.avatarUrl) {
         user = await User.findByIdAndUpdate(

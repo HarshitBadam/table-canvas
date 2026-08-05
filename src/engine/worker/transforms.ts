@@ -133,7 +133,9 @@ export async function countCombinedTransformRows(
 
 export async function executeTransform(
   conn: duckdb.AsyncDuckDBConnection,
-  transformDef: TransformDef & { outputTableId: string; columnIdToName?: Record<string, string> }
+  transformDef: TransformDef & { outputTableId: string; columnIdToName?: Record<string, string> },
+  onMutationCheckpoint?: () => Promise<void>,
+  onFinalizeCommit?: () => Promise<void>,
 ): Promise<TransformResult> {
   const { outputTableId, columnIdToName = {} } = transformDef
   const outputTableName = sanitizeTableName(outputTableId)
@@ -267,45 +269,63 @@ export async function executeTransform(
       throw new Error(`Unknown transform type: ${(transformDef as TransformDef).type}`)
   }
 
-  await conn.query(`DROP TABLE IF EXISTS "${outputTableName}"`)
-  await conn.query(sql)
-  await conn.query(
-    `ALTER TABLE "${outputTableName}" ADD COLUMN "${INTERNAL_ROW_ID_COLUMN}" VARCHAR`
-  )
-  await conn.query(
-    `UPDATE "${outputTableName}"
-     SET "${INTERNAL_ROW_ID_COLUMN}" = 'row_' || CAST(rowid AS VARCHAR)`
-  )
+  if (onMutationCheckpoint) await onMutationCheckpoint()
+  await conn.query('BEGIN TRANSACTION')
+  try {
+    await conn.query(`DROP TABLE IF EXISTS "${outputTableName}"`)
+    await conn.query(sql)
+    if (onMutationCheckpoint) await onMutationCheckpoint()
+    await conn.query(
+      `ALTER TABLE "${outputTableName}" ADD COLUMN "${INTERNAL_ROW_ID_COLUMN}" VARCHAR`
+    )
+    await conn.query(
+      `UPDATE "${outputTableName}"
+       SET "${INTERNAL_ROW_ID_COLUMN}" = 'row_' || CAST(rowid AS VARCHAR)`
+    )
+    if (onMutationCheckpoint) await onMutationCheckpoint()
 
-  const schemaResult = await conn.query(`DESCRIBE "${outputTableName}"`)
-  const schemaData = schemaResult.toArray().filter(
-    (col: { column_name: string }) => col.column_name !== INTERNAL_ROW_ID_COLUMN,
-  )
+    const schemaResult = await conn.query(`DESCRIBE "${outputTableName}"`)
+    const schemaData = schemaResult.toArray().filter(
+      (col: { column_name: string }) => col.column_name !== INTERNAL_ROW_ID_COLUMN,
+    )
 
-  const countResult = await conn.query(`SELECT COUNT(*) as cnt FROM "${outputTableName}"`)
-  const rowCount = Number(countResult.toArray()[0]?.cnt ?? 0)
+    const countResult = await conn.query(`SELECT COUNT(*) as cnt FROM "${outputTableName}"`)
+    const rowCount = Number(countResult.toArray()[0]?.cnt ?? 0)
 
-  const previewResult = await conn.query(`SELECT * FROM "${outputTableName}" LIMIT 20`)
-  const preview = previewResult.toArray().map(row => {
-    const obj: Record<string, CellValue> = {}
-    for (const key of Object.keys(row)) {
-      if (key !== INTERNAL_ROW_ID_COLUMN) obj[key] = row[key] as CellValue
-    }
-    return obj
-  })
+    const previewResult = await conn.query(`SELECT * FROM "${outputTableName}" LIMIT 20`)
+    const preview = previewResult.toArray().map(row => {
+      const obj: Record<string, CellValue> = {}
+      for (const key of Object.keys(row)) {
+        if (key !== INTERNAL_ROW_ID_COLUMN) obj[key] = row[key] as CellValue
+      }
+      return obj
+    })
+    // The only point that may irrevocably commit: replaces the final
+    // checkpoint-before-COMMIT gap with a handshake that cannot race the
+    // caller's timeout (see `finalizeCommit` in engine.worker.ts).
+    if (onFinalizeCommit) await onFinalizeCommit()
+    await conn.query('COMMIT')
 
-  return {
-    tableId: outputTableId,
-    schema: {
-      columns: schemaData.map((col: { column_name: string; column_type: string; null: string }) => ({
-        id: col.column_name,
-        name: col.column_name,
-        type: mapDuckDBTypeToApp(col.column_type),
-        nullable: col.null === 'YES',
-      })),
+    return {
+      tableId: outputTableId,
+      schema: {
+        columns: schemaData.map((col: { column_name: string; column_type: string; null: string }) => ({
+          id: col.column_name,
+          name: col.column_name,
+          type: mapDuckDBTypeToApp(col.column_type),
+          nullable: col.null === 'YES',
+        })),
+        rowCount,
+      },
       rowCount,
-    },
-    rowCount,
-    preview,
+      preview,
+    }
+  } catch (error) {
+    try {
+      await conn.query('ROLLBACK')
+    } catch {
+      // Preserve the transform/cancellation failure.
+    }
+    throw error
   }
 }

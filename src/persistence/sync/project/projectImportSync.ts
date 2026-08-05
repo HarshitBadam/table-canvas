@@ -6,8 +6,9 @@ import {
 } from '../../storage/local-db/db'
 import { replaceReportsForProject } from '../../storage/local-db/reportStorage'
 import {
-  getStorageScope,
-  isCloudStorageScope,
+  captureStorageScopeContext,
+  isGuestStorageScope,
+  isStorageScopeContextCurrent,
 } from '../../storage/storageScope'
 import { isNetworkOnline } from '../session/syncState'
 import { promoteLocalProject } from '../session/localProjectPromotion'
@@ -23,7 +24,8 @@ export async function importProjectWithSync(
       ? project.reports.map(report => [report.id, report] as const)
       : Object.entries(project.reports ?? {})),
   )
-  const scope = getStorageScope()
+  const context = captureStorageScopeContext()
+  const scope = context.scope
   const result = {
     ...project,
     reports,
@@ -38,16 +40,24 @@ export async function importProjectWithSync(
     result.nodes,
     result.edges,
     result.patches,
+    undefined,
+    scope,
   )
+  if (!isStorageScopeContextCurrent(context)) {
+    throw new Error('The account changed while the project was being imported.')
+  }
   await replaceReportsForProject(result.id, reports, scope)
-  if (isNetworkOnline() && isCloudStorageScope()) {
+  if (isNetworkOnline() && !isGuestStorageScope(scope)) {
     try {
-      const promotion = await promoteLocalProject(result.id, scope)
+      const promotion = await promoteLocalProject(result.id, scope, context)
       if (promotion) {
         const promoted = await loadProjectLocal(
           promotion.destinationProjectId,
           scope,
         )
+        if (!isStorageScopeContextCurrent(context)) {
+          throw new Error('The account changed while the project was being imported.')
+        }
         if (promoted) {
           return {
             ...promoted,
@@ -65,6 +75,9 @@ export async function importProjectWithSync(
     } catch (error) {
       console.error('[Sync] Imported project is safely queued for retry:', error)
     }
+  }
+  if (!isStorageScopeContextCurrent(context)) {
+    throw new Error('The account changed while the project was being imported.')
   }
   return result
 }

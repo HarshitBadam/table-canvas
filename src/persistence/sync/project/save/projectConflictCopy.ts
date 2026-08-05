@@ -1,8 +1,9 @@
-import { saveProject as saveProjectLocal } from '../../../storage/local-db/db'
-import type { ProjectSnapshot } from '../../../storage/local-db/dbCore'
-import { deserializePatches } from '../../../storage/local-db/patchSerialization'
-import { clearProjectSyncOperation } from './projectSyncQueue'
-import { replaceReportsForProject } from '../../../storage/local-db/reportStorage'
+import { getDB, type ProjectSnapshot } from '../../../storage/local-db/dbCore'
+import {
+  isStorageScopeContextCurrent,
+  scopedStorageKey,
+  type StorageScopeContext,
+} from '../../../storage/storageScope'
 import { reportProjectSyncError } from '../../session/syncNotifications'
 
 /**
@@ -12,27 +13,64 @@ import { reportProjectSyncError } from '../../session/syncNotifications'
 export async function preserveConflictCopy(
   projectId: string,
   snapshot: ProjectSnapshot,
+  attemptedGeneration: number,
   scope: string,
-): Promise<void> {
+  context: StorageScopeContext,
+  deleteOriginal = false,
+): Promise<boolean> {
+  const db = await getDB()
   const recoveryId = createLocalId()
-  await saveProjectLocal(
-    recoveryId,
-    `${snapshot.name} (conflict copy)`,
-    snapshot.nodes,
-    snapshot.edges,
-    deserializePatches(snapshot.patches),
-    { revision: 0 },
-    scope,
-  )
-  const reports = Object.fromEntries(Object.values(snapshot.reports).map((report) => {
+  const originalKey = scopedStorageKey(scope, projectId)
+  const recoveryKey = scopedStorageKey(scope, recoveryId)
+  const tx = db.transaction(['projects', 'reports', 'projectSync'], 'readwrite')
+  const syncStore = tx.objectStore('projectSync')
+  const current = await syncStore.get(originalKey)
+  if (
+    !current
+    || current.operation !== 'save'
+    || current.generation !== attemptedGeneration
+    || context.scope !== scope
+    || !isStorageScopeContextCurrent(context)
+  ) {
+    await tx.done
+    return false
+  }
+
+  const now = new Date().toISOString()
+  await tx.objectStore('projects').put({
+    id: recoveryKey,
+    entityId: recoveryId,
+    ownerId: scope,
+    name: `${snapshot.name} (conflict copy)`,
+    nodes: snapshot.nodes,
+    edges: snapshot.edges,
+    patches: snapshot.patches,
+    createdAt: now,
+    updatedAt: now,
+    revision: 0,
+  })
+  await Promise.all(Object.values(snapshot.reports).map((report) => {
     const id = createReportId()
-    return [id, { ...report, id, projectId: recoveryId }]
+    return tx.objectStore('reports').put({
+      ...report,
+      id: scopedStorageKey(scope, id),
+      entityId: id,
+      ownerId: scope,
+      projectId: recoveryId,
+    })
   }))
-  await replaceReportsForProject(recoveryId, reports, scope)
-  await clearProjectSyncOperation(projectId, scope)
+  if (deleteOriginal) {
+    const reports = await tx.objectStore('reports').index('by-owner-project')
+      .getAll([scope, projectId])
+    await Promise.all(reports.map(report => tx.objectStore('reports').delete(report.id)))
+    await tx.objectStore('projects').delete(originalKey)
+  }
+  await syncStore.delete(originalKey)
+  await tx.done
   reportProjectSyncError(
     'A newer cloud version was found. Your unsynced work was preserved as a conflict copy.',
   )
+  return true
 }
 
 function createLocalId(): string {

@@ -1,6 +1,7 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
 import type {
   WorkerRequest,
+  WorkerMessage,
   WorkerResponse,
   LoadTableRequest,
   AggregationDef,
@@ -16,6 +17,47 @@ let db: duckdb.AsyncDuckDB | null = null
 let conn: duckdb.AsyncDuckDBConnection | null = null
 let initPromise: Promise<void> | null = null
 let scheduler: WorkerRequestScheduler | null = null
+
+async function mutationCheckpoint(requestId: string): Promise<void> {
+  // Yield to the worker event loop so a cancellation posted while DuckDB was
+  // busy can be observed before the surrounding transaction commits. This is
+  // an intermediate, still-abortable checkpoint: a rejection here is always
+  // followed by a ROLLBACK, so a same-event-loop-gap race here is harmless.
+  await new Promise<void>(resolve => setTimeout(resolve, 0))
+  if (scheduler?.isMutationCancelled(requestId)) {
+    throw new Error('Worker mutation cancelled')
+  }
+}
+
+const pendingCommitDecisions = new Map<string, (granted: boolean) => void>()
+
+function requestCommitDecision(requestId: string): Promise<boolean> {
+  return new Promise<boolean>(resolve => {
+    pendingCommitDecisions.set(requestId, resolve)
+    self.postMessage({ type: 'prepareCommit', requestId })
+  })
+}
+
+/**
+ * The single point that may irrevocably commit a mutation (the final
+ * statement of a transaction, or the sole statement of an atomic
+ * single-statement mutation). Unlike `mutationCheckpoint`, this does not
+ * rely on a local flag plus a timing gap: it round-trips through the main
+ * thread, which is the only place that knows whether the RPC timeout has
+ * already fired for this request. The main thread answers synchronously
+ * against its own pending-request bookkeeping, so the timeout firing and
+ * this decision can never both apply to the same request - one necessarily
+ * happens first and permanently decides the outcome.
+ */
+async function finalizeCommit(requestId: string): Promise<void> {
+  if (scheduler?.isMutationCancelled(requestId)) {
+    throw new Error('Worker mutation cancelled')
+  }
+  const granted = await requestCommitDecision(requestId)
+  if (!granted) {
+    throw new Error('Worker mutation cancelled')
+  }
+}
 
 async function initDuckDB(): Promise<void> {
   if (db && conn) return
@@ -70,6 +112,7 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
   const { id, type, payload } = request
 
   try {
+    if (scheduler?.isMutationCancelled(id)) throw new Error('Worker mutation cancelled')
     let result: unknown
 
     switch (type) {
@@ -82,13 +125,22 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
         await loadTable(
           requireConn(),
           payload as LoadTableRequest,
-          () => scheduler?.flushPendingReads() ?? Promise.resolve(),
+          async () => {
+            await scheduler?.flushPendingReads()
+            await mutationCheckpoint(id)
+          },
+          () => finalizeCommit(id),
         )
         result = { success: true }
         break
 
       case 'executeTransform':
-        result = await executeTransform(requireConn(), payload as TransformDef & { outputTableId: string })
+        result = await executeTransform(
+          requireConn(),
+          payload as TransformDef & { outputTableId: string },
+          () => mutationCheckpoint(id),
+          () => finalizeCommit(id),
+        )
         break
 
       case 'countCombinedTransformRows':
@@ -131,7 +183,7 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
           value: CellValue
           columnType?: string
         }
-        await updateCell(requireConn(), tableId, rowId, column, value, columnType)
+        await updateCell(requireConn(), tableId, rowId, column, value, columnType, () => finalizeCommit(id))
         result = { success: true }
         break
       }
@@ -143,14 +195,14 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
           columns: string[]
           types: string[]
         }
-        await insertRow(requireConn(), tableId, values, columns, types)
+        await insertRow(requireConn(), tableId, values, columns, types, () => finalizeCommit(id))
         result = { success: true }
         break
       }
 
       case 'deleteRow': {
         const { tableId, rowIndex } = payload as { tableId: string; rowIndex: number }
-        await deleteRow(requireConn(), tableId, rowIndex)
+        await deleteRow(requireConn(), tableId, rowIndex, () => finalizeCommit(id))
         result = { success: true }
         break
       }
@@ -168,7 +220,7 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
       }
 
       case 'dropTable':
-        await dropTable(requireConn(), payload as string)
+        await dropTable(requireConn(), payload as string, () => finalizeCommit(id))
         result = { success: true }
         break
 
@@ -191,7 +243,19 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
 
 scheduler = new WorkerRequestScheduler(handleRequest)
 
-self.onmessage = (event: MessageEvent<WorkerRequest>) => {
+self.onmessage = (event: MessageEvent<WorkerMessage>) => {
+  if (event.data.type === 'cancelMutation') {
+    scheduler?.cancelMutation(event.data.requestId)
+    return
+  }
+  if (event.data.type === 'commitDecision') {
+    const resolve = pendingCommitDecisions.get(event.data.requestId)
+    if (resolve) {
+      pendingCommitDecisions.delete(event.data.requestId)
+      resolve(event.data.granted)
+    }
+    return
+  }
   scheduler?.enqueue(event.data)
 }
 

@@ -52,4 +52,41 @@ describe('WorkerRequestScheduler', () => {
       'batch-2',
     ]))
   })
+
+  it('retains cancellation for queued and cooperatively running mutations', async () => {
+    let releaseRunning!: () => void
+    const runningGate = new Promise<void>(resolve => {
+      releaseRunning = resolve
+    })
+    const cancellationObserved: string[] = []
+    const scheduler = new WorkerRequestScheduler(async (req) => {
+      if (req.id === 'running') await runningGate
+      if (scheduler.isMutationCancelled(req.id)) cancellationObserved.push(req.id)
+    })
+
+    scheduler.enqueue(request('running', 'loadTable'))
+    await Promise.resolve()
+    scheduler.enqueue(request('queued', 'executeTransform'))
+
+    expect(scheduler.cancelMutation('running')).toBe(true)
+    expect(scheduler.cancelMutation('queued')).toBe(true)
+    releaseRunning()
+
+    await vi.waitFor(() => expect(cancellationObserved).toEqual(['running', 'queued']))
+    expect(scheduler.isMutationCancelled('running')).toBe(false)
+    expect(scheduler.isMutationCancelled('queued')).toBe(false)
+  })
+
+  it('ignores cancellation delivered after a mutation completed', async () => {
+    const handled: string[] = []
+    const scheduler = new WorkerRequestScheduler(async (req) => {
+      handled.push(req.id)
+    })
+
+    scheduler.enqueue(request('already-complete', 'updateCell'))
+    await vi.waitFor(() => expect(handled).toEqual(['already-complete']))
+
+    expect(scheduler.cancelMutation('already-complete')).toBe(false)
+    expect(scheduler.isMutationCancelled('already-complete')).toBe(false)
+  })
 })

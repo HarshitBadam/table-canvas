@@ -9,12 +9,16 @@ import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
 import fileRoutes from './routes/files.js';
-import { reconcileStorageUsage } from './services/storageQuota.service.js';
+import {
+  initializeStorageQuotaIndexes,
+  reconcileStorageUsage,
+} from './services/storageQuota.service.js';
 import { revokeLegacyRefreshSessions } from './services/auth.service.js';
 import { initializeFileIndexes } from './services/file.service.js';
 import { initializeRateLimitIndexes } from './services/rateLimitStore.js';
 import { createCsrfProtection } from './middleware/csrfProtection.js';
 import { closeServerTelemetry, initializeServerTelemetry } from './observability/sentry.js';
+import { recoverPendingFileDeletes } from './services/fileLifecycle.service.js';
 
 validateConfig();
 initializeServerTelemetry();
@@ -78,7 +82,9 @@ async function startServer(): Promise<void> {
     await connectDatabase();
     await revokeLegacyRefreshSessions();
     await initializeFileIndexes();
+    await initializeStorageQuotaIndexes();
     await initializeRateLimitIndexes();
+    await recoverPendingFileDeletes();
     await reconcileStorageUsage();
 
     httpServer = app.listen(config.port, () => {

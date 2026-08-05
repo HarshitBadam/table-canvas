@@ -27,12 +27,42 @@ export interface WorkerRequest {
   payload: unknown
 }
 
+export interface WorkerMutationCancelRequest {
+  type: 'cancelMutation'
+  requestId: string
+}
+
+/**
+ * Sent by the worker immediately before the single point that irrevocably
+ * commits a mutation (the last statement of a transaction, or the sole
+ * statement of an atomic single-statement mutation). The main thread's reply
+ * is the sole, race-free authority on whether the commit may proceed: it is
+ * decided synchronously against the same state used to fire the RPC timeout,
+ * so the timeout and this handshake can never both "win" for the same request.
+ */
+export interface WorkerCommitDecisionRequest {
+  type: 'prepareCommit'
+  requestId: string
+}
+
+export interface WorkerCommitDecisionReply {
+  type: 'commitDecision'
+  requestId: string
+  granted: boolean
+}
+
+export type WorkerMessage = WorkerRequest | WorkerMutationCancelRequest | WorkerCommitDecisionReply
+
 export interface WorkerResponse {
   id: string
   success: boolean
   data?: unknown
   error?: string
 }
+
+export type WorkerReadyMessage = { type: 'ready' }
+
+export type WorkerToMainMessage = WorkerResponse | WorkerReadyMessage | WorkerCommitDecisionRequest
 
 export interface TableSlice {
   tableId: string

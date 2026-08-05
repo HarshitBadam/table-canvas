@@ -3,6 +3,21 @@ import {
   documentOpenLockName,
   documentTabId,
 } from './documentIdentity'
+import {
+  hasOpenDocumentPeer,
+  openDocumentPresenceChannel,
+} from './documentPresence'
+import {
+  clearMirrorRetry,
+  createMirrorRetry,
+  resetMirrorRetry,
+  scheduleMirrorRetry,
+  type MirrorRetry,
+} from './documentLeaseRetry'
+import type { DeleteGuardResult } from './documentDeleteGuard'
+import { canDeleteFromSnapshot } from './documentDeleteProbe'
+
+export { withInactiveDocumentDeleteGuard } from './documentDeleteGuard'
 
 /**
  * Exactly one tab per document may write it. Ownership is only ever established by
@@ -23,9 +38,12 @@ interface LeaseSession {
   releaseLock: (() => void) | null
   releaseOpen: (() => void) | null
   openAbort: AbortController | null
+  openTask: Promise<void> | null
   stopped: boolean
   /** True once another tab has owned the document while this one watched. */
   mirrored: boolean
+  /** Backoff for retrying a failed mirror-promotion without spinning. */
+  retry: MirrorRetry
 }
 
 export interface LeaseSessionOptions {
@@ -38,92 +56,13 @@ const IDLE_STATE: LeaseState = {
   role: 'acquiring',
 }
 
-const PRESENCE_CHANNEL_NAME = 'table-canvas:document-presence'
-const PRESENCE_PROBE_TIMEOUT_MS = 100
-
-interface PresenceProbe {
-  type: 'probe'
-  key: string
-  requestId: string
-  senderId: string
-}
-
-interface PresenceResponse {
-  type: 'open'
-  key: string
-  requestId: string
-  senderId: string
-}
-
 let session: LeaseSession | null = null
 let options: LeaseSessionOptions | null = null
 let state: LeaseState = IDLE_STATE
 const listeners = new Set<() => void>()
 
-function isPresenceProbe(value: unknown): value is PresenceProbe {
-  if (!value || typeof value !== 'object') return false
-  const message = value as Partial<PresenceProbe>
-  return message.type === 'probe'
-    && typeof message.key === 'string'
-    && typeof message.requestId === 'string'
-    && typeof message.senderId === 'string'
-}
-
-function isPresenceResponse(value: unknown): value is PresenceResponse {
-  if (!value || typeof value !== 'object') return false
-  const message = value as Partial<PresenceResponse>
-  return message.type === 'open'
-    && typeof message.key === 'string'
-    && typeof message.requestId === 'string'
-    && typeof message.senderId === 'string'
-}
-
 function openPresenceChannel(active: LeaseSession): void {
-  if (typeof BroadcastChannel === 'undefined') return
-  const channel = new BroadcastChannel(PRESENCE_CHANNEL_NAME)
-  channel.onmessage = event => {
-    if (!isPresenceProbe(event.data)) return
-    if (event.data.key !== active.key || event.data.senderId === active.tabId) return
-    channel.postMessage({
-      type: 'open',
-      key: active.key,
-      requestId: event.data.requestId,
-      senderId: active.tabId,
-    } satisfies PresenceResponse)
-  }
-  active.presenceChannel = channel
-}
-
-async function hasOpenPeer(key: string): Promise<boolean> {
-  if (typeof BroadcastChannel === 'undefined') return false
-  const channel = new BroadcastChannel(PRESENCE_CHANNEL_NAME)
-  const requestId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  const senderId = documentTabId()
-
-  return new Promise(resolve => {
-    let settled = false
-    const finish = (open: boolean) => {
-      if (settled) return
-      settled = true
-      window.clearTimeout(timer)
-      channel.close()
-      resolve(open)
-    }
-    const timer = window.setTimeout(() => finish(false), PRESENCE_PROBE_TIMEOUT_MS)
-    channel.onmessage = event => {
-      if (!isPresenceResponse(event.data)) return
-      if (
-        event.data.key === key
-        && event.data.requestId === requestId
-        && event.data.senderId !== senderId
-      ) {
-        finish(true)
-      }
-    }
-    channel.postMessage({ type: 'probe', key, requestId, senderId } satisfies PresenceProbe)
-  })
+  active.presenceChannel = openDocumentPresenceChannel(active.key, active.tabId)
 }
 
 function emit(next: Partial<LeaseState>): void {
@@ -142,9 +81,14 @@ export function subscribeLease(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
-/** True unless another tab is known to own this document, so writes fail closed. */
-export function holdsWriteLease(): boolean {
-  return !session || state.role === 'owner'
+export function hasDocumentLease(): boolean {
+  return session !== null
+}
+
+/** With a key, ownership must belong to that exact document. */
+export function holdsWriteLease(key?: string): boolean {
+  if (!session) return key === undefined
+  return state.role === 'owner' && (key === undefined || session.key === key)
 }
 
 function releaseLock(active: LeaseSession): void {
@@ -164,11 +108,12 @@ function releaseOpen(active: LeaseSession): void {
 async function holdOpenPresence(active: LeaseSession): Promise<void> {
   const locks = navigator.locks
   if (!locks) return
-  active.openAbort = new AbortController()
+  const controller = new AbortController()
+  active.openAbort = controller
   try {
     await locks.request(
       documentOpenLockName(active.key),
-      { mode: 'shared', signal: active.openAbort.signal },
+      { mode: 'shared', signal: controller.signal },
       async lock => {
         if (!lock || active.stopped) return
         await new Promise<void>((resolve) => {
@@ -179,7 +124,24 @@ async function holdOpenPresence(active: LeaseSession): Promise<void> {
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError' || active.stopped) return
     console.warn('[DocumentLease] Could not take the open-presence lock:', error)
+  } finally {
+    if (active.openAbort === controller) active.openAbort = null
   }
+}
+
+function startOpenPresence(active: LeaseSession): void {
+  if (active.stopped || active.openTask) return
+  const task = holdOpenPresence(active)
+  active.openTask = task
+  void task.finally(() => {
+    if (active.openTask === task) active.openTask = null
+  })
+}
+
+async function holdUntilReleased(active: LeaseSession): Promise<void> {
+  await new Promise<void>((resolve) => {
+    active.releaseLock = resolve
+  })
 }
 
 async function hold(active: LeaseSession, lock: Lock | null): Promise<void> {
@@ -188,16 +150,38 @@ async function hold(active: LeaseSession, lock: Lock | null): Promise<void> {
     try {
       await options?.onPromoted?.()
     } catch (error) {
-      // Keep the lock even when adoption fails. Releasing here would leave every
-      // queued reader stuck as a mirror with nobody holding write ownership.
+      // Failed durable adoption must never enable edits or persistence, but it
+      // also must not strand the exclusive lock: release it (role stays
+      // 'mirror', no new visible UI state) and retry later on a backoff so
+      // this tab can still recover ownership without blocking every tab.
       console.error('[DocumentLease] Could not refresh before editing here:', error)
+      scheduleMirrorRetry(active.retry, () => {
+        if (active.stopped) return
+        void requestMirrorLock(active)
+      })
+      return
     }
   }
+  resetMirrorRetry(active.retry)
   if (active.stopped) return
   emit({ role: 'owner' })
-  await new Promise<void>((resolve) => {
-    active.releaseLock = resolve
-  })
+  await holdUntilReleased(active)
+}
+
+async function requestMirrorLock(active: LeaseSession): Promise<void> {
+  const locks = navigator.locks
+  if (!locks || active.stopped) return
+  active.abort = new AbortController()
+  try {
+    await locks.request(
+      documentLeaseName(active.key),
+      { mode: 'exclusive', signal: active.abort.signal },
+      lock => hold(active, lock),
+    )
+  } catch (error) {
+    if ((error as { name?: string })?.name === 'AbortError' || active.stopped) return
+    console.error('[DocumentLease] Could not take the write lease:', error)
+  }
 }
 
 async function acquire(active: LeaseSession): Promise<void> {
@@ -226,15 +210,10 @@ async function acquire(active: LeaseSession): Promise<void> {
     if (acquiredImmediately || active.stopped) return
     active.mirrored = true
     emit({ role: 'mirror' })
-    await locks.request(
-      documentLeaseName(active.key),
-      { mode: 'exclusive', signal: active.abort.signal },
-      lock => hold(active, lock),
-    )
+    await requestMirrorLock(active)
   } catch (error) {
     if ((error as { name?: string })?.name === 'AbortError' || active.stopped) return
     console.error('[DocumentLease] Could not take the write lease:', error)
-    emit({ role: 'owner' })
   }
 }
 
@@ -248,17 +227,22 @@ export function startDocumentLease(sessionOptions: LeaseSessionOptions): () => v
     releaseLock: null,
     releaseOpen: null,
     openAbort: null,
+    openTask: null,
     stopped: false,
     mirrored: false,
+    retry: createMirrorRetry(),
   }
   session = active
   options = sessionOptions
-  state = IDLE_STATE
+  // A fresh snapshot also notifies consumers that an acquiring session now exists,
+  // even though the public role remains unchanged.
+  state = { role: 'acquiring' }
+  for (const listener of listeners) listener()
 
   openPresenceChannel(active)
   // Presence is independent of write ownership: every open tab (owner or mirror)
   // holds a shared lock so deletes can be blocked while the project is in use.
-  void holdOpenPresence(active)
+  startOpenPresence(active)
   void acquire(active)
   return () => {
     if (session === active) stopDocumentLease()
@@ -271,6 +255,7 @@ export function stopDocumentLease(): void {
   active.stopped = true
   active.presenceChannel?.close()
   active.presenceChannel = null
+  clearMirrorRetry(active.retry)
   releaseLock(active)
   releaseOpen(active)
   active.abort?.abort()
@@ -293,7 +278,7 @@ export async function canDeleteDocument(
   key: string,
   isActiveDocument: boolean,
 ): Promise<boolean> {
-  if (await hasOpenPeer(key)) return false
+  if (await hasOpenDocumentPeer(key)) return false
   const locks = navigator.locks
   if (!locks) {
     console.warn('[DocumentLease] Web Locks unavailable; assuming this is the only tab.')
@@ -307,26 +292,16 @@ export async function canDeleteDocument(
       const pending = snapshot.pending ?? []
       const openName = documentOpenLockName(key)
       const leaseName = documentLeaseName(key)
-      const openHeld = held.filter(lock => lock.name === openName).length
-      const writeHeld = held.some(lock => lock.name === leaseName)
-      const writePending = pending.some(lock => lock.name === leaseName)
-
-      if (isActiveDocument) {
-        // This tab contributes one shared presence holder. Any additional holder
-        // (or a queued write waiter) means another tab still has the project open.
-        if (openHeld > 1) return false
-        if (openHeld === 1) {
-          if (!thisTabHoldsPresence(key)) return false
-          return !writePending
-        }
-        // Presence not registered yet — only allow if we already own the write
-        // lease and nobody else is waiting for it.
-        if (!holdsWriteLease() || writePending) return false
-        return true
-      }
-
-      if (openHeld > 0 || writeHeld || writePending) return false
-      return true
+      return canDeleteFromSnapshot(
+        {
+          openHeld: held.filter(lock => lock.name === openName).length,
+          writeHeld: held.some(lock => lock.name === leaseName),
+          writePending: pending.some(lock => lock.name === leaseName),
+        },
+        isActiveDocument,
+        thisTabHoldsPresence(key),
+        holdsWriteLease(),
+      )
     }
 
     // No query() — fallback probes. An active tab cannot probe its own shared
@@ -349,34 +324,65 @@ export async function canDeleteDocument(
   }
 }
 
-export interface DeleteGuardResult<T> {
-  acquired: boolean
-  value?: T
-}
-
-export async function withInactiveDocumentDeleteGuard<T>(
+/**
+ * Temporarily upgrades this tab's shared presence to an exclusive deletion guard.
+ * The write lease remains held throughout, while the exclusive presence lock blocks
+ * another tab from opening the document during the destructive operation.
+ *
+ * Only failures to acquire/probe the guard map to `{ acquired: false }`. Once the
+ * guard is actually held, errors thrown by `action` (save/report/delete) propagate
+ * to the caller so real failures are never silently reported as "in use elsewhere".
+ */
+export async function withActiveDocumentDeleteGuard<T>(
   key: string,
   action: () => Promise<T>,
 ): Promise<DeleteGuardResult<T>> {
-  if (await hasOpenPeer(key)) return { acquired: false }
+  const active = session
+  if (
+    !active
+    || active.key !== key
+    || active.stopped
+    || state.role !== 'owner'
+    || await hasOpenDocumentPeer(key)
+  ) {
+    return { acquired: false }
+  }
   const locks = navigator.locks
   if (!locks) {
     return { acquired: true, value: await action() }
   }
 
-  return locks.request(
-    documentOpenLockName(key),
-    { mode: 'exclusive', ifAvailable: true },
-    async openLock => {
-      if (!openLock) return { acquired: false }
-      return locks.request(
-        documentLeaseName(key),
-        { mode: 'exclusive', ifAvailable: true },
-        async writeLock => {
-          if (!writeLock) return { acquired: false }
-          return { acquired: true, value: await action() }
-        },
-      )
-    },
-  )
+  let downgraded = false
+  try {
+    releaseOpen(active)
+    await active.openTask
+    downgraded = true
+  } catch (error) {
+    console.warn('[DocumentLease] Could not release open presence for deletion guard:', error)
+  }
+  if (!downgraded || session !== active || active.stopped || state.role !== 'owner') {
+    if (session === active && !active.stopped) startOpenPresence(active)
+    return { acquired: false }
+  }
+
+  let guardHeld = false
+  try {
+    return await locks.request(
+      documentOpenLockName(key),
+      { mode: 'exclusive', ifAvailable: true },
+      async openLock => {
+        if (!openLock || session !== active || state.role !== 'owner') {
+          return { acquired: false }
+        }
+        guardHeld = true
+        return { acquired: true, value: await action() }
+      },
+    )
+  } catch (error) {
+    if (guardHeld) throw error
+    console.warn('[DocumentLease] Could not guard active project deletion:', error)
+    return { acquired: false }
+  } finally {
+    if (session === active && !active.stopped) startOpenPresence(active)
+  }
 }

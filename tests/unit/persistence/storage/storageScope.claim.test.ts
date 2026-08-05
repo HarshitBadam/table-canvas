@@ -45,6 +45,21 @@ describe('claimGuestStorageScope', () => {
     reloaded.releaseGuestStorageScopeClaim()
   })
 
+  it('uses a valid non-blocking Web Locks option combination', async () => {
+    const request = vi.spyOn(locks, 'request')
+    const scope = await loadScopeModule()
+
+    await scope.claimGuestStorageScope()
+
+    expect(request).toHaveBeenCalledWith(
+      expect.stringContaining('table-canvas:guest-scope:'),
+      { mode: 'exclusive', ifAvailable: true },
+      expect.any(Function),
+    )
+    expect(request.mock.calls[0][1]).not.toHaveProperty('signal')
+    scope.releaseGuestStorageScopeClaim()
+  })
+
   it('mints a fresh scope when a duplicated tab already claimed the cloned one', async () => {
     const owner = await loadScopeModule()
     const original = await owner.claimGuestStorageScope()

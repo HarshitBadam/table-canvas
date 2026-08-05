@@ -9,7 +9,13 @@ import {
   serializePatches,
   type SerializedPatches,
 } from '../../../storage/local-db/patchSerialization'
-import { getStorageScope, scopedStorageKey } from '../../../storage/storageScope'
+import {
+  captureStorageScopeContext,
+  getStorageScope,
+  isStorageScopeContextCurrent,
+  scopedStorageKey,
+  type StorageScopeContext,
+} from '../../../storage/storageScope'
 import { withoutRuntimeNodeState } from '@/state/document/transientProjectState'
 
 export interface ProjectSavePayload {
@@ -28,8 +34,10 @@ export async function saveProjectAndEnqueue(
   patches: Record<string, Patches>,
   reports: Record<string, Report>,
   scope = getStorageScope(),
+  context = captureStorageScopeContext(),
 ): Promise<ProjectSyncOperation> {
   const db = await getDB()
+  assertCurrentScope(scope, context)
   const id = scopedStorageKey(scope, projectId)
   const tx = db.transaction(['projects', 'projectSync'], 'readwrite')
   const projectStore = tx.objectStore('projects')
@@ -38,6 +46,11 @@ export async function saveProjectAndEnqueue(
     projectStore.get(id),
     syncStore.get(id),
   ])
+  if (scope !== context.scope || !isStorageScopeContextCurrent(context)) {
+    tx.abort()
+    await tx.done.catch(() => undefined)
+    throw new Error('The account changed while the project was being saved.')
+  }
   if (existingOperation?.operation === 'delete') {
     tx.abort()
     await tx.done.catch(() => undefined)
@@ -121,9 +134,11 @@ export async function enqueueProjectSave(
  */
 export async function replaceQueuedProjectSave(
   projectId: string,
+  attemptedGeneration: number,
   snapshot: ProjectSnapshot,
   expectedRevision: number,
   scope = getStorageScope(),
+  context?: StorageScopeContext,
 ): Promise<ProjectSyncOperation | null> {
   const db = await getDB()
   const id = scopedStorageKey(scope, projectId)
@@ -134,7 +149,12 @@ export async function replaceQueuedProjectSave(
     projectStore.get(id),
     syncStore.get(id),
   ])
-  if (!current || current.operation !== 'save') {
+  if (
+    !current
+    || current.operation !== 'save'
+    || current.generation !== attemptedGeneration
+    || !isContextCurrentForScope(scope, context)
+  ) {
     await tx.done
     return null
   }
@@ -167,12 +187,19 @@ export async function enqueueProjectDelete(
   projectId: string,
   expectedRevision: number,
   scope = getStorageScope(),
+  context = captureStorageScopeContext(),
 ): Promise<ProjectSyncOperation> {
   const db = await getDB()
+  assertCurrentScope(scope, context)
   const id = scopedStorageKey(scope, projectId)
   const tx = db.transaction('projectSync', 'readwrite')
   const syncStore = tx.objectStore('projectSync')
   const existing = await syncStore.get(id)
+  if (scope !== context.scope || !isStorageScopeContextCurrent(context)) {
+    tx.abort()
+    await tx.done.catch(() => undefined)
+    throw new Error('The account changed while the project was being deleted.')
+  }
   const generation = (existing?.generation ?? 0) + 1
   const now = new Date().toISOString()
   const operation: ProjectSyncOperation = {
@@ -193,15 +220,24 @@ export async function enqueueProjectDelete(
 export async function cancelQueuedProjectDelete(
   projectId: string,
   scope = getStorageScope(),
-): Promise<void> {
+  generation?: number,
+  context?: StorageScopeContext,
+): Promise<boolean> {
   const db = await getDB()
   const id = scopedStorageKey(scope, projectId)
   const tx = db.transaction('projectSync', 'readwrite')
   const operation = await tx.store.get(id)
-  if (operation?.operation === 'delete') {
+  if (
+    operation?.operation === 'delete'
+    && (generation === undefined || operation.generation === generation)
+    && isContextCurrentForScope(scope, context)
+  ) {
     await tx.store.delete(id)
+    await tx.done
+    return true
   }
   await tx.done
+  return false
 }
 
 export async function getProjectSyncOperation(
@@ -225,6 +261,7 @@ export async function acknowledgeProjectSave(
   revision: number,
   serverUpdatedAt: Date | string,
   scope = getStorageScope(),
+  context?: StorageScopeContext,
 ): Promise<void> {
   const db = await getDB()
   const id = scopedStorageKey(scope, projectId)
@@ -233,6 +270,15 @@ export async function acknowledgeProjectSave(
     tx.objectStore('projects').get(id),
     tx.objectStore('projectSync').get(id),
   ])
+  // The server already accepted this operation, so the ack must land in the
+  // explicit `scope` it was issued for even if the auth epoch bumped meanwhile
+  // (e.g. a token refresh) while it was in flight. Only bail if the caller's
+  // own context disagrees about which scope this operation belongs to - never
+  // on epoch alone, and never by writing into whatever scope is now active.
+  if (context && context.scope !== scope) {
+    await tx.done
+    return
+  }
 
   if (project) {
     project.revision = revision
@@ -255,14 +301,21 @@ export async function acknowledgeProjectSave(
 export async function deleteProjectSnapshot(
   projectId: string,
   scope = getStorageScope(),
+  context = captureStorageScopeContext(),
 ): Promise<Record<string, ProjectNode> | null> {
   const db = await getDB()
+  if (scope !== context.scope || !isStorageScopeContextCurrent(context)) return null
   const id = scopedStorageKey(scope, projectId)
   const tx = db.transaction(['projects', 'reports'], 'readwrite')
   const projectStore = tx.objectStore('projects')
   const project = await projectStore.get(id)
   const reports = await tx.objectStore('reports').index('by-owner-project')
     .getAll([scope, projectId])
+  if (!isStorageScopeContextCurrent(context)) {
+    tx.abort()
+    await tx.done.catch(() => undefined)
+    return null
+  }
   await Promise.all(reports.map(report => tx.objectStore('reports').delete(report.id)))
   await projectStore.delete(id)
   await tx.done
@@ -273,6 +326,7 @@ export async function finalizeProjectDelete(
   projectId: string,
   generation: number,
   scope = getStorageScope(),
+  context?: StorageScopeContext,
 ): Promise<Record<string, ProjectNode> | null> {
   const db = await getDB()
   const id = scopedStorageKey(scope, projectId)
@@ -286,6 +340,7 @@ export async function finalizeProjectDelete(
     !current
     || current.operation !== 'delete'
     || current.generation !== generation
+    || !isContextCurrentForScope(scope, context)
   ) {
     await tx.done
     return null
@@ -305,7 +360,35 @@ export async function finalizeProjectDelete(
 export async function clearProjectSyncOperation(
   projectId: string,
   scope = getStorageScope(),
-): Promise<void> {
+  generation?: number,
+  context?: StorageScopeContext,
+): Promise<boolean> {
   const db = await getDB()
-  await db.delete('projectSync', scopedStorageKey(scope, projectId))
+  const id = scopedStorageKey(scope, projectId)
+  const tx = db.transaction('projectSync', 'readwrite')
+  const current = await tx.store.get(id)
+  if (
+    !current
+    || (generation !== undefined && current.generation !== generation)
+    || !isContextCurrentForScope(scope, context)
+  ) {
+    await tx.done
+    return false
+  }
+  await tx.store.delete(id)
+  await tx.done
+  return true
+}
+
+function assertCurrentScope(scope: string, context: StorageScopeContext): void {
+  if (scope !== context.scope || !isStorageScopeContextCurrent(context)) {
+    throw new Error('The account changed while the project operation was in progress.')
+  }
+}
+
+function isContextCurrentForScope(
+  scope: string,
+  context?: StorageScopeContext,
+): boolean {
+  return !context || (context.scope === scope && isStorageScopeContextCurrent(context))
 }

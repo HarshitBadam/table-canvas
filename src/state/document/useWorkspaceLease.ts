@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import {
   getLeaseState,
+  hasDocumentLease,
   subscribeLease,
   type LeaseState,
 } from './documentLease'
@@ -15,8 +16,9 @@ export function useWorkspaceLease(): WorkspaceLease {
   const state = useSyncExternalStore(subscribeLease, getLeaseState, getLeaseState)
   return {
     ...state,
-    // Only a known mirror is statically read-only. `acquiring` is brief while the
-    // lock settles; persistence still fails closed via `holdsWriteLease`.
-    canEdit: state.role !== 'mirror',
+    // The initial lock probe is brief, but controls must fail closed until the
+    // browser has granted ownership. With no document open, project creation and
+    // other non-document controls remain available.
+    canEdit: !hasDocumentLease() || state.role === 'owner',
   }
 }

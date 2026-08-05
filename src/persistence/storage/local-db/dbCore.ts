@@ -92,6 +92,7 @@ const DB_VERSION = 3
 
 let dbInstance: IDBPDatabase<TableCanvasDB> | null = null
 let dbOpenPromise: Promise<IDBPDatabase<TableCanvasDB>> | null = null
+let dbOpenGeneration = 0
 
 /** Long enough for a normal open/upgrade; short enough to fail fast if another
  *  tab is holding a connection open and never releases it. */
@@ -109,8 +110,17 @@ function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
   })
 }
 
-function openTableCanvasDB(): Promise<IDBPDatabase<TableCanvasDB>> {
-  return openDB<TableCanvasDB>(DB_NAME, DB_VERSION, {
+function retireOpenGeneration(generation: number): void {
+  if (generation !== dbOpenGeneration) return
+  dbOpenGeneration += 1
+  dbOpenPromise = null
+}
+
+function openTableCanvasDB(
+  generation: number,
+): Promise<IDBPDatabase<TableCanvasDB>> {
+  let openedDB: IDBPDatabase<TableCanvasDB> | null = null
+  const opening = openDB<TableCanvasDB>(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion, _newVersion, transaction) {
       if (oldVersion < 1) {
         const projectStore = db.createObjectStore('projects', { keyPath: 'id' })
@@ -137,8 +147,9 @@ function openTableCanvasDB(): Promise<IDBPDatabase<TableCanvasDB>> {
     },
     // Release immediately so another tab's upgrade/deleteDB is not blocked forever.
     blocking() {
-      dbInstance?.close()
-      dbInstance = null
+      openedDB?.close()
+      if (dbInstance === openedDB) dbInstance = null
+      retireOpenGeneration(generation)
     },
     blocked(currentVersion, blockedVersion) {
       console.warn(
@@ -147,6 +158,10 @@ function openTableCanvasDB(): Promise<IDBPDatabase<TableCanvasDB>> {
       )
     },
   })
+  void opening.then(db => {
+    openedDB = db
+  }, () => undefined)
+  return opening
 }
 
 async function resetTableCanvasDB(): Promise<void> {
@@ -162,10 +177,37 @@ async function resetTableCanvasDB(): Promise<void> {
   )
 }
 
-async function openWithRecovery(): Promise<IDBPDatabase<TableCanvasDB>> {
+function openAttemptWithTimeout(
+  generation: number,
+  message: string,
+): Promise<IDBPDatabase<TableCanvasDB>> {
+  const opening = openTableCanvasDB(generation)
+  let timedOut = false
+  const guardedOpening = opening.then(db => {
+    if (timedOut || generation !== dbOpenGeneration) {
+      db.close()
+      throw new Error('Local database open attempt was superseded.')
+    }
+    return db
+  })
+
+  let timer: ReturnType<typeof setTimeout>
+  return new Promise<IDBPDatabase<TableCanvasDB>>((resolve, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true
+      retireOpenGeneration(generation)
+      reject(new Error(message))
+    }, DB_OPERATION_TIMEOUT_MS)
+    guardedOpening.then(resolve, reject)
+  }).finally(() => clearTimeout(timer))
+}
+
+async function openWithRecovery(
+  generation: number,
+): Promise<IDBPDatabase<TableCanvasDB>> {
   try {
-    return await withTimeout(
-      openTableCanvasDB(),
+    return await openAttemptWithTimeout(
+      generation,
       'Local database did not open in time. Close other Table Canvas tabs and try again.',
     )
   } catch (error) {
@@ -174,8 +216,8 @@ async function openWithRecovery(): Promise<IDBPDatabase<TableCanvasDB>> {
     if (error instanceof DOMException && error.name === 'VersionError') {
       console.warn('[db] Local database version is newer than expected; resetting it.', error)
       await resetTableCanvasDB()
-      return withTimeout(
-        openTableCanvasDB(),
+      return openAttemptWithTimeout(
+        generation,
         'Local database did not open in time after reset. Close other Table Canvas tabs and try again.',
       )
     }
@@ -186,15 +228,21 @@ async function openWithRecovery(): Promise<IDBPDatabase<TableCanvasDB>> {
 export async function getDB(): Promise<IDBPDatabase<TableCanvasDB>> {
   if (dbInstance) return dbInstance
   if (!dbOpenPromise) {
-    dbOpenPromise = openWithRecovery()
+    const generation = ++dbOpenGeneration
+    const attempt = openWithRecovery(generation)
       .then(db => {
+        if (generation !== dbOpenGeneration) {
+          db.close()
+          throw new Error('Local database open attempt was superseded.')
+        }
         dbInstance = db
         return db
       })
       .catch(error => {
-        dbOpenPromise = null
+        if (dbOpenPromise === attempt) dbOpenPromise = null
         throw error
       })
+    dbOpenPromise = attempt
   }
   return dbOpenPromise
 }

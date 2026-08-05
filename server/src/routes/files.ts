@@ -5,11 +5,9 @@ import { requireAuth } from '../middleware/auth.js';
 import {
   uploadFile,
   downloadFile,
-  deleteFile,
   listUserFiles,
   getFileMetadata,
   findFileByOperationId,
-  getFileLifecycleMetadata,
 } from '../services/file.service.js';
 import {
   asyncHandler,
@@ -22,9 +20,15 @@ import { User } from '../models/User.js';
 import { Project } from '../models/Project.js';
 import { checkFileSize } from '../config/enforce.js';
 import { getLimits, type Tier } from '../config/limits.js';
-import { reserveStorage, releaseStorage } from '../services/storageQuota.service.js';
+import {
+  cancelStorageReservation,
+  completeStorageReservation,
+  renewStorageReservation,
+  reserveStorage,
+} from '../services/storageQuota.service.js';
 import { createApiRateLimit } from '../middleware/apiRateLimit.js';
 import { Types } from 'mongoose';
+import { deleteUnreferencedFile } from '../services/fileLifecycle.service.js';
 
 const router = Router();
 
@@ -67,19 +71,6 @@ const upload = multer({
     }
   },
 });
-
-function nodesReferenceFile(nodes: unknown, fileId: string): boolean {
-  if (!nodes || typeof nodes !== 'object' || Array.isArray(nodes)) return false;
-  return Object.values(nodes as Record<string, unknown>).some((node) => {
-    if (!node || typeof node !== 'object') return false;
-    const plan = (node as { plan?: unknown }).plan;
-    return Boolean(
-      plan
-      && typeof plan === 'object'
-      && (plan as { fileRef?: unknown }).fileRef === fileId
-    );
-  });
-}
 
 router.use(requireAuth);
 
@@ -154,12 +145,12 @@ router.post(
       }
     }
 
-    const reserved = await reserveStorage(
+    const reservationId = await reserveStorage(
       userId,
       file.size,
       getLimits(tier).maxServerStorageBytes,
     );
-    if (!reserved) {
+    if (!reservationId) {
       throw new AppError('This upload would exceed your storage quota', 413);
     }
 
@@ -177,6 +168,12 @@ router.post(
     }
 
     let uploadedFile: UploadedFile;
+    const reservationHeartbeat = setInterval(() => {
+      void renewStorageReservation(reservationId).catch((error: unknown) => {
+        console.error('[Files] Failed to renew upload reservation:', error);
+      });
+    }, 60_000);
+    reservationHeartbeat.unref();
     try {
       uploadedFile = await uploadFile(
         file.buffer,
@@ -187,10 +184,11 @@ router.post(
           userId,
           projectId,
           clientOperationId: operationId,
+          storageReservationId: reservationId,
         },
       );
     } catch (error) {
-      await releaseStorage(userId, file.size);
+      await cancelStorageReservation(reservationId);
       if (
         operationId
         && error
@@ -212,7 +210,10 @@ router.post(
         }
       }
       throw error;
+    } finally {
+      clearInterval(reservationHeartbeat);
     }
+    await completeStorageReservation(reservationId);
 
     const response: ApiResponse<{ file: UploadedFile }> = {
       success: true,
@@ -287,25 +288,11 @@ router.delete(
       throw new ValidationError(['Invalid file ID format']);
     }
 
-    const exists = await getFileLifecycleMetadata(fileId, userId);
-    if (!exists) throw new NotFoundError('File');
-    const retainedProjects = await Project.find({
-      userId: new Types.ObjectId(userId),
-      deletedAt: null,
-    }).select('nodes');
-    const referenced = retainedProjects.some(project => (
-      nodesReferenceFile(project.nodes, fileId)
-    ));
-    if (referenced) {
-      throw new ConflictError('File is still referenced by an active project');
-    }
-
-    const deletedBytes = await deleteFile(fileId, userId);
+    const deletedBytes = await deleteUnreferencedFile(userId, fileId);
 
     if (deletedBytes == null) {
       throw new NotFoundError('File');
     }
-    await releaseStorage(userId, deletedBytes);
 
     const response: ApiResponse = {
       success: true,

@@ -23,6 +23,10 @@ vi.mock('@/state/projectStore', () => ({
   },
 }))
 import { synchronizeAfterReconnect } from '@/state/app-session/persistence/usePersistenceLifecycle'
+import {
+  bumpActiveProjectGeneration,
+  serializeProjectOperation,
+} from '@/state/app-session/persistence/projectOperationSerializer'
 
 function appState(): AppProviderState {
   return {
@@ -112,5 +116,91 @@ describe('reconnect persistence recovery', () => {
 
     expect(state.projects).toEqual(appState().projects)
     expect(state.projectId).toBe('project-1')
+  })
+
+  it('serializes overlapping reconnect recovery runs', async () => {
+    let releaseFirst!: () => void
+    const firstPending = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+    const saveLatestProject = vi.fn()
+      .mockReturnValueOnce(firstPending)
+      .mockResolvedValue(undefined)
+    const options = {
+      saveLatestProject,
+      prepareProject: vi.fn(),
+      setState: vi.fn(),
+    }
+
+    const first = synchronizeAfterReconnect(options)
+    await vi.waitFor(() => expect(saveLatestProject).toHaveBeenCalledOnce())
+    const second = synchronizeAfterReconnect(options)
+    await Promise.resolve()
+
+    expect(saveLatestProject).toHaveBeenCalledOnce()
+    releaseFirst()
+    await Promise.all([first, second])
+    expect(saveLatestProject).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not hold the shared project-action serializer during reconnect network I/O', async () => {
+    let releaseSave!: () => void
+    const saveLatestProject = vi.fn(() => new Promise<void>((resolve) => {
+      releaseSave = resolve
+    }))
+
+    const reconnect = synchronizeAfterReconnect({
+      saveLatestProject,
+      prepareProject: vi.fn(),
+      setState: vi.fn(),
+    })
+    await vi.waitFor(() => expect(saveLatestProject).toHaveBeenCalledOnce())
+
+    // Reconnect's network I/O is still pending, but an unrelated serialized
+    // project action (e.g. a project switch) must run immediately rather than
+    // queueing behind it for however long the network call takes.
+    const otherOperation = vi.fn().mockResolvedValue('done')
+    await expect(serializeProjectOperation(otherOperation)).resolves.toBe('done')
+    expect(otherOperation).toHaveBeenCalledOnce()
+
+    releaseSave()
+    await reconnect
+  })
+
+  it('discards a stale reconnect result once the user switches projects mid-flight', async () => {
+    const recovered = {
+      id: 'project-1',
+      name: 'Newer cloud project',
+      nodes: {},
+      edges: {},
+      patches: {},
+      reports: {},
+      revision: 4,
+    }
+    sync.flushAllProjectSavesWithSync.mockResolvedValue([
+      { projectId: 'project-1', operation: 'save' },
+    ])
+    sync.loadProjectWithSync.mockImplementation(async () => {
+      // The user switches to a different project while this network call is
+      // still in flight; the reconnect's eventual result must be discarded.
+      bumpActiveProjectGeneration()
+      projectState.projectId = 'project-2'
+      return recovered
+    })
+    const prepareProject = vi.fn().mockResolvedValue(undefined)
+    let state = appState()
+    const setState = vi.fn((update: SetStateAction<AppProviderState>) => {
+      state = typeof update === 'function' ? update(state) : update
+    })
+
+    await synchronizeAfterReconnect({
+      saveLatestProject: vi.fn().mockResolvedValue(undefined),
+      prepareProject,
+      setState,
+    })
+
+    expect(prepareProject).not.toHaveBeenCalled()
+    expect(state.projectId).toBe(appState().projectId)
+    expect(state.projectName).toBe(appState().projectName)
   })
 })

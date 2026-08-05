@@ -53,7 +53,7 @@ describe('queued project conflict recovery', () => {
     const { flushAllProjectSavesWithSync } = await import('@/persistence/sync/session/syncService')
 
     await expect(flushAllProjectSavesWithSync()).resolves.toEqual([
-      { projectId: 'project-1', operation: 'save' },
+      { projectId: 'project-1', operation: 'save', generation: 1 },
     ])
 
     const projects = await db.listProjects(scope)
@@ -87,7 +87,7 @@ describe('queued project conflict recovery', () => {
     const { flushAllProjectSavesWithSync } = await import('@/persistence/sync/session/syncService')
 
     await expect(flushAllProjectSavesWithSync()).resolves.toEqual([
-      { projectId: 'project-1', operation: 'delete' },
+      { projectId: 'project-1', operation: 'delete', generation: 1 },
     ])
 
     expect(await db.getProjectSyncOperation('project-1', scope)).toBeNull()

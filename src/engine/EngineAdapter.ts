@@ -98,8 +98,7 @@ class EngineAdapter {
   private initPromise: Promise<void> | null = null
 
   private constructor() {
-    const worker = new EngineWorker()
-    this.rpc = new WorkerRPC(worker)
+    this.rpc = this.createRPC()
   }
 
   static getInstance(): EngineAdapter {
@@ -112,18 +111,21 @@ class EngineAdapter {
   async init(): Promise<void> {
     if (this.initialized) return
     if (!this.initPromise) {
+      const initializingRPC = this.rpc
       this.initPromise = (async () => {
-        await this.rpc.waitForReady()
-        await this.rpc.call('init', {})
+        await initializingRPC.waitForReady()
+        await initializingRPC.call('init', {})
         this.initialized = true
-      })()
+      })().catch(error => {
+        if (this.rpc === initializingRPC) {
+          initializingRPC.terminate()
+          this.rpc = this.createRPC()
+        }
+        this.initPromise = null
+        throw error
+      })
     }
-    try {
-      await this.initPromise
-    } catch (error) {
-      this.initPromise = null
-      throw error
-    }
+    await this.initPromise
   }
 
   async loadTable(
@@ -300,6 +302,10 @@ class EngineAdapter {
     if (!this.initialized) {
       await this.init()
     }
+  }
+
+  private createRPC(): WorkerRPC {
+    return new WorkerRPC(new EngineWorker())
   }
 }
 
