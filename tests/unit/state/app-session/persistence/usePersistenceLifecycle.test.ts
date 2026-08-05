@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { SetStateAction } from 'react'
+import type { AppProviderState } from '@/state/app-session/appContextValue'
 
 const sync = vi.hoisted(() => ({
   fetchProjects: vi.fn(),
@@ -21,6 +23,28 @@ vi.mock('@/state/projectStore', () => ({
   },
 }))
 import { synchronizeAfterReconnect } from '@/state/app-session/persistence/usePersistenceLifecycle'
+
+function appState(): AppProviderState {
+  return {
+    phase: 'ready',
+    phaseMessage: '',
+    engineReady: true,
+    user: null,
+    isAuthenticated: true,
+    projectId: 'project-1',
+    projectName: 'Project 1',
+    projects: [{
+      id: 'project-1',
+      name: 'Project 1',
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    }],
+    isSaving: false,
+    isProjectOperationPending: false,
+    error: null,
+    syncError: null,
+  }
+}
 
 describe('reconnect persistence recovery', () => {
   beforeEach(() => {
@@ -72,5 +96,21 @@ describe('reconnect persistence recovery', () => {
 
     expect(sync.loadProjectWithSync).not.toHaveBeenCalled()
     expect(prepareProject).not.toHaveBeenCalled()
+  })
+
+  it('keeps the known catalog when a reconnect fetch is transiently empty', async () => {
+    let state = appState()
+    const setState = vi.fn((update: SetStateAction<AppProviderState>) => {
+      state = typeof update === 'function' ? update(state) : update
+    })
+
+    await synchronizeAfterReconnect({
+      saveLatestProject: vi.fn().mockResolvedValue(undefined),
+      prepareProject: vi.fn(),
+      setState,
+    })
+
+    expect(state.projects).toEqual(appState().projects)
+    expect(state.projectId).toBe('project-1')
   })
 })

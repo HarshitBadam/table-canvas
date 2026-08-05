@@ -1,53 +1,85 @@
 import { useLayoutEffect, useRef } from 'react'
 import {
-  type FitViewOptions,
   type Node,
   useNodesInitialized,
   useReactFlow,
   useUpdateNodeInternals,
 } from 'reactflow'
 
-import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
+import {
+  acknowledgeCanvasImportBatches,
+  useCanvasImportBatchStore,
+} from '@/state/runtime/canvasImportBatchStore'
+import { getCanvasFitViewOptions } from './canvasFitViewOptions'
 
-export const CANVAS_FIT_VIEW_OPTIONS = {
-  padding: 0.08,
-  maxZoom: 1.1,
-} satisfies FitViewOptions
+const EMPTY_CANVAS_FIRST_NODE_CENTER = { x: 270, y: 190 }
 
 interface CanvasFitViewProps {
   nodes: Node[]
   projectId: string | null
-  selectedNodeId: string | null
 }
 
 export function CanvasFitView({
   nodes,
   projectId,
-  selectedNodeId,
 }: CanvasFitViewProps) {
-  const { fitView } = useReactFlow()
+  const { fitView, setCenter, viewportInitialized } = useReactFlow()
   const updateNodeInternals = useUpdateNodeInternals()
   const nodesInitialized = useNodesInitialized()
-  const cacheInfo = useTableRuntimeStore(state => state.cacheInfo)
+  const activeBatches = useCanvasImportBatchStore(state => state.activeBatches)
+  const completedBatches = useCanvasImportBatchStore(state => state.completedBatches)
   const fittedProjectRef = useRef<string | null | undefined>(undefined)
   const pendingProjectFitRef = useRef<string | null | undefined>(undefined)
+  const initializedEmptyProjectRef = useRef<string | null | undefined>(undefined)
   const visibleNodeIdsRef = useRef<Set<string>>(new Set())
-  const pendingFitNodeIdRef = useRef<string | null>(null)
 
   useLayoutEffect(() => {
+    const projectHasActiveBatch = Object.values(activeBatches)
+      .some(batch => batch.projectId === projectId)
+    const projectBatches = completedBatches.filter(batch => batch.projectId === projectId)
+    const projectBatchIds = projectBatches.map(batch => batch.id)
     const currentNodeIds = new Set(nodes.map(node => node.id))
+    const previousCount = visibleNodeIdsRef.current.size
+    const addedNodeIds = nodes
+      .filter(node => !visibleNodeIdsRef.current.has(node.id))
+      .map(node => node.id)
+    const grewFromEmptyCanvas = previousCount === 0
+      && initializedEmptyProjectRef.current === projectId
 
     if (nodes.length === 0) {
+      if (viewportInitialized && initializedEmptyProjectRef.current !== projectId) {
+        setCenter(
+          EMPTY_CANVAS_FIRST_NODE_CENTER.x,
+          EMPTY_CANVAS_FIRST_NODE_CENTER.y,
+          { zoom: 1, duration: 0 },
+        )
+        initializedEmptyProjectRef.current = projectId
+      }
       visibleNodeIdsRef.current = currentNodeIds
-      pendingFitNodeIdRef.current = null
+      if (projectBatches.length > 0) acknowledgeCanvasImportBatches(projectBatchIds)
       return
     }
 
-    if (fittedProjectRef.current !== projectId) {
+    // Empty first node: keep the pre-centered viewport, no animated fit.
+    if (nodes.length === 1 && grewFromEmptyCanvas) {
+      visibleNodeIdsRef.current = currentNodeIds
+      if (projectBatches.length > 0) acknowledgeCanvasImportBatches(projectBatchIds)
+      return
+    }
+
+    initializedEmptyProjectRef.current = undefined
+
+    if (fittedProjectRef.current === undefined) {
+      fittedProjectRef.current = projectId
+      visibleNodeIdsRef.current = currentNodeIds
+      if (!projectHasActiveBatch) {
+        acknowledgeCanvasImportBatches(projectBatchIds)
+        return
+      }
+    } else if (fittedProjectRef.current !== projectId) {
       fittedProjectRef.current = projectId
       pendingProjectFitRef.current = projectId
       visibleNodeIdsRef.current = currentNodeIds
-      pendingFitNodeIdRef.current = null
     }
 
     const scheduleMeasuredFit = (
@@ -63,7 +95,7 @@ export function CanvasFitView({
         updateNodeInternals(nodeIds)
         frame = window.requestAnimationFrame(() => {
           if (cancelled || !isCurrent()) return
-          if (fitView(CANVAS_FIT_VIEW_OPTIONS)) {
+          if (fitView(getCanvasFitViewOptions(nodes.length))) {
             onSuccess()
             return
           }
@@ -79,48 +111,46 @@ export function CanvasFitView({
     }
 
     if (pendingProjectFitRef.current === projectId) {
-      if (!nodesInitialized) return
+      if (projectHasActiveBatch || !nodesInitialized || !viewportInitialized) return
       return scheduleMeasuredFit(
         nodes.map(node => node.id),
         () => pendingProjectFitRef.current === projectId,
-        () => { pendingProjectFitRef.current = undefined },
+        () => {
+          pendingProjectFitRef.current = undefined
+          acknowledgeCanvasImportBatches(projectBatchIds)
+        },
       )
     }
 
-    const addedNodes = nodes.filter(node => !visibleNodeIdsRef.current.has(node.id))
-    visibleNodeIdsRef.current = currentNodeIds
-    const addedTarget = addedNodes.find(node => node.id === selectedNodeId)
-      ?? addedNodes[addedNodes.length - 1]
-    if (addedTarget) pendingFitNodeIdRef.current = addedTarget.id
+    if (!nodesInitialized || !viewportInitialized) return
 
-    const pendingNodeId = pendingFitNodeIdRef.current
-    const pendingNode = nodes.find(node => node.id === pendingNodeId)
-    if (!pendingNode) {
-      pendingFitNodeIdRef.current = null
+    // Import, undo/redo, duplicate, etc.: refit whenever the graph gains nodes.
+    if (addedNodeIds.length === 0 || nodes.length <= 1) {
+      visibleNodeIdsRef.current = currentNodeIds
+      if (!projectHasActiveBatch && projectBatches.length > 0) {
+        acknowledgeCanvasImportBatches(projectBatchIds)
+      }
       return
     }
 
-    const schema = pendingNode.data?.schema
-    if (
-      !nodesInitialized
-      || cacheInfo[pendingNode.id]?.phase !== 'ready'
-      || !schema
-      || schema.columns.length === 0
-    ) return
-
     return scheduleMeasuredFit(
-      [pendingNode.id],
-      () => pendingFitNodeIdRef.current === pendingNode.id,
-      () => { pendingFitNodeIdRef.current = null },
+      addedNodeIds,
+      () => addedNodeIds.every(id => currentNodeIds.has(id)),
+      () => {
+        visibleNodeIdsRef.current = currentNodeIds
+        if (!projectHasActiveBatch) acknowledgeCanvasImportBatches(projectBatchIds)
+      },
     )
   }, [
-    cacheInfo,
+    activeBatches,
+    completedBatches,
     fitView,
     nodes,
     nodesInitialized,
     projectId,
-    selectedNodeId,
+    setCenter,
     updateNodeInternals,
+    viewportInitialized,
   ])
 
   return null

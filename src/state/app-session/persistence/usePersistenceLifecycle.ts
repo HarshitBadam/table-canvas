@@ -97,7 +97,9 @@ export async function synchronizeAfterReconnect({
       ...previous,
       projectId: activePromotion?.destinationProjectId ?? previous.projectId,
       projectName: activeProjectName ?? previous.projectName,
-      projects,
+      projects: projects.length === 0 && previous.projects.length > 0
+        ? previous.projects
+        : projects,
     }))
   } catch (error) {
     console.error('[AppContext] Reconnect sync failed:', error)

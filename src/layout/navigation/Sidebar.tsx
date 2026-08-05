@@ -10,7 +10,9 @@ import { activeSidebarNodeId, WORKSPACE_NAV_ITEMS, type ViewMode } from './viewN
 import type { ProjectNode, TableNode, ChartNode } from '@/types'
 import { useDialogFocus } from '@/components/useDialogFocus'
 import { BrandMark } from '@/components/BrandMark'
+import { DelayedHoverTooltip } from '@/components/DelayedHoverTooltip'
 import { SidebarNodeItem } from './SidebarNodeItem'
+import { useCanvasImportBatchStore } from '@/state/runtime/canvasImportBatchStore'
 
 interface SidebarProps {
   isOpen?: boolean
@@ -25,7 +27,21 @@ export function Sidebar({
 }: SidebarProps) {
   const { openTable, openChart, openCanvas, openDashboard, openReport } = useNavigation()
   const nodes = useProjectStore((state) => state.nodes)
+  const projectId = useProjectStore((state) => state.projectId)
   const selectedNodeId = useProjectStore((state) => state.selectedNodeId)
+  const historyCanUndo = useProjectStore(
+    state => !state.history.transaction && state.history.past.length > 0,
+  )
+  const historyCanRedo = useProjectStore(
+    state => !state.history.transaction && state.history.future.length > 0,
+  )
+  const importActive = useCanvasImportBatchStore(state =>
+    Object.values(state.activeBatches).some(batch => batch.projectId === projectId)
+  )
+  const canUndo = historyCanUndo && !importActive
+  const canRedo = historyCanRedo && !importActive
+  const undo = useProjectStore(state => state.undo)
+  const redo = useProjectStore(state => state.redo)
   const { requestNodeDeletion } = useNodeDeletion()
   const { canEdit } = useWorkspaceLease()
   const [newTableModalOpen, setNewTableModalOpen] = useState(false)
@@ -191,7 +207,43 @@ export function Sidebar({
         </nav>
 
         <div className="border-t border-border bg-surface-secondary/50 p-4">
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <ThemeToggle />
+            </div>
+            <div className="flex items-center gap-0.5" role="group" aria-label="Edit history">
+              <DelayedHoverTooltip
+                label={!canEdit ? EDITING_ELSEWHERE_TOOLTIP : canUndo ? 'Undo' : 'Nothing to undo'}
+              >
+                <button
+                  type="button"
+                  onClick={undo}
+                  disabled={!canUndo || !canEdit}
+                  className="flex h-7 w-7 cursor-default items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-text-primary disabled:opacity-35"
+                  aria-label="Undo"
+                >
+                  <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m15 18-6-6 6-6" />
+                  </svg>
+                </button>
+              </DelayedHoverTooltip>
+              <DelayedHoverTooltip
+                label={!canEdit ? EDITING_ELSEWHERE_TOOLTIP : canRedo ? 'Redo' : 'Nothing to redo'}
+              >
+                <button
+                  type="button"
+                  onClick={redo}
+                  disabled={!canRedo || !canEdit}
+                  className="flex h-7 w-7 cursor-default items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-text-primary disabled:opacity-35"
+                  aria-label="Redo"
+                >
+                  <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m9 18 6-6-6-6" />
+                  </svg>
+                </button>
+              </DelayedHoverTooltip>
+            </div>
+          </div>
         </div>
 
         <NewTableModal

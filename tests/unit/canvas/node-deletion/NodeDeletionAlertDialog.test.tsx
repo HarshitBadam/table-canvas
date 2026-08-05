@@ -111,3 +111,32 @@ describe('shared node deletion alert dialog', () => {
     expect(within(dialog).getByText(/undo this change from the toolbar/i)).toBeVisible()
   })
 })
+
+describe('sidebar history controls', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetStore()
+  })
+
+  it('keeps undo and redo beside the theme toggle and disables undo at project creation', () => {
+    addSource('Sales')
+    render(<Providers><Sidebar /></Providers>)
+
+    const historyControls = screen.getByRole('group', { name: 'Edit history' })
+    const themeToggle = screen.getByRole('button', { name: /Switch to .* mode/i })
+    const undo = within(historyControls).getByRole('button', { name: 'Undo' })
+    const redo = within(historyControls).getByRole('button', { name: 'Redo' })
+
+    expect(historyControls.parentElement).toContainElement(themeToggle)
+    expect(undo).toBeEnabled()
+    expect(redo).toBeDisabled()
+
+    fireEvent.click(undo)
+    expect(screen.getByText('No tables yet')).toBeVisible()
+    expect(undo).toBeDisabled()
+    expect(redo).toBeEnabled()
+
+    fireEvent.click(undo)
+    expect(screen.getByText('No tables yet')).toBeVisible()
+  })
+})
