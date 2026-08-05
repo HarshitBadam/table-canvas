@@ -135,7 +135,7 @@ export async function deleteUnreferencedFile(
  * stale writer's in-flight commit (see `deleteUnreferencedFile`) a chance
  * to either land -- and be healed here -- or fail on its own.
  */
-export async function reapPendingFileDeletes(graceMs = 0): Promise<void> {
+async function reapPendingFileDeletes(graceMs = 0): Promise<void> {
   const db = mongoose.connection.db;
   if (!db) throw new Error('Database connection not established');
   const cutoff = new Date(Date.now() - graceMs);
