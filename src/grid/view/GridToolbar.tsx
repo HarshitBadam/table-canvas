@@ -2,6 +2,7 @@ import { hasActiveFilters, countActiveFilters } from '../filtering/filterUtils'
 import { formatNumber } from '@/lib/utils'
 import { EDITING_ELSEWHERE_TOOLTIP } from '@/state/document/useWorkspaceLease'
 import { useGridContext } from './useGridContext'
+import { DISCOVERY_ANCHORS } from '@/discovery/discoveryTourDefinitions'
 
 interface GridToolbarProps {
   totalRows: number
@@ -82,7 +83,8 @@ export function GridToolbar({
             <button
               onClick={onAddColumn}
               disabled={!canEdit}
-              className="btn btn-secondary min-h-11 gap-1.5 px-2.5 py-0 text-xs disabled:opacity-40 sm:min-h-0 sm:px-3 sm:py-1.5"
+              data-discovery-anchor={DISCOVERY_ANCHORS.gridAddColumn}
+              className="btn min-h-11 gap-1.5 border-0 bg-surface-secondary px-2.5 py-0 text-xs text-text-primary hover:bg-surface-tertiary disabled:opacity-40 sm:min-h-0 sm:px-3 sm:py-1.5"
               title={canEdit ? `Insert column ${columnInsertionDescription}` : EDITING_ELSEWHERE_TOOLTIP}
               aria-label={`Add column ${columnInsertionDescription}`}
             >
@@ -97,7 +99,7 @@ export function GridToolbar({
         <div role="group" aria-label="Explore" className="flex min-w-0 flex-wrap items-center gap-2">
           <button
             onClick={() => handleToggleFilters()}
-            className={`btn min-h-11 gap-1.5 px-2.5 py-0 text-xs sm:min-h-0 sm:px-3 sm:py-1.5 ${showFilterPanel || hasActiveFilters(filters) ? 'btn-primary' : 'btn-ghost'}`}
+            className={`btn min-h-11 gap-1.5 border-0 px-2.5 py-0 text-xs sm:min-h-0 sm:px-3 sm:py-1.5 ${showFilterPanel || hasActiveFilters(filters) ? 'btn-primary' : 'bg-surface-secondary text-text-primary hover:bg-surface-tertiary'}`}
             aria-label="Filter table"
             aria-pressed={showFilterPanel}
           >
@@ -114,7 +116,7 @@ export function GridToolbar({
 
           <button
             onClick={onOpenChartBuilder}
-            className="btn btn-secondary min-h-11 gap-1.5 px-2.5 py-0 text-xs sm:min-h-0 sm:px-3 sm:py-1.5"
+            className="btn min-h-11 gap-1.5 border-0 bg-surface-secondary px-2.5 py-0 text-xs text-text-primary hover:bg-surface-tertiary sm:min-h-0 sm:px-3 sm:py-1.5"
             title="Create chart from this table"
             aria-label="Create chart from this table"
           >
@@ -141,6 +143,7 @@ export function GridToolbar({
 
           <button
             onClick={onToggleSuggestions}
+            data-discovery-anchor={DISCOVERY_ANCHORS.gridSuggestions}
             className={`btn min-h-11 gap-1.5 px-2.5 py-0 text-xs sm:min-h-0 sm:px-3 sm:py-1.5 ${showSuggestions ? 'btn-primary' : 'btn-ghost'}`}
             aria-label="Suggestions"
             aria-pressed={showSuggestions}
