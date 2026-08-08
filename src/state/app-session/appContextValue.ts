@@ -4,6 +4,7 @@ import type { ProjectSummary } from '@/api/projects.api'
 import type { LimitExceeded } from '@/shared/enforce'
 import type { Report } from '@/report/types'
 import type { Edge, Patches, ProjectNode } from '@/types'
+import type { DiscoveryTourState } from '@/discovery/discoveryTourPersistence'
 
 export interface ProjectImportData {
   name: string
@@ -39,6 +40,7 @@ export interface AppContextValue {
   continueAsGuest: () => Promise<void>
   leaveGuest: () => Promise<void>
   logout: () => Promise<void>
+  updateDiscoveryTours: (state: DiscoveryTourState) => void
   createNewProject: (name?: string) => Promise<void>
   duplicateActiveProject: () => Promise<void>
   deleteProject: (projectId: string) => Promise<void>

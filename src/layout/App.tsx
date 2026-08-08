@@ -77,6 +77,8 @@ export default function App() {
 
 function MainApp() {
   const {
+    user,
+    updateDiscoveryTours,
     projectId,
     projectName,
     projectLimitViolation,
@@ -162,7 +164,12 @@ function MainApp() {
 
   return (
     <NavigationProvider value={navigationValue}>
-      <DiscoveryTourProvider activeView={activeView} projectId={projectId}>
+      <DiscoveryTourProvider
+        activeView={activeView}
+        projectId={projectId}
+        user={user!}
+        onDiscoveryToursChange={updateDiscoveryTours}
+      >
       <NodeDeletionProvider>
         <StorageWarningBanner />
         <MergeNoticeBanner />

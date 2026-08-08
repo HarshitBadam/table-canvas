@@ -32,6 +32,8 @@ export interface MockBackendState {
 
 interface MockBackendOptions {
   state?: MockBackendState
+  /** When `guest`, auth endpoints reject so the app can enter Continue as guest. */
+  authMode?: 'account' | 'guest'
 }
 
 export function createMockBackendState(): MockBackendState {
@@ -103,15 +105,44 @@ export async function installMockBackend(
     email: 'sample@example.com',
     name: 'Sample User',
     tier: 'google',
+    discoveryTours: {
+      version: 1,
+      completedTours: [] as string[],
+    },
     createdAt: new Date().toISOString(),
   }
+
+  const authMode = options.authMode ?? 'account'
 
   await page.route('**/api/**', async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
 
+    if (authMode === 'guest' && (
+      path === '/api/auth/me'
+      || path === '/api/auth/refresh'
+    )) {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false, error: 'Unauthorized' }),
+      })
+      return
+    }
     if (path === '/api/auth/me') {
       await fulfillJson(route, { user })
+      return
+    }
+    if (
+      path === '/api/auth/me/discovery-tours'
+      && request.method() === 'PUT'
+    ) {
+      const body = request.postDataJSON() as { completedTours?: string[] } | null
+      user.discoveryTours.completedTours = Array.from(new Set([
+        ...user.discoveryTours.completedTours,
+        ...(body?.completedTours ?? []),
+      ]))
+      await fulfillJson(route, { discoveryTours: user.discoveryTours })
       return
     }
     if (path === '/api/projects' && request.method() === 'GET') {

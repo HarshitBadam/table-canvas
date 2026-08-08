@@ -1,6 +1,15 @@
 import { Request } from 'express';
 import { Types } from 'mongoose';
 
+export const DISCOVERY_TOUR_VERSION = 1;
+export const DISCOVERY_TOUR_IDS = ['canvas', 'report', 'grid'] as const;
+export type DiscoveryTourId = typeof DISCOVERY_TOUR_IDS[number];
+
+export interface DiscoveryTourState {
+  version: number;
+  completedTours: DiscoveryTourId[];
+}
+
 
 /**
  * Base interface for soft-deletable entities
@@ -33,6 +42,7 @@ export interface IUser {
   tier: 'guest' | 'google';
   refreshTokens: IRefreshToken[];
   storageUsedBytes: number;
+  discoveryTours?: DiscoveryTourState;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +53,7 @@ interface IUserPublic {
   name: string;
   tier: 'guest' | 'google';
   avatarUrl?: string;
+  discoveryTours: DiscoveryTourState;
   createdAt: Date;
 }
 

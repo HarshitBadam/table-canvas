@@ -6,6 +6,7 @@ import authRoutes from '../../../src/routes/auth.js';
 import { errorHandler } from '../../../src/middleware/errorHandler.js';
 import { User } from '../../../src/models/User.js';
 import {
+  generateAccessToken,
   generateRefreshToken,
   getRefreshTokenExpiryDate,
   hashPassword,
@@ -62,6 +63,100 @@ describe('Auth API session lifecycle', () => {
     const user = await User.findByEmail('login@example.com');
     expect(user?.refreshTokens).toHaveLength(1);
     expect(user?.refreshTokens[0].tokenHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('unions discovery tour completion idempotently for the authenticated user', async () => {
+    const user = await User.create({
+      email: 'discovery@example.com',
+      name: 'Discovery User',
+      passwordHash: await hashPassword('SecurePass1'),
+      discoveryTours: {
+        version: 1,
+        completedTours: ['canvas'],
+      },
+    });
+    const accessToken = generateAccessToken(user.id, user.email);
+
+    const response = await request(app)
+      .put('/api/auth/me/discovery-tours')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ version: 1, completedTours: ['canvas', 'report'] })
+      .expect(200);
+
+    expect(response.body.data.discoveryTours).toEqual({
+      version: 1,
+      completedTours: ['canvas', 'report'],
+    });
+    expect((await User.findById(user.id))?.discoveryTours?.completedTours)
+      .toEqual(['canvas', 'report']);
+  });
+
+  it('does not lose discovery completion from concurrent tabs', async () => {
+    const user = await User.create({
+      email: 'concurrent-discovery@example.com',
+      name: 'Concurrent Discovery User',
+      passwordHash: await hashPassword('SecurePass1'),
+    });
+    const accessToken = generateAccessToken(user.id, user.email);
+
+    await Promise.all([
+      request(app)
+        .put('/api/auth/me/discovery-tours')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ version: 1, completedTours: ['canvas'] })
+        .expect(200),
+      request(app)
+        .put('/api/auth/me/discovery-tours')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ version: 1, completedTours: ['report'] })
+        .expect(200),
+    ]);
+
+    expect((await User.findById(user.id))?.discoveryTours?.completedTours)
+      .toEqual(expect.arrayContaining(['canvas', 'report']));
+  });
+
+  it('resets stale discovery state to the current version before merging', async () => {
+    const user = await User.create({
+      email: 'stale-discovery@example.com',
+      name: 'Stale Discovery User',
+      passwordHash: await hashPassword('SecurePass1'),
+    });
+    await User.collection.updateOne(
+      { _id: user._id },
+      { $set: { discoveryTours: { version: 0, completedTours: ['canvas'] } } },
+    );
+    const accessToken = generateAccessToken(user.id, user.email);
+
+    const response = await request(app)
+      .put('/api/auth/me/discovery-tours')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ version: 1, completedTours: ['grid'] })
+      .expect(200);
+
+    expect(response.body.data.discoveryTours).toEqual({
+      version: 1,
+      completedTours: ['grid'],
+    });
+  });
+
+  it('validates and authenticates discovery completion updates', async () => {
+    await request(app)
+      .put('/api/auth/me/discovery-tours')
+      .send({ version: 1, completedTours: ['canvas'] })
+      .expect(401);
+
+    const user = await User.create({
+      email: 'invalid-discovery@example.com',
+      name: 'Invalid Discovery User',
+      passwordHash: await hashPassword('SecurePass1'),
+    });
+    const accessToken = generateAccessToken(user.id, user.email);
+    await request(app)
+      .put('/api/auth/me/discovery-tours')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ version: 1, completedTours: ['unknown'] })
+      .expect(400);
   });
 
   it('allows exactly one atomic rotation of a refresh token', async () => {

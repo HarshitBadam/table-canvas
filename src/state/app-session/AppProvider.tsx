@@ -52,6 +52,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     performLogout,
     continueAsGuest: setGuestAuth,
     leaveGuest: clearGuestAuth,
+    updateDiscoveryTours,
   } = useAuthState()
   const [projectLimitViolation, setProjectLimitViolation] =
     useState<LimitExceeded | null>(null)
@@ -324,6 +325,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     continueAsGuest,
     leaveGuest,
     logout,
+    updateDiscoveryTours,
     createNewProject,
     duplicateActiveProject,
     deleteProject,

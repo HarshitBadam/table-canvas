@@ -1,4 +1,9 @@
 import { api, ApiError, probeApi, refreshSession } from './client';
+import {
+  DISCOVERY_TOUR_VERSION,
+  type DiscoveryTourId,
+  type DiscoveryTourState,
+} from '@/discovery/discoveryTourPersistence';
 
 const AUTH_BOOT_TIMEOUT_MS = 3_000;
 
@@ -9,6 +14,7 @@ export interface User {
   name: string;
   tier: 'guest' | 'google';
   avatarUrl?: string;
+  discoveryTours: DiscoveryTourState;
   createdAt: Date;
 }
 
@@ -41,6 +47,19 @@ export async function loginWithGoogle(credential: string): Promise<AuthResponse>
 
 export async function logout(): Promise<void> {
   await api.post('/auth/logout', undefined, { skipAuth: true });
+}
+
+export async function completeDiscoveryTours(
+  completedTours: readonly DiscoveryTourId[],
+): Promise<DiscoveryTourState> {
+  const response = await api.put<{ discoveryTours: DiscoveryTourState }>(
+    '/auth/me/discovery-tours',
+    {
+      version: DISCOVERY_TOUR_VERSION,
+      completedTours,
+    },
+  );
+  return response.discoveryTours;
 }
 
 export async function warmBackend(): Promise<boolean> {

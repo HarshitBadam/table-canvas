@@ -7,6 +7,7 @@ import {
   LoginCredentials,
   User,
 } from '@/api/auth.api'
+import type { DiscoveryTourState } from '@/discovery/discoveryTourPersistence'
 import { setAuthErrorHandler } from '@/api/client'
 import { migrateLegacyGuestData } from '@/persistence/storage/legacyGuestMigration'
 import {
@@ -22,6 +23,7 @@ const LOCAL_USER: User = {
   email: 'local@tablecanvas.app',
   name: 'Local User',
   tier: 'guest',
+  discoveryTours: { version: 1, completedTours: [] },
   createdAt: new Date(0),
 }
 
@@ -192,6 +194,12 @@ export function useAuthState() {
     setIsAuthenticated(false)
   }, [])
 
+  const updateDiscoveryTours = useCallback((discoveryTours: DiscoveryTourState) => {
+    setUser(current => current?.tier === 'google'
+      ? { ...current, discoveryTours }
+      : current)
+  }, [])
+
   return {
     user,
     isAuthenticated,
@@ -201,5 +209,6 @@ export function useAuthState() {
     performCheckAuth,
     continueAsGuest,
     leaveGuest,
+    updateDiscoveryTours,
   }
 }
