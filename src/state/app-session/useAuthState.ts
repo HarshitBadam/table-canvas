@@ -194,8 +194,11 @@ export function useAuthState() {
     setIsAuthenticated(false)
   }, [])
 
-  const updateDiscoveryTours = useCallback((discoveryTours: DiscoveryTourState) => {
-    setUser(current => current?.tier === 'google'
+  const updateDiscoveryTours = useCallback((
+    accountId: string,
+    discoveryTours: DiscoveryTourState,
+  ) => {
+    setUser(current => current?.tier === 'google' && current.id === accountId
       ? { ...current, discoveryTours }
       : current)
   }, [])

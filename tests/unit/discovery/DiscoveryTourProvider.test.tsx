@@ -168,10 +168,13 @@ describe('DiscoveryTourProvider', () => {
       'report',
       'grid',
     ])
-    expect(onDiscoveryToursChange).toHaveBeenCalledWith({
-      version: 1,
-      completedTours: ['canvas', 'report', 'grid'],
-    })
+    expect(onDiscoveryToursChange).toHaveBeenCalledWith(
+      'account-1',
+      {
+        version: 1,
+        completedTours: ['canvas', 'report', 'grid'],
+      },
+    )
   })
 
   it('replay does not erase durable guest completion', async () => {

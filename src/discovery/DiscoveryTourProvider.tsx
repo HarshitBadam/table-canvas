@@ -65,7 +65,10 @@ export function DiscoveryTourProvider({
   activeView: ViewMode
   projectId: string | null
   user: User
-  onDiscoveryToursChange?: (state: DiscoveryTourState) => void
+  onDiscoveryToursChange?: (
+    accountId: string,
+    state: DiscoveryTourState,
+  ) => void
   children: ReactNode
 }) {
   const [activeTour, setActiveTour] = useState<DiscoveryTourDefinition | null>(null)
@@ -127,16 +130,14 @@ export function DiscoveryTourProvider({
       .then(state => {
         acknowledgeAccountDiscoveryTours(accountId, state.completedTours)
         cacheAccountDiscoveryTours(accountId, state.completedTours)
-        onDiscoveryToursChangeRef.current?.(state)
+        onDiscoveryToursChangeRef.current?.(accountId, state)
         if (cancelled || identityRef.current !== accountIdentity) return
         setCompletedTourIds(current => new Set([
           ...current,
           ...state.completedTours,
         ]))
       })
-      .catch(() => {
-        // Pending completion remains local and will retry on the next startup.
-      })
+      .catch(() => undefined)
 
     return () => { cancelled = true }
   }, [closePreparedReportMenu, user.id, user.tier])
@@ -163,14 +164,14 @@ export function DiscoveryTourProvider({
     ) return
 
     let cancelled = false
-    let attempts = 0
+    let retryDelay = 250
     let timer: ReturnType<typeof setTimeout> | undefined
 
     const tryStart = () => {
       if (cancelled) return
-      attempts += 1
       if (hasBlockingDialog() || !surfaceReady(tourId)) {
-        if (attempts < 40) timer = setTimeout(tryStart, 250)
+        timer = setTimeout(tryStart, retryDelay)
+        retryDelay = Math.min(retryDelay * 2, 1_000)
         return
       }
       setStepIndex(0)
@@ -216,16 +217,14 @@ export function DiscoveryTourProvider({
         .then(state => {
           acknowledgeAccountDiscoveryTours(user.id, state.completedTours)
           cacheAccountDiscoveryTours(user.id, state.completedTours)
-          onDiscoveryToursChangeRef.current?.(state)
+          onDiscoveryToursChangeRef.current?.(user.id, state)
           if (identityRef.current !== accountIdentity) return
           setCompletedTourIds(current => new Set([
             ...current,
             ...state.completedTours,
           ]))
         })
-        .catch(() => {
-          // Optimistic local completion prevents repetition until retry succeeds.
-        })
+        .catch(() => undefined)
     }
     setActiveTour(null)
     setStepIndex(0)
