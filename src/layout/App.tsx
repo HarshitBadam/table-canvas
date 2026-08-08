@@ -170,89 +170,89 @@ function MainApp() {
         user={user!}
         onDiscoveryToursChange={updateDiscoveryTours}
       >
-      <NodeDeletionProvider>
-        <StorageWarningBanner />
-        <MergeNoticeBanner />
-        {syncError && (
-          <div
-            className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900"
-            role="alert"
-          >
-            {syncError}{' '}
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="font-semibold underline"
+        <NodeDeletionProvider>
+          <StorageWarningBanner />
+          <MergeNoticeBanner />
+          {syncError && (
+            <div
+              className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900"
+              role="alert"
             >
-              Reload safely
-            </button>
-          </div>
-        )}
-        <div className="relative flex h-full min-h-0 bg-canvas">
-          <Sidebar
-            isOpen={navigationOpen}
-            onClose={() => setNavigationOpen(false)}
-            activeView={activeView}
-          />
-
-          <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <AppHeader
-              viewMode={activeView}
-              selectedNode={selectedNode}
-              exportState={exportState}
-              onOpenNavigation={() => setNavigationOpen(true)}
-            />
-
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {!projectId ? <EmptyWorkspace /> : <Suspense fallback={
-              <div className="flex h-full items-center justify-center" role="status" aria-label="Loading view">
-                <LoadingSpinner />
-              </div>
-            }>
-              {activeView === 'canvas' && (
-                <ErrorBoundary name="CanvasView">
-                  <CanvasView onNodeDoubleClick={handleNodeDoubleClick} />
-                </ErrorBoundary>
-              )}
-              {activeView === 'grid' && selectedNodeId && (
-                <ErrorBoundary name="GridView">
-                  <GridView tableId={selectedNodeId} />
-                </ErrorBoundary>
-              )}
-              {activeView === 'chart' && selectedNodeId && (
-                <ErrorBoundary name="ChartView">
-                  <ChartView chartId={selectedNodeId} />
-                </ErrorBoundary>
-              )}
-              {activeView === 'dashboard' && (
-                <ErrorBoundary name="Dashboard">
-                  <Dashboard />
-                </ErrorBoundary>
-              )}
-              {activeView === 'report' && (
-                <ErrorBoundary name="ReportView">
-                  <ReportView reportId={reportId} onOpenTable={handleOpenTable} />
-                </ErrorBoundary>
-              )}
-            </Suspense>}
-          </div>
-          {projectId && (
-            <MobileBottomNav
-              viewMode={activeView}
-              onOpenCanvas={handleBackToCanvas}
-              onOpenDashboard={handleOpenDashboard}
-              onOpenReport={handleOpenReport}
-            />
+              {syncError}{' '}
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="font-semibold underline"
+              >
+                Reload safely
+              </button>
+            </div>
           )}
-          </main>
-        </div>
+          <div className="relative flex h-full min-h-0 bg-canvas">
+            <Sidebar
+              isOpen={navigationOpen}
+              onClose={() => setNavigationOpen(false)}
+              activeView={activeView}
+            />
 
-        <UpgradePrompt
-          open={!!projectLimitViolation}
-          onOpenChange={(open) => { if (!open) setProjectLimitViolation(null) }}
-          violation={projectLimitViolation}
-        />
-      </NodeDeletionProvider>
+            <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+              <AppHeader
+                viewMode={activeView}
+                selectedNode={selectedNode}
+                exportState={exportState}
+                onOpenNavigation={() => setNavigationOpen(true)}
+              />
+
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {!projectId ? <EmptyWorkspace /> : <Suspense fallback={
+                <div className="flex h-full items-center justify-center" role="status" aria-label="Loading view">
+                  <LoadingSpinner />
+                </div>
+              }>
+                {activeView === 'canvas' && (
+                  <ErrorBoundary name="CanvasView">
+                    <CanvasView onNodeDoubleClick={handleNodeDoubleClick} />
+                  </ErrorBoundary>
+                )}
+                {activeView === 'grid' && selectedNodeId && (
+                  <ErrorBoundary name="GridView">
+                    <GridView tableId={selectedNodeId} />
+                  </ErrorBoundary>
+                )}
+                {activeView === 'chart' && selectedNodeId && (
+                  <ErrorBoundary name="ChartView">
+                    <ChartView chartId={selectedNodeId} />
+                  </ErrorBoundary>
+                )}
+                {activeView === 'dashboard' && (
+                  <ErrorBoundary name="Dashboard">
+                    <Dashboard />
+                  </ErrorBoundary>
+                )}
+                {activeView === 'report' && (
+                  <ErrorBoundary name="ReportView">
+                    <ReportView reportId={reportId} onOpenTable={handleOpenTable} />
+                  </ErrorBoundary>
+                )}
+              </Suspense>}
+            </div>
+            {projectId && (
+              <MobileBottomNav
+                viewMode={activeView}
+                onOpenCanvas={handleBackToCanvas}
+                onOpenDashboard={handleOpenDashboard}
+                onOpenReport={handleOpenReport}
+              />
+            )}
+            </main>
+          </div>
+
+          <UpgradePrompt
+            open={!!projectLimitViolation}
+            onOpenChange={(open) => { if (!open) setProjectLimitViolation(null) }}
+            violation={projectLimitViolation}
+          />
+        </NodeDeletionProvider>
       </DiscoveryTourProvider>
     </NavigationProvider>
   )

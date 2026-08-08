@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useDialogFocus } from '@/components/useDialogFocus'
 import type { DiscoveryTourStep } from './discoveryTourDefinitions'
+import { findVisibleAnchor } from './discoveryAnchorDom'
 import { DiscoveryStepVisual } from './DiscoveryStepVisual'
 
 interface DiscoveryTourOverlayProps {
@@ -26,27 +27,6 @@ interface TargetRect {
 const SPOTLIGHT_PADDING = 2
 const CARD_GAP = 16
 const VIEWPORT_MARGIN = 16
-
-function findVisibleAnchor(anchorIds: readonly string[]): HTMLElement | null {
-  for (const anchorId of anchorIds) {
-    const candidates = document.querySelectorAll<HTMLElement>(
-      `[data-discovery-anchor="${anchorId}"]`,
-    )
-    for (const candidate of candidates) {
-      const rect = candidate.getBoundingClientRect()
-      const style = window.getComputedStyle(candidate)
-      if (
-        rect.width > 0
-        && rect.height > 0
-        && style.display !== 'none'
-        && style.visibility !== 'hidden'
-      ) {
-        return candidate
-      }
-    }
-  }
-  return null
-}
 
 function useTargetRect(anchorIds: readonly string[] | undefined, stepId: string) {
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null)

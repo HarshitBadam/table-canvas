@@ -26,6 +26,7 @@ import {
   getDiscoveryTour,
   type DiscoveryTourDefinition,
 } from './discoveryTourDefinitions'
+import { findVisibleAnchor } from './discoveryAnchorDom'
 import { DiscoveryTourOverlay } from './DiscoveryTourOverlay'
 import {
   DiscoveryTourContext,
@@ -36,20 +37,6 @@ function tourIdForView(view: ViewMode): DiscoveryTourId | null {
   if (view === 'canvas' || view === 'report') return view
   if (view === 'grid') return 'grid'
   return null
-}
-
-function visibleAnchor(anchorId: string): HTMLElement | null {
-  const elements = document.querySelectorAll<HTMLElement>(
-    `[data-discovery-anchor="${anchorId}"]`,
-  )
-  return Array.from(elements).find(element => {
-    const rect = element.getBoundingClientRect()
-    const style = window.getComputedStyle(element)
-    return rect.width > 0
-      && rect.height > 0
-      && style.display !== 'none'
-      && style.visibility !== 'hidden'
-  }) ?? null
 }
 
 function hasBlockingDialog(): boolean {
@@ -65,7 +52,7 @@ function hasBlockingDialog(): boolean {
 
 function surfaceReady(tourId: DiscoveryTourId): boolean {
   if (tourId !== 'grid') return true
-  return visibleAnchor(DISCOVERY_ANCHORS.gridSuggestions) !== null
+  return findVisibleAnchor([DISCOVERY_ANCHORS.gridSuggestions]) !== null
 }
 
 export function DiscoveryTourProvider({
@@ -98,7 +85,7 @@ export function DiscoveryTourProvider({
 
   const closePreparedReportMenu = useCallback(() => {
     if (!reportMenuOpenedRef.current) return
-    const trigger = visibleAnchor(DISCOVERY_ANCHORS.reportInsertTrigger)
+    const trigger = findVisibleAnchor([DISCOVERY_ANCHORS.reportInsertTrigger])
     if (trigger?.getAttribute('aria-expanded') === 'true') trigger.click()
     reportMenuOpenedRef.current = false
   }, [])
@@ -202,7 +189,7 @@ export function DiscoveryTourProvider({
 
   useEffect(() => {
     if (currentStep?.prepare !== 'open-report-insert') return
-    const trigger = visibleAnchor(DISCOVERY_ANCHORS.reportInsertTrigger)
+    const trigger = findVisibleAnchor([DISCOVERY_ANCHORS.reportInsertTrigger])
     if (!trigger || trigger.getAttribute('aria-expanded') === 'true') return
 
     trigger.click()
