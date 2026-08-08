@@ -6,6 +6,7 @@ import {
   toolbarTriggerChip,
 } from './toolbarStyles';
 import { useToolbarMenu } from './useToolbarMenu';
+import { DISCOVERY_ANCHORS } from '@/discovery/discoveryTourDefinitions';
 
 interface ReportInsertMenuProps {
   blocked: { disabled?: boolean; title?: string };
@@ -87,6 +88,7 @@ export function ReportInsertMenu({
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
+        data-discovery-anchor={DISCOVERY_ANCHORS.reportInsertTrigger}
         onClick={() => setOpen(value => !value)}
         onKeyDown={handleTriggerKeyDown}
         className={`${toolbarTriggerChip} ${open ? 'bg-surface-tertiary' : ''}`}
@@ -106,6 +108,7 @@ export function ReportInsertMenu({
           ref={menuRef}
           role="menu"
           aria-label="Insert block"
+          data-discovery-anchor={DISCOVERY_ANCHORS.reportInsertMenu}
           onKeyDown={handleMenuKeyDown}
           className={`${toolbarMenuSurface} right-0 w-[min(17rem,calc(100vw-1rem))]`}
         >

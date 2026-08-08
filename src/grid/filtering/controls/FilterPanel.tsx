@@ -199,8 +199,7 @@ export function FilterPanel({
       <Dialog.Portal>
         <Dialog.Overlay className="join-overlay z-modal-backdrop motion-safe:animate-fade-in" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-modal flex h-fit max-h-[calc(100dvh-1rem)] w-full max-w-[calc(100vw-1rem)]
-            -translate-x-1/2 -translate-y-1/2
+          className="fixed inset-0 z-modal m-auto flex h-fit max-h-[calc(100dvh-1rem)] w-full max-w-[calc(100vw-1rem)]
             flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-2xl motion-safe:animate-fade-in sm:max-w-xl"
         >
         <div className="border-b border-border-subtle px-4 py-4 sm:px-6">

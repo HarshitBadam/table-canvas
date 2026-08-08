@@ -6,7 +6,19 @@ function tableSidebarName(name: string, rowCount: number | string) {
   return new RegExp(`^${name} .*${rowCount} rows`)
 }
 
-export async function bootApp(page: Page) {
+interface BootAppOptions {
+  discoveryTours?: boolean
+}
+
+export async function bootApp(page: Page, options: BootAppOptions = {}) {
+  if (!options.discoveryTours) {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'table-canvas:discovery-tours:v1:account:sample-user',
+        JSON.stringify({ canvas: true, report: true, grid: true }),
+      )
+    })
+  }
   await installMockBackend(page)
   // Preview can briefly 404 while workers start in parallel; retry until the
   // canvas is actually mounted instead of treating the first navigation as final.

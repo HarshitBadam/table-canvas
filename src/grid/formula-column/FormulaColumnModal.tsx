@@ -132,23 +132,23 @@ export function FormulaColumnModal({
         aria-labelledby="formula-column-title"
         aria-describedby="formula-column-description"
         tabIndex={-1}
-        className={`flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-xl bg-white shadow-xl transition-all duration-200 dark:bg-gray-900 ${
+        className={`flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-xl border border-border-elevation bg-surface shadow-xl transition-all duration-200 ${
           isFormula ? 'w-[520px] max-w-full' : 'w-[380px] max-w-full'
         }`}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-          <h3 id="formula-column-title" className="text-base font-semibold text-gray-900 dark:text-gray-100">
+        <div className="px-5 py-4 border-b border-border-subtle">
+          <h3 id="formula-column-title" className="text-base font-semibold text-text-primary">
             {initialColumn ? 'Edit Formula' : 'New Column'}
           </h3>
-          <p id="formula-column-description" className="text-xs text-gray-500 mt-0.5">
+          <p id="formula-column-description" className="text-xs text-text-secondary mt-0.5">
             {initialColumn ? `Update the formula for ${initialColumn.name}` : 'Add a new column to your table'}
           </p>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           <div>
-            <label htmlFor="formula-column-name" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            <label htmlFor="formula-column-name" className="block text-xs font-medium text-text-secondary mb-1.5">
               Column Name
             </label>
             <input
@@ -157,7 +157,7 @@ export function FormulaColumnModal({
               value={columnName}
               onChange={(e) => setColumnName(e.target.value)}
               disabled={Boolean(initialColumn)}
-              className={`input rounded-lg px-3 py-2 ${columnNameError ? 'border-red-300 bg-red-50 dark:bg-red-900/10' : ''}`}
+              className={`input rounded-lg px-3 py-2 ${columnNameError ? 'border-red-300 bg-red-50 dark:border-red-900/50 dark:bg-red-900/10' : ''}`}
               placeholder="Enter column name..."
               autoFocus
               aria-invalid={Boolean(columnNameError)}
@@ -208,7 +208,7 @@ export function FormulaColumnModal({
 
           {!isFormula && (
             <div>
-              <span className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <span className="block text-xs font-medium text-text-secondary mb-2">
                 Data Type
               </span>
               <div className="space-y-1.5">
@@ -226,19 +226,19 @@ export function FormulaColumnModal({
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
                       staticType === type.value
                         ? 'border border-accent-green/30 bg-accent-green/10'
-                        : 'bg-gray-50 dark:bg-gray-800 border border-transparent hover:bg-gray-100 dark:hover:bg-gray-700'
+                        : 'bg-surface-secondary border border-transparent hover:bg-surface-tertiary'
                     }`}
                   >
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold ${
                       staticType === type.value
                         ? 'bg-accent-green text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                        : 'bg-surface-tertiary text-text-secondary'
                     }`}>
                       {type.value === 'string' ? 'T' : type.value === 'number' ? '#' : type.value === 'boolean' ? '?' : 'D'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className={`text-sm font-medium ${
-                        staticType === type.value ? 'text-accent-text' : 'text-gray-900 dark:text-gray-100'
+                        staticType === type.value ? 'text-accent-text' : 'text-text-primary'
                       }`}>
                         {type.label}
                       </div>
@@ -283,7 +283,7 @@ export function FormulaColumnModal({
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="formula-column-expression" className="text-xs font-medium text-gray-700 dark:text-gray-300">Formula</label>
+                  <label htmlFor="formula-column-expression" className="text-xs font-medium text-text-secondary">Formula</label>
                   {formula && !formulaErrors.length && (
                     <span className="rounded-full bg-accent-green/10 px-2 py-0.5 text-xs font-medium text-accent-text">
                       Returns {inferredType}
@@ -297,7 +297,7 @@ export function FormulaColumnModal({
                   placeholder='e.g., [unit_price] * [quantity]'
                   className={`w-full resize-none rounded-lg border px-3 py-2.5 font-mono text-sm transition-colors ${
                     formulaErrors.length 
-                      ? 'border-red-300 bg-red-50 dark:bg-red-900/10'
+                      ? 'border-red-300 bg-red-50 dark:border-red-900/50 dark:bg-red-900/10'
                       : 'border-border bg-surface'
                   }`}
                   rows={3}
@@ -314,9 +314,9 @@ export function FormulaColumnModal({
               </div>
 
               <div className="flex gap-3" style={{ height: '200px' }}>
-                <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Columns</span>
+                <div className="flex-1 flex flex-col bg-surface-secondary rounded-lg border border-border-subtle overflow-hidden">
+                  <div className="px-3 py-2 border-b border-border-subtle bg-surface">
+                    <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">Columns</span>
                   </div>
                   <div className="flex-1 overflow-y-auto p-1.5">
                     {columnInfo.map((col) => (
@@ -324,31 +324,31 @@ export function FormulaColumnModal({
                         key={col.id}
                         type="button"
                         onClick={() => insertIntoFormula(`[${col.name}]`)}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-white dark:hover:bg-gray-700 transition-colors group"
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-surface transition-colors group"
                       >
                         <span className={`w-5 h-5 rounded text-xs font-bold flex items-center justify-center flex-shrink-0 ${
                           col.type === 'number' ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-600' :
                           col.type === 'date' ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600' :
                           col.type === 'boolean' ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-600' :
-                          'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                          'bg-surface-tertiary text-text-tertiary'
                         }`}>
                           {col.type === 'number' ? '#' : col.type === 'date' ? 'D' : col.type === 'boolean' ? '?' : 'T'}
                         </span>
-                        <span className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1">{col.name}</span>
+                        <span className="text-xs text-text-secondary truncate flex-1">{col.name}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Functions</span>
+                <div className="flex-1 flex flex-col bg-surface-secondary rounded-lg border border-border-subtle overflow-hidden">
+                  <div className="px-3 py-2 border-b border-border-subtle bg-surface">
+                    <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">Functions</span>
                   </div>
                   <div className="flex-1 overflow-y-auto">
                     {Object.entries(functionCategories).map(([category, funcs]) => (
                       funcs.length > 0 && (
                         <div key={category}>
-                          <div className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider sticky top-0 bg-gray-50 dark:bg-gray-800/50">
+                          <div className="px-3 py-1 text-xs font-semibold text-text-tertiary uppercase tracking-wider sticky top-0 bg-surface-secondary">
                             {category}
                           </div>
                           {funcs.map((fn) => (
@@ -356,12 +356,12 @@ export function FormulaColumnModal({
                               key={fn.name}
                               type="button"
                               onClick={() => insertIntoFormula(`${fn.name}(`)}
-                              className="w-full px-3 py-1.5 text-left hover:bg-white dark:hover:bg-gray-700 transition-colors"
+                              className="w-full px-3 py-1.5 text-left hover:bg-surface transition-colors"
                             >
                               <div className="font-mono text-xs font-semibold text-accent-text">
                                 {fn.name}
                               </div>
-                              <div className="text-xs text-gray-500 leading-tight">
+                              <div className="text-xs text-text-tertiary leading-tight">
                                 {fn.description}
                               </div>
                             </button>
@@ -375,11 +375,11 @@ export function FormulaColumnModal({
             </>
           )}
         </div>
-        <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex gap-2 bg-gray-50 dark:bg-gray-800/50">
+        <div className="px-5 py-3 border-t border-border-subtle flex gap-2 bg-surface-secondary/50">
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg transition-colors"
+            className="flex-1 px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-tertiary rounded-lg transition-colors"
           >
             Cancel
           </button>

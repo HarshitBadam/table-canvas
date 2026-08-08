@@ -21,6 +21,8 @@ import { MergeNoticeBanner } from '@/components/MergeNoticeBanner'
 import { NodeDeletionProvider } from '@/canvas/node-deletion/NodeDeletionAlertDialog'
 import { EmptyWorkspace } from './EmptyWorkspace'
 import { useDocumentTitle } from './useDocumentTitle'
+import { DiscoveryTourProvider } from '@/discovery/DiscoveryTourProvider'
+import { DISCOVERY_ANCHORS } from '@/discovery/discoveryTourDefinitions'
 
 const GridView = lazy(() => import('@/grid/GridView').then(m => ({ default: m.GridView })))
 const ChartView = lazy(() => import('@/charts/ChartView').then(m => ({ default: m.ChartView })))
@@ -160,6 +162,7 @@ function MainApp() {
 
   return (
     <NavigationProvider value={navigationValue}>
+      <DiscoveryTourProvider activeView={activeView} projectId={projectId}>
       <NodeDeletionProvider>
         <StorageWarningBanner />
         <MergeNoticeBanner />
@@ -243,6 +246,7 @@ function MainApp() {
           violation={projectLimitViolation}
         />
       </NodeDeletionProvider>
+      </DiscoveryTourProvider>
     </NavigationProvider>
   )
 }
@@ -272,24 +276,26 @@ function MobileBottomNav({
   return (
     <nav
       aria-label="Workspace"
-      className="safe-area-bottom grid shrink-0 grid-cols-3 border-t border-border bg-surface lg:hidden"
+      className="safe-area-bottom shrink-0 border-t border-border bg-surface lg:hidden"
     >
-      {items.map(item => (
-        <button
-          key={item.label}
-          type="button"
-          onClick={item.onClick}
-          aria-current={item.active ? 'page' : undefined}
-          className={`flex min-h-14 flex-col items-center justify-center gap-1 px-2 text-xs font-medium ${
-            item.active ? 'bg-accent-green/10 text-accent-text' : 'text-text-secondary'
-          }`}
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.iconPath} />
-          </svg>
-          {item.label}
-        </button>
-      ))}
+      <div className="grid grid-cols-3" data-discovery-anchor={DISCOVERY_ANCHORS.workspaceNavigation}>
+        {items.map(item => (
+          <button
+            key={item.label}
+            type="button"
+            onClick={item.onClick}
+            aria-current={item.active ? 'page' : undefined}
+            className={`flex min-h-14 flex-col items-center justify-center gap-1 px-2 text-xs font-medium ${
+              item.active ? 'bg-accent-green/10 text-accent-text' : 'text-text-secondary'
+            }`}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.iconPath} />
+            </svg>
+            {item.label}
+          </button>
+        ))}
+      </div>
     </nav>
   )
 }

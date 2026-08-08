@@ -6,6 +6,7 @@ import { TipTapEditor, type TipTapEditorHandle } from './editor/TipTapEditor';
 import { ReportToolbar } from './toolbar/ReportToolbar';
 import type { Editor, JSONContent } from '@tiptap/react';
 import type { Report, ReportTemplateId } from './types';
+import { DISCOVERY_ANCHORS } from '@/discovery/discoveryTourDefinitions';
 
 import './PrintStyles.css';
 
@@ -181,7 +182,10 @@ function ReportStart({
           </div>
         )}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div
+        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+        data-discovery-anchor={DISCOVERY_ANCHORS.reportStart}
+      >
         {templates.map((template) => (
           <button
             key={template.id}

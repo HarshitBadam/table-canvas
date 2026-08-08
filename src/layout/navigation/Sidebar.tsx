@@ -13,6 +13,8 @@ import { BrandMark } from '@/components/BrandMark'
 import { DelayedHoverTooltip } from '@/components/DelayedHoverTooltip'
 import { SidebarNodeItem } from './SidebarNodeItem'
 import { useCanvasImportBatchStore } from '@/state/runtime/canvasImportBatchStore'
+import { useDiscoveryTours } from '@/discovery/DiscoveryTourContext'
+import { DISCOVERY_ANCHORS } from '@/discovery/discoveryTourDefinitions'
 
 interface SidebarProps {
   isOpen?: boolean
@@ -44,6 +46,7 @@ export function Sidebar({
   const redo = useProjectStore(state => state.redo)
   const { requestNodeDeletion } = useNodeDeletion()
   const { canEdit } = useWorkspaceLease()
+  const { replayAllTours } = useDiscoveryTours()
   const [newTableModalOpen, setNewTableModalOpen] = useState(false)
 
   const activeNodeId = activeSidebarNodeId(activeView, selectedNodeId)
@@ -179,31 +182,36 @@ export function Sidebar({
 
       </div>
 
-        <nav className="space-y-1 border-t border-border px-4 py-3" aria-label="Views">
-          {WORKSPACE_NAV_ITEMS.map((item) => {
-            const openView = item.id === 'canvas'
-              ? openCanvas
-              : item.id === 'dashboard'
-                ? openDashboard
-                : openReport
-            const isActive = activeView === item.id
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => { openView(); onClose() }}
-                aria-current={isActive ? 'page' : undefined}
-                className={`btn btn-ghost w-full gap-2.5 justify-start text-sm ${
-                  isActive ? 'sidebar-view-active' : ''
-                }`}
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.iconPath} />
-                </svg>
-                {item.label}
-              </button>
-            )
-          })}
+        <nav
+          className="border-t border-border px-4 py-3"
+          aria-label="Views"
+        >
+          <div className="space-y-1" data-discovery-anchor={DISCOVERY_ANCHORS.workspaceNavigation}>
+            {WORKSPACE_NAV_ITEMS.map((item) => {
+              const openView = item.id === 'canvas'
+                ? openCanvas
+                : item.id === 'dashboard'
+                  ? openDashboard
+                  : openReport
+              const isActive = activeView === item.id
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => { openView(); onClose() }}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`btn btn-ghost w-full gap-2.5 justify-start text-sm ${
+                    isActive ? 'sidebar-view-active' : ''
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.iconPath} />
+                  </svg>
+                  {item.label}
+                </button>
+              )
+            })}
+          </div>
         </nav>
 
         <div className="border-t border-border bg-surface-secondary/50 p-4">
@@ -211,6 +219,21 @@ export function Sidebar({
             <div className="min-w-0 flex-1">
               <ThemeToggle />
             </div>
+            <DelayedHoverTooltip label="Replay guided tours">
+              <button
+                type="button"
+                onClick={() => {
+                  replayAllTours()
+                  onClose()
+                }}
+                className="flex h-7 w-7 cursor-default items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-text-primary"
+                aria-label="Replay guided tours"
+              >
+                <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.5v.01M9.6 10a2.55 2.55 0 1 1 4.6 1.52c-.75.98-2.2 1.3-2.2 2.48m0 3.5v.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+              </button>
+            </DelayedHoverTooltip>
             <div className="flex items-center gap-0.5" role="group" aria-label="Edit history">
               <DelayedHoverTooltip
                 label={!canEdit ? EDITING_ELSEWHERE_TOOLTIP : canUndo ? 'Undo' : 'Nothing to undo'}
