@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './e2e.fixture'
-import { createManualTable } from './app.support'
+import { createManualTable, seedCompletedDiscoveryTours } from './app.support'
 import {
   createMockBackendState,
   installMockBackend,
@@ -10,6 +10,7 @@ import {
 const MIRROR_NOTICE = 'Read-only · Editing in another tab'
 
 async function bootTab(page: Page, state: MockBackendState) {
+  await seedCompletedDiscoveryTours(page)
   await installMockBackend(page, { state })
   await page.goto('/')
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
@@ -17,6 +18,7 @@ async function bootTab(page: Page, state: MockBackendState) {
 
 async function openSecondTab(page: Page, state: MockBackendState) {
   const second = await page.context().newPage()
+  await seedCompletedDiscoveryTours(second)
   await installMockBackend(second, { state })
   await second.goto('/')
   // Ownership is decided purely by which tab holds the Web Lock, never by focus.

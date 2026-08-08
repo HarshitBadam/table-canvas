@@ -11,21 +11,28 @@ interface BootAppOptions {
   authMode?: 'account' | 'guest'
 }
 
+export async function seedCompletedDiscoveryTours(
+  page: Page,
+  tourIds: readonly ('canvas' | 'report' | 'grid')[] = ['canvas', 'report', 'grid'],
+) {
+  await page.addInitScript((completedTours) => {
+    localStorage.setItem(
+      'table-canvas:discovery-tours:v1:guest-browser',
+      JSON.stringify({
+        version: 1,
+        completedTours,
+      }),
+    )
+  }, [...tourIds])
+}
+
 export async function bootApp(page: Page, options: BootAppOptions = {}) {
   const authMode = options.authMode ?? 'account'
   if (options.discoveryTours !== true) {
     const completedTours = Array.isArray(options.discoveryTours)
       ? [...options.discoveryTours]
       : ['canvas', 'report', 'grid']
-    await page.addInitScript((tourIds) => {
-      localStorage.setItem(
-        'table-canvas:discovery-tours:v1:guest-browser',
-        JSON.stringify({
-          version: 1,
-          completedTours: tourIds,
-        }),
-      )
-    }, completedTours)
+    await seedCompletedDiscoveryTours(page, completedTours)
   }
   // Guest tabs are tab-local: seed the session marker so boot skips account auth
   // without visiting the login page (and its noisy Google/401 console traffic).
