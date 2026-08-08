@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  completeDiscoveryTour,
-  discoveryTourStorageKey,
-  isDiscoveryTourComplete,
-  resetDiscoveryTours,
+  accountDiscoveryPendingStorageKey,
+  acknowledgeAccountDiscoveryTours,
+  cacheAccountDiscoveryTours,
+  completeGuestDiscoveryTour,
+  guestDiscoveryTourStorageKey,
+  normalizeDiscoveryTourState,
+  queuePendingAccountDiscoveryTours,
+  readCachedAccountDiscoveryTours,
+  readGuestDiscoveryTours,
+  readPendingAccountDiscoveryTours,
+  resetDiscoveryTourAccountCacheForTests,
 } from '@/discovery/discoveryTourPersistence'
 
 let stored: Map<string, string>
@@ -11,6 +18,7 @@ let stored: Map<string, string>
 describe('discoveryTourPersistence', () => {
   beforeEach(() => {
     stored = new Map<string, string>()
+    resetDiscoveryTourAccountCacheForTests()
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => stored.get(key) ?? null,
       setItem: (key: string, value: string) => stored.set(key, value),
@@ -22,50 +30,61 @@ describe('discoveryTourPersistence', () => {
     vi.unstubAllGlobals()
   })
 
-  it('stores completion independently by scope and surface', () => {
-    completeDiscoveryTour('canvas', 'account:one')
-    completeDiscoveryTour('grid', 'account:two')
+  it('stores guest completion once for the browser rather than a project scope', () => {
+    completeGuestDiscoveryTour('canvas')
+    completeGuestDiscoveryTour('grid')
 
-    expect(isDiscoveryTourComplete('canvas', 'account:one')).toBe(true)
-    expect(isDiscoveryTourComplete('grid', 'account:one')).toBe(false)
-    expect(isDiscoveryTourComplete('grid', 'account:two')).toBe(true)
+    expect(readGuestDiscoveryTours()).toEqual(['canvas', 'grid'])
+    expect(stored.get(guestDiscoveryTourStorageKey())).toBe(
+      JSON.stringify({ version: 1, completedTours: ['canvas', 'grid'] }),
+    )
   })
 
-  it('can reset one tour without resetting the others', () => {
-    completeDiscoveryTour('canvas', 'account:one')
-    completeDiscoveryTour('report', 'account:one')
+  it('queues pending account completion independently by account', () => {
+    queuePendingAccountDiscoveryTours('one', ['canvas'])
+    queuePendingAccountDiscoveryTours('two', ['grid'])
 
-    resetDiscoveryTours('account:one', 'canvas')
-
-    expect(isDiscoveryTourComplete('canvas', 'account:one')).toBe(false)
-    expect(isDiscoveryTourComplete('report', 'account:one')).toBe(true)
+    expect(readPendingAccountDiscoveryTours('one')).toEqual(['canvas'])
+    expect(readPendingAccountDiscoveryTours('two')).toEqual(['grid'])
   })
 
-  it('can reset every tour in a scope', () => {
-    completeDiscoveryTour('canvas', 'account:one')
-    completeDiscoveryTour('report', 'account:one')
+  it('removes only account completions acknowledged by the server', () => {
+    queuePendingAccountDiscoveryTours('one', ['canvas', 'report'])
 
-    resetDiscoveryTours('account:one')
+    acknowledgeAccountDiscoveryTours('one', ['canvas'])
+    expect(readPendingAccountDiscoveryTours('one')).toEqual(['report'])
 
-    expect(stored.get(discoveryTourStorageKey('account:one'))).toBeUndefined()
+    acknowledgeAccountDiscoveryTours('one', ['report'])
+    expect(stored.get(accountDiscoveryPendingStorageKey('one'))).toBeUndefined()
   })
 
-  it('ignores malformed and unknown stored values', () => {
-    stored.set(discoveryTourStorageKey('account:one'), '{broken')
-    expect(isDiscoveryTourComplete('canvas', 'account:one')).toBe(false)
+  it('ignores malformed, stale, and unknown stored values', () => {
+    stored.set(guestDiscoveryTourStorageKey(), '{broken')
+    expect(readGuestDiscoveryTours()).toEqual([])
 
     stored.set(
-      discoveryTourStorageKey('account:one'),
-      JSON.stringify({ canvas: 'yes', unknown: true }),
+      guestDiscoveryTourStorageKey(),
+      JSON.stringify({ version: 0, completedTours: ['canvas'] }),
     )
-    expect(isDiscoveryTourComplete('canvas', 'account:one')).toBe(false)
+    expect(readGuestDiscoveryTours()).toEqual([])
+
+    expect(normalizeDiscoveryTourState({
+      version: 1,
+      completedTours: ['canvas', 'unknown', 'canvas'],
+    })).toEqual({ version: 1, completedTours: ['canvas'] })
   })
 
   it('does not throw when storage is unavailable', () => {
     vi.stubGlobal('localStorage', {})
 
-    expect(() => completeDiscoveryTour('canvas', 'account:one')).not.toThrow()
-    expect(isDiscoveryTourComplete('canvas', 'account:one')).toBe(false)
-    expect(() => resetDiscoveryTours('account:one')).not.toThrow()
+    expect(() => completeGuestDiscoveryTour('canvas')).not.toThrow()
+    expect(readGuestDiscoveryTours()).toEqual([])
+    expect(() => queuePendingAccountDiscoveryTours('one', ['grid'])).not.toThrow()
+  })
+
+  it('caches account completions in memory across remounts', () => {
+    cacheAccountDiscoveryTours('one', ['canvas'])
+    cacheAccountDiscoveryTours('one', ['report'])
+    expect(readCachedAccountDiscoveryTours('one')).toEqual(['canvas', 'report'])
   })
 })

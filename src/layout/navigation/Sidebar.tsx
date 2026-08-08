@@ -99,12 +99,22 @@ export function Sidebar({
         }`}
       >
         <div className="flex h-16 items-center border-b border-border px-4">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="w-9 h-9 rounded bg-accent-green flex items-center justify-center">
-              <BrandMark className="w-5 h-5 text-white" />
-            </div>
-            <span className="truncate font-bold text-base text-text-primary">Table Canvas</span>
-          </div>
+          <DelayedHoverTooltip label="Replay guided tours">
+            <button
+              type="button"
+              onClick={() => {
+                replayAllTours()
+                onClose()
+              }}
+              aria-label="Replay guided tours"
+              className="flex min-w-0 flex-1 cursor-default items-center gap-3 rounded-md py-1 text-left transition-opacity hover:opacity-80"
+            >
+              <div className="w-9 h-9 rounded bg-accent-green flex items-center justify-center">
+                <BrandMark className="w-5 h-5 text-white" />
+              </div>
+              <span className="truncate font-bold text-base text-text-primary">Table Canvas</span>
+            </button>
+          </DelayedHoverTooltip>
         </div>
 
         <div className="space-y-2 border-b border-border p-4">
@@ -219,21 +229,6 @@ export function Sidebar({
             <div className="min-w-0 flex-1">
               <ThemeToggle />
             </div>
-            <DelayedHoverTooltip label="Replay guided tours">
-              <button
-                type="button"
-                onClick={() => {
-                  replayAllTours()
-                  onClose()
-                }}
-                className="flex h-7 w-7 cursor-default items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-surface-secondary hover:text-text-primary"
-                aria-label="Replay guided tours"
-              >
-                <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.5v.01M9.6 10a2.55 2.55 0 1 1 4.6 1.52c-.75.98-2.2 1.3-2.2 2.48m0 3.5v.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-              </button>
-            </DelayedHoverTooltip>
             <div className="flex items-center gap-0.5" role="group" aria-label="Edit history">
               <DelayedHoverTooltip
                 label={!canEdit ? EDITING_ELSEWHERE_TOOLTIP : canUndo ? 'Undo' : 'Nothing to undo'}

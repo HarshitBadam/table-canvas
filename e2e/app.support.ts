@@ -7,18 +7,35 @@ function tableSidebarName(name: string, rowCount: number | string) {
 }
 
 interface BootAppOptions {
-  discoveryTours?: boolean
+  discoveryTours?: boolean | readonly ('canvas' | 'report' | 'grid')[]
+  authMode?: 'account' | 'guest'
 }
 
 export async function bootApp(page: Page, options: BootAppOptions = {}) {
-  if (!options.discoveryTours) {
-    await page.addInitScript(() => {
+  const authMode = options.authMode ?? 'account'
+  if (options.discoveryTours !== true) {
+    const completedTours = Array.isArray(options.discoveryTours)
+      ? [...options.discoveryTours]
+      : ['canvas', 'report', 'grid']
+    await page.addInitScript((tourIds) => {
       localStorage.setItem(
-        'table-canvas:discovery-tours:v1:account:sample-user',
-        JSON.stringify({ canvas: true, report: true, grid: true }),
+        'table-canvas:discovery-tours:v1:guest-browser',
+        JSON.stringify({
+          version: 1,
+          completedTours: tourIds,
+        }),
       )
+    }, completedTours)
+  }
+  // Guest tabs are tab-local: seed the session marker so boot skips account auth
+  // without visiting the login page (and its noisy Google/401 console traffic).
+  if (authMode === 'guest') {
+    await page.addInitScript(() => {
+      sessionStorage.setItem('table-canvas:guest-session', 'true')
     })
   }
+  // Keep the account mock available for incidental API probes; guest-session is
+  // what selects guest identity in the app.
   await installMockBackend(page)
   // Preview can briefly 404 while workers start in parallel; retry until the
   // canvas is actually mounted instead of treating the first navigation as final.

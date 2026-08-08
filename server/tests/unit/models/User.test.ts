@@ -89,6 +89,7 @@ describe('User model', () => {
       expect(pub.tier).toBe('google');
       expect(pub.avatarUrl).toBe('https://example.com/avatar.png');
       expect(pub.createdAt).toBeDefined();
+      expect(pub.discoveryTours).toEqual({ version: 1, completedTours: [] });
 
       expect((pub as Record<string, unknown>)['passwordHash']).toBeUndefined();
       expect((pub as Record<string, unknown>)['refreshTokens']).toBeUndefined();
@@ -109,6 +110,24 @@ describe('User model', () => {
       const fetched = await User.findById(user._id);
       const pub = fetched!.toPublic();
       expect(pub.tier).toBe('google');
+    });
+
+    it('normalizes missing and stale discovery state for existing users', async () => {
+      const user = await User.create({
+        email: 'legacy-discovery@example.com',
+        name: 'Legacy Discovery User',
+        passwordHash: '$2b$12$legacyhash',
+      });
+      await User.collection.updateOne(
+        { _id: user._id },
+        { $set: { discoveryTours: { version: 0, completedTours: ['canvas'] } } },
+      );
+
+      const fetched = await User.findById(user._id);
+      expect(fetched!.toPublic().discoveryTours).toEqual({
+        version: 1,
+        completedTours: [],
+      });
     });
 
     it('omits avatarUrl from toPublic when not set', async () => {

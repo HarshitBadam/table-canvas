@@ -6,16 +6,7 @@ import {
   openManualTable,
 } from './app.support'
 
-async function resetTour(page: Parameters<typeof bootApp>[0], tourId: 'canvas' | 'report' | 'grid') {
-  await page.evaluate((id) => {
-    const key = 'table-canvas:discovery-tours:v1:account:sample-user'
-    const current = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, true>
-    delete current[id]
-    localStorage.setItem(key, JSON.stringify(current))
-  }, tourId)
-}
-
-test('canvas tour launches once and can be replayed', async ({ page }) => {
+test('canvas tour launches once, does not relaunch after reload, and can be replayed from the logo', async ({ page }) => {
   await bootApp(page, { discoveryTours: true })
 
   await expect(page.getByRole('dialog', { name: 'Build workflows by connecting tables' })).toBeVisible()
@@ -24,10 +15,69 @@ test('canvas tour launches once and can be replayed', async ({ page }) => {
   await page.getByRole('button', { name: 'Done' }).click()
 
   await page.reload()
+  await expect(page.locator('.react-flow')).toBeVisible()
   await expect(page.getByRole('dialog')).toBeHidden()
 
   await page.getByRole('button', { name: 'Replay guided tours' }).click()
   await expect(page.getByRole('dialog', { name: 'Build workflows by connecting tables' })).toBeVisible()
+})
+
+test('account tour completion persists from the server after guest storage is cleared', async ({ page }) => {
+  await bootApp(page, { discoveryTours: true })
+
+  await expect(page.getByRole('dialog', { name: 'Build workflows by connecting tables' })).toBeVisible()
+  await page.getByRole('button', { name: 'Next' }).click()
+  await page.getByRole('button', { name: 'Done' }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
+
+  await page.evaluate(() => {
+    localStorage.removeItem('table-canvas:discovery-tours:v1:guest-browser')
+    for (const key of Object.keys(localStorage)) {
+      if (key.includes(':pending:account:')) localStorage.removeItem(key)
+    }
+  })
+  await page.reload()
+  await expect(page.locator('.react-flow')).toBeVisible()
+  await expect(page.getByRole('dialog')).toBeHidden()
+})
+
+test('guest browser completion merges into the signed-in account', async ({ page }) => {
+  const sync = page.waitForRequest(request =>
+    request.url().includes('/api/auth/me/discovery-tours')
+    && request.method() === 'PUT',
+  )
+  await bootApp(page, { discoveryTours: ['canvas'] })
+  const request = await sync
+  expect(request.postDataJSON()).toMatchObject({
+    version: 1,
+    completedTours: expect.arrayContaining(['canvas']),
+  })
+  await expect(page.getByRole('dialog')).toBeHidden()
+
+  await page.evaluate(() => {
+    localStorage.removeItem('table-canvas:discovery-tours:v1:guest-browser')
+  })
+  await page.reload()
+  await expect(page.locator('.react-flow')).toBeVisible()
+  await expect(page.getByRole('dialog')).toBeHidden()
+})
+
+test('guest tour completion persists across reload', async ({ page }) => {
+  await bootApp(page, { discoveryTours: true, authMode: 'guest' })
+
+  await expect(page.getByRole('dialog', { name: 'Build workflows by connecting tables' })).toBeVisible()
+  await page.getByRole('button', { name: 'Next' }).click()
+  await page.getByRole('button', { name: 'Done' }).click()
+  await expect(page.getByRole('dialog')).toBeHidden()
+
+  const stored = await page.evaluate(() =>
+    localStorage.getItem('table-canvas:discovery-tours:v1:guest-browser'),
+  )
+  expect(stored).toContain('canvas')
+
+  await page.reload()
+  await expect(page.locator('.react-flow')).toBeVisible()
+  await expect(page.getByRole('dialog')).toBeHidden()
 })
 
 test('canvas tour keeps its workspace step visible on mobile', async ({ page }) => {
@@ -52,13 +102,12 @@ test('canvas tour keeps its workspace step visible on mobile', async ({ page }) 
 })
 
 test('report tour previews blocks and opens the real Insert menu', async ({ page }) => {
-  await bootApp(page)
+  await bootApp(page, { discoveryTours: ['canvas', 'grid'] })
 
   await page.locator('aside').getByRole('button', { name: 'Report', exact: true }).click()
   await page.getByRole('button', { name: 'Blank report' }).click()
   await expect(page.getByRole('button', { name: 'Insert', exact: true })).toBeVisible()
 
-  await resetTour(page, 'report')
   await openCanvasView(page)
   await page.locator('aside').getByRole('button', { name: 'Report', exact: true }).click()
 
@@ -69,9 +118,8 @@ test('report tour previews blocks and opens the real Insert menu', async ({ page
 })
 
 test('table tour spotlights Suggestions and calculated columns', async ({ page }) => {
-  await bootApp(page)
+  await bootApp(page, { discoveryTours: ['canvas', 'report'] })
   await createManualTable(page, 'Tour Data', 5)
-  await resetTour(page, 'grid')
   await openManualTable(page, 'Tour Data', 5)
 
   await expect(page.getByRole('dialog', { name: 'Let your data suggest the next step' })).toBeVisible()

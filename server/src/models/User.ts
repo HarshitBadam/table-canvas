@@ -1,5 +1,12 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
-import { IUser, IRefreshToken } from '../types/index.js';
+import {
+  DISCOVERY_TOUR_IDS,
+  DISCOVERY_TOUR_VERSION,
+  type DiscoveryTourId,
+  type DiscoveryTourState,
+  type IUser,
+  type IRefreshToken,
+} from '../types/index.js';
 
 const RefreshTokenSchema = new Schema<IRefreshToken>(
   {
@@ -15,6 +22,24 @@ const RefreshTokenSchema = new Schema<IRefreshToken>(
   { _id: false }
 );
 
+const DiscoveryTourSchema = new Schema<DiscoveryTourState>(
+  {
+    version: {
+      type: Number,
+      required: true,
+      default: DISCOVERY_TOUR_VERSION,
+    },
+    completedTours: {
+      type: [{
+        type: String,
+        enum: DISCOVERY_TOUR_IDS,
+      }],
+      default: [],
+    },
+  },
+  { _id: false },
+);
+
 export interface IUserDocument extends Omit<IUser, '_id'>, Document {
   toPublic(): {
     id: string;
@@ -22,6 +47,7 @@ export interface IUserDocument extends Omit<IUser, '_id'>, Document {
     name: string;
     tier: 'guest' | 'google';
     avatarUrl?: string;
+    discoveryTours: DiscoveryTourState;
     createdAt: Date;
   };
 }
@@ -83,6 +109,13 @@ const UserSchema = new Schema<IUserDocument, IUserModel>(
       min: 0,
       default: 0,
     },
+    discoveryTours: {
+      type: DiscoveryTourSchema,
+      default: () => ({
+        version: DISCOVERY_TOUR_VERSION,
+        completedTours: [],
+      }),
+    },
   },
   {
     timestamps: true,
@@ -95,11 +128,20 @@ const UserSchema = new Schema<IUserDocument, IUserModel>(
 UserSchema.index({ 'refreshTokens.tokenHash': 1 });
 
 UserSchema.methods.toPublic = function () {
+  const completedTours = this.discoveryTours?.version === DISCOVERY_TOUR_VERSION
+    ? this.discoveryTours.completedTours.filter(
+      (tourId: DiscoveryTourId) => DISCOVERY_TOUR_IDS.includes(tourId),
+    )
+    : [];
   const pub: ReturnType<IUserDocument['toPublic']> = {
     id: this._id.toString(),
     email: this.email,
     name: this.name,
     tier: this.tier || 'google',
+    discoveryTours: {
+      version: DISCOVERY_TOUR_VERSION,
+      completedTours,
+    },
     createdAt: this.createdAt,
   };
   if (this.avatarUrl) {

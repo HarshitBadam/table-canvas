@@ -1,6 +1,14 @@
 import { Router, Response } from 'express';
 import { User, IUserDocument } from '../models/User.js';
-import { AuthenticatedRequest, ApiResponse, LoginResponse, RegisterResponse } from '../types/index.js';
+import {
+  DISCOVERY_TOUR_IDS,
+  DISCOVERY_TOUR_VERSION,
+  type AuthenticatedRequest,
+  type ApiResponse,
+  type DiscoveryTourId,
+  type LoginResponse,
+  type RegisterResponse,
+} from '../types/index.js';
 import {
   hashPassword,
   comparePassword,
@@ -183,6 +191,61 @@ router.get(
 
     res.json(response);
   })
+);
+
+router.put(
+  '/me/discovery-tours',
+  requireAuth,
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const { version, completedTours } = req.body ?? {};
+    if (!Number.isInteger(version) || version < 1) {
+      throw new ValidationError(['A positive discovery tour version is required']);
+    }
+    if (
+      !Array.isArray(completedTours)
+      || completedTours.length > DISCOVERY_TOUR_IDS.length
+      || completedTours.some(
+        tourId => typeof tourId !== 'string'
+          || !DISCOVERY_TOUR_IDS.includes(tourId as DiscoveryTourId),
+      )
+    ) {
+      throw new ValidationError(['Completed discovery tours contain an invalid tour ID']);
+    }
+
+    const requestedTours = completedTours as DiscoveryTourId[];
+    const user = await User.findByIdAndUpdate(
+      req.user!.userId,
+      [{
+        $set: {
+          discoveryTours: {
+            version: DISCOVERY_TOUR_VERSION,
+            completedTours: {
+              $setUnion: [
+                {
+                  $cond: [
+                    { $eq: ['$discoveryTours.version', DISCOVERY_TOUR_VERSION] },
+                    { $ifNull: ['$discoveryTours.completedTours', []] },
+                    [],
+                  ],
+                },
+                requestedTours,
+              ],
+            },
+          },
+        },
+      }],
+      { new: true },
+    );
+    if (!user) throw new AuthenticationError('User not found');
+
+    const response: ApiResponse = {
+      success: true,
+      data: {
+        discoveryTours: user.toPublic().discoveryTours,
+      },
+    };
+    res.json(response);
+  }),
 );
 
 router.post(
