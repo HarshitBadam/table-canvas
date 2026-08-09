@@ -8,6 +8,7 @@ import {
   downloadProjectZip,
   openCanvasView,
   openManualTable,
+  seedCompletedDiscoveryTours,
 } from './app.support'
 
 const workbookPath = resolve(process.cwd(), 'data/sample_workbook.xlsx')
@@ -46,6 +47,7 @@ function projectHasCellPatches(
 }
 
 async function bootMockedApp(page: Page) {
+  await seedCompletedDiscoveryTours(page)
   const backend = await installMockBackend(page)
   await page.goto('/')
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 20_000 })
