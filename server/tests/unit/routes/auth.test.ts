@@ -157,6 +157,11 @@ describe('Auth API session lifecycle', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ version: 1, completedTours: ['unknown'] })
       .expect(400);
+    await request(app)
+      .put('/api/auth/me/discovery-tours')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ version: 2, completedTours: ['canvas'] })
+      .expect(400);
   });
 
   it('allows exactly one atomic rotation of a refresh token', async () => {

@@ -40,7 +40,7 @@ export interface AppContextValue {
   continueAsGuest: () => Promise<void>
   leaveGuest: () => Promise<void>
   logout: () => Promise<void>
-  updateDiscoveryTours: (state: DiscoveryTourState) => void
+  updateDiscoveryTours: (accountId: string, state: DiscoveryTourState) => void
   createNewProject: (name?: string) => Promise<void>
   duplicateActiveProject: () => Promise<void>
   deleteProject: (projectId: string) => Promise<void>

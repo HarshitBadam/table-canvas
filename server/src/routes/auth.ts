@@ -198,8 +198,10 @@ router.put(
   requireAuth,
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const { version, completedTours } = req.body ?? {};
-    if (!Number.isInteger(version) || version < 1) {
-      throw new ValidationError(['A positive discovery tour version is required']);
+    if (version !== DISCOVERY_TOUR_VERSION) {
+      throw new ValidationError([
+        `Discovery tour version must be ${DISCOVERY_TOUR_VERSION}`,
+      ]);
     }
     if (
       !Array.isArray(completedTours)
