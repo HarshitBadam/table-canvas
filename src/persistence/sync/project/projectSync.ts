@@ -1,11 +1,9 @@
 import { getProject, listProjects, type ProjectSummary } from '@/api/projects.api'
 import { ApiError } from '@/api/client'
-import type { Edge, Patches, ProjectNode } from '@/types'
 import {
   listProjects as listProjectsLocal, loadProject as loadProjectLocal,
   saveProject as saveProjectLocal,
 } from '../../storage/local-db/db'
-import { deserializePatches } from '../../storage/local-db/patchSerialization'
 import { isNetworkOnline } from '../session/syncState'
 import { createRemoteProject, isRetryableRemoteDeferral } from './projectCreateReconciliation'
 import {
@@ -13,7 +11,9 @@ import {
   createProjectIntentKey,
   fromRemote,
   toTimestamp,
+  type ProjectWithSync,
 } from './projectSyncHelpers'
+import { loadProjectWithSync } from './projectLoadSync'
 import { deleteUnreferencedLocalFiles } from '../files/fileGarbageCollection'
 import {
   flushAllQueuedProjectSavesWithSync,
@@ -26,14 +26,11 @@ import {
   isGuestStorageScope,
   isStorageScopeContextCurrent,
 } from '../../storage/storageScope'
-import type { Report } from '@/report/types'
-import { replaceReportsForProject } from '../../storage/local-db/reportStorage'
 import {
   cancelQueuedProjectDelete,
   clearProjectSyncOperation,
   deleteProjectSnapshot,
   enqueueProjectDelete,
-  getProjectSyncOperation,
   listProjectSyncOperations,
 } from './save/projectSyncQueue'
 import {
@@ -45,22 +42,13 @@ import { publishCatalogChanged, publishProjectDeleted } from './projectCatalog'
 export { isRetryableRemoteDeferral } from './projectCreateReconciliation'
 export { syncOfflineAccountProjects } from '../session/localProjectPromotion'
 export { importProjectWithSync } from './projectImportSync'
+export { loadProjectWithSync } from './projectLoadSync'
 export {
   flushProjectSaveWithSync, saveProjectWithSync, setProjectSyncErrorHandler,
 } from './save/projectSaveSync'
 export { setProjectMergeHandler } from '../session/syncNotifications'
 export type { ProjectMergeEvent } from '../session/syncNotifications'
-export interface ProjectWithSync {
-  id: string
-  name: string
-  nodes: Record<string, ProjectNode>
-  edges: Record<string, Edge>
-  patches: Record<string, Patches>
-  isLocalOnly?: boolean
-  needsSync?: boolean
-  revision?: number
-  reports?: Record<string, Report>
-}
+export type { ProjectWithSync } from './projectSyncHelpers'
 export async function fetchProjects(): Promise<ProjectSummary[]> {
   const context = captureStorageScopeContext()
   const scope = context.scope
@@ -142,140 +130,6 @@ export async function flushAllProjectSavesWithSync(): Promise<ProjectSyncConflic
     await loadProjectWithSync(conflict.projectId)
   }
   return conflicts
-}
-
-export async function loadProjectWithSync(projectId: string): Promise<ProjectWithSync | null> {
-  const context = captureStorageScopeContext()
-  const scope = context.scope
-  const localProject = await loadProjectLocal(projectId, scope)
-  const pending = await getProjectSyncOperation(projectId, scope)
-  if (!isStorageScopeContextCurrent(context)) return null
-  if (pending?.operation === 'delete') {
-    if (isNetworkOnline() && !isGuestStorageScope(scope)) {
-      try {
-        await flushProjectSaveWithSync(projectId, scope, context)
-        return null
-      } catch (error) {
-        if (error instanceof ApiError && error.statusCode === 409) {
-          await cancelQueuedProjectDelete(
-            projectId,
-            scope,
-            pending.generation,
-            context,
-          )
-          publishCatalogChanged(scope)
-          reportProjectSyncError(
-            'This project changed in the cloud and was not deleted. The newer version was kept.',
-          )
-        } else if (isRetryableRemoteDeferral(error)) {
-          return null
-        } else {
-          throw error
-        }
-      }
-    } else {
-      return null
-    }
-  }
-  if (projectId.startsWith('local_')) {
-    if (!localProject) return null
-    return {
-      ...localProject,
-      patches: deserializePatches(localProject.patches),
-      isLocalOnly: true,
-      needsSync: true,
-      revision: localProject.revision ?? 0,
-    }
-  }
-
-  if (isNetworkOnline() && !isGuestStorageScope(scope)) {
-    try {
-      let remoteProject = await getProject(projectId)
-      if (!isStorageScopeContextCurrent(context)) return null
-      if (pending?.operation === 'save' && localProject) {
-        try {
-          await flushProjectSaveWithSync(projectId, scope, context)
-          if (!isStorageScopeContextCurrent(context)) return null
-          const synced = await loadProjectLocal(projectId, scope)
-          if (synced) {
-            return {
-              ...synced,
-              patches: deserializePatches(synced.patches),
-              isLocalOnly: false,
-              needsSync: false,
-              revision: synced.revision ?? remoteProject.revision ?? 0,
-            }
-          }
-        } catch (error) {
-          if (error instanceof ApiError && error.statusCode === 409) {
-            // The flush already merged or preserved the queued work; take the cloud copy.
-            remoteProject = await getProject(projectId)
-            if (!isStorageScopeContextCurrent(context)) return null
-          } else if (isRetryableRemoteDeferral(error)) {
-            return {
-              ...localProject,
-              patches: deserializePatches(localProject.patches),
-              isLocalOnly: false,
-              needsSync: true,
-              revision: localProject.revision ?? 0,
-            }
-          } else {
-            throw error
-          }
-        }
-      }
-
-      const loaded = fromRemote(remoteProject)
-      await saveProjectLocal(
-        loaded.id,
-        loaded.name,
-        loaded.nodes,
-        loaded.edges,
-        loaded.patches,
-        {
-          createdAt: remoteProject.createdAt,
-          updatedAt: remoteProject.updatedAt,
-          revision: remoteProject.revision,
-        },
-        scope,
-      )
-      if (!isStorageScopeContextCurrent(context)) return null
-      await replaceReportsForProject(
-        loaded.id,
-        remoteProject.reports ?? {},
-        scope,
-      )
-      if (!isStorageScopeContextCurrent(context)) return null
-      await captureProjectSyncBase(
-        loaded.id,
-        remoteProject.revision ?? 0,
-        remoteProjectSnapshot(remoteProject),
-        scope,
-        context,
-      )
-      if (!isStorageScopeContextCurrent(context)) return null
-      return loaded
-    } catch (error) {
-      console.error('[syncService] Failed to load project from backend:', error)
-      if (!isStorageScopeContextCurrent(context)) return null
-      // Invalid/missing remote ids should fall back to the local cache instead of
-      // hard-failing boot when IndexedDB still has a usable copy.
-      const missingOrInvalidRemote = error instanceof ApiError
-        && (error.statusCode === 400 || error.statusCode === 404)
-      if (!missingOrInvalidRemote && !isRetryableRemoteDeferral(error)) {
-        throw error
-      }
-    }
-  }
-  if (!localProject) return null
-  const fallback = {
-    ...localProject,
-    patches: deserializePatches(localProject.patches),
-    isLocalOnly: !isNetworkOnline() || isGuestStorageScope(scope),
-    needsSync: pending?.operation === 'save',
-    revision: localProject.revision ?? 0,
-  }
-  return fallback
 }
 
 export async function createProjectWithSync(name = 'Untitled Project'): Promise<ProjectWithSync> {

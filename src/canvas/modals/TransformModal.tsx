@@ -1,22 +1,16 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useProjectStore } from '@/state/projectStore'
-import type { TableRow } from '@/state/dataStore'
-import { useAppAuth } from '@/state/AppContext'
 import { useWorkspaceLease } from '@/state/document/useWorkspaceLease'
-import { JoinType, type TransformDef } from '@/types'
-import { getEngine } from '@/engine/EngineAdapter'
-import { getTableData } from '@/engine/materialization/tableDataService'
-import { analyzeMatch, findBestKeys } from '@/canvas/joinUtils'
-import { checkRowCount, checkTableCount, checkTransformOutputSafety, type LimitExceeded } from '@/shared/enforce'
-import type { Tier } from '@/shared/limits'
-import { beginTableOperation } from '@/state/runtime/tableOperationCoordinator'
+import { JoinType } from '@/types'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { getVisibleFocusableElement, isVisibleElement } from '@/components/useDialogFocus'
 import { JoinColumnSelect } from './JoinColumnSelect'
 import { TransformOutputOptions } from './TransformOutputOptions'
 import { TransformTypeControls } from './TransformTypeControls'
-import { finalizeCombinedTable } from './finalizeCombinedTable'
+import { useTransformPreview } from './useTransformPreview'
+import { useTransformCreation } from './useTransformCreation'
+
 type TransformModalProps = {
   isOpen: boolean
   /** Hides the combine dialog without unmounting (keeps upgrade prompt alive). */
@@ -27,10 +21,6 @@ type TransformModalProps = {
   targetNodeId: string
 }
 const MAX_TABLE_NAME_LENGTH = 100
-// Cap preview size so key-selection match checks stay responsive; findBestKeys
-// compares every left/right pair against this sample. Full join/append still
-// runs over complete tables at creation time.
-const MATCH_PREVIEW_SAMPLE_LIMIT = 1_000
 
 export function TransformModal({
   isOpen,
@@ -40,30 +30,13 @@ export function TransformModal({
   targetNodeId,
 }: TransformModalProps) {
   const nodes = useProjectStore(s => s.nodes)
-  const addDerivedTable = useProjectStore(s => s.addDerivedTable)
-  const { user } = useAppAuth()
   const { canEdit } = useWorkspaceLease()
   const leftNode = nodes[sourceNodeId]
   const rightNode = nodes[targetNodeId]
   const [joinType, setJoinType] = useState<JoinType>('left')
   const [operation, setOperation] = useState<'join' | 'union'>('join')
-  const [leftKey, setLeftKey] = useState('')
-  const [rightKey, setRightKey] = useState('')
   const [outputName, setOutputName] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [upgradeViolation, setUpgradeViolation] = useState<LimitExceeded | null>(null)
-  const [upgradeOpen, setUpgradeOpen] = useState(false)
-  const [leftData, setLeftData] = useState<TableRow[]>([])
-  const [rightData, setRightData] = useState<TableRow[]>([])
-  const [leftTotalRows, setLeftTotalRows] = useState(0)
-  const [rightTotalRows, setRightTotalRows] = useState(0)
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [previewError, setPreviewError] = useState<string>()
-  const [previewRequestKey, setPreviewRequestKey] = useState(0)
-  const [isCreating, setIsCreating] = useState(false)
-  const [createError, setCreateError] = useState<string>()
-  const creatingRef = useRef(false)
-  const keysTouchedRef = useRef(false)
   const operationFocusRef = useRef<HTMLButtonElement>(null)
   const leftCols = useMemo(() => 
     (leftNode?.kind === 'source_table' || leftNode?.kind === 'derived_table') 
@@ -83,52 +56,37 @@ export function TransformModal({
       table: rightNode?.name, sourceTone: rightNode?.kind === 'derived_table' ? 'derived' as const : 'source' as const,
     }))
   ], [leftCols, rightCols, leftNode?.kind, leftNode?.name, rightNode?.kind, rightNode?.name])
+
+  const {
+    leftKey,
+    rightKey,
+    setLeftKey,
+    setRightKey,
+    leftTotalRows,
+    rightTotalRows,
+    previewLoading,
+    previewError,
+    retryPreview,
+    match,
+    isExactMatch,
+  } = useTransformPreview({ isOpen, sourceNodeId, targetNodeId, leftCols, rightCols })
+
+  const {
+    isCreating,
+    createError,
+    clearCreateError,
+    upgradeViolation,
+    upgradeOpen,
+    setUpgradeOpen,
+    create,
+  } = useTransformCreation({ onClose, onDismiss })
+
   useEffect(() => {
     if (leftNode && rightNode) setOutputName(`${leftNode.name} + ${rightNode.name}`)
   }, [leftNode, rightNode])
   useEffect(() => {
     setSelected(new Set(allCols.map(c => c.id)))
   }, [allCols])
-  useEffect(() => {
-    if (!isOpen) return
-    keysTouchedRef.current = false
-  }, [isOpen, sourceNodeId, targetNodeId])
-  useEffect(() => {
-    if (!isOpen) return
-    let cancelled = false
-    setPreviewLoading(true)
-    setPreviewError(undefined)
-    void Promise.all([
-      getTableData(sourceNodeId, 0, MATCH_PREVIEW_SAMPLE_LIMIT),
-      getTableData(targetNodeId, 0, MATCH_PREVIEW_SAMPLE_LIMIT),
-    ]).then(([left, right]) => {
-      if (cancelled) return
-      setLeftData(left.rows)
-      setRightData(right.rows)
-      setLeftTotalRows(left.totalRows)
-      setRightTotalRows(right.totalRows)
-      setPreviewError(left.error || right.error)
-    }).catch((error) => {
-      if (!cancelled) {
-        setPreviewError(error instanceof Error ? error.message : 'Unable to preview join data')
-      }
-    }).finally(() => {
-      if (!cancelled) setPreviewLoading(false)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [isOpen, sourceNodeId, targetNodeId, previewRequestKey])
-  useEffect(() => {
-    if (keysTouchedRef.current) return
-    if (leftCols.length && rightCols.length) {
-      const best = findBestKeys(leftCols, rightCols, leftData, rightData)
-      if (best) { setLeftKey(best.left); setRightKey(best.right) }
-      else { setLeftKey(leftCols[0].id); setRightKey(rightCols[0].id) }
-    }
-  }, [leftCols, rightCols, leftData, rightData])
-  const match = useMemo(() => analyzeMatch(leftData, rightData, leftKey, rightKey), [leftData, rightData, leftKey, rightKey])
-  const isExactMatch = leftTotalRows <= MATCH_PREVIEW_SAMPLE_LIMIT && rightTotalRows <= MATCH_PREVIEW_SAMPLE_LIMIT
   const canUnion = leftCols.length > 0 && leftCols.length === rightCols.length && leftCols.every(
     (column, index) => column.type === rightCols[index]?.type,
   )
@@ -152,110 +110,6 @@ export function TransformModal({
       return next
     })
   }, [])
-  const closeCombineAndOpenUpgrade = useCallback((violation: LimitExceeded) => {
-    setUpgradeViolation(violation)
-    onClose()
-    setUpgradeOpen(true)
-  }, [onClose])
-  const handleCreate = useCallback(async () => {
-    if (creatingRef.current) return
-    if (operation === 'join' && (!leftKey || !rightKey)) return
-    if (operation === 'union' && !canUnion) return
-    const tier: Tier = user?.tier ?? 'guest'
-    const currentTableCount = Object.values(nodes).filter(
-      (n) => n.kind === 'source_table' || n.kind === 'derived_table',
-    ).length
-    const tableCheck = checkTableCount(currentTableCount, tier)
-    if (!tableCheck.ok) {
-      closeCombineAndOpenUpgrade(tableCheck)
-      return
-    }
-    const lCols = allCols.filter(c => c.side === 'L' && selected.has(c.id)).map(c => c.colId)
-    const rCols = allCols.filter(c => c.side === 'R' && selected.has(c.id) && c.colId !== rightKey).map(c => c.colId)
-    const transformDef: Extract<TransformDef, { type: 'join' | 'union' }> = operation === 'union'
-      ? {
-          type: 'union',
-          sourceTableIds: [sourceNodeId, targetNodeId],
-        }
-      : {
-          type: 'join',
-          leftTableId: sourceNodeId,
-          rightTableId: targetNodeId,
-          joinType,
-          leftKey,
-          rightKey,
-          leftColumns: lCols.length < leftCols.length ? lCols : undefined,
-          rightColumns: rCols.length < rightCols.length - 1 ? rCols : undefined,
-          leftTableName: leftNode?.name,
-          rightTableName: rightNode?.name,
-        }
-    creatingRef.current = true
-    setIsCreating(true)
-    setCreateError(undefined)
-    try {
-      // Count the SQL result before creating a target node so over-limit outputs
-      // never appear as a stuck 0-row table. checkTransformOutputSafety runs for
-      // every tier (including uncapped ones) as an OOM guard, not a plan limit.
-      const [left, right] = await Promise.all([
-        getTableData(sourceNodeId, 0, 1),
-        getTableData(targetNodeId, 0, 1),
-      ])
-      if (left.error || right.error) {
-        const failedTableName = left.error ? leftNode?.name : rightNode?.name
-        throw new Error(
-          `Unable to prepare ${failedTableName ?? 'an input table'}: ${left.error || right.error}`,
-        )
-      }
-      // Union size is the sum of preview totals; join cardinality needs an engine count.
-      let rowCount: number
-      if (operation === 'union') {
-        rowCount = leftTotalRows + rightTotalRows
-      } else {
-        const columnIdToName = Object.fromEntries(
-          [...leftCols, ...rightCols].map(column => [column.id, column.name]),
-        )
-        rowCount = await getEngine().countCombinedTransformRows(
-          transformDef,
-          columnIdToName,
-        )
-      }
-      const safetyCheck = checkTransformOutputSafety(rowCount)
-      if (!safetyCheck.ok) {
-        const action = operation === 'union' ? 'Appending these tables' : 'Joining these tables'
-        setCreateError(`${action} ${safetyCheck.reason}`)
-        return
-      }
-      if (tier === 'guest') {
-        const rowCheck = checkRowCount(rowCount, tier)
-        if (!rowCheck.ok) {
-          const action = operation === 'union' ? 'Appending these tables' : 'Joining these tables'
-          closeCombineAndOpenUpgrade({
-            ...rowCheck,
-            reason: `${action} would create ${rowCount.toLocaleString()} rows. Guest projects allow up to ${rowCheck.limit.toLocaleString()} rows per table; filter or reduce the input rows, then try again.`,
-          })
-          return
-        }
-      }
-      const id = addDerivedTable({
-        name: outputName.trim() || `${leftNode?.name} + ${rightNode?.name}`,
-        transformDef,
-        upstreamNodeIds: [sourceNodeId, targetNodeId],
-      })
-      const generation = beginTableOperation(id, 'waiting')
-      onDismiss()
-      void finalizeCombinedTable(id, generation, tier, [sourceNodeId, targetNodeId])
-    } catch (error) {
-      console.error('[TransformModal] Failed to create table:', error)
-      setCreateError(
-        error instanceof Error
-          ? error.message
-          : 'We could not create the combined table. Check the selected columns and try again.',
-      )
-    } finally {
-      creatingRef.current = false
-      setIsCreating(false)
-    }
-  }, [leftKey, rightKey, operation, canUnion, selected, outputName, leftNode, rightNode, sourceNodeId, targetNodeId, joinType, leftCols, rightCols, allCols, addDerivedTable, closeCombineAndOpenUpgrade, onDismiss, nodes, user, leftTotalRows, rightTotalRows])
   const leftOpts = useMemo(
     () => leftCols.map(c => ({ value: c.id, label: c.name, type: c.type })),
     [leftCols],
@@ -275,7 +129,7 @@ export function TransformModal({
       <Dialog.Root
         open={isOpen}
         onOpenChange={open => {
-          if (!open && !creatingRef.current) onDismiss()
+          if (!open && !isCreating) onDismiss()
         }}
       >
         <Dialog.Portal>
@@ -344,10 +198,7 @@ export function TransformModal({
                   <JoinColumnSelect
                     value={leftKey}
                     options={leftOpts}
-                    onChange={value => {
-                      keysTouchedRef.current = true
-                      setLeftKey(value)
-                    }}
+                    onChange={setLeftKey}
                     placeholder="Select a column"
                     ariaLabel={`${leftNode?.name ?? 'Left table'} match column`}
                   />
@@ -358,10 +209,7 @@ export function TransformModal({
                   <JoinColumnSelect
                     value={rightKey}
                     options={rightOpts}
-                    onChange={value => {
-                      keysTouchedRef.current = true
-                      setRightKey(value)
-                    }}
+                    onChange={setRightKey}
                     placeholder="Select a column"
                     ariaLabel={`${rightNode?.name ?? 'Right table'} match column`}
                   />
@@ -378,7 +226,7 @@ export function TransformModal({
                     <button
                       type="button"
                       className="ml-1 font-semibold underline"
-                      onClick={() => setPreviewRequestKey((key) => key + 1)}
+                      onClick={retryPreview}
                     >
                       Try again
                     </button>
@@ -416,7 +264,7 @@ export function TransformModal({
               onToggleColumn={toggle}
               onOutputNameChange={name => {
                 setOutputName(name)
-                setCreateError(undefined)
+                clearCreateError()
               }}
             />
           </div>
@@ -436,7 +284,24 @@ export function TransformModal({
               </Dialog.Close>
               <button
                 type="button"
-                onClick={() => void handleCreate()}
+                onClick={() => void create({
+                  operation,
+                  joinType,
+                  leftKey,
+                  rightKey,
+                  canUnion,
+                  selected,
+                  outputName,
+                  leftNode,
+                  rightNode,
+                  sourceNodeId,
+                  targetNodeId,
+                  leftCols,
+                  rightCols,
+                  allCols,
+                  leftTotalRows,
+                  rightTotalRows,
+                })}
                 disabled={!canCreate || isCreating}
                 className="canvas-touch-target join-btn-create"
               >

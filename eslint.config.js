@@ -43,9 +43,7 @@ export default tseslint.config(
   },
   {
     files: [
-      'src/canvas/modals/TransformModal.tsx',
       'src/engine/materialization/materializationService.ts',
-      'src/layout/project-controls/ProjectSwitcher.tsx',
       'src/report/editor/extensions/AtomicBlockNavigation.ts',
       'tests/unit/engine/materialization/materializationService.test.ts',
     ],

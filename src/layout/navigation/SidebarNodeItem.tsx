@@ -3,22 +3,14 @@ import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { ProjectNode, TableNode } from '@/types'
 import { useProjectStore } from '@/state/projectStore'
-import { continuePendingSourceDuplicate } from '@/state/project/continuePendingSourceDuplicate'
-import { duplicateDerivedTable } from '@/state/project/duplicateDerivedTable'
-import { useAppAuth } from '@/state/AppContext'
-import {
-  isTableUpdating,
-  isTableWaiting,
-  useNodeCacheInfo,
-} from '@/state/tableRuntimeStore'
+import { isTableUpdating, useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { EDITING_ELSEWHERE_TOOLTIP, useWorkspaceLease } from '@/state/document/useWorkspaceLease'
 import { focusMenuItem } from '@/lib/focusMenuItem'
 import { ChartTypeIcon } from '@/charts/ChartTypeIcon'
 import { TableTypeIcon } from '@/components/TableTypeIcon'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { DuplicateTableErrorDialog } from '@/components/DuplicateTableErrorDialog'
-import { checkTableCount, type LimitExceeded } from '@/shared/enforce'
-import { beginTableOperation } from '@/state/runtime/tableOperationCoordinator'
+import { useSidebarNodeDuplication } from './useSidebarNodeDuplication'
 
 interface SidebarNodeItemProps {
   node: ProjectNode
@@ -39,21 +31,23 @@ export function SidebarNodeItem({
   onDelete,
 }: SidebarNodeItemProps) {
   const updateNode = useProjectStore(state => state.updateNode)
-  const duplicateNode = useProjectStore(state => state.duplicateNode)
   const saveSnapshot = useProjectStore(state => state.saveSnapshot)
-  const nodes = useProjectStore(state => state.nodes)
-  const { user } = useAppAuth()
   const { canEdit } = useWorkspaceLease()
   const cacheInfo = useNodeCacheInfo(node.id)
+  const {
+    duplicating,
+    upgradeViolation,
+    upgradeOpen,
+    setUpgradeOpen,
+    duplicateError,
+    clearDuplicateError,
+    duplicate,
+  } = useSidebarNodeDuplication(node)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState(node.name)
-  const [upgradeViolation, setUpgradeViolation] = useState<LimitExceeded | null>(null)
-  const [upgradeOpen, setUpgradeOpen] = useState(false)
-  const [duplicateError, setDuplicateError] = useState<string | null>(null)
-  const [duplicating, setDuplicating] = useState(false)
   const menuOpen = menuPosition !== null
 
   useEffect(() => {
@@ -118,52 +112,6 @@ export function SidebarNodeItem({
       updateNode(node.id, { name: nextName })
     }
     setRenaming(false)
-  }
-
-  const duplicate = async () => {
-    setMenuPosition(null)
-    if (node.kind === 'source_table' || node.kind === 'derived_table') {
-      const currentTableCount = Object.values(nodes).filter(
-        candidate => candidate.kind === 'source_table' || candidate.kind === 'derived_table',
-      ).length
-      const capacity = checkTableCount(currentTableCount, user?.tier ?? 'guest')
-      if (!capacity.ok) {
-        setUpgradeViolation(capacity)
-        setUpgradeOpen(true)
-        return
-      }
-    }
-
-    if (node.kind === 'derived_table') {
-      if (duplicating) return
-      setDuplicating(true)
-      const result = await duplicateDerivedTable(
-        node.id,
-        user?.tier ?? 'guest',
-        { selectDuplicate: false },
-      )
-      setDuplicating(false)
-      if (!result.ok) {
-        if (result.code === 'LIMIT_EXCEEDED') {
-          setUpgradeViolation(result.violation)
-          setUpgradeOpen(true)
-        } else {
-          setDuplicateError(result.error)
-        }
-        return
-      }
-      return
-    }
-
-    const duplicateId = duplicateNode(node.id, { selectDuplicate: false })
-    if (
-      duplicateId
-      && node.kind === 'source_table'
-      && isTableWaiting(cacheInfo)
-    ) {
-      const generation = beginTableOperation(duplicateId, 'waiting')
-      void continuePendingSourceDuplicate(node.id, duplicateId, generation)
-    }
   }
 
   const isTable = node.kind === 'source_table' || node.kind === 'derived_table'
@@ -266,7 +214,10 @@ export function SidebarNodeItem({
           <MenuItem
             icon={<DuplicateIcon />}
             label={duplicating ? 'Duplicating…' : 'Duplicate'}
-            onClick={() => void duplicate()}
+            onClick={() => {
+              setMenuPosition(null)
+              void duplicate()
+            }}
             disabled={!canEdit || duplicating}
           />
           <MenuItem
@@ -289,7 +240,7 @@ export function SidebarNodeItem({
       />
       <DuplicateTableErrorDialog
         error={duplicateError}
-        onClose={() => setDuplicateError(null)}
+        onClose={clearDuplicateError}
       />
     </li>
   )

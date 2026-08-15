@@ -1,8 +1,26 @@
 import { getProject } from '@/api/projects.api'
 import { withoutRuntimeNodeState } from '@/state/document/transientProjectState'
+import type { Edge, Patches, ProjectNode } from '@/types'
+import type { Report } from '@/report/types'
 import { deserializePatches } from '../../storage/local-db/patchSerialization'
 import { scopedStorageKey } from '../../storage/storageScope'
-import type { ProjectWithSync } from './projectSync'
+
+/**
+ * Declared here (a leaf module with no dependents of its own) rather than in the
+ * facade so both `projectSync.ts` and `projectLoadSync.ts` can depend on this type
+ * without creating an import cycle between them.
+ */
+export interface ProjectWithSync {
+  id: string
+  name: string
+  nodes: Record<string, ProjectNode>
+  edges: Record<string, Edge>
+  patches: Record<string, Patches>
+  isLocalOnly?: boolean
+  needsSync?: boolean
+  revision?: number
+  reports?: Record<string, Report>
+}
 
 export function fromRemote(
   project: Awaited<ReturnType<typeof getProject>>,
