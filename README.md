@@ -148,3 +148,7 @@ npm run docker:seed      # Reset local Docker users and recreate the demo user
 ```
 
 See [docs/testing.md](docs/testing.md) for domain suites, release checks, and E2E details.
+
+## License
+
+This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE).
