@@ -22,9 +22,17 @@ Join or append two tables, select the matching columns and output fields, and re
 
 ## Table view
 
+### Editable grid
+
 ![Editable source table with typed columns and spreadsheet controls](screenshots/table-view.png)
 
 Edit typed source data in a virtualized spreadsheet with dedicated row, column, filter, chart, and suggestion controls.
+
+### Formula columns
+
+![Formula-column editor calculating a stock buffer ratio](screenshots/formula-column.png)
+
+Build typed calculated columns from existing fields and spreadsheet-style functions, with the result type validated before the column is added.
 
 ## Suggestions panel
 
@@ -62,9 +70,17 @@ Table-level health checks and suggested analyses turn the dashboard into an acti
 
 ## Report builder
 
-![Report editor with formatted analysis, a live chart and the block insertion menu](screenshots/report-builder.png)
+### Live analysis
 
-Compose formatted analysis around live project data, then insert charts, linked tables, editable tables, callouts, and collapsible sections.
+![Report editor combining inventory analysis with a live stock chart](screenshots/report-builder.png)
+
+Combine summary metrics, narrative context, live project charts, review notes, and supporting analysis in one document.
+
+### Composable blocks
+
+![Report block menu offering charts, linked tables, editable tables, callouts and toggles](screenshots/report-blocks.png)
+
+The insertion menu adds project charts, linked tables, editable tables, callouts, and collapsible sections wherever the analysis needs them.
 
 ## Project portability
 
