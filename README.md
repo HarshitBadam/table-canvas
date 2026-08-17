@@ -5,6 +5,8 @@ Table Canvas is a local-first visual data workbench for turning CSV and Excel fi
 > **Built solo. Core technical pieces:** DuckDB-WASM, a dependency-aware DAG computation engine, transactional project-wide history, a ReactFlow canvas, and local-first IndexedDB persistence.
 >
 > **Live:** [table-canvas.vercel.app](https://table-canvas.vercel.app)
+>
+> **Product snapshots:** [Take a quick tour](docs/screenshots.md)
 
 Table Canvas runs SQL inside a Web Worker and persists complete projects locally in IndexedDB, so no server is required. An optional Express and MongoDB backend adds authentication, cross-device synchronization, offline replay, and conflict handling. [How it works →](docs/architecture.md)
 
@@ -72,6 +74,7 @@ Open `http://localhost:3000` and choose **Continue as guest**. For authenticatio
 | ---------------------------------------------------- | -------------------------------------------------- |
 | [Architecture](docs/architecture.md)                 | Runtime, DAG, state, computation, persistence      |
 | [Features](docs/features.md)                         | Canvas, grid, charts, dashboards, reports          |
+| [Product screenshots](docs/screenshots.md)           | Visual tour of the primary workflows               |
 | [Setup](docs/setup.md)                               | Run modes, configuration, scripts, troubleshooting |
 | [Technology stack](docs/stack.md)                    | Libraries, infrastructure, and responsibilities    |
 | [Repository structure](docs/repository-structure.md) | File map and guided code-reading paths             |
