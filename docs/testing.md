@@ -85,7 +85,7 @@ Run a single file: `npm run test:run tests/unit/engine/graph/dependencyGraph.tes
 | Configuration and middleware | `config/*.test.ts`, `middleware/*.test.ts` |
 | Models and services | `models/*.test.ts`, `services/*.test.ts` |
 
-**E2E**: `e2e/derived-tables.{canvas,interactions,layout}.spec.ts` covers canvas rendering, interactions, and responsive layout. `sample-workbook.spec.ts`, `report-workflow.spec.ts`, `data-workflows.spec.ts`, and `formula-columns.spec.ts` cover persisted import/edit/clean/report workflows. `tab-ownership.spec.ts` drives two real tabs for mirroring, focus handover, and project independence. Specs share helpers in `e2e/derived-tables.support.ts` and `e2e/app.support.ts`.
+**E2E**: `e2e/derived-tables.{canvas,interactions,layout}.spec.ts` covers canvas rendering, interactions, and responsive layout. `sample-workbook.spec.ts`, `report-workflow.spec.ts`, `data-workflows.spec.ts`, and `formula-columns.spec.ts` cover persisted import/edit/clean/report workflows. `tab-ownership.spec.ts` drives two real tabs for mirroring, focus handover, and project independence. `discovery-tours.spec.ts` verifies contextual tour targeting, progression, persistence, and restart behavior. Specs share helpers in `e2e/derived-tables.support.ts` and `e2e/app.support.ts`.
 
 `e2e/ux/` is the release-blocking UX contract: committed visual baselines, WCAG checks, keyboard/focus behavior, supported viewport geometry, browser-error detection, project switching, canvas joins, production telemetry, bounded DOM/memory use, and main-thread long-task budgets.
 

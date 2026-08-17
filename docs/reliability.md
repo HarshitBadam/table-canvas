@@ -23,6 +23,26 @@ stays read-only and retries rather than writing stale state.
 
 Only the owner writes. Per-tab compute state — materialization progress, cache counts, derived schema — lives outside the document in a runtime store, so a mirroring tab can materialize and browse tables locally without its results reaching IndexedDB, the server, or the owner's document.
 
+```mermaid
+flowchart LR
+    Lock["Web Lock<br/>owner scope + project id"]
+    Writer["Writer tab"]
+    IDB[("IndexedDB snapshot")]
+    Channel["BroadcastChannel invalidation"]
+    ReaderA["Reader tab"]
+    ReaderB["Reader tab"]
+
+    Lock --> Writer
+    Writer -->|durable save| IDB
+    Writer --> Channel
+    Channel --> ReaderA
+    Channel --> ReaderB
+    IDB -->|reload| ReaderA
+    IDB -->|reload| ReaderB
+```
+
+The channel carries invalidations rather than project payloads. Reader tabs reload the durable snapshot, which keeps one local source of truth.
+
 ## Guest promotion and offline recovery
 
 After sign-in, local guest and account-offline projects are promoted with stable idempotency keys. Promotion completes in this order:
@@ -47,6 +67,24 @@ Startup and reconnect replay reconcile HTTP 409 responses before initialization 
 ## Cross-device merge
 
 A rejected save is merged, not discarded. Every acknowledged save records the exact snapshot the server accepted as that document's base, so a 409 has three versions to work with: the base, the local queued payload, and the current server state. The merge is per entity — a node, edge, cell patch, or report changed on only one side is taken from that side, and only genuine both-changed collisions need arbitration. The merged snapshot replaces the queued payload together with the server's fresh revision in one durable write, and the save is re-sent — at most three attempts per flush, so a document under contention gives up and falls back rather than looping. A 429 is retried after the server's `Retry-After`, capped at five seconds.
+
+```mermaid
+sequenceDiagram
+    participant Queue as IndexedDB queue
+    participant Client as Sync client
+    participant Server as Express API
+    participant Merge as Three-way merge
+
+    Queue->>Client: Local payload + base + revision
+    Client->>Server: Save with expected revision
+    Server-->>Client: 409 + current project
+    Client->>Merge: Base, local, server
+    Merge-->>Client: Merged project
+    Client->>Queue: Replace payload + fresh revision
+    Client->>Server: Retry merged save
+    Server-->>Client: Accepted + next revision
+    Client->>Queue: Acknowledge exact generation
+```
 
 Arbitration is last-write-wins on the node's `updatedAt`, with deterministic tiebreaks so two devices resolving the same conflict independently reach the same snapshot: the server wins ties, absent or unparseable timestamps, and every `ui`/position collision. Deleting a node loses to editing it, because a delete is one gesture and the edits under it are many. Edges that would outlive a deleted node, or close a cycle, are dropped and named in the merge notice. Reports never lose data: the losing side is kept beside the winner as a "(recovered)" copy.
 
@@ -98,13 +136,7 @@ Implemented in `src/state/app-session/useAuthState.ts` and the storage/sync modu
 
 Rate-limit counters live in MongoDB rather than a dedicated cache. A second stateful dependency would add its own credentials, availability, and failure modes to defend against traffic that the edge proxy already absorbs, and rate limiters that fail open provide no protection when that dependency is down. Revisit this only if Mongo shows connection saturation or rate-limit write latency under real load.
 
-| Scope | Window | Limit | Key |
-| --- | --- | --- | --- |
-| Sign-in, registration, Google sign-in | 15 min | 20 | address |
-| Token refresh | 15 min | 120 | address |
-| Project create, update, delete | 5 min | 300 | account |
-| File upload | 15 min | 60 | account |
-| File download | 15 min | 300 | account |
+The current windows, limits, and keys are part of the [API rate-limit contract](api.md#rate-limits).
 
 Authenticated limiters are keyed by account, not address, because proxies and carrier NAT collapse many honest users onto one address while one abusive account can rotate addresses freely. They are mounted after `requireAuth`, so unauthenticated floods are rejected by token verification without a database write. The upload limiter runs before the multipart parser so a throttled request never buffers its body.
 

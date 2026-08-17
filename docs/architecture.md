@@ -1,53 +1,56 @@
 # Architecture
 
-Computation happens client-side in DuckDB-WASM. The optional server only handles auth and persistence. If the server isn't reachable, the app runs entirely in the browser (local mode).
+Table Canvas treats the browser as the primary runtime. DuckDB-WASM performs computation, IndexedDB owns durable local state, and the optional server adds identity and synchronization without becoming part of the query path.
 
+## System overview
+
+```mermaid
+flowchart TB
+    subgraph Browser
+        UI["React views<br/>Canvas, Grid, Charts, Reports"]
+        State["Zustand stores<br/>Graph, patches, history"]
+        IDB[("IndexedDB<br/>Projects, files, reports, sync queue")]
+        Worker["Web Worker<br/>DuckDB-WASM"]
+
+        UI <--> State
+        State <--> IDB
+        State <--> Worker
+    end
+
+    subgraph OptionalServer["Optional server"]
+        API["Express API"]
+        Services["Auth, sync, file services"]
+        Mongo[("MongoDB and GridFS")]
+
+        API --> Services --> Mongo
+    end
+
+    State -.->|account sync| API
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                          Browser                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐    │
-│  │   React UI  │  │   Zustand   │  │      IndexedDB      │    │
-│  │ (Canvas,    │◄─┤   Stores    │◄─┤ (Projects, Files,   │    │
-│  │  Grid, etc.)│  │             │  │ Reports, Sync Queue)│    │
-│  └──────┬──────┘  └──────┬──────┘  └─────────────────────┘    │
-│         │                │                                    │
-│         │         ┌──────▼───────┐                            │
-│         └────────►│  Web Worker  │                            │
-│                   │  DuckDB-WASM │                            │
-│                   └──────────────┘                            │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                       (optional sync)
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                          Server                               │
-│   Express routes ─► services ─► MongoDB (users, projects)     │
-└─────────────────────────────────────────────────────────────┘
-```
 
-## Source layout
+The browser path is complete on its own. When account sync is enabled, project snapshots and source files cross the optional API boundary; SQL execution and materialized tables remain in the browser.
 
-Major client domains under `src/`:
-
-| Domain | Role |
-|--------|------|
-| `api/`, `auth/` | Optional backend client and login UI |
-| `canvas/`, `grid/`, `charts/`, `dashboard/`, `report/` | Primary views |
-| `engine/` | DuckDB worker, DAG helpers, materialization |
-| `formula/`, `suggestions/` | Spreadsheet formulas and recommendation engine |
-| `persistence/` | Local storage, import/export, merge, sync |
-| `state/` | Session orchestration, document lease/mirror, Zustand slices |
-| `layout/`, `components/`, `observability/`, `shared/` | Shell, shared UI, telemetry, limits |
-
-Tests are separated from production sources:
-
-- Frontend: `tests/unit/` (mirrors `src/`) and `tests/support/` (`@test/*`)
-- Backend: `server/tests/unit/` (mirrors `server/src/`) and `server/tests/support/`
-- E2E: `e2e/`
+The file-level map lives in [Repository structure](repository-structure.md), and the dependency inventory lives in [Technology stack](stack.md).
 
 ## The DAG
 
 A project is a directed acyclic graph. Nodes are tables and charts; edges are transforms that turn upstream tables into downstream ones.
+
+```mermaid
+flowchart LR
+    Orders["Source table<br/>Orders.csv"]
+    Customers["Source table<br/>Customers.xlsx"]
+    Join["Derived table<br/>Join"]
+    Filter["Derived table<br/>Filter"]
+    Chart["Chart<br/>Reference edge"]
+
+    Orders -->|join| Join
+    Customers -->|join| Join
+    Join -->|filter| Filter
+    Filter -.->|reference| Chart
+```
+
+Data-transform edges participate in computation. The chart reference edge records lineage without producing another table.
 
 ### Node types
 
@@ -101,6 +104,24 @@ Other stores:
 
 `AppProvider` (`src/state/app-session/AppProvider.tsx`, exported through `src/state/AppContext.ts`) ties it together: it boots the engine, checks auth, loads or creates a project, materializes tables, and auto-saves when the graph changes.
 
+### Transactional history
+
+Canvas operations, table edits, formulas, charts, and imports share the project history in `src/state/stores/historySlice.ts`. Simple edits save a snapshot before mutation. Multi-step operations open a transaction, then commit one history entry or restore the original state on failure.
+
+```mermaid
+flowchart LR
+    Action["Project action"] --> Snapshot["Snapshot graph, patches, selection"]
+    Snapshot --> Mutation["Apply one or more mutations"]
+    Mutation --> Commit["Commit history entry"]
+    Commit --> Undo["Undo or redo"]
+    Undo --> Restore["Restore project state"]
+    Restore --> Reconcile["Reconcile changed tables"]
+    Reconcile --> Invalidate["Invalidate affected descendants"]
+    Invalidate --> Recompute["Recompute on demand"]
+```
+
+History is capped by entry count and serialized size. File references retained only by undo entries are protected from cleanup. Reports keep a separate TipTap history, and the global shortcut router directs each command to the active text field, report, or project so one history never falls through into another.
+
 ### Dirty propagation
 
 Editing a source cell updates its patches and marks the node plus every downstream descendant dirty in `useTableRuntimeStore`. These flags are not persisted on project nodes. Dirty tables are recomputed the next time they're needed.
@@ -115,12 +136,20 @@ Auth cookies are origin-shared, while guest choice and the initiating tab's expl
 
 DuckDB-WASM runs in a dedicated worker (`src/engine/worker/`) so SQL execution never blocks the UI thread. The main thread talks to it over a small RPC layer (`src/engine/worker/rpc.ts`).
 
-```
-Main thread                Worker thread
-    │  ── loadTable ──►          │
-    │  ◄─ ready ──────           │
-    │  ── transform ──►          │
-    │  ◄─ result ─────           │
+```mermaid
+sequenceDiagram
+    participant Main as Main thread
+    participant RPC as Worker RPC
+    participant DuckDB as DuckDB-WASM
+
+    Main->>RPC: loadTable(file, schema)
+    RPC->>DuckDB: create and populate table
+    DuckDB-->>RPC: ready
+    RPC-->>Main: table metadata
+    Main->>RPC: execute transform plan
+    RPC->>DuckDB: run generated SQL
+    DuckDB-->>RPC: rows and schema
+    RPC-->>Main: materialization result
 ```
 
 ### Materialization
@@ -152,53 +181,9 @@ When a table is opened, the profiler (`src/lib/profiling/`) computes per-column 
 
 ## Transforms
 
-`TransformType` in `src/types/transform.types.ts` contains six user-facing data
-transforms plus an internal `reference` edge used to bind charts to tables.
-Each data transform has its own definition shape:
+`TransformType` in `src/types/transform.types.ts` contains six user-facing data transforms: filter, group and summarize, join, select, calculated column, and union. Each edge stores a serializable transform plan. The worker turns that plan into SQL when its target table is materialized.
 
-### filter
-```typescript
-{ type: 'filter', sourceTableId, conditions: FilterCondition[], logic: 'and' | 'or' }
-```
-Operators: equals, not_equals, contains, not_contains, starts_with, ends_with, greater_than, less_than, greater_equal, less_equal, between, is_null, is_not_null.
-
-### group_summarize
-```typescript
-{
-  type: 'group_summarize',
-  sourceTableId,
-  groupByColumns: string[],
-  aggregations: [{ columnId, operation: 'sum'|'avg'|'min'|'max'|'count'|'count_distinct', alias }]
-}
-```
-
-### join
-```typescript
-{ type: 'join', leftTableId, rightTableId, joinType: 'inner'|'left'|'right'|'full', leftKey, rightKey,
-  leftColumns?, rightColumns?, columnPrefix? }
-```
-
-### select
-Column projection and renaming.
-```typescript
-{ type: 'select', sourceTableId, columns: [{ sourceColumnId, newName?, include }] }
-```
-
-### calculated_column
-Adds a column from a formula expression.
-```typescript
-{ type: 'calculated_column', sourceTableId, newColumnName, expression }
-```
-
-### union
-Stacks rows from multiple tables.
-```typescript
-{ type: 'union', sourceTableIds: string[] }
-```
-
-### reference
-Internal chart-to-table relationship. It records dependency/lineage and is not
-offered in the transform modal.
+An internal `reference` edge binds a chart to a table and participates in lineage without producing data. User-facing behavior and supported operators are documented in [Features](features.md#transforms); the TypeScript definitions are the source of truth for plan shapes.
 
 ## Persistence
 
@@ -247,42 +232,14 @@ is skipped and the app stays purely local.
 
 Within one browser, `documentLease` gives a single tab the right to write a given project while `documentMirror` invalidates readers over `BroadcastChannel` (readers reload from IndexedDB). `projectCatalog` fans out create/rename/delete within a storage scope the same way. See [Reliability](reliability.md) for the ownership and merge contract in full.
 
-## Reports
+## Optional server boundary
 
-Report UI lives under `src/report/`:
+The Express application exposes authentication, project, and file routes. Its services enforce account capacity, payload limits, storage quotas, and revision checks before writing to MongoDB or GridFS. It does not execute transforms or materialize tables.
 
-- `editor/` — TipTap editor, extensions, linked-data nodes (embedded tables/charts), table nodes
-- `toolbar/`, `layout/` — chrome around the editor
-- `export/`, `pdf/` — HTML/PDF export paths
-- `reportStore.ts` — report documents persisted with the project
-
-## Server layout
-
-Optional backend under `server/src/`:
-
-| Path | Role |
-|------|------|
-| `index.ts`, `routes/` | Health/readiness plus auth, project, and file routes |
-| `services/` | Auth/Google, files and lifecycle, leases, project capacity/payload limits, storage quota, rate-limit store |
-| `models/` | Mongoose models |
-| `middleware/` | Auth, CSRF, rate limits, errors |
-| `config/`, `observability/`, `types/` | Env/enforce, Sentry, shared types |
-
-Backend tests: `server/tests/unit/` and `server/tests/support/`. Typecheck covers both with `npm --prefix server run typecheck` (`server/tsconfig.test.json`).
-
-## Export
-
-Exporting a project bundles everything into a self-contained ZIP:
-
-```
-project.tablecanvas.json   # full state, with base64-encoded source files
-data.xlsx                  # every table as a sheet
-reports/*.html             # reports as HTML
-reports/*.pdf              # reports as PDF
-```
-
-All tables are included as individual sheets in `data.xlsx` inside the ZIP.
+Client limits in `src/shared/limits.ts` and server limits in `server/src/config/limits.ts` are intentionally mirrored because the frontend and backend build independently. A limit change must update both files. See [Repository structure](repository-structure.md#optional-backend) for the module map and [API](api.md) for the request contracts.
 
 ## Error boundaries
 
 Each major view (Canvas, Grid, Charts, Dashboard, Reports) is wrapped in `ErrorBoundary` (`src/observability/ErrorBoundary.tsx`), so a render error in one area shows a recovery UI instead of taking down the whole app.
+
+Continue with [Session and data reliability](reliability.md) for the synchronization contracts or [Repository structure](repository-structure.md) for implementation entry points.

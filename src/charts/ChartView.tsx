@@ -143,7 +143,7 @@ export function ChartView({ chartId }: ChartViewProps) {
   const yAxisName = config.yAxis ? (columnNames[config.yAxis] || config.yAxis) : '—'
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="h-full min-h-0 overflow-y-auto">
       <div className="mx-auto w-full max-w-5xl space-y-4 p-3 sm:p-6">
         <div className="rounded-lg border border-border bg-surface shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-3 py-4 sm:px-5">

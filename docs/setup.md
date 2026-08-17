@@ -117,6 +117,42 @@ Generate secrets with `openssl rand -base64 32`.
 
 Google Sign-In is optional in every environment. The client hides the Google button when its client ID is absent.
 
+## Scripts
+
+Development and build commands:
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start the Vite development server |
+| `npm run build` | Typecheck and build the frontend |
+| `npm run preview` | Serve the production frontend build locally |
+| `npm run lint` | Check file length and run ESLint |
+| `npm run check:dead-code` | Check dead code and dependency cycles in both applications |
+
+Backend commands run through the nested package:
+
+| Command | Purpose |
+|---|---|
+| `npm --prefix server run dev` | Start the backend with file watching |
+| `npm --prefix server run lint` | Lint backend source and tests |
+| `npm --prefix server run typecheck` | Typecheck backend source and tests |
+| `npm --prefix server run build` | Compile the backend |
+
+Docker commands:
+
+| Command | Purpose |
+|---|---|
+| `npm run docker:up` | Build, start, and seed the local full stack |
+| `npm run docker:up:attached` | Start the stack with attached logs and no automatic seed |
+| `npm run docker:logs` | Follow frontend and backend logs |
+| `npm run docker:restart` | Rebuild and restart the stack |
+| `npm run docker:seed` | Reset local users and recreate the demo user |
+| `npm run docker:down` | Stop the stack and retain data |
+| `npm run docker:down:volumes` | Stop the stack and erase Docker data |
+| `npm run test:production` | Run the isolated production Compose smoke test |
+
+Test commands and release gates are documented in [Testing](testing.md#running).
+
 ## Build
 
 ```bash

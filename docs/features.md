@@ -4,6 +4,10 @@
 
 The app shell (`src/layout/`) is a sidebar plus a main view area. The sidebar lists tables and charts and has buttons to switch between Canvas, Dashboard, and Report views. The main area swaps between five views: canvas, grid, chart, dashboard, and report. Double-clicking a table node opens the grid; clicking a chart node opens the chart editor.
 
+## Guided discovery
+
+Contextual tours introduce the canvas, grid, and report workflows the first time each view becomes relevant. Tours anchor to live controls, pause when a required target is unavailable, persist completion locally, and can be restarted from the interface. Definitions and persistence live under `src/discovery/`; the browser contract is covered by `e2e/discovery-tours.spec.ts`.
+
 ## Canvas
 
 A node-based editor (ReactFlow) where you build pipelines by connecting tables.

@@ -32,7 +32,7 @@ const AGGREGATION_OPTIONS: Array<{ value: AggregationType; label: string }> = [
 ]
 
 function optionClassName(selected: boolean): string {
-  return `flex min-h-11 cursor-pointer items-center justify-center rounded-md border text-xs font-semibold transition-colors focus-within:ring-2 focus-within:ring-accent-green focus-within:ring-offset-2 ${
+  return `flex min-h-11 cursor-pointer items-center justify-center rounded-md border text-xs font-semibold transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent-green has-[:focus-visible]:ring-offset-2 ${
     selected
       ? 'border-accent-green bg-accent-green/10 text-accent-text'
       : 'border-transparent bg-surface-secondary text-text-secondary hover:bg-surface-tertiary hover:text-text-primary'
