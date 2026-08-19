@@ -5,10 +5,99 @@ Table Canvas is a local-first visual data workbench for turning CSV and Excel fi
 > **Built solo. Core technical pieces:** DuckDB-WASM, a dependency-aware DAG computation engine, transactional project-wide history, a ReactFlow canvas, and local-first IndexedDB persistence.
 >
 > **Live:** [table-canvas.vercel.app](https://table-canvas.vercel.app)
->
-> **Product snapshots:** [Take a quick tour](docs/screenshots.md)
 
 Table Canvas runs SQL inside a Web Worker and persists complete projects locally in IndexedDB, so no server is required. An optional Express and MongoDB backend adds authentication, cross-device synchronization, offline replay, and conflict handling. [How it works →](docs/architecture.md)
+
+<details open>
+<summary><strong>Product walkthrough</strong></summary>
+
+### Workbook import
+
+Inspect an Excel workbook, review every available sheet and row count, then choose which tables to add to the project.
+
+![Excel workbook sheet selection with eight sheets ready to import](docs/screenshots/workbook-import.png)
+
+### Visual pipeline
+
+Source tables feed joined and summarized results, while the linked chart remains part of the visible transformation lineage.
+
+![Canvas containing source tables, derived tables and a linked chart](docs/screenshots/canvas-pipeline.png)
+
+### Combine tables
+
+Join or append two tables, select the matching columns and output fields, and review the match rate before creating the derived result.
+
+![Join configuration with matching columns and a match-rate preview](docs/screenshots/combine-tables.png)
+
+### Table view
+
+#### Editable grid
+
+Edit typed source data in a virtualized spreadsheet with dedicated row, column, filter, chart, and suggestion controls.
+
+![Editable source table with typed columns and spreadsheet controls](docs/screenshots/table-view.png)
+
+#### Formula columns
+
+Build typed calculated columns from existing fields and spreadsheet-style functions, with the result type validated before the column is added.
+
+![Formula-column editor calculating a stock buffer ratio](docs/screenshots/formula-column.png)
+
+### Suggestions panel
+
+#### Analysis recommendations
+
+Profile-driven recommendations explain why an analysis fits the table and can create the resulting chart directly.
+
+![Expanded analysis recommendation for a stock trend chart](docs/screenshots/suggestions-analysis.png)
+
+#### Batch cleaning
+
+Cleaning suggestions show affected values and combine compatible fixes into one reviewable action.
+
+![Batch cleaning review with eight selected data-quality fixes](docs/screenshots/suggestions-cleaning.png)
+
+### Chart editor
+
+Switch between bar, line, pie, and scatter charts while configuring the source, axes, measure, and aggregation against live project data.
+
+![Rendered stock chart with chart type, axes and aggregation controls](docs/screenshots/chart-editor.png)
+
+### Project dashboard
+
+#### Overview and lineage
+
+Workspace totals and completeness sit beside a compact data-flow map of source tables, derived tables, and charts.
+
+![Project dashboard with workspace totals and a transformation lineage map](docs/screenshots/dashboard-overview.png)
+
+#### Data health and next actions
+
+Table-level health checks and suggested analyses turn the dashboard into an actionable project overview.
+
+![Project dashboard showing derived-table health and suggested actions](docs/screenshots/dashboard-actions.png)
+
+### Report builder
+
+#### Live analysis
+
+Combine summary metrics, narrative context, live project charts, review notes, and supporting analysis in one document.
+
+![Report editor combining inventory analysis with a live stock chart](docs/screenshots/report-builder.png)
+
+#### Composable blocks
+
+The insertion menu adds project charts, linked tables, editable tables, callouts, and collapsible sections wherever the analysis needs them.
+
+![Report block menu offering charts, linked tables, editable tables, callouts and toggles](docs/screenshots/report-blocks.png)
+
+### Project portability
+
+Export a self-contained ZIP with project state, Excel data, and reports, or import a saved Table Canvas project without requiring an account.
+
+![Project import and export menu over a populated canvas](docs/screenshots/project-portability.png)
+
+</details>
 
 ## Quick start
 
@@ -74,7 +163,6 @@ Open `http://localhost:3000` and choose **Continue as guest**. For authenticatio
 | ---------------------------------------------------- | -------------------------------------------------- |
 | [Architecture](docs/architecture.md)                 | Runtime, DAG, state, computation, persistence      |
 | [Features](docs/features.md)                         | Canvas, grid, charts, dashboards, reports          |
-| [Product screenshots](docs/screenshots.md)           | Visual tour of the primary workflows               |
 | [Setup](docs/setup.md)                               | Run modes, configuration, scripts, troubleshooting |
 | [Technology stack](docs/stack.md)                    | Libraries, infrastructure, and responsibilities    |
 | [Repository structure](docs/repository-structure.md) | File map and guided code-reading paths             |
