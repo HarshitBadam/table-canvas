@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, lazy, Suspense, useMemo } from 'react'
 import { LoadingSpinner } from '@/layout/LoadingSpinner'
+import { TableViewLoadingSkeleton } from '@/components/ViewLoadingSkeletons'
 import { useProjectStore } from '@/state/projectStore'
 import { useTableRuntimeStore } from '@/state/tableRuntimeStore'
 import { EDITING_ELSEWHERE_TOOLTIP } from '@/state/document/useWorkspaceLease'
@@ -275,40 +276,21 @@ export function GridView({ tableId }: GridViewProps) {
 
   if (isInitialLoad) {
     return (
-      <div className="flex flex-col h-full" aria-busy="true">
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-surface">
-          <span className="text-sm text-text-secondary">{node.name}</span>
-          <div className="flex-1" />
-          <span className="badge badge-accent animate-pulse">{node.kind === 'derived_table' ? 'Computing...' : 'Loading...'}</span>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center max-w-md px-6" role="status" aria-live="polite">
-            <div className="w-16 h-16 mx-auto mb-4 relative">
-              <div className="absolute inset-0 rounded-full border-4 border-accent-green/20" />
-              <div className="absolute inset-0 animate-spin rounded-full border-4 border-accent-green border-t-transparent" />
-            </div>
-            <h3 className="text-lg font-semibold text-text-primary mb-2">{node.kind === 'derived_table' ? 'Computing Table' : 'Loading Table'}</h3>
-            <p className="text-sm text-text-secondary">
-              {node.kind === 'derived_table' ? 'Executing transform and loading data...' : 'Loading table data...'}
+      <div className="relative h-full">
+        <TableViewLoadingSkeleton
+          tableName={node.name}
+          isDerived={node.kind === 'derived_table'}
+        />
+        {loadingElapsedSeconds >= 8 && (
+          <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 shadow-md">
+            <p className="whitespace-nowrap text-sm text-text-secondary">
+              This is taking longer than expected. Your table and edits are safe.
             </p>
-            {loadingElapsedSeconds >= 8 && (
-              <>
-                <p className="text-sm text-text-secondary mt-2">
-                  This is taking longer than expected. Your table and edits are still safe.
-                </p>
-                <div className="mt-5 flex items-center justify-center">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={handleRetry}
-                  >
-                    Retry
-                  </button>
-                </div>
-              </>
-            )}
+            <button type="button" className="btn btn-primary" onClick={handleRetry}>
+              Retry
+            </button>
           </div>
-        </div>
+        )}
       </div>
     )
   }

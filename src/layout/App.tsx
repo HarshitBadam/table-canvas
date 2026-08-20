@@ -14,6 +14,7 @@ import { useApp } from '@/state/AppContext'
 import { LoginPage } from '@/auth/LoginPage'
 import { LoadingScreen } from './LoadingScreen'
 import { LoadingSpinner } from './LoadingSpinner'
+import { ChartViewLoadingSkeleton, TableViewLoadingSkeleton } from '@/components/ViewLoadingSkeletons'
 import { ErrorBoundary } from '@/observability/ErrorBoundary'
 import { UpgradePrompt } from '@/components/UpgradePrompt'
 import { StorageWarningBanner } from '@/persistence/storage/StorageWarningBanner'
@@ -205,9 +206,18 @@ function MainApp() {
 
             <div className="min-h-0 flex-1 overflow-hidden">
               {!projectId ? <EmptyWorkspace /> : <Suspense fallback={
-                <div className="flex h-full items-center justify-center" role="status" aria-label="Loading view">
-                  <LoadingSpinner />
-                </div>
+                activeView === 'grid' ? (
+                  <TableViewLoadingSkeleton
+                    tableName={selectedNode?.name}
+                    isDerived={selectedNode?.kind === 'derived_table'}
+                  />
+                ) : activeView === 'chart' ? (
+                  <ChartViewLoadingSkeleton />
+                ) : (
+                  <div className="flex h-full items-center justify-center" role="status" aria-label="Loading view">
+                    <LoadingSpinner />
+                  </div>
+                )
               }>
                 {activeView === 'canvas' && (
                   <ErrorBoundary name="CanvasView">

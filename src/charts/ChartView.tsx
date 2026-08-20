@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useRef, useState } from 'react'
-import { LoadingSpinner } from '@/layout/LoadingSpinner'
 import { SelectField } from '@/components/SelectField'
+import { ChartDataLoadingSkeleton } from '@/components/ViewLoadingSkeletons'
 import { useProjectStore } from '@/state/projectStore'
 import { useNodeCacheInfo } from '@/state/tableRuntimeStore'
 import { ChartRenderer } from './renderers/ChartRenderer'
@@ -208,9 +208,7 @@ export function ChartView({ chartId }: ChartViewProps) {
           
           <div className="p-2 sm:p-6">
             {loading ? (
-              <div className="h-[420px] flex items-center justify-center">
-                <LoadingSpinner size="lg" className="text-accent-green" />
-              </div>
+              <ChartDataLoadingSkeleton />
             ) : error ? (
               <div className="h-[420px] flex flex-col items-center justify-center text-center px-8">
                 <div className="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center mb-4">
